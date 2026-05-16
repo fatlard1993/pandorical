@@ -1,0 +1,11 @@
+{
+	"required": true,
+	"package": "justfatlard.pandorical.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"SlotMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

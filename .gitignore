@@ -1,0 +1,28 @@
+# Gradle
+.gradle/
+build/
+
+# Minecraft dev run directory
+run/
+
+# IntelliJ IDEA
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Eclipse
+*.launch
+.settings/
+.classpath
+.project
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code local settings
+.claude/settings.local.json
