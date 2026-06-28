@@ -20,28 +20,35 @@ public final class PandoricalApi {
     private static final justfatlard.pandorical.content.ContentRegistry CONTENT = new justfatlard.pandorical.content.ContentRegistry();
     private static final CameraApiImpl CAMERA = new CameraApiImpl();
 
+    /** Holds the type and ID of the screen currently open for a player. */
+    private record ScreenContext(String screenType, String screenId) {}
+
     // --- Per-player state ---
     private static final Map<UUID, Set<String>> playerCapabilities = new ConcurrentHashMap<>();
     private static final Set<UUID> contentReadyPlayers = ConcurrentHashMap.newKeySet();
-    private static final Map<UUID, String> playerScreenTypes = new ConcurrentHashMap<>();
-    private static final Map<UUID, String> playerScreenIds = new ConcurrentHashMap<>();
+    private static final Map<UUID, ScreenContext> playerScreens = new ConcurrentHashMap<>();
 
     private static final int MAX_ACTION_DATA_ENTRIES = 32;
     private static final int MAX_ACTION_STRING_LENGTH = 1024;
 
     // --- Public API ---
 
-    /**
-     * Check if a player has Pandorical installed and has completed the handshake.
-     * Use this to guard Pandorical API calls for players who may be on vanilla clients.
-     */
     /** Returns true when Pandorical is loaded on the server. */
     public static boolean isAvailable() { return true; }
 
+    /**
+     * Returns true if the player has completed the Pandorical handshake; false for vanilla clients.
+     * Use this to guard all Pandorical API calls so they are not sent to players without the mod.
+     */
     public static boolean isAvailable(ServerPlayer player) {
         return playerCapabilities.containsKey(player.getUUID());
     }
 
+    /**
+     * Returns true if the player's Pandorical client advertised the given capability.
+     * Known capability strings: {@code "screens"}, {@code "hud"}, {@code "camera"}.
+     * A capability being absent means the client version does not support that feature.
+     */
     public static boolean hasCapability(ServerPlayer player, String capability) {
         Set<String> caps = playerCapabilities.get(player.getUUID());
         return caps != null && caps.contains(capability);
@@ -59,9 +66,13 @@ public final class PandoricalApi {
         return contentReadyPlayers.contains(player.getUUID());
     }
 
+    /** Returns the screen API for opening, updating, and closing declarative screens. */
     public static ScreenApi screens() { return SCREENS; }
+    /** Returns the HUD API for showing, updating, and hiding HUD overlays. */
     public static HudApi hud() { return HUD; }
+    /** Returns the content API for registering custom blocks, items, and assets. */
     public static ContentApi content() { return CONTENT; }
+    /** Returns the camera API for adjusting camera distance and perspective for a player. */
     public static CameraApi camera() { return CAMERA; }
 
     // --- Internal methods (used by Pandorical core, not for consuming mods) ---
@@ -83,29 +94,28 @@ public final class PandoricalApi {
     public static void removePlayer(UUID playerUuid) {
         playerCapabilities.remove(playerUuid);
         contentReadyPlayers.remove(playerUuid);
-        playerScreenTypes.remove(playerUuid);
-        playerScreenIds.remove(playerUuid);
+        playerScreens.remove(playerUuid);
     }
 
     /** @hidden */
     public static ScreenApiImpl screensImpl() { return SCREENS; }
 
     private static void setPlayerScreen(UUID playerUuid, String screenType, String screenId) {
-        playerScreenTypes.put(playerUuid, screenType);
-        playerScreenIds.put(playerUuid, screenId);
+        playerScreens.put(playerUuid, new ScreenContext(screenType, screenId));
     }
 
     private static String getPlayerScreenType(UUID playerUuid) {
-        return playerScreenTypes.get(playerUuid);
+        ScreenContext ctx = playerScreens.get(playerUuid);
+        return ctx != null ? ctx.screenType() : null;
     }
 
     private static String getPlayerScreenId(UUID playerUuid) {
-        return playerScreenIds.get(playerUuid);
+        ScreenContext ctx = playerScreens.get(playerUuid);
+        return ctx != null ? ctx.screenId() : null;
     }
 
     private static void clearPlayerScreen(UUID playerUuid) {
-        playerScreenTypes.remove(playerUuid);
-        playerScreenIds.remove(playerUuid);
+        playerScreens.remove(playerUuid);
     }
 
     // --- ScreenApi implementation ---
@@ -179,7 +189,13 @@ public final class PandoricalApi {
         @Override
         public void close(ServerPlayer player, String screenId) {
             if (!isAvailable(player)) return;
-            clearPlayerScreen(player.getUUID());
+            // Only clear tracking when this screenId is still the active one.
+            // If handleResponse() opened a NEW screen before we got here, the new
+            // screen's tracking must survive so its buttons can be handled.
+            String currentId = getPlayerScreenId(player.getUUID());
+            if (screenId.equals(currentId)) {
+                clearPlayerScreen(player.getUUID());
+            }
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
                 new justfatlard.pandorical.protocol.CloseScreenS2C(screenId));
         }
@@ -258,7 +274,7 @@ public final class PandoricalApi {
             BiConsumer<ServerPlayer, Map<String, String>> fallback = fallbackHandlers.get(screenType);
             if (fallback != null) {
                 Map<String, String> dataWithId = new java.util.HashMap<>(action.data());
-                dataWithId.put("_componentId", action.componentId());
+                dataWithId.put(ScreenApi.FALLBACK_COMPONENT_ID_KEY, action.componentId());
                 fallback.accept(player, dataWithId);
             } else {
                 justfatlard.pandorical.Pandorical.LOGGER.debug(

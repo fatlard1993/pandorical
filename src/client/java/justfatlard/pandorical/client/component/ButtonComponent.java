@@ -1,7 +1,7 @@
 package justfatlard.pandorical.client.component;
 
 import justfatlard.pandorical.protocol.ComponentDef;
-import net.minecraft.ChatFormatting;
+import net.minecraft.world.scores.TeamColor;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 
@@ -68,7 +68,7 @@ public class ButtonComponent extends AbstractComponent {
         if (!enabled) {
             textColor = TEXT_DISABLED;
         } else if ("accepted".equals(style)) {
-            textColor = ChatFormatting.GREEN.getColor();
+            textColor = 0xFF000000 | TeamColor.GREEN.rgb();
         } else {
             textColor = TEXT_NORMAL;
         }

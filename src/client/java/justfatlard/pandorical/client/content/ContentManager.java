@@ -395,12 +395,18 @@ public class ContentManager {
                             intMin = Integer.parseInt(minMax[0]);
                             int intMax = Integer.parseInt(minMax[1]);
                             valueCount = intMax - intMin + 1;
-                        } catch (NumberFormatException ignored) {}
+                        } catch (NumberFormatException ignored) {
+                            Pandorical.LOGGER.warn("[pandorical] Malformed state prop range '{}' for block '{}', defaulting to 0", parts[2], entry.id());
+                        }
                     } else {
-                        try { valueCount = Integer.parseInt(parts[2]); } catch (NumberFormatException ignored) {}
+                        try { valueCount = Integer.parseInt(parts[2]); } catch (NumberFormatException ignored) {
+                            Pandorical.LOGGER.warn("[pandorical] Malformed state prop range '{}' for block '{}', defaulting to 0", parts[2], entry.id());
+                        }
                     }
                 } else if (parts.length == 2) {
-                    try { valueCount = Integer.parseInt(parts[1]); } catch (NumberFormatException ignored) {}
+                    try { valueCount = Integer.parseInt(parts[1]); } catch (NumberFormatException ignored) {
+                        Pandorical.LOGGER.warn("[pandorical] Malformed state prop range '{}' for block '{}', defaulting to 0", parts[1], entry.id());
+                    }
                 }
                 var prop = DynamicBlock.resolveProperty(propName, baseBlock, valueCount, intMin, propType, enumValues);
                 if (prop != null) {
@@ -658,9 +664,9 @@ public class ContentManager {
                     Pandorical.LOGGER.debug("PackRepository is loading packs — providing Pandorical virtual pack");
                     var supplier = new net.minecraft.server.packs.repository.Pack.ResourcesSupplier() {
                         @Override
-                        public net.minecraft.server.packs.PackResources openPrimary(net.minecraft.server.packs.PackLocationInfo info) { return virtualPack; }
+                        public net.minecraft.server.packs.PackMetadataResources openMetadata(net.minecraft.server.packs.PackLocationInfo info) { return virtualPack; }
                         @Override
-                        public net.minecraft.server.packs.PackResources openFull(net.minecraft.server.packs.PackLocationInfo info, net.minecraft.server.packs.repository.Pack.Metadata metadata) { return virtualPack; }
+                        public java.util.stream.Stream<net.minecraft.server.packs.PackResources> openResources(net.minecraft.server.packs.PackLocationInfo info, net.minecraft.server.packs.repository.Pack.Metadata metadata) { return java.util.stream.Stream.of(virtualPack); }
                     };
 
                     var metadata = new net.minecraft.server.packs.repository.Pack.Metadata(
@@ -704,9 +710,14 @@ public class ContentManager {
             // After reload completes, force all chunks to re-render
             // so they pick up the newly loaded block models
             Minecraft mc = Minecraft.getInstance();
-            if (mc != null && mc.levelRenderer != null) {
-                mc.levelRenderer.allChanged();
-                Pandorical.LOGGER.info("Resource reload complete — forced chunk re-render");
+            if (mc != null && mc.levelRenderer != null && mc.level != null) {
+                mc.levelRenderer.invalidateCompiledGeometry(
+                    mc.level,
+                    mc.options,
+                    mc.gameRenderer.mainCamera(),
+                    mc.getBlockColors()
+                );
+                Pandorical.LOGGER.info("Resource reload complete — invalidated compiled geometry for full re-render");
             }
 
             // Verify the pack was actually loaded
@@ -933,12 +944,18 @@ public class ContentManager {
                             intMin = Integer.parseInt(minMax[0]);
                             int intMax = Integer.parseInt(minMax[1]);
                             valueCount = intMax - intMin + 1;
-                        } catch (NumberFormatException ignored) {}
+                        } catch (NumberFormatException ignored) {
+                            Pandorical.LOGGER.warn("[pandorical] Malformed state prop range '{}' for block '{}', defaulting to 0", parts[2], entry.id());
+                        }
                     } else {
-                        try { valueCount = Integer.parseInt(parts[2]); } catch (NumberFormatException ignored) {}
+                        try { valueCount = Integer.parseInt(parts[2]); } catch (NumberFormatException ignored) {
+                            Pandorical.LOGGER.warn("[pandorical] Malformed state prop range '{}' for block '{}', defaulting to 0", parts[2], entry.id());
+                        }
                     }
                 } else if (parts.length == 2) {
-                    try { valueCount = Integer.parseInt(parts[1]); } catch (NumberFormatException ignored) {}
+                    try { valueCount = Integer.parseInt(parts[1]); } catch (NumberFormatException ignored) {
+                        Pandorical.LOGGER.warn("[pandorical] Malformed state prop range '{}' for block '{}', defaulting to 0", parts[1], entry.id());
+                    }
                 }
                 var prop = DynamicBlock.resolveProperty(propName, baseBlock, valueCount, intMin, propType, enumValues);
                 if (prop != null) {

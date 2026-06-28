@@ -49,9 +49,9 @@ public class PandoricalClient implements ClientModInitializer {
             ContentManager.tick();
             if (ContentManager.isSyncing() && client.gui != null) {
                 // Show as both title and actionbar for visibility
-                client.gui.setTitle(net.minecraft.network.chat.Component.literal(ContentManager.getSyncStatus())
+                client.gui.hud.setTitle(net.minecraft.network.chat.Component.literal(ContentManager.getSyncStatus())
                     .withStyle(net.minecraft.ChatFormatting.GOLD));
-                client.gui.setTimes(0, 40, 10);
+                client.gui.hud.setTimes(0, 40, 10);
             }
         });
 
@@ -125,7 +125,7 @@ public class PandoricalClient implements ClientModInitializer {
                     pendingContainerDefs.put(payload.screenId(), payload);
                 } else {
                     PandoricalScreen screen = new PandoricalScreen(payload);
-                    Minecraft.getInstance().setScreen(screen);
+                    Minecraft.getInstance().gui.setScreen(screen);
                 }
             });
         });
@@ -133,7 +133,7 @@ public class PandoricalClient implements ClientModInitializer {
         // Update screen
         ClientPlayNetworking.registerGlobalReceiver(UpdateScreenS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> {
-                Screen current = Minecraft.getInstance().screen;
+                Screen current = Minecraft.getInstance().gui.screen();
                 if (current instanceof PandoricalScreen ps && ps.getScreenId().equals(payload.screenId())) {
                     ps.applyUpdates(payload.updates());
                 } else if (current instanceof PandoricalContainerScreen pcs && payload.screenId().equals(pcs.getScreenId())) {
@@ -145,11 +145,11 @@ public class PandoricalClient implements ClientModInitializer {
         // Close screen
         ClientPlayNetworking.registerGlobalReceiver(CloseScreenS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> {
-                Screen current = Minecraft.getInstance().screen;
+                Screen current = Minecraft.getInstance().gui.screen();
                 if (current instanceof PandoricalScreen ps && ps.getScreenId().equals(payload.screenId())) {
-                    Minecraft.getInstance().setScreen(null);
+                    Minecraft.getInstance().gui.setScreen(null);
                 } else if (current instanceof PandoricalContainerScreen pcs && payload.screenId().equals(pcs.getScreenId())) {
-                    Minecraft.getInstance().setScreen(null);
+                    Minecraft.getInstance().gui.setScreen(null);
                 }
             });
         });

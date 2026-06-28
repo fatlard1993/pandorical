@@ -56,7 +56,8 @@ public class PandoricalScreen extends Screen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
-        this.extractBackground(graphics, mouseX, mouseY, delta);
+        // Let super handle blur/background (blur can only fire once per frame in 26.3+)
+        super.extractRenderState(graphics, mouseX, mouseY, delta);
 
         for (PandoricalComponent component : components) {
             ScreenHelper.renderComponentTree(component, graphics, mouseX, mouseY, delta);

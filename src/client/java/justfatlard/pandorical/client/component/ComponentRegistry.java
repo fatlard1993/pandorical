@@ -36,6 +36,7 @@ public final class ComponentRegistry {
         register(ComponentType.TEXT, TextComponent::new);
         register(ComponentType.TEXT_INPUT, TextInputComponent::new);
         register(ComponentType.ITEM_SLOT, ItemSlotComponent::new);
+        register(ComponentType.ITEM_ICON, ItemIconComponent::new);
         register(ComponentType.INVENTORY_GRID, InventoryGridComponent::new);
         register(ComponentType.SCROLL_PANEL, ScrollPanelComponent::new);
         register(ComponentType.SPRITE, SpriteComponent::new);

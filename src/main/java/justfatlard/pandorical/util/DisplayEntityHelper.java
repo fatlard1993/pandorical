@@ -2,7 +2,7 @@ package justfatlard.pandorical.util;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Display;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
@@ -22,7 +22,7 @@ public final class DisplayEntityHelper {
      * Does NOT add it to the world — call world.addFreshEntity() after configuration.
      */
     public static Display.BlockDisplay createBlockDisplay(ServerLevel world, BlockState state, Vec3 position) {
-        Display.BlockDisplay display = new Display.BlockDisplay(EntityType.BLOCK_DISPLAY, world);
+        Display.BlockDisplay display = new Display.BlockDisplay(EntityTypes.BLOCK_DISPLAY, world);
         display.setPos(position);
         display.setBlockState(state);
         return display;

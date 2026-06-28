@@ -110,6 +110,16 @@ public class ScreenBuilder {
         return this;
     }
 
+    /** Add an item icon. itemId is a registry path e.g. "minecraft:red_shrub". count > 1 shows stack overlay. */
+    public ScreenBuilder itemIcon(String id, int x, int y, String itemId, int count) {
+        this.components.add(new ComponentBuilder(id, ComponentType.ITEM_ICON)
+            .bounds(x, y, 16, 16)
+            .prop(ComponentType.PROP_ITEM_ID, itemId)
+            .prop(ComponentType.PROP_ITEM_COUNT, String.valueOf(count))
+            .build());
+        return this;
+    }
+
     /** Add a sprite (colored rectangle). Props: color */
     public ScreenBuilder sprite(String id, int x, int y, int w, int h, Map<String, String> props) {
         this.components.add(new ComponentBuilder(id, ComponentType.SPRITE)

@@ -8,6 +8,7 @@ import net.minecraft.world.item.MapItem;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import net.minecraft.world.scores.PlayerTeam;
+import net.minecraft.world.scores.TeamColor;
 import org.joml.Matrix3x2fStack;
 
 import java.util.Map;
@@ -367,9 +368,9 @@ public class MapComponent extends AbstractComponent {
             String playerName = dec.name.getString();
             PlayerTeam team = mc.level.getScoreboard().getPlayersTeam(playerName);
             if (team != null) {
-                net.minecraft.ChatFormatting fmt = team.getColor();
-                if (fmt != null && fmt.getColor() != null) {
-                    return 0xFF000000 | fmt.getColor();
+                var teamColor = team.getColor();
+                if (teamColor.isPresent()) {
+                    return 0xFF000000 | teamColor.get().rgb();
                 }
             }
         }

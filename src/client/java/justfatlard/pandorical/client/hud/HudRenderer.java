@@ -25,7 +25,7 @@ public final class HudRenderer {
 
 	private static void render(GuiGraphicsExtractor context, DeltaTracker delta) {
 		Minecraft mc = Minecraft.getInstance();
-		if (mc.player == null || mc.screen != null) return;
+		if (mc.player == null || mc.gui.screen() != null) return;
 
 		int guiWidth = context.guiWidth();
 		int guiHeight = context.guiHeight();

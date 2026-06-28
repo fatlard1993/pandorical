@@ -17,9 +17,9 @@
         "pandorical.client.mixins.json"
     ],
     "depends": {
-        "fabricloader": ">=0.18.5",
+        "fabricloader": ">=0.19.3",
         "minecraft": ">=26.1",
         "java": ">=25",
-        "fabric-api": ">=0.144.3"
+        "fabric-api": ">=0.153.1"
     }
 }

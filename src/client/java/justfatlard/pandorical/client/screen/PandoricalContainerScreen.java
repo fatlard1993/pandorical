@@ -61,15 +61,14 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-        this.extractBackground(context, mouseX, mouseY, delta);
+        // super handles blur/background (can only fire once per frame in 26.3+)
+        // and renders vanilla slot overlays (items, hover highlights)
+        super.extractRenderState(context, mouseX, mouseY, delta);
 
-        // Render declarative components
+        // Render declarative components on top
         for (PandoricalComponent component : components) {
             ScreenHelper.renderComponentTree(component, context, mouseX, mouseY, delta);
         }
-
-        // Render vanilla slot overlay (items, hover highlights)
-        super.extractRenderState(context, mouseX, mouseY, delta);
 
         this.extractTooltip(context, mouseX, mouseY);
     }

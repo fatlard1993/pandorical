@@ -12,6 +12,12 @@ import java.util.function.BiConsumer;
 
 public interface ScreenApi {
     /**
+     * Key injected into the data map passed to
+     * {@link #onActionFallback} handlers so they can identify which component
+     * triggered the action. The value is the component's ID string.
+     */
+    String FALLBACK_COMPONENT_ID_KEY = "_componentId";
+    /**
      * Open a non-container declarative screen for the player.
      */
     void open(ServerPlayer player, OpenScreenS2C screen);

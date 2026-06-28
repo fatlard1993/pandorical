@@ -1,5 +1,5 @@
 plugins {
-    id 'net.fabricmc.fabric-loom' version '1.15.5'
+    id 'net.fabricmc.fabric-loom' version '1.17.12'
     id 'maven-publish'
 }
 
@@ -55,6 +55,15 @@ jar {
     from("LICENSE") {
         rename { "${it}_${project.base.archivesName.get()}" }
     }
+}
+
+// Copy the built JAR to the local dev client's mods folder after build.
+// Run: ./gradlew syncClient
+tasks.register('syncClient', Copy) {
+    dependsOn build
+    from("build/libs/${project.archives_base_name}-${project.mod_version}.jar")
+    into('/Users/chase.whitfield/Projects/village-client/mods')
+    description = 'Deploy pandorical JAR to the local dev client mods folder.'
 }
 
 publishing {

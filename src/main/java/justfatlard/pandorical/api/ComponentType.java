@@ -14,6 +14,7 @@ public final class ComponentType {
     public static final String TEXT = "text";
     public static final String TEXT_INPUT = "text_input";
     public static final String ITEM_SLOT = "item_slot";
+    public static final String ITEM_ICON = "item_icon";
     public static final String INVENTORY_GRID = "inventory_grid";
     public static final String SCROLL_PANEL = "scroll_panel";
     public static final String SPRITE = "sprite";
@@ -69,6 +70,12 @@ public final class ComponentType {
     public static final String PROP_VALUE = "value";
     /** "true"/"false" — whether the input accepts text. */
     public static final String PROP_EDITABLE = "editable";
+
+    // ItemIcon props
+    /** Registry ID of the item to display, e.g. "minecraft:red_shrub". */
+    public static final String PROP_ITEM_ID = "item_id";
+    /** Stack count to display in the decoration overlay (defaults to 1, hidden if 1). */
+    public static final String PROP_ITEM_COUNT = "item_count";
 
     // ItemSlot props
     /** Slot index in the container. */

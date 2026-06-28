@@ -95,6 +95,7 @@ public class PandoricalMenu extends AbstractContainerMenu {
 
     @Override
     public ItemStack quickMoveStack(Player player, int slotIndex) {
+        if (slotIndex < 0 || slotIndex >= this.slots.size()) return ItemStack.EMPTY;
         Slot slot = this.slots.get(slotIndex);
         if (!slot.hasItem()) return ItemStack.EMPTY;
 
