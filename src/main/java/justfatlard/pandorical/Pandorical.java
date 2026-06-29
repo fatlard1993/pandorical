@@ -1,6 +1,9 @@
 package justfatlard.pandorical;
 
+import justfatlard.pandorical.api.EntityRendererRegistry;
 import justfatlard.pandorical.api.PandoricalApi;
+import justfatlard.pandorical.api.PlayerInventoryApi;
+import justfatlard.pandorical.api.PlayerInventoryApiImpl;
 import justfatlard.pandorical.config.PandoricalSyncTask;
 import justfatlard.pandorical.protocol.*;
 import justfatlard.pandorical.screen.PandoricalMenu;
@@ -119,6 +122,7 @@ public class Pandorical implements ModInitializer {
         // S2C config
         PayloadTypeRegistry.clientboundConfiguration().register(SyncContentConfigS2C.TYPE, SyncContentConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(SyncAssetsConfigS2C.TYPE, SyncAssetsConfigS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundConfiguration().register(PlayerInventoryRegistrationsS2C.TYPE, PlayerInventoryRegistrationsS2C.STREAM_CODEC);
         // C2S config
         PayloadTypeRegistry.serverboundConfiguration().register(ContentReadyConfigC2S.TYPE, ContentReadyConfigC2S.STREAM_CODEC);
 
@@ -134,6 +138,7 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(SyncContentS2C.TYPE, SyncContentS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SyncAssetsS2C.TYPE, SyncAssetsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(CameraHintS2C.TYPE, CameraHintS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(EntityRenderersS2C.TYPE, EntityRenderersS2C.STREAM_CODEC);
 
         // C2S play
         PayloadTypeRegistry.serverboundPlay().register(HelloC2S.TYPE, HelloC2S.STREAM_CODEC);
@@ -162,6 +167,10 @@ public class Pandorical implements ModInitializer {
         // Server: add our sync task BEFORE Fabric's registry sync
         ServerConfigurationConnectionEvents.BEFORE_CONFIGURE.register((handler, server) -> {
             if (ServerConfigurationNetworking.canSend(handler, SyncContentConfigS2C.TYPE)) {
+                // Send inventory slot registrations during config phase so the client
+                // has them BEFORE InventoryMenu is constructed on play-phase entry.
+                sendConfigPhaseInventoryRegistrations(handler);
+
                 var contentRegistry = PandoricalApi.contentRegistry();
                 if (contentRegistry.hasContent()) {
                     try {
@@ -235,8 +244,8 @@ public class Pandorical implements ModInitializer {
                     contentRegistry.syncContentTo(player);
                 }
 
-                // Re-send inventory now that the player is fully registered.
-                player.inventoryMenu.sendAllDataToRemote();
+                // Send entity renderer registrations to the client.
+                sendEntityRenderers(player);
             });
         });
 
@@ -266,7 +275,7 @@ public class Pandorical implements ModInitializer {
 
             // Track config-phase players for later — don't pre-register capabilities yet
             // because the client can't deserialize full component data (armor materials, etc.)
-            // until after the handshake. Inventory will be re-sent in HelloC2S handler.
+            // until after the handshake. Capabilities are registered on HelloC2S arrival.
             var player = handler.getPlayer();
             if (configPhaseSyncedPlayers.remove(player.getGameProfile().id())) {
                 PandoricalApi.markContentReady(player.getUUID());
@@ -277,5 +286,43 @@ public class Pandorical implements ModInitializer {
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             PandoricalApi.removePlayer(handler.getPlayer().getUUID());
         });
+    }
+
+    /**
+     * Send all registered extra inventory slot groups during the configuration phase.
+     * This ensures {@code ClientInventorySlotRegistry} is populated BEFORE the client
+     * constructs {@code InventoryMenu} on play-phase entry, avoiding the
+     * {@code IndexOutOfBoundsException} caused by mismatched slot counts.
+     */
+    private static void sendConfigPhaseInventoryRegistrations(
+            net.minecraft.server.network.ServerConfigurationPacketListenerImpl handler) {
+        List<PlayerInventoryApi.SlotRegistration> regs = PandoricalApi.playerInventoryImpl().getRegistrations();
+        if (regs.isEmpty()) return;
+
+        List<PlayerInventoryRegistrationsS2C.SlotGroup> groups = new java.util.ArrayList<>();
+        for (PlayerInventoryApi.SlotRegistration reg : regs) {
+            List<PlayerInventoryRegistrationsS2C.SlotPosition> positions = new java.util.ArrayList<>();
+            for (PlayerInventoryApi.SlotEntry entry : reg.slots()) {
+                positions.add(new PlayerInventoryRegistrationsS2C.SlotPosition(
+                    entry.slotIndex(), entry.screenX(), entry.screenY(), entry.backgroundSprite()));
+            }
+            groups.add(new PlayerInventoryRegistrationsS2C.SlotGroup(
+                reg.namespace().toString(), positions));
+        }
+
+        ServerConfigurationNetworking.send(handler, new PlayerInventoryRegistrationsS2C(groups));
+        LOGGER.debug("Sent {} extra inventory slot group(s) during config phase", groups.size());
+    }
+
+    /**
+     * Send all registered entity renderer mappings to the player.
+     * Called after the player completes the HelloC2S handshake.
+     */
+    private static void sendEntityRenderers(net.minecraft.server.level.ServerPlayer player) {
+        java.util.Map<String, String> renderers = EntityRendererRegistry.getAll();
+        if (renderers.isEmpty()) return;
+
+        ServerPlayNetworking.send(player, new EntityRenderersS2C(new java.util.HashMap<>(renderers)));
+        LOGGER.debug("Sent {} entity renderer mapping(s) to {}", renderers.size(), player.getName().getString());
     }
 }

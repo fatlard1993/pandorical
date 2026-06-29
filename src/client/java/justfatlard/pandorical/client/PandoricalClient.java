@@ -6,6 +6,8 @@ import justfatlard.pandorical.client.component.ComponentRegistry;
 import justfatlard.pandorical.client.content.ContentManager;
 import justfatlard.pandorical.client.hud.HudManager;
 import justfatlard.pandorical.client.hud.HudRenderer;
+import justfatlard.pandorical.client.inventory.ClientInventorySlotRegistry;
+import justfatlard.pandorical.client.renderer.ClientEntityRendererRegistry;
 import justfatlard.pandorical.client.screen.PandoricalContainerScreen;
 import justfatlard.pandorical.client.screen.PandoricalScreen;
 import justfatlard.pandorical.protocol.*;
@@ -101,6 +103,14 @@ public class PandoricalClient implements ClientModInitializer {
                 payload.chunkIndex() + 1, payload.totalChunks());
             ContentManager.handleConfigSyncAssets(payload);
         });
+
+        // Receive extra inventory slot registrations during config phase so that
+        // ClientInventorySlotRegistry is populated BEFORE InventoryMenu is constructed
+        // on play-phase entry (InventoryMenu.<init> fires before any play packets arrive).
+        ClientConfigurationNetworking.registerGlobalReceiver(PlayerInventoryRegistrationsS2C.TYPE, (payload, context) -> {
+            Pandorical.LOGGER.debug("Config phase: received {} extra inventory slot group(s)", payload.groups().size());
+            ClientInventorySlotRegistry.receive(payload);
+        });
     }
 
     private void registerClientHandlers() {
@@ -178,6 +188,11 @@ public class PandoricalClient implements ClientModInitializer {
             context.client().execute(() -> CameraManager.handleHint(payload));
         });
 
+        // Entity renderer registrations — apply to EntityRenderers.PROVIDERS
+        ClientPlayNetworking.registerGlobalReceiver(EntityRenderersS2C.TYPE, (payload, context) -> {
+            context.client().execute(() -> ClientEntityRendererRegistry.applyRenderers(payload));
+        });
+
         // When entering play phase, inject resource pack if config-phase synced assets
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             if (ContentManager.wasConfigPhaseSynced()) {
@@ -195,6 +210,8 @@ public class PandoricalClient implements ClientModInitializer {
             ContentManager.reset();
             CameraManager.onDisconnect();
             HudManager.clear();
+            ClientInventorySlotRegistry.reset();
+            ClientEntityRendererRegistry.reset();
         });
     }
 }

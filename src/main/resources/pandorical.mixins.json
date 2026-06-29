@@ -3,7 +3,8 @@
 	"package": "justfatlard.pandorical.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
-		"SlotMixin"
+		"SlotMixin",
+		"InventoryMenuMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

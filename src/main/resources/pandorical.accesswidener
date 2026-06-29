@@ -4,6 +4,9 @@ accessWidener v2 official
 mutable field net/minecraft/world/inventory/Slot x I
 mutable field net/minecraft/world/inventory/Slot y I
 
+# Allow reading EntityRenderers.PROVIDERS for dynamic client-side renderer registration
+accessible field net/minecraft/client/renderer/entity/EntityRenderers PROVIDERS Ljava/util/Map;
+
 # Make imageWidth/imageHeight mutable for dynamic screen sizing
 mutable field net/minecraft/client/gui/screens/inventory/AbstractContainerScreen imageWidth I
 mutable field net/minecraft/client/gui/screens/inventory/AbstractContainerScreen imageHeight I

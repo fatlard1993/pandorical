@@ -19,6 +19,7 @@ public final class PandoricalApi {
     private static final HudApiImpl HUD = new HudApiImpl();
     private static final justfatlard.pandorical.content.ContentRegistry CONTENT = new justfatlard.pandorical.content.ContentRegistry();
     private static final CameraApiImpl CAMERA = new CameraApiImpl();
+    private static final PlayerInventoryApiImpl PLAYER_INVENTORY = new PlayerInventoryApiImpl();
 
     /** Holds the type and ID of the screen currently open for a player. */
     private record ScreenContext(String screenType, String screenId) {}
@@ -75,10 +76,32 @@ public final class PandoricalApi {
     /** Returns the camera API for adjusting camera distance and perspective for a player. */
     public static CameraApi camera() { return CAMERA; }
 
+    /**
+     * Returns the player inventory API for registering extra inventory slots that appear
+     * in the vanilla inventory screen and persist across sessions.
+     */
+    public static PlayerInventoryApi playerInventory() { return PLAYER_INVENTORY; }
+
+    /**
+     * Register an entity type to be rendered with the given renderer key on Pandorical clients.
+     * Supported keys: {@code "thrown_item"}, {@code "invisible"}.
+     * Must be called during server-side mod initialisation.
+     *
+     * @param entityType  the entity type (must already be registered in the vanilla registry)
+     * @param rendererKey a renderer key string
+     */
+    public static void registerEntityRenderer(net.minecraft.world.entity.EntityType<?> entityType,
+                                              String rendererKey) {
+        EntityRendererRegistry.register(entityType, rendererKey);
+    }
+
     // --- Internal methods (used by Pandorical core, not for consuming mods) ---
 
     /** @hidden */
     public static justfatlard.pandorical.content.ContentRegistry contentRegistry() { return CONTENT; }
+
+    /** @hidden — used by InventoryMenuMixin */
+    public static PlayerInventoryApiImpl playerInventoryImpl() { return PLAYER_INVENTORY; }
 
     /** @hidden */
     public static void registerPlayerCapabilities(UUID playerUuid, Set<String> capabilities) {

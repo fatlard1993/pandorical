@@ -198,21 +198,17 @@ public class MapComponent extends AbstractComponent {
         // Draw player arrow with optional compass tip (on top of mob dots)
         drawArrow(graphics, selfSi, selfSj, facingDirX, facingDirY, MARKER_COLOR);
 
-        // --- Compass destination X marker — stable dec-byte position (no edge drift) ---
+        // --- Compass destination marker — vanilla target_point sprite, centered on target ---
         if (hasCompassTarget) {
             float cpx = originX + (compassDecX / 2.0f + 64f) * zoomScale;
             float cpy = originY + (compassDecY / 2.0f + 64f) * zoomScale;
             if (cpx >= x && cpx < x + width && cpy >= y && cpy < y + height) {
-                int cpxi = Math.round(cpx), cpyi = Math.round(cpy);
-                graphics.fill(cpxi - 2, cpyi - 2, cpxi - 1, cpyi - 1, 0xFF000000);
-                graphics.fill(cpxi + 1, cpyi - 2, cpxi + 2, cpyi - 1, 0xFF000000);
-                graphics.fill(cpxi - 1, cpyi - 1, cpxi + 1, cpyi + 1, 0xFF000000);
-                graphics.fill(cpxi - 2, cpyi + 1, cpxi - 1, cpyi + 2, 0xFF000000);
-                graphics.fill(cpxi + 1, cpyi + 1, cpxi + 2, cpyi + 2, 0xFF000000);
-                graphics.fill(cpxi - 1, cpyi - 1, cpxi,     cpyi,     0xFFFF6600);
-                graphics.fill(cpxi,     cpyi,     cpxi + 1, cpyi + 1, 0xFFFF6600);
-                graphics.fill(cpxi,     cpyi - 1, cpxi + 1, cpyi,     0xFFFF6600);
-                graphics.fill(cpxi - 1, cpyi,     cpxi,     cpyi + 1, 0xFFFF6600);
+                int pinW = 8, pinH = 8;
+                int cpxi = Math.round(cpx) - pinW / 2;
+                int cpyi = Math.round(cpy) - pinH / 2;
+                graphics.blitSprite(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
+                    net.minecraft.resources.Identifier.withDefaultNamespace("map/decorations/target_point"),
+                    cpxi, cpyi, pinW, pinH);
             }
         }
 

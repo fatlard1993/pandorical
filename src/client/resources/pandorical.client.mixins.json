@@ -5,7 +5,9 @@
 	"mixins": [],
 	"client": [
 		"ItemCountRendererMixin",
-		"CameraMixin"
+		"CameraMixin",
+		"InventoryMenuClientMixin",
+		"InventoryScreenMixin"
 	],
 	"injectors": {
 		"defaultRequire": 0
