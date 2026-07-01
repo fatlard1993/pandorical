@@ -123,6 +123,7 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundConfiguration().register(SyncContentConfigS2C.TYPE, SyncContentConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(SyncAssetsConfigS2C.TYPE, SyncAssetsConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(PlayerInventoryRegistrationsS2C.TYPE, PlayerInventoryRegistrationsS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundConfiguration().register(BlockTintsConfigS2C.TYPE, BlockTintsConfigS2C.STREAM_CODEC);
         // C2S config
         PayloadTypeRegistry.serverboundConfiguration().register(ContentReadyConfigC2S.TYPE, ContentReadyConfigC2S.STREAM_CODEC);
 
@@ -170,6 +171,7 @@ public class Pandorical implements ModInitializer {
                 // Send inventory slot registrations during config phase so the client
                 // has them BEFORE InventoryMenu is constructed on play-phase entry.
                 sendConfigPhaseInventoryRegistrations(handler);
+                sendConfigPhaseBlockTints(handler);
 
                 var contentRegistry = PandoricalApi.contentRegistry();
                 if (contentRegistry.hasContent()) {
@@ -312,6 +314,14 @@ public class Pandorical implements ModInitializer {
 
         ServerConfigurationNetworking.send(handler, new PlayerInventoryRegistrationsS2C(groups));
         LOGGER.debug("Sent {} extra inventory slot group(s) during config phase", groups.size());
+    }
+
+    private static void sendConfigPhaseBlockTints(
+            net.minecraft.server.network.ServerConfigurationPacketListenerImpl handler) {
+        var impl = PandoricalApi.blockTintsImpl();
+        if (!impl.hasEntries()) return;
+        ServerConfigurationNetworking.send(handler, impl.buildPacket());
+        LOGGER.debug("Sent {} block tint group(s) during config phase", impl.buildPacket().entries().size());
     }
 
     /**

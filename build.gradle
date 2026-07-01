@@ -57,8 +57,6 @@ jar {
     }
 }
 
-// Copy the built JAR to the local dev client's mods folder after build.
-// Run: ./gradlew syncClient
 tasks.register('syncClient', Copy) {
     dependsOn build
     from("build/libs/${project.archives_base_name}-${project.mod_version}.jar")

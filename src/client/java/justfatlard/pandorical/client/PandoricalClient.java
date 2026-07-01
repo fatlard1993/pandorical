@@ -17,15 +17,23 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.client.rendering.v1.BlockColorRegistry;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.color.block.BlockTintSource;
+import net.minecraft.client.color.block.BlockTintSources;
 import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.level.block.Block;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class PandoricalClient implements ClientModInitializer {
     private static final List<String> CLIENT_CAPABILITIES = List.of("screens", "content", "hud", "camera");
@@ -111,6 +119,32 @@ public class PandoricalClient implements ClientModInitializer {
             Pandorical.LOGGER.debug("Config phase: received {} extra inventory slot group(s)", payload.groups().size());
             ClientInventorySlotRegistry.receive(payload);
         });
+
+        ClientConfigurationNetworking.registerGlobalReceiver(BlockTintsConfigS2C.TYPE, (payload, context) -> {
+            Pandorical.LOGGER.debug("Config phase: received {} block tint group(s)", payload.entries().size());
+            payload.entries().forEach(PandoricalClient::applyBlockTints);
+        });
+    }
+
+    private static void applyBlockTints(BlockTintsConfigS2C.Entry entry) {
+        BlockTintSource source = switch (entry.tintType()) {
+            case "grass"     -> BlockTintSources.grass();
+            case "stem"      -> BlockTintSources.stem();
+            case "sugar_cane"-> BlockTintSources.sugarCane();
+            case "foliage"   -> BlockTintSources.foliage();
+            case "constant"  -> BlockTintSources.constant(entry.constantColor());
+            default -> {
+                Pandorical.LOGGER.warn("Unknown block tint type '{}' — skipping", entry.tintType());
+                yield null;
+            }
+        };
+        if (source == null) return;
+
+        Block[] blocks = entry.blockIds().stream()
+            .map(id -> BuiltInRegistries.BLOCK.getValue(Identifier.of(id)))
+            .filter(Objects::nonNull)
+            .toArray(Block[]::new);
+        if (blocks.length > 0) BlockColorRegistry.register(List.of(source), blocks);
     }
 
     private void registerClientHandlers() {

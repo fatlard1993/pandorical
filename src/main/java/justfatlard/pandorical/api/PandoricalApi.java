@@ -20,6 +20,7 @@ public final class PandoricalApi {
     private static final justfatlard.pandorical.content.ContentRegistry CONTENT = new justfatlard.pandorical.content.ContentRegistry();
     private static final CameraApiImpl CAMERA = new CameraApiImpl();
     private static final PlayerInventoryApiImpl PLAYER_INVENTORY = new PlayerInventoryApiImpl();
+    private static final BlockTintApiImpl BLOCK_TINTS = new BlockTintApiImpl();
 
     /** Holds the type and ID of the screen currently open for a player. */
     private record ScreenContext(String screenType, String screenId) {}
@@ -82,6 +83,9 @@ public final class PandoricalApi {
      */
     public static PlayerInventoryApi playerInventory() { return PLAYER_INVENTORY; }
 
+    /** Returns the block tint API for registering biome-color and constant tint mappings. */
+    public static BlockTintApi blockTints() { return BLOCK_TINTS; }
+
     /**
      * Register an entity type to be rendered with the given renderer key on Pandorical clients.
      * Supported keys: {@code "thrown_item"}, {@code "invisible"}.
@@ -102,6 +106,9 @@ public final class PandoricalApi {
 
     /** @hidden — used by InventoryMenuMixin */
     public static PlayerInventoryApiImpl playerInventoryImpl() { return PLAYER_INVENTORY; }
+
+    /** @hidden */
+    public static BlockTintApiImpl blockTintsImpl() { return BLOCK_TINTS; }
 
     /** @hidden */
     public static void registerPlayerCapabilities(UUID playerUuid, Set<String> capabilities) {
@@ -361,5 +368,29 @@ public final class PandoricalApi {
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
                 new justfatlard.pandorical.protocol.CameraHintS2C("reset", Map.of()));
         }
+    }
+
+    // --- BlockTintApi implementation ---
+
+    public static final class BlockTintApiImpl implements BlockTintApi {
+        private final java.util.List<justfatlard.pandorical.protocol.BlockTintsConfigS2C.Entry> entries =
+            new java.util.ArrayList<>();
+
+        @Override public void grass(String... blockIds)     { add("grass",     0, blockIds); }
+        @Override public void stem(String... blockIds)      { add("stem",      0, blockIds); }
+        @Override public void sugarCane(String... blockIds) { add("sugar_cane",0, blockIds); }
+        @Override public void foliage(String... blockIds)   { add("foliage",   0, blockIds); }
+        @Override public void constant(int argb, String... blockIds) { add("constant", argb, blockIds); }
+
+        private void add(String tintType, int constantColor, String[] blockIds) {
+            entries.add(new justfatlard.pandorical.protocol.BlockTintsConfigS2C.Entry(
+                tintType, constantColor, java.util.List.of(blockIds)));
+        }
+
+        public justfatlard.pandorical.protocol.BlockTintsConfigS2C buildPacket() {
+            return new justfatlard.pandorical.protocol.BlockTintsConfigS2C(java.util.List.copyOf(entries));
+        }
+
+        public boolean hasEntries() { return !entries.isEmpty(); }
     }
 }
