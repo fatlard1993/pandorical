@@ -34,6 +34,15 @@ public final class ComponentType {
      * predating this prop render. Used by: sprite
      */
     public static final String PROP_TEXTURE = "texture";
+    /**
+     * The texture's native pixel size for a textured sprite. When both are set, the texture is
+     * drawn at native size and CLIPPED to the component's bounds instead of stretched: animating
+     * the component's width then reveals or hides the texture from its left edge, which is how a
+     * shaped progress fill works (e.g. a fill following a curved path). Clients predating these
+     * props stretch instead of clipping. Used by: sprite
+     */
+    public static final String PROP_TEXTURE_WIDTH = "texture_width";
+    public static final String PROP_TEXTURE_HEIGHT = "texture_height";
     /** Text color. Accepts #RRGGBB or #AARRGGBB. Used by: text, button, particle_burst */
     public static final String PROP_COLOR = "color";
 

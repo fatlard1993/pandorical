@@ -20,6 +20,8 @@ import java.util.Map;
 public class SpriteComponent extends AbstractComponent {
     private int color;
     private Identifier texture;
+    private int textureWidth;
+    private int textureHeight;
 
     @Override
     public void init(ComponentDef def, ComponentContext context) {
@@ -38,13 +40,33 @@ public class SpriteComponent extends AbstractComponent {
         trackColor("color", color);
         String textureId = props.get("texture");
         texture = (textureId == null || textureId.isEmpty()) ? null : Identifier.tryParse(textureId);
+        textureWidth = parseIntProp("texture_width");
+        textureHeight = parseIntProp("texture_height");
+    }
+
+    private int parseIntProp(String key) {
+        String value = props.get(key);
+        if (value == null) return 0;
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
     }
 
     @Override
     public void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         if (texture != null) {
-            graphics.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0F, 0.0F,
-                width, height, width, height);
+            if (textureWidth > 0 && textureHeight > 0) {
+                // Native-size draw clipped to bounds: the width/height of the
+                // component select how much of the texture is revealed
+                graphics.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0F, 0.0F,
+                    Math.min(width, textureWidth), Math.min(height, textureHeight),
+                    textureWidth, textureHeight);
+            } else {
+                graphics.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, 0.0F, 0.0F,
+                    width, height, width, height);
+            }
             return;
         }
         int renderColor = interpolatedColor("color", 0xFFFFFFFF, delta);
