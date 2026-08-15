@@ -47,6 +47,18 @@ public class ComponentBuilder {
         return this;
     }
 
+    /** Uniform scale multiplier applied around the component's center. Supported on: sprite, text. */
+    public ComponentBuilder scale(float scale) {
+        this.props.put(ComponentType.PROP_SCALE, String.valueOf(scale));
+        return this;
+    }
+
+    /** Rotation in degrees applied around the component's center. Supported on: sprite, text. */
+    public ComponentBuilder rotation(float degrees) {
+        this.props.put(ComponentType.PROP_ROTATION, String.valueOf(degrees));
+        return this;
+    }
+
     public ComponentBuilder props(Map<String, String> props) {
         this.props.putAll(props);
         return this;

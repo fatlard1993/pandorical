@@ -11,9 +11,9 @@ import java.util.Map;
  * Wraps vanilla EditBox for text input fields.
  * Sends "input" action with {"text": "..."} on every change.
  *
- * NOTE: In 26.1, EditBox is a widget that handles its own rendering and input
- * via the widget event system. This component creates the EditBox and renders
- * it manually, but input events need to be forwarded via the widget's own methods.
+ * EditBox is a self-rendering widget: it handles its own rendering and input via the
+ * widget event system. This component creates the EditBox, renders it via extractRenderState,
+ * and forwards input events through the widget's own methods.
  */
 public class TextInputComponent extends AbstractComponent {
     private EditBox editBox;
@@ -60,7 +60,7 @@ public class TextInputComponent extends AbstractComponent {
     @Override
     public void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         if (editBox != null) {
-            // EditBox.extractRenderState handles its own rendering in 26.1
+            // EditBox renders itself via extractRenderState
             editBox.extractRenderState(graphics, mouseX, mouseY, delta);
         }
     }
@@ -80,7 +80,7 @@ public class TextInputComponent extends AbstractComponent {
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (editBox != null && editBox.isFocused()) {
-            // In 26.1, keyPressed takes a KeyEvent. We create one manually.
+            // keyPressed takes a KeyEvent; we construct one manually from the raw codes.
             return editBox.keyPressed(new net.minecraft.client.input.KeyEvent(keyCode, scanCode, modifiers));
         }
         return false;

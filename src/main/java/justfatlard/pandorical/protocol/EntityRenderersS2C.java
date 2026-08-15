@@ -16,8 +16,8 @@ import java.util.Map;
  * being installed on the client.
  *
  * Supported renderer keys (case-sensitive):
- *   "thrown_item" — ThrownItemRenderer
- *   "invisible"   — NoopRenderer (renders nothing)
+ *   "thrown_item": ThrownItemRenderer
+ *   "invisible":   NoopRenderer (renders nothing)
  */
 public record EntityRenderersS2C(
     Map<String, String> renderers

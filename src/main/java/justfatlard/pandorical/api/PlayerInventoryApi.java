@@ -62,41 +62,23 @@ public interface PlayerInventoryApi {
     void registerSlots(Identifier namespace, List<SlotEntry> slots);
 
     /**
-     * Return the item currently in a player's extra slot.
-     *
-     * @param player    the server-side player
-     * @param namespace the namespace used when registering the slot group
-     * @param slotIndex slot index within that namespace's group
-     * @return the current {@link ItemStack}, or {@link ItemStack#EMPTY}
+     * Return the item currently in a player's extra slot,
+     * or {@link ItemStack#EMPTY}.
      */
     ItemStack getSlot(ServerPlayer player, Identifier namespace, int slotIndex);
 
     /**
-     * Replace the item in a player's extra slot. Does not trigger
-     * {@link #onSlotChange} listeners — use this for programmatic writes during initialisation
-     * or reward logic where you do not want to re-trigger your own listener.
-     *
-     * @param player    the server-side player
-     * @param namespace the namespace used when registering the slot group
-     * @param slotIndex slot index within that namespace's group
-     * @param stack     the new {@link ItemStack} to place in the slot
+     * Replace the item in a player's extra slot. Does not trigger {@link #onSlotChange}
+     * listeners: use this for programmatic writes (initialisation, reward logic) where
+     * re-triggering your own listener is unwanted.
      */
     void setSlot(ServerPlayer player, Identifier namespace, int slotIndex, ItemStack stack);
 
     /**
      * Register a callback invoked after any extra-slot change is processed on the server.
-     * Multiple listeners for the same namespace are supported (they are appended in order).
-     *
-     * @param namespace the namespace whose slot changes should be reported
-     * @param handler   called with (player, slotIndex, newStack)
+     * Multiple listeners for the same namespace are supported (appended in order).
      */
     void onSlotChange(Identifier namespace, BiConsumer<ServerPlayer, SlotChangeEvent> handler);
 
-    /**
-     * Data class passed to {@link #onSlotChange} listeners.
-     *
-     * @param slotIndex the index within the namespace's slot group that changed
-     * @param newStack  the new contents of the slot
-     */
     record SlotChangeEvent(int slotIndex, ItemStack newStack) {}
 }

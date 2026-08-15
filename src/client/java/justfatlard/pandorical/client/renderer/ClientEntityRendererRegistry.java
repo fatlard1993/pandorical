@@ -90,7 +90,7 @@ public final class ClientEntityRendererRegistry {
     /** Clear state on disconnect so re-joining re-registers correctly. */
     public static void reset() {
         registeredTypes.clear();
-        // Do NOT clear the providers map itself — that would break vanilla renderers.
+        // Do NOT clear the providers map itself; that would break vanilla renderers.
     }
 
     // --- Private helpers ---
@@ -103,7 +103,7 @@ public final class ClientEntityRendererRegistry {
     private static EntityRendererProvider<?> resolveProvider(String key) {
         return switch (key) {
             case EntityRendererRegistry.KEY_THROWN_ITEM ->
-                // Raw cast is intentional — we cannot express T extends Entity & ItemSupplier
+                // Raw cast is intentional; we cannot express T extends Entity & ItemSupplier
                 // in the provider map's wildcard-typed signature. This is safe at runtime.
                 (EntityRendererProvider) ctx -> new ThrownItemRenderer(ctx);
             case EntityRendererRegistry.KEY_INVISIBLE ->

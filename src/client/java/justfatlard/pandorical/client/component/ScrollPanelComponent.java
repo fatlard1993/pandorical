@@ -10,12 +10,12 @@ import java.util.Map;
  * Children are laid out vertically; scrolling shifts which are visible.
  *
  * Props:
- *   scroll_offset — current scroll position in items (default 0)
- *   item_height — height per item (default 22)
- *   visible_items — how many items fit (default 5)
- *   total_items — total item count for scroll bounds
- *   show_scrollbar — "true"/"false" (default true)
- *   background — background color (default transparent)
+ *   scroll_offset: current scroll position in items (default 0)
+ *   item_height: height per item (default 22)
+ *   visible_items: how many items fit (default 5)
+ *   total_items: total item count for scroll bounds
+ *   show_scrollbar: "true"/"false" (default true)
+ *   background: background color (default transparent)
  */
 public class ScrollPanelComponent extends AbstractComponent {
     private int scrollOffset;

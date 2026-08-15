@@ -70,7 +70,7 @@ public class DynamicSlabBlock extends SlabBlock {
 
     /**
      * Create a DynamicSlabBlock with extra properties beyond TYPE and WATERLOGGED.
-     * The extra properties list should NOT include type or waterlogged — those are
+     * The extra properties list should NOT include type or waterlogged; those are
      * added by SlabBlock automatically.
      */
     public static DynamicSlabBlock create(Properties blockProps, List<Property<?>> extraProperties) {

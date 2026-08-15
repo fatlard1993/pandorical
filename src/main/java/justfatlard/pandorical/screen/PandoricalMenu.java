@@ -16,7 +16,7 @@ import java.util.Set;
  * Dynamic container menu for Pandorical screens.
  *
  * Two construction paths:
- * - Client: PandoricalMenu(int, Inventory) via MenuType factory — creates max slots, screen def set later
+ * - Client: PandoricalMenu(int, Inventory) via MenuType factory: creates max slots, screen def set later
  * - Server: PandoricalMenu(MenuType, int, Inventory, Container, readOnlySlots, screenDef)
  */
 public class PandoricalMenu extends AbstractContainerMenu {
@@ -30,7 +30,7 @@ public class PandoricalMenu extends AbstractContainerMenu {
     private Runnable removedCallback;
 
     /**
-     * Client constructor — called by MenuType factory.
+     * Client constructor, called by the MenuType factory.
      * Creates max slots backed by a temp container. Vanilla sync will populate them.
      * The actual slot count and positions come from screenDef set later.
      */
@@ -39,7 +39,7 @@ public class PandoricalMenu extends AbstractContainerMenu {
         this.modContainer = new SimpleContainer(MAX_MOD_SLOTS);
         this.readOnlySlots = Set.of();
 
-        // Create max mod slots — vanilla will sync the ones the server actually uses
+        // Create max mod slots; vanilla will sync the ones the server actually uses
         for (int i = 0; i < MAX_MOD_SLOTS; i++) {
             this.addSlot(new PandoricalSlot(modContainer, i, -1000, -1000, true));
         }
@@ -56,7 +56,7 @@ public class PandoricalMenu extends AbstractContainerMenu {
     }
 
     /**
-     * Server constructor — called by Pandorical.createMenu().
+     * Server constructor, called by Pandorical.createMenu().
      */
     public PandoricalMenu(MenuType<?> menuType, int syncId, Inventory playerInventory,
                           Container serverContainer, Set<Integer> readOnlySlots, OpenScreenS2C screenDef) {
@@ -109,7 +109,7 @@ public class PandoricalMenu extends AbstractContainerMenu {
                 return ItemStack.EMPTY;
             }
         } else {
-            if (!this.moveItemStackTo(stack, 0, modSlotCount, false)) {
+            if (!moveIntoEditableModSlots(stack, modSlotCount)) {
                 return ItemStack.EMPTY;
             }
         }
@@ -122,6 +122,23 @@ public class PandoricalMenu extends AbstractContainerMenu {
 
         if (slotChangeCallback != null) slotChangeCallback.run();
         return original;
+    }
+
+    // Shift-click from inventory into the mod container. Vanilla's moveItemStackTo only
+    // consults Slot#mayPlace on its empty-slot pass, not its stack-merge pass, so a single
+    // moveItemStackTo(stack, 0, modSlotCount) would let a merge top off an existing stack in a
+    // read-only slot. Move only across the editable sub-ranges so read-only slots are never a
+    // merge or place target.
+    private boolean moveIntoEditableModSlots(ItemStack stack, int modSlotCount) {
+        boolean moved = false;
+        int i = 0;
+        while (i < modSlotCount && !stack.isEmpty()) {
+            if (readOnlySlots.contains(i)) { i++; continue; }
+            int start = i;
+            while (i < modSlotCount && !readOnlySlots.contains(i)) i++;
+            if (this.moveItemStackTo(stack, start, i, false)) moved = true;
+        }
+        return moved;
     }
 
     @Override

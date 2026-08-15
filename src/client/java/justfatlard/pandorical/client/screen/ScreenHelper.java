@@ -6,6 +6,7 @@ import justfatlard.pandorical.protocol.ComponentUpdate;
 import justfatlard.pandorical.protocol.ScreenActionC2S;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import org.joml.Matrix3x2fStack;
 
 import java.util.List;
 import java.util.Map;
@@ -44,7 +45,7 @@ public final class ScreenHelper {
 
     public static void renderComponentTree(PandoricalComponent component, GuiGraphicsExtractor graphics,
                                             int mouseX, int mouseY, float delta) {
-        component.render(graphics, mouseX, mouseY, delta);
+        renderWithGeometryTransform(component, graphics, mouseX, mouseY, delta);
 
         // Apply scissor clipping for scroll panels
         boolean clipping = component instanceof ScrollPanelComponent;
@@ -59,6 +60,83 @@ public final class ScreenHelper {
 
         if (clipping) {
             graphics.disableScissor();
+        }
+    }
+
+    private static final float GEOMETRY_EPSILON = 0.01f;
+
+    /**
+     * Renders a single component with its interpolated geometry (position/size/scale/rotation)
+     * applied as a GUI-space transform, generic to every component type, not just sprite/text,
+     * since every {@link AbstractComponent} tracks geometry interpolation unconditionally (see
+     * {@code AbstractComponent.interpolatedGeometry}). Components other than {@code AbstractComponent}
+     * (none currently registered, but the interface permits custom ones) render unmodified.
+     *
+     * <p>Width/height changes are applied as a non-uniform scale anchored at the component's raw
+     * top-left corner (matching how resizing visually reads as "growing/shrinking from the corner"),
+     * position changes as a translate, and scale/rotation props as a uniform scale/rotation anchored
+     * at the interpolated center, mirroring the pose-stack technique {@code StructureRenderer}
+     * already uses for structure poses, adapted to 2D GUI space via {@code GuiGraphicsExtractor.pose()}
+     * (a {@link Matrix3x2fStack}) instead of a 3D {@code PoseStack}.
+     *
+     * <p>Skips the pose push/pop entirely when nothing differs from the component's raw bounds;
+     * the common case for the vast majority of static components every frame.
+     */
+    private static void renderWithGeometryTransform(PandoricalComponent component, GuiGraphicsExtractor graphics,
+                                                      int mouseX, int mouseY, float delta) {
+        if (!(component instanceof AbstractComponent ac)) {
+            component.render(graphics, mouseX, mouseY, delta);
+            return;
+        }
+
+        AbstractComponent.GeometrySnapshot g = ac.interpolatedGeometry(delta);
+        int rawX = ac.getX(), rawY = ac.getY(), rawW = ac.getWidth(), rawH = ac.getHeight();
+
+        boolean needsTransform = Math.abs(g.scale() - 1f) > GEOMETRY_EPSILON
+            || Math.abs(g.rotation()) > GEOMETRY_EPSILON
+            || Math.abs(g.x() - rawX) > GEOMETRY_EPSILON
+            || Math.abs(g.y() - rawY) > GEOMETRY_EPSILON
+            || Math.abs(g.width() - rawW) > GEOMETRY_EPSILON
+            || Math.abs(g.height() - rawH) > GEOMETRY_EPSILON;
+
+        if (!needsTransform) {
+            component.render(graphics, mouseX, mouseY, delta);
+            return;
+        }
+
+        Matrix3x2fStack pose = graphics.pose();
+        pose.pushMatrix();
+        try {
+            if (rawW > 0 && Math.abs(g.width() - rawW) > GEOMETRY_EPSILON) {
+                pose.scaleAround(g.width() / rawW, 1f, rawX, rawY);
+            }
+            if (rawH > 0 && Math.abs(g.height() - rawH) > GEOMETRY_EPSILON) {
+                pose.scaleAround(1f, g.height() / rawH, rawX, rawY);
+            }
+            pose.translate(g.x() - rawX, g.y() - rawY);
+
+            float cx = g.x() + g.width() / 2f;
+            float cy = g.y() + g.height() / 2f;
+            if (Math.abs(g.rotation()) > GEOMETRY_EPSILON) {
+                pose.rotateAbout((float) Math.toRadians(g.rotation()), cx, cy);
+            }
+            if (Math.abs(g.scale() - 1f) > GEOMETRY_EPSILON) {
+                pose.scaleAround(g.scale(), cx, cy);
+            }
+
+            component.render(graphics, mouseX, mouseY, delta);
+        } finally {
+            pose.popMatrix();
+        }
+    }
+
+    /**
+     * Advance client-side interpolation for a component and its whole subtree by one client tick.
+     */
+    public static void tickTree(PandoricalComponent component) {
+        component.tick();
+        for (PandoricalComponent child : component.getChildren()) {
+            tickTree(child);
         }
     }
 

@@ -31,7 +31,7 @@ public final class ClientInventorySlotRegistry {
         return Collections.unmodifiableList(groups);
     }
 
-    /** Called on disconnect — clears all stored registrations. */
+    /** Called on disconnect; clears all stored registrations. */
     public static void reset() {
         groups.clear();
     }

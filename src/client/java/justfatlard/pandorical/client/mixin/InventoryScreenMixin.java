@@ -51,7 +51,7 @@ public abstract class InventoryScreenMixin {
     private void pandorical$drawExtraSlotBackgrounds(GuiGraphicsExtractor graphics,
                                                      int mouseX, int mouseY, float delta,
                                                      CallbackInfo ci) {
-        // GuiGraphicsExtractor exposes the scaled screen dimensions — use them to
+        // GuiGraphicsExtractor exposes the scaled screen dimensions; use them to
         // derive the inventory's top-left corner without needing @Shadow on inherited fields.
         int leftPos = (graphics.guiWidth()  - INV_W) / 2;
         int topPos  = (graphics.guiHeight() - INV_H) / 2;

@@ -44,7 +44,7 @@ public abstract class InventoryMenuClientMixin extends AbstractContainerMenu {
             int size = group.slots().size();
             if (size == 0) continue;
 
-            // Dummy container — content is synced from the server automatically.
+            // Dummy container; content is synced from the server automatically.
             SimpleContainer dummyContainer = new SimpleContainer(size);
 
             for (PlayerInventoryRegistrationsS2C.SlotPosition pos : group.slots()) {

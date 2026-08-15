@@ -9,18 +9,13 @@ import net.minecraft.server.level.ServerPlayer;
 public interface ContentApi {
     /**
      * Declare a custom block for client sync. Call during onInitialize.
-     * This stores metadata that will be sent to Pandorical clients so they can
-     * register the block in their local registries. The server-side block must be
-     * registered separately with vanilla's Registry.register().
+     * Stores metadata sent to Pandorical clients so they can register the block
+     * locally; the server-side block must still be registered separately with
+     * vanilla's Registry.register().
      */
     void registerBlock(String id, BlockRegistration registration);
 
-    /**
-     * Declare a custom item for client sync. Call during onInitialize.
-     * This stores metadata that will be sent to Pandorical clients so they can
-     * register the item in their local registries. The server-side item must be
-     * registered separately with vanilla's Registry.register().
-     */
+    /** Same contract as {@link #registerBlock}, for items. */
     void registerItem(String id, ItemRegistration registration);
 
     /**
@@ -44,17 +39,12 @@ public interface ContentApi {
     void registerServerOnlyNamespace(String namespace);
 
     /**
-     * Override a vanilla item's appearance for Pandorical clients.
-     * Supports renaming, retexturing, and model replacement.
+     * Override a vanilla item's appearance (name, texture, model) for Pandorical
+     * clients. Injected into the VirtualResourcePack at TOP priority, so it wins
+     * over vanilla resources; vanilla clients are unaffected. Multiple name
+     * overrides targeting the same namespace merge into a single lang file.
      *
-     * The override is injected into the VirtualResourcePack at TOP priority,
-     * so it takes effect over vanilla resources. Vanilla clients are unaffected.
-     *
-     * Can be called multiple times for different items. Multiple name overrides
-     * targeting the same namespace are merged into a single lang file.
-     *
-     * @param vanillaItemId Full item ID, e.g. "minecraft:rabbit_hide"
-     * @param override      The override to apply
+     * @param vanillaItemId full item ID, e.g. "minecraft:rabbit_hide"
      */
     void overrideVanillaItem(String vanillaItemId, VanillaItemOverride override);
 }

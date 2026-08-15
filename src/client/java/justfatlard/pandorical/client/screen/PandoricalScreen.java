@@ -55,6 +55,14 @@ public class PandoricalScreen extends Screen {
     }
 
     @Override
+    public void tick() {
+        super.tick();
+        for (PandoricalComponent component : components) {
+            ScreenHelper.tickTree(component);
+        }
+    }
+
+    @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         // Let super handle blur/background (blur can only fire once per frame in 26.3+)
         super.extractRenderState(graphics, mouseX, mouseY, delta);
@@ -76,7 +84,7 @@ public class PandoricalScreen extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        if (ScreenHelper.dispatchKeyPressed(components, event.key(), event.scancode(), event.modifiers())) {
+        if (ScreenHelper.dispatchKeyPressed(components, event.key(), event.keycode(), event.modifiers())) {
             return true;
         }
         return super.keyPressed(event);

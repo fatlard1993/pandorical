@@ -41,7 +41,7 @@ public abstract class InventoryMenuMixin extends AbstractContainerMenu {
     @Inject(method = "<init>", at = @At("RETURN"))
     private void pandorical$addExtraSlots(Inventory playerInventory, boolean active, Player player,
                                           CallbackInfo ci) {
-        // Only run on the server side — LocalPlayer check is in the client mixin.
+        // Only run on the server side; the LocalPlayer check is in the client mixin.
         if (!(player instanceof ServerPlayer serverPlayer)) return;
 
         PlayerInventoryApiImpl impl = PandoricalApi.playerInventoryImpl();

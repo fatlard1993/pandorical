@@ -2,7 +2,9 @@ package justfatlard.pandorical.api;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,6 +23,9 @@ public final class PandoricalApi {
     private static final CameraApiImpl CAMERA = new CameraApiImpl();
     private static final PlayerInventoryApiImpl PLAYER_INVENTORY = new PlayerInventoryApiImpl();
     private static final BlockTintApiImpl BLOCK_TINTS = new BlockTintApiImpl();
+    private static final StructureApiImpl STRUCTURES = new StructureApiImpl();
+    private static final EntityOverlayApiImpl ENTITY_OVERLAYS = new EntityOverlayApiImpl();
+    private static final KeybindApiImpl KEYBINDS = new KeybindApiImpl();
 
     /** Holds the type and ID of the screen currently open for a player. */
     private record ScreenContext(String screenType, String screenId) {}
@@ -28,6 +33,7 @@ public final class PandoricalApi {
     // --- Per-player state ---
     private static final Map<UUID, Set<String>> playerCapabilities = new ConcurrentHashMap<>();
     private static final Set<UUID> contentReadyPlayers = ConcurrentHashMap.newKeySet();
+    private static final Set<UUID> contentSyncStarted = ConcurrentHashMap.newKeySet();
     private static final Map<UUID, ScreenContext> playerScreens = new ConcurrentHashMap<>();
 
     private static final int MAX_ACTION_DATA_ENTRIES = 32;
@@ -48,7 +54,8 @@ public final class PandoricalApi {
 
     /**
      * Returns true if the player's Pandorical client advertised the given capability.
-     * Known capability strings: {@code "screens"}, {@code "hud"}, {@code "camera"}.
+     * Known capability strings: {@code "screens"}, {@code "hud"}, {@code "camera"},
+     * {@code "structures"}, {@code "entity_overlays"}, {@code "keybinds"}.
      * A capability being absent means the client version does not support that feature.
      */
     public static boolean hasCapability(ServerPlayer player, String capability) {
@@ -87,6 +94,33 @@ public final class PandoricalApi {
     public static BlockTintApi blockTints() { return BLOCK_TINTS; }
 
     /**
+     * Returns the structure API for displaying moving, rotating clusters of blocks
+     * (e.g. rideable ships) to Pandorical clients as a single batch-rendered object.
+     */
+    public static StructureApi structures() { return STRUCTURES; }
+
+    /**
+     * Returns the entity overlay API for rendering an extra texture layer over a
+     * living entity's model on Pandorical clients (e.g. per-entity cosmetics).
+     */
+    public static EntityOverlayApi entityOverlays() { return ENTITY_OVERLAYS; }
+
+    /**
+     * Returns the keybind API for receiving rebindable keybind presses from
+     * Pandorical clients, with no client mod needed on the declaring mod's side.
+     */
+    public static KeybindApi keybinds() { return KEYBINDS; }
+
+    /**
+     * Returns the screen ID of the screen currently open for this player via Pandorical,
+     * or null if no Pandorical screen is open. Useful for mods that need to push updates
+     * to a screen they opened earlier without tracking the ID themselves.
+     */
+    public static String getOpenScreenId(UUID playerUuid) {
+        return getPlayerScreenId(playerUuid);
+    }
+
+    /**
      * Register an entity type to be rendered with the given renderer key on Pandorical clients.
      * Supported keys: {@code "thrown_item"}, {@code "invisible"}.
      * Must be called during server-side mod initialisation.
@@ -104,11 +138,20 @@ public final class PandoricalApi {
     /** @hidden */
     public static justfatlard.pandorical.content.ContentRegistry contentRegistry() { return CONTENT; }
 
-    /** @hidden — used by InventoryMenuMixin */
+    /** @hidden used by InventoryMenuMixin */
     public static PlayerInventoryApiImpl playerInventoryImpl() { return PLAYER_INVENTORY; }
 
     /** @hidden */
     public static BlockTintApiImpl blockTintsImpl() { return BLOCK_TINTS; }
+
+    /** @hidden used by Pandorical's EntityTrackingEvents registration */
+    public static StructureApiImpl structuresImpl() { return STRUCTURES; }
+
+    /** @hidden used by Pandorical's EntityTrackingEvents/ServerEntityEvents registration */
+    public static EntityOverlayApiImpl entityOverlaysImpl() { return ENTITY_OVERLAYS; }
+
+    /** @hidden used by Pandorical's KeyPressC2S receiver and handshake push */
+    public static KeybindApiImpl keybindsImpl() { return KEYBINDS; }
 
     /** @hidden */
     public static void registerPlayerCapabilities(UUID playerUuid, Set<String> capabilities) {
@@ -120,11 +163,23 @@ public final class PandoricalApi {
         contentReadyPlayers.add(playerUuid);
     }
 
+    /**
+     * Reserves the one content sync allowed per connection. Returns true exactly once per
+     * player until they disconnect, so a client that re-sends HelloC2S (e.g. to force a resync
+     * it never acknowledges) cannot repeatedly trigger the full content+asset rebuild.
+     * @hidden
+     */
+    public static boolean beginContentSync(UUID playerUuid) {
+        return contentSyncStarted.add(playerUuid);
+    }
+
     /** @hidden */
     public static void removePlayer(UUID playerUuid) {
         playerCapabilities.remove(playerUuid);
         contentReadyPlayers.remove(playerUuid);
+        contentSyncStarted.remove(playerUuid);
         playerScreens.remove(playerUuid);
+        KEYBINDS.removePlayer(playerUuid);
     }
 
     /** @hidden */
@@ -184,14 +239,14 @@ public final class PandoricalApi {
             }
             setPlayerScreen(player.getUUID(), screen.screenType(), screen.screenId());
 
-            // Send the screen definition FIRST — client stores it in pending map
+            // The screen definition must be sent before openMenu: the client stores it in
+            // a pending map and matches the incoming menu against it.
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, screen);
 
-            // Then open the menu — client matches it with the pending screen def
             String screenType = screen.screenType();
             int slotCount = screen.container().map(c -> c.slotCount()).orElse(0);
             player.openMenu(new PandoricalMenuProvider(screen, serverContainer, readOnlySlots,
-                // slot change callback — track previous state, only report changed slots
+                // slot change callback (reports every slot, not just changed ones)
                 () -> {
                     SlotChangeHandler handler = slotChangeHandlers.get(screenType);
                     if (handler != null) {
@@ -219,12 +274,21 @@ public final class PandoricalApi {
         @Override
         public void close(ServerPlayer player, String screenId) {
             if (!isAvailable(player)) return;
-            // Only clear tracking when this screenId is still the active one.
+            // Only act when this screenId is still the active one.
             // If handleResponse() opened a NEW screen before we got here, the new
             // screen's tracking must survive so its buttons can be handled.
             String currentId = getPlayerScreenId(player.getUUID());
             if (screenId.equals(currentId)) {
-                clearPlayerScreen(player.getUUID());
+                // For a container screen, close the server-side menu too. Otherwise the menu
+                // stays live after the client is told to hide the overlay, its removed-callback
+                // never runs, and any items held in the container are stranded (and destroyed on
+                // the eventual real close). The instanceof guard ensures we only ever close our
+                // own menu, never an unrelated vanilla one; removed() clears tracking itself.
+                if (player.containerMenu instanceof justfatlard.pandorical.screen.PandoricalMenu) {
+                    player.closeContainer();
+                } else {
+                    clearPlayerScreen(player.getUUID());
+                }
             }
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
                 new justfatlard.pandorical.protocol.CloseScreenS2C(screenId));
@@ -259,7 +323,6 @@ public final class PandoricalApi {
             String screenType = getPlayerScreenType(player.getUUID());
             if (screenType == null) return;
 
-            // Validate screenId matches player's actual open screen
             String expectedScreenId = getPlayerScreenId(player.getUUID());
             if (expectedScreenId != null && !expectedScreenId.equals(action.screenId())) {
                 justfatlard.pandorical.Pandorical.LOGGER.warn(
@@ -268,7 +331,6 @@ public final class PandoricalApi {
                 return;
             }
 
-            // Validate C2S data payload size
             if (action.data().size() > MAX_ACTION_DATA_ENTRIES) {
                 justfatlard.pandorical.Pandorical.LOGGER.warn(
                     "Player {} sent action with {} data entries (max {}) — ignoring",
@@ -392,5 +454,308 @@ public final class PandoricalApi {
         }
 
         public boolean hasEntries() { return !entries.isEmpty(); }
+    }
+
+    // --- StructureApi implementation ---
+
+    /**
+     * Server-side state for one structure. Broadcast-scoped (not per-player): mutated in
+     * place and re-broadcast to every current tracker of {@code anchorEntity} on every call.
+     */
+    private static final class StructureState {
+        final Entity anchorEntity;
+        final Map<RelPos, BlockState> blocks;
+        StructurePose pose;
+        boolean visible;
+
+        StructureState(Entity anchorEntity, Map<RelPos, BlockState> blocks, StructurePose pose, boolean visible) {
+            this.anchorEntity = anchorEntity;
+            this.blocks = blocks;
+            this.pose = pose;
+            this.visible = visible;
+        }
+    }
+
+    public static final class StructureApiImpl implements StructureApi {
+        private final Map<String, StructureState> structures = new ConcurrentHashMap<>();
+
+        @Override
+        public void spawn(Entity anchorEntity, String structureId, List<BlockEntry> blocks, StructurePose initialPose) {
+            Map<RelPos, BlockState> blockMap = new LinkedHashMap<>();
+            for (BlockEntry entry : blocks) blockMap.put(entry.pos(), entry.state());
+
+            StructureState state = new StructureState(anchorEntity, blockMap, initialPose, true);
+            structures.put(structureId, state);
+
+            justfatlard.pandorical.protocol.SpawnStructureS2C packet = buildSpawnPacket(structureId, state);
+            broadcastToTrackers(state.anchorEntity, packet);
+        }
+
+        @Override
+        public void updatePose(String structureId, StructurePose pose) {
+            StructureState state = structures.get(structureId);
+            if (state == null) return;
+            state.pose = pose;
+
+            broadcastToTrackers(state.anchorEntity, new justfatlard.pandorical.protocol.UpdateStructurePoseS2C(
+                structureId, pose.x(), pose.y(), pose.z(), pose.yaw()));
+        }
+
+        @Override
+        public void updateBlocks(String structureId, List<BlockEntry> added, List<RelPos> removed, Map<RelPos, BlockState> changed) {
+            StructureState state = structures.get(structureId);
+            if (state == null) return;
+
+            for (BlockEntry entry : added) state.blocks.put(entry.pos(), entry.state());
+            for (RelPos pos : removed) state.blocks.remove(pos);
+            for (Map.Entry<RelPos, BlockState> entry : changed.entrySet()) state.blocks.put(entry.getKey(), entry.getValue());
+
+            List<justfatlard.pandorical.protocol.StructureBlockEntry> addedWire = toWireEntries(added);
+            List<justfatlard.pandorical.protocol.StructureRelPos> removedWire = removed.stream()
+                .map(p -> new justfatlard.pandorical.protocol.StructureRelPos(p.x(), p.y(), p.z()))
+                .toList();
+            List<justfatlard.pandorical.protocol.StructureBlockEntry> changedWire = changed.entrySet().stream()
+                .map(e -> new justfatlard.pandorical.protocol.StructureBlockEntry(e.getKey().x(), e.getKey().y(), e.getKey().z(), e.getValue()))
+                .toList();
+
+            broadcastToTrackers(state.anchorEntity, new justfatlard.pandorical.protocol.UpdateStructureBlocksS2C(
+                structureId, addedWire, removedWire, changedWire));
+        }
+
+        @Override
+        public void setVisible(String structureId, boolean visible) {
+            StructureState state = structures.get(structureId);
+            if (state == null) return;
+            state.visible = visible;
+
+            broadcastToTrackers(state.anchorEntity,
+                new justfatlard.pandorical.protocol.SetStructureVisibleS2C(structureId, visible));
+        }
+
+        @Override
+        public void despawn(String structureId) {
+            StructureState state = structures.remove(structureId);
+            if (state == null) return;
+
+            broadcastToTrackers(state.anchorEntity, new justfatlard.pandorical.protocol.DespawnStructureS2C(structureId));
+        }
+
+        /** @hidden called from Pandorical's EntityTrackingEvents.START_TRACKING handler. */
+        public void handleStartTracking(Entity entity, ServerPlayer player) {
+            if (!hasCapability(player, "structures")) return;
+            for (Map.Entry<String, StructureState> entry : structures.entrySet()) {
+                if (entry.getValue().anchorEntity == entity) {
+                    net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
+                        buildSpawnPacket(entry.getKey(), entry.getValue()));
+                }
+            }
+        }
+
+        /** @hidden called from Pandorical's EntityTrackingEvents.STOP_TRACKING handler. */
+        public void handleStopTracking(Entity entity, ServerPlayer player) {
+            if (!isAvailable(player)) return;
+            for (Map.Entry<String, StructureState> entry : structures.entrySet()) {
+                if (entry.getValue().anchorEntity == entity) {
+                    net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
+                        new justfatlard.pandorical.protocol.DespawnStructureS2C(entry.getKey()));
+                }
+            }
+        }
+
+        private justfatlard.pandorical.protocol.SpawnStructureS2C buildSpawnPacket(String structureId, StructureState state) {
+            return new justfatlard.pandorical.protocol.SpawnStructureS2C(
+                structureId,
+                toWireEntries(state.blocks),
+                state.pose.x(), state.pose.y(), state.pose.z(), state.pose.yaw(),
+                state.visible
+            );
+        }
+
+        private List<justfatlard.pandorical.protocol.StructureBlockEntry> toWireEntries(List<BlockEntry> entries) {
+            return entries.stream()
+                .map(e -> new justfatlard.pandorical.protocol.StructureBlockEntry(e.pos().x(), e.pos().y(), e.pos().z(), e.state()))
+                .toList();
+        }
+
+        private List<justfatlard.pandorical.protocol.StructureBlockEntry> toWireEntries(Map<RelPos, BlockState> blocks) {
+            return blocks.entrySet().stream()
+                .map(e -> new justfatlard.pandorical.protocol.StructureBlockEntry(e.getKey().x(), e.getKey().y(), e.getKey().z(), e.getValue()))
+                .toList();
+        }
+
+        private void broadcastToTrackers(Entity anchorEntity, net.minecraft.network.protocol.common.custom.CustomPacketPayload packet) {
+            for (ServerPlayer player : net.fabricmc.fabric.api.networking.v1.PlayerLookup.tracking(anchorEntity)) {
+                if (hasCapability(player, "structures")) {
+                    net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, packet);
+                }
+            }
+        }
+    }
+
+    /** @hidden implementation of {@link EntityOverlayApi}; broadcast design mirrors StructureApiImpl. */
+    public static final class EntityOverlayApiImpl implements EntityOverlayApi {
+        private record OverlayEntry(Entity entity, net.minecraft.resources.Identifier texture) {}
+
+        // Keyed by entity UUID; entries dropped on entity unload (see
+        // handleEntityUnload). The wire protocol uses the network id, which is
+        // unique per server run, so a cleared client never confuses entities.
+        private final Map<UUID, OverlayEntry> overlays = new ConcurrentHashMap<>();
+
+        @Override
+        public void set(Entity entity, net.minecraft.resources.Identifier texture) {
+            if (entity == null || texture == null) return;
+            overlays.put(entity.getUUID(), new OverlayEntry(entity, texture));
+            justfatlard.pandorical.Pandorical.LOGGER.info("Entity overlay set: {} ({}) -> {}",
+                entity.getId(),
+                net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()),
+                texture);
+            broadcastToTrackers(entity,
+                new justfatlard.pandorical.protocol.EntityOverlayS2C(entity.getId(), texture.toString()));
+        }
+
+        @Override
+        public void clear(Entity entity) {
+            if (entity == null) return;
+            if (overlays.remove(entity.getUUID()) == null) return;
+            broadcastToTrackers(entity,
+                new justfatlard.pandorical.protocol.EntityOverlayS2C(entity.getId(), ""));
+        }
+
+        /** @hidden called from Pandorical's EntityTrackingEvents.START_TRACKING handler. */
+        public void handleStartTracking(Entity entity, ServerPlayer player) {
+            if (!hasCapability(player, "entity_overlays")) return;
+            OverlayEntry entry = overlays.get(entity.getUUID());
+            if (entry != null) {
+                net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
+                    new justfatlard.pandorical.protocol.EntityOverlayS2C(entity.getId(), entry.texture().toString()));
+            }
+        }
+
+        /**
+         * @hidden called after HelloC2S registers capabilities: on join, entity
+         * tracking starts before the handshake completes, so overlays for
+         * already-tracked entities must be replayed here.
+         */
+        public void handlePlayerReady(ServerPlayer player) {
+            if (!hasCapability(player, "entity_overlays")) return;
+            for (OverlayEntry entry : overlays.values()) {
+                if (net.fabricmc.fabric.api.networking.v1.PlayerLookup.tracking(entry.entity()).contains(player)) {
+                    net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
+                        new justfatlard.pandorical.protocol.EntityOverlayS2C(
+                            entry.entity().getId(), entry.texture().toString()));
+                }
+            }
+        }
+
+        /** @hidden called from Pandorical's ServerEntityEvents.ENTITY_UNLOAD handler. */
+        public void handleEntityUnload(Entity entity) {
+            overlays.remove(entity.getUUID());
+        }
+
+        private void broadcastToTrackers(Entity entity, net.minecraft.network.protocol.common.custom.CustomPacketPayload packet) {
+            for (ServerPlayer player : net.fabricmc.fabric.api.networking.v1.PlayerLookup.tracking(entity)) {
+                if (hasCapability(player, "entity_overlays")) {
+                    net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, packet);
+                }
+            }
+        }
+    }
+
+    /** @hidden implementation of {@link KeybindApi}; pool model rationale in the interface javadoc. */
+    public static final class KeybindApiImpl implements KeybindApi {
+        /** Must match the pool the client registers at startup. */
+        public static final int MAX_SLOTS = 8;
+        // Key codes in the game's own InputConstants table (NOT GLFW: KEY_G is
+        // 10 on this snapshot generation, and 71 is scroll lock). Literals
+        // because InputConstants is a client-only class, absent on a dedicated
+        // server. Slot 0 defaults to G; 0 is the unbound/unknown code.
+        private static final int[] POOL_DEFAULT_KEYS = {10, 0, 0, 0, 0, 0, 0, 0};
+        private static final int MAX_PRESSES_PER_TICK = 8;
+
+        private record Registration(String id, String displayName, KeybindHandler handler) {}
+
+        private final Map<Integer, Registration> bySlot = new ConcurrentHashMap<>();
+        private final Set<String> registeredIds = ConcurrentHashMap.newKeySet();
+        // Per-player rate limit: [tick the count belongs to, dispatches that tick]
+        private final Map<UUID, long[]> pressCounters = new ConcurrentHashMap<>();
+
+        @Override
+        public void register(String id, int preferredDefaultKey, String displayName, KeybindHandler handler) {
+            if (id == null || displayName == null || handler == null) {
+                justfatlard.pandorical.Pandorical.LOGGER.warn("Ignoring keybind registration with null id/name/handler");
+                return;
+            }
+            if (!registeredIds.add(id)) {
+                justfatlard.pandorical.Pandorical.LOGGER.warn("Keybind id '{}' already registered — ignoring", id);
+                return;
+            }
+
+            int slot = chooseSlot(preferredDefaultKey);
+            if (slot < 0) {
+                registeredIds.remove(id);
+                justfatlard.pandorical.Pandorical.LOGGER.error(
+                    "Keybind pool exhausted ({} slots) — cannot register '{}'", MAX_SLOTS, id);
+                return;
+            }
+            bySlot.put(slot, new Registration(id, displayName, handler));
+
+            // The controls screen label for the claimed slot resolves through
+            // the synced pandorical lang, overriding the client's shipped
+            // "Pandorical Action N" default for this server only
+            CONTENT.addLangEntries(Map.of("key.pandorical.action" + (slot + 1), displayName));
+
+            justfatlard.pandorical.Pandorical.LOGGER.info(
+                "Keybind registered: '{}' -> slot {} (\"{}\", pool default {})",
+                id, slot, displayName, POOL_DEFAULT_KEYS[slot] == -1 ? "unbound" : POOL_DEFAULT_KEYS[slot]);
+        }
+
+        private int chooseSlot(int preferredDefaultKey) {
+            for (int i = 0; i < MAX_SLOTS; i++) {
+                if (!bySlot.containsKey(i) && POOL_DEFAULT_KEYS[i] == preferredDefaultKey) return i;
+            }
+            for (int i = 0; i < MAX_SLOTS; i++) {
+                if (!bySlot.containsKey(i)) return i;
+            }
+            return -1;
+        }
+
+        /** @hidden push claimed slots after the capability handshake completes. */
+        public void handlePlayerReady(ServerPlayer player) {
+            if (bySlot.isEmpty() || !hasCapability(player, "keybinds")) return;
+            java.util.List<Integer> slots = new java.util.ArrayList<>(bySlot.keySet());
+            java.util.Collections.sort(slots);
+            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
+                new justfatlard.pandorical.protocol.KeybindDeclarationsS2C(slots));
+        }
+
+        /** @hidden validate and dispatch one press; called on the server thread. */
+        public void handleKeyPress(ServerPlayer player, int slot) {
+            if (!hasCapability(player, "keybinds")) return;
+            if (slot < 0 || slot >= MAX_SLOTS) return;
+            Registration registration = bySlot.get(slot);
+            if (registration == null) return;
+
+            // A held or spammed key must not become a server-side amplifier
+            long currentTick = player.level().getServer().getTickCount();
+            long[] counter = pressCounters.computeIfAbsent(player.getUUID(), u -> new long[]{-1, 0});
+            if (counter[0] != currentTick) {
+                counter[0] = currentTick;
+                counter[1] = 0;
+            }
+            if (++counter[1] > MAX_PRESSES_PER_TICK) return;
+
+            try {
+                registration.handler().onPress(player);
+            } catch (Exception e) {
+                justfatlard.pandorical.Pandorical.LOGGER.error(
+                    "Keybind handler '{}' threw for player {}: {}",
+                    registration.id(), player.getName().getString(), e.getMessage(), e);
+            }
+        }
+
+        /** @hidden */
+        public void removePlayer(UUID playerUuid) {
+            pressCounters.remove(playerUuid);
+        }
     }
 }

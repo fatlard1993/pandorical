@@ -49,13 +49,22 @@ public final class HudRenderer {
 	private static int resolveX(HudOverlay overlay, int guiWidth) {
 		return switch (overlay.anchor) {
 			case "top_right", "bottom_right" -> guiWidth - overlay.offsetX - overlay.getWidth();
+			// "center" treats offsetX as a pixel nudge away from true horizontal center, rather than
+			// a corner margin; lets overlays sit near the crosshair (e.g. a telegraphed prompt)
+			// where none of the four corner anchors can reach.
+			case "center" -> (guiWidth - overlay.getWidth()) / 2 + overlay.offsetX;
+			// "bottom_center" treats offsetX as the signed position of the overlay's LEFT edge
+			// relative to horizontal center: the vanilla hotbar status rows (health, hunger, air)
+			// are laid out center-relative, so overlays meant to sit with them anchor the same way.
+			case "bottom_center" -> guiWidth / 2 + overlay.offsetX;
 			default -> overlay.offsetX; // top_left, bottom_left, or unrecognized
 		};
 	}
 
 	private static int resolveY(HudOverlay overlay, int guiHeight) {
 		return switch (overlay.anchor) {
-			case "bottom_left", "bottom_right" -> guiHeight - overlay.offsetY - overlay.getHeight();
+			case "bottom_left", "bottom_right", "bottom_center" -> guiHeight - overlay.offsetY - overlay.getHeight();
+			case "center" -> (guiHeight - overlay.getHeight()) / 2 + overlay.offsetY;
 			default -> overlay.offsetY; // top_left, top_right, or unrecognized
 		};
 	}

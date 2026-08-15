@@ -11,7 +11,7 @@ import org.joml.Quaternionf;
  * Lightweight utility for managing vanilla Display.BlockDisplay entities server-side.
  * Replaces Polymer's ElementHolder/BlockDisplayElement pattern.
  *
- * Display entities are vanilla — clients render them natively without any mod.
+ * Display entities are vanilla: clients render them natively without any mod.
  * The server creates, positions, and removes them; vanilla sync handles the rest.
  */
 public final class DisplayEntityHelper {
@@ -19,7 +19,7 @@ public final class DisplayEntityHelper {
 
     /**
      * Create a BlockDisplay entity at the given position.
-     * Does NOT add it to the world — call world.addFreshEntity() after configuration.
+     * Does NOT add it to the world; call world.addFreshEntity() after configuration.
      */
     public static Display.BlockDisplay createBlockDisplay(ServerLevel world, BlockState state, Vec3 position) {
         Display.BlockDisplay display = new Display.BlockDisplay(EntityTypes.BLOCK_DISPLAY, world);

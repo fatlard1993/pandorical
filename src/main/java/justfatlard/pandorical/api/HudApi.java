@@ -21,13 +21,21 @@ public interface HudApi {
      * Only the component entries present in {@code updates} are changed; all other components
      * in the overlay retain their current state (partial update, not a full replace).
      * The {@code overlayId} must match the id used in the corresponding {@link #show} call.
+     *
+     * <p>Geometry (position/size) and, on sprite/text, scale/rotation can be pushed the same way
+     * as any other prop; see {@link ComponentType#PROP_X}/{@code PROP_Y}/{@code PROP_WIDTH}/
+     * {@code PROP_HEIGHT}/{@code PROP_SCALE}/{@code PROP_ROTATION}, or build the update with
+     * {@link ComponentUpdateBuilder} for convenience. The client smoothly interpolates towards
+     * each new value rather than snapping; no special handling needed on the server side beyond
+     * calling this as often as the value changes (server-tick-rate calls, e.g. once/tick, render
+     * smoothly).
      */
     void update(ServerPlayer player, String overlayId, List<ComponentUpdate> updates);
 
     /**
      * Hide a HUD overlay for a player.
      * Instructs the client to stop rendering the overlay. Does not remove any server-side
-     * state associated with the overlay — call {@link #show} again to restore it.
+     * state associated with the overlay; call {@link #show} again to restore it.
      */
     void hide(ServerPlayer player, String overlayId);
 }

@@ -29,14 +29,9 @@ import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 /**
- * Client-side content registration.
- * Receives SyncContentS2C and SyncAssetsS2C, then:
- * 1. Unfreezes registries
- * 2. Registers blocks and items (cloning properties from base blocks)
- * 3. Re-freezes registries
- * 4. Injects VirtualResourcePack with synced assets
- * 5. Triggers resource reload
- * 6. Sends ContentReadyC2S
+ * Client-side content registration: receives SyncContentS2C and SyncAssetsS2C,
+ * registers the synced blocks/items into the (temporarily unfrozen) registries,
+ * injects the VirtualResourcePack, triggers a resource reload, and acks with ContentReadyC2S.
  */
 public class ContentManager {
     private static final VirtualResourcePack virtualPack = new VirtualResourcePack();
@@ -50,10 +45,9 @@ public class ContentManager {
     // Registry lookups on unfrozen registries may not find recently registered entries.
     private static final Map<Identifier, Block> registeredBlocks = new HashMap<>();
 
-    // Safety limits
-    private static final int MAX_ASSET_BYTES = 50 * 1024 * 1024; // 50MB max
-    private static final int MAX_SINGLE_ASSET = 10 * 1024 * 1024; // 10MB per file
-    private static final long SYNC_TIMEOUT_MS = 30_000; // 30 second timeout
+    private static final int MAX_ASSET_BYTES = 50 * 1024 * 1024;
+    private static final int MAX_SINGLE_ASSET = 10 * 1024 * 1024;
+    private static final long SYNC_TIMEOUT_MS = 30_000;
 
     public static void reset() {
         pendingContent = null;
@@ -71,7 +65,6 @@ public class ContentManager {
     }
 
     private static volatile boolean syncing = false;
-    /** True if content was synced during configuration phase (not play phase). */
     private static volatile boolean configPhaseSynced = false;
 
     // Config-phase state (separate from play-phase to avoid mixing)
@@ -79,7 +72,6 @@ public class ContentManager {
     private static final List<byte[]> configAssetChunks = new ArrayList<>();
     private static volatile int expectedConfigAssetChunks = -1;
 
-    /** True while content is being synced from the server. */
     public static boolean isSyncing() { return syncing && !contentRegistered; }
 
     /** Progress 0.0-1.0 based on asset chunks received. */
@@ -92,7 +84,6 @@ public class ContentManager {
         return (float) received / expectedAssetChunks;
     }
 
-    /** Human-readable sync status. */
     public static String getSyncStatus() {
         if (!syncing) return "";
         if (pendingContent == null) return "Connecting to server...";
@@ -107,9 +98,6 @@ public class ContentManager {
         return "Registering content...";
     }
 
-    /**
-     * Handle content definition payload.
-     */
     public static void handleSyncContent(SyncContentS2C payload) {
         pendingContent = payload;
         expectedAssetChunks = payload.expectedAssetChunks();
@@ -118,13 +106,9 @@ public class ContentManager {
         Pandorical.LOGGER.info("Received content sync: {} blocks, {} items, expecting {} asset chunks",
             payload.blocks().size(), payload.items().size(), expectedAssetChunks);
 
-        // If no assets expected (or assets already arrived), finalize
         tryFinalize();
     }
 
-    /**
-     * Handle asset chunk payload.
-     */
     public static void handleSyncAssets(SyncAssetsS2C payload) {
         if (contentRegistered) {
             Pandorical.LOGGER.warn("Received asset chunk after content already registered — ignoring");
@@ -134,13 +118,11 @@ public class ContentManager {
         expectedAssetChunks = payload.totalChunks();
         if (syncStartTime == 0) syncStartTime = System.currentTimeMillis();
 
-        // Validate chunk index
         if (payload.chunkIndex() < 0 || payload.chunkIndex() >= payload.totalChunks()) {
             Pandorical.LOGGER.warn("Invalid asset chunk index {}/{}", payload.chunkIndex(), payload.totalChunks());
             return;
         }
 
-        // Store chunk at correct index
         while (assetChunks.size() <= payload.chunkIndex()) {
             assetChunks.add(null);
         }
@@ -148,19 +130,14 @@ public class ContentManager {
 
         Pandorical.LOGGER.debug("Received asset chunk {}/{}", payload.chunkIndex() + 1, payload.totalChunks());
 
-        // Check if all chunks received
         tryFinalize();
     }
 
-    /**
-     * Called periodically to check for timeout on asset reassembly.
-     */
     public static void tick() {
         if (syncStartTime > 0 && !contentRegistered) {
             if (System.currentTimeMillis() - syncStartTime > SYNC_TIMEOUT_MS) {
                 Pandorical.LOGGER.warn("Content sync timed out after {}ms — finalizing with available data",
                     SYNC_TIMEOUT_MS);
-                // Force finalize with what we have
                 if (expectedAssetChunks > 0) {
                     long received = assetChunks.stream().filter(Objects::nonNull).count();
                     Pandorical.LOGGER.warn("Received {}/{} asset chunks before timeout", received, expectedAssetChunks);
@@ -175,10 +152,7 @@ public class ContentManager {
     // Configuration-phase handlers
     // ==========================================================================
 
-    /**
-     * Handle content definition payload during CONFIGURATION phase.
-     * Called on the network thread — NOT the render thread.
-     */
+    /** Runs on the network thread, never the render thread. */
     public static void handleConfigSyncContent(SyncContentConfigS2C payload) {
         pendingConfigContent = payload;
         expectedConfigAssetChunks = payload.expectedAssetChunks();
@@ -190,10 +164,7 @@ public class ContentManager {
         tryFinalizeConfig();
     }
 
-    /**
-     * Handle asset chunk payload during CONFIGURATION phase.
-     * Called on the network thread — NOT the render thread.
-     */
+    /** Runs on the network thread, never the render thread. */
     public static void handleConfigSyncAssets(SyncAssetsConfigS2C payload) {
         if (configPhaseSynced) {
             Pandorical.LOGGER.warn("Config phase: received asset chunk after already synced — ignoring");
@@ -233,9 +204,9 @@ public class ContentManager {
 
     /**
      * Finalize config-phase sync: register blocks/items, unpack assets, send ack.
-     * This runs on the NETWORK THREAD during config phase.
-     * We do NOT call addMapping — Fabric's SynchronizeRegistriesTask will assign IDs.
-     * We DO call Block.BLOCK_STATE_REGISTRY.add() so states exist for Fabric to sync.
+     * Runs on the network thread. Does not call addMapping; Fabric's
+     * SynchronizeRegistriesTask assigns registry IDs, and block state IDs are
+     * mapped later by {@link #remapBlockStateIds()}.
      */
     private static synchronized void forceFinalizeConfig() {
         if (configPhaseSynced) return;
@@ -249,32 +220,20 @@ public class ContentManager {
             return;
         }
 
-        // Unpack assets first (into virtual pack)
         if (expectedConfigAssetChunks > 0) {
             unpackConfigAssets();
         }
 
-        // Check if this is a reconnect — blocks already registered from previous session.
-        // On reconnect, skip all registry manipulation to avoid corrupting Fabric's state.
-        // Just repopulate tracking maps and apply shape data.
-        boolean isReconnect = content.blocks().stream().anyMatch(entry -> {
-            Identifier id = Identifier.tryParse(entry.id());
-            return id != null && BuiltInRegistries.BLOCK.containsKey(id);
-        });
-
-        if (isReconnect) {
-            Pandorical.LOGGER.info("Config phase: reconnect detected — reusing {} existing blocks, {} items",
-                content.blocks().size(), content.items().size());
-            for (SyncContentS2C.BlockEntry entry : content.blocks()) {
-                Identifier id = Identifier.tryParse(entry.id());
-                if (id != null && BuiltInRegistries.BLOCK.containsKey(id)) {
-                    Block existing = BuiltInRegistries.BLOCK.getValue(id);
-                    registeredBlocks.put(id, existing);
-                    DynamicBlock.applyShapeData(existing, entry.shapeData());
-                }
-            }
-        } else {
-            // First connection — register blocks/items/stubs
+        // No global reconnect fast-path here: every register method below is
+        // per-entry idempotent (an already-present id is reused/skipped, with
+        // shape data reapplied for blocks), which handles reconnects AND the
+        // case a former any-present short-circuit fatally mishandled: a mod
+        // installed on BOTH client and server (e.g. pinata) pre-registers its
+        // own entries at client startup, which made a first connection look
+        // like a reconnect and skipped registering every server-only mod's
+        // entries, so Fabric's registry sync then rejected the join with
+        // hundreds of unknown entries.
+        {
             unfreezeRegistry(BuiltInRegistries.BLOCK);
             unfreezeRegistry(BuiltInRegistries.ITEM);
             unfreezeRegistry(BuiltInRegistries.ENTITY_TYPE);
@@ -318,19 +277,17 @@ public class ContentManager {
             }
         }
 
-        // Note: resource pack injection happens later when Minecraft client is fully available
-        // (during play phase or via a scheduled task). Config phase doesn't have the client instance ready.
+        // Resource pack injection happens later, once the Minecraft client instance exists;
+        // config phase doesn't have it yet.
 
-        // Send acknowledgment to server so it can complete PandoricalSyncTask
+        // The ack lets the server complete PandoricalSyncTask.
         ClientConfigurationNetworking.send(new ContentReadyConfigC2S());
         Pandorical.LOGGER.info("Config phase: sent ContentReadyConfigC2S acknowledgment");
     }
 
     /**
-     * Register a block during config phase.
-     * Same as registerBlock but does NOT call addMapping — instead calls
-     * Block.BLOCK_STATE_REGISTRY.add() so the state exists in the registry
-     * for Fabric's sync to assign the authoritative ID.
+     * Config-phase variant of registerBlock: leaves block state IDs unassigned so
+     * {@link #remapBlockStateIds()} can map them to the server's IDs at JOIN time.
      */
     private static void registerBlockConfig(SyncContentS2C.BlockEntry entry) {
         try {
@@ -340,8 +297,8 @@ public class ContentManager {
                 return;
             }
 
-            // On reconnect, blocks may already be registered from the previous session.
-            // Track the existing block and apply fresh shape data — don't re-register.
+            // On reconnect the block survives from the previous session: track it and
+            // apply fresh shape data rather than re-registering.
             if (BuiltInRegistries.BLOCK.containsKey(id)) {
                 Block existing = BuiltInRegistries.BLOCK.getValue(id);
                 registeredBlocks.put(id, existing);
@@ -350,7 +307,6 @@ public class ContentManager {
                 return;
             }
 
-            // Clone properties from base block
             Identifier baseId = Identifier.tryParse(entry.baseBlockId());
             BlockBehaviour.Properties props;
             if (baseId != null) {
@@ -369,14 +325,12 @@ public class ContentManager {
             ResourceKey<Block> key = ResourceKey.create(Registries.BLOCK, id);
             props.setId(key);
 
-            // Resolve state properties
             Block baseBlock = baseId != null ? BuiltInRegistries.BLOCK.getValue(baseId) : null;
             List<net.minecraft.world.level.block.state.properties.Property<?>> stateProps = new java.util.ArrayList<>();
             for (String propSpec : entry.stateProperties()) {
-                // Format: "name:type:valuesOrCount"
-                // type: b=boolean, i=integer, e=enum(comma-separated names)
-                // or legacy "name:valueCount"
-                // For integers: new format "name:i:min:max" (split(":",3) gives parts[2]="min:max")
+                // Wire format: "name:type:valuesOrCount" where type is b=boolean, i=integer,
+                // e=enum (comma-separated names); integers use "name:i:min:max" (split(":",3)
+                // leaves parts[2]="min:max"); legacy form is "name:valueCount".
                 String[] parts = propSpec.split(":", 3);
                 String propName = parts[0];
                 String propType = "i";
@@ -389,7 +343,6 @@ public class ContentManager {
                         enumValues = parts[2];
                         valueCount = parts[2].split(",").length;
                     } else if ("i".equals(propType) && parts[2].contains(":")) {
-                        // New format: "min:max"
                         String[] minMax = parts[2].split(":", 2);
                         try {
                             intMin = Integer.parseInt(minMax[0]);
@@ -417,18 +370,15 @@ public class ContentManager {
                 }
             }
 
-            // Create the appropriate block class based on base block type or state properties.
-            // Using the correct class gives proper collision shapes, placement behavior, etc.
             Block block = createBlock(props, stateProps, baseBlock, entry.stateProperties());
             Registry.register(BuiltInRegistries.BLOCK, id, block);
             registeredBlocks.put(id, block);
 
-            // Apply server-provided VoxelShapes for correct collision and selection
             DynamicBlock.applyShapeData(block, entry.shapeData());
 
-            // Do NOT add states to BLOCK_STATE_REGISTRY here.
-            // States will be added with correct server IDs in remapBlockStateIds()
-            // which runs synchronously at JOIN time, before any chunks are decoded.
+            // Do NOT add states to BLOCK_STATE_REGISTRY here. They get the server's IDs
+            // in remapBlockStateIds(), which runs synchronously at JOIN time, before any
+            // chunks are decoded.
 
             Pandorical.LOGGER.debug("Config phase: registered block {} (base: {}, class: {}, states: {})",
                 entry.id(), entry.baseBlockId(), block.getClass().getSimpleName(),
@@ -488,10 +438,6 @@ public class ContentManager {
         }
     }
 
-    /**
-     * Returns true if content was synced during the configuration phase.
-     * Used to determine if play-phase sync should be skipped for blocks/items.
-     */
     public static boolean wasConfigPhaseSynced() {
         return configPhaseSynced;
     }
@@ -501,28 +447,25 @@ public class ContentManager {
     // ==========================================================================
 
     private static boolean allAssetsReceived() {
-        if (expectedAssetChunks == 0) return true; // No assets expected
-        if (expectedAssetChunks < 0) return false; // Not yet known (content packet hasn't arrived)
+        if (expectedAssetChunks == 0) return true;
+        if (expectedAssetChunks < 0) return false; // content packet hasn't arrived yet
         return assetChunks.size() == expectedAssetChunks
             && assetChunks.stream().noneMatch(Objects::isNull);
     }
 
     private static void unpackAssets() {
         try {
-            // Check total size before assembling
             long totalSize = assetChunks.stream().filter(Objects::nonNull).mapToLong(c -> c.length).sum();
             if (totalSize > MAX_ASSET_BYTES) {
                 Pandorical.LOGGER.error("Asset data too large: {} bytes (max {})", totalSize, MAX_ASSET_BYTES);
                 return;
             }
 
-            // Reassemble chunks
             ByteArrayOutputStream assembled = new ByteArrayOutputStream();
             for (byte[] chunk : assetChunks) {
                 if (chunk != null) assembled.write(chunk);
             }
 
-            // Decompress with size limit
             byte[] compressed = assembled.toByteArray();
             ByteArrayOutputStream decompressedBaos = new ByteArrayOutputStream();
             try (GZIPInputStream gzis = new GZIPInputStream(new ByteArrayInputStream(compressed))) {
@@ -540,7 +483,7 @@ public class ContentManager {
                 }
             }
 
-            // Parse: [pathUTF][dataLen][data] repeated
+            // Wire format: [pathUTF][dataLen][data] repeated
             DataInputStream dis = new DataInputStream(new ByteArrayInputStream(decompressedBaos.toByteArray()));
             int count = 0;
             while (dis.available() > 0) {
@@ -580,10 +523,9 @@ public class ContentManager {
             return;
         }
 
-        // If config-phase already registered blocks/items, skip registry work.
-        // Play-phase only needs to handle resource pack injection and non-registry features.
+        // If config-phase already registered blocks/items, skip registry work;
+        // play-phase then only handles resource pack injection and non-registry features.
         if (!configPhaseSynced) {
-            // Unfreeze registries
             unfreezeRegistry(BuiltInRegistries.BLOCK);
             unfreezeRegistry(BuiltInRegistries.ITEM);
             unfreezeRegistry(BuiltInRegistries.ENTITY_TYPE);
@@ -601,7 +543,6 @@ public class ContentManager {
                     registerItem(entry);
                 }
 
-                // Register stubs for additional registry types (play-phase fallback)
                 int stubCount = 0;
                 stubCount += registerEntityTypeStubs(content.entityTypes());
                 stubCount += registerBlockEntityTypeStubs(content.blockEntityTypes());
@@ -613,23 +554,19 @@ public class ContentManager {
                 Pandorical.LOGGER.info("Play phase fallback: registered {} blocks, {} items, and {} stubs on client",
                     content.blocks().size(), content.items().size(), stubCount);
             } finally {
-                // Don't re-freeze — 26.1 validates tags aren't present before freezing,
-                // but client tags are already loaded from initial startup.
+                // Don't re-freeze: 26.1 validates that tags aren't present before freezing,
+                // and client tags are already loaded from initial startup.
             }
         } else {
             Pandorical.LOGGER.debug("Play phase: skipping block/item/stub registration — already done in config phase");
         }
 
-        // Inject virtual resource pack and trigger reload
         injectResourcePack();
 
         ClientPlayNetworking.send(new ContentReadyC2S());
     }
 
-    /**
-     * Inject the virtual resource pack if it has resources.
-     * Called from both config-phase finalize (deferred) and play-phase finalize.
-     */
+    /** Called from both config-phase finalize (deferred) and play-phase finalize. */
     public static void injectResourcePack() {
         if (!virtualPack.hasResources()) {
             Pandorical.LOGGER.warn("Virtual pack has no resources — skipping injection");
@@ -642,22 +579,19 @@ public class ContentManager {
             return;
         }
 
-        // Log what's in the virtual pack for diagnostics
         var namespaces = virtualPack.getNamespaces(net.minecraft.server.packs.PackType.CLIENT_RESOURCES);
         Pandorical.LOGGER.info("Virtual pack contains {} namespaces: {}", namespaces.size(), namespaces);
         virtualPack.debugLangFiles();
 
-        // Add a custom RepositorySource to the PackRepository that provides our virtual pack.
-        // This ensures our pack is included in every future resource reload.
+        // Registering a RepositorySource (rather than adding the pack once) keeps the
+        // virtual pack included in every future resource reload.
         try {
             var packRepo = client.getResourcePackRepository();
-            // Get the 'sources' set from PackRepository
             var sourcesField = net.minecraft.server.packs.repository.PackRepository.class.getDeclaredField("sources");
             sourcesField.setAccessible(true);
             @SuppressWarnings("unchecked")
             var sources = (java.util.Set<net.minecraft.server.packs.repository.RepositorySource>) sourcesField.get(packRepo);
 
-            // Add our source if not already present
             var pandoricalSource = new net.minecraft.server.packs.repository.RepositorySource() {
                 @Override
                 public void loadPacks(java.util.function.Consumer<net.minecraft.server.packs.repository.Pack> consumer) {
@@ -686,7 +620,6 @@ public class ContentManager {
                 }
             };
 
-            // Make the set mutable if needed
             var mutableSources = new java.util.LinkedHashSet<>(sources);
             mutableSources.add(pandoricalSource);
             sourcesField.set(packRepo, mutableSources);
@@ -698,17 +631,14 @@ public class ContentManager {
             return;
         }
 
-        // Register block/item color providers for dynamic blocks that need biome tinting.
-        // This must happen before the resource reload so tinted models render correctly.
+        // Both registrations must precede the reload: tint providers so tinted models
+        // render correctly, and creative tab items because tab contents are rebuilt
+        // during reload.
         registerBlockColors(client);
-
-        // Register creative tab items BEFORE reload — tab contents are rebuilt during reload
         registerCreativeTabItems();
 
-        // Trigger full resource reload — now our pack will be included
         client.reloadResourcePacks().thenRun(() -> {
-            // After reload completes, force all chunks to re-render
-            // so they pick up the newly loaded block models
+            // Force all chunks to re-render so they pick up the newly loaded block models.
             Minecraft mc = Minecraft.getInstance();
             if (mc != null && mc.levelRenderer != null && mc.level != null) {
                 mc.levelRenderer.invalidateCompiledGeometry(
@@ -720,7 +650,6 @@ public class ContentManager {
                 Pandorical.LOGGER.info("Resource reload complete — invalidated compiled geometry for full re-render");
             }
 
-            // Verify the pack was actually loaded
             var repo = mc.getResourcePackRepository();
             boolean found = false;
             for (var pack : repo.getSelectedPacks()) {
@@ -736,20 +665,15 @@ public class ContentManager {
                     repo.getAvailableIds(), repo.getSelectedIds());
             }
 
-            // Verify language loaded
             var lang = net.minecraft.locale.Language.getInstance();
             String test = lang.getOrDefault("block.dirt-slab-justfatlard.dirt_slab", "NOT_FOUND");
             Pandorical.LOGGER.info("Lang test: block.dirt-slab-justfatlard.dirt_slab = '{}'", test);
         });
     }
 
-    /**
-     * Add all dynamically registered items to creative tabs so they appear in creative inventory.
-     */
     private static void registerCreativeTabItems() {
         if (pendingConfigContent == null) return;
         try {
-            // Categorize items by type for correct creative tab placement
             List<Item> buildingBlocks = new java.util.ArrayList<>();
             List<Item> combat = new java.util.ArrayList<>();
             List<Item> tools = new java.util.ArrayList<>();
@@ -764,15 +688,11 @@ public class ContentManager {
                 if (item == null || item == net.minecraft.world.item.Items.AIR) continue;
 
                 if (!entry.equipSlot().isEmpty()) {
-                    // Armor → Combat
                     combat.add(item);
                 } else if (!entry.toolType().isEmpty()) {
-                    // Tools/weapons → Tools & Utilities
                     tools.add(item);
                 } else if (item instanceof net.minecraft.world.item.BlockItem blockItem) {
                     var block = blockItem.getBlock();
-                    // Slabs, stairs, fences, walls → Building Blocks
-                    // Plants, crops, dirt variants → Natural Blocks
                     String blockId = entry.id();
                     if (blockId.contains("slab") || blockId.contains("stair") || blockId.contains("fence")
                             || blockId.contains("wall") || blockId.contains("post") || blockId.contains("floor")) {
@@ -783,11 +703,9 @@ public class ContentManager {
                             || blockId.contains("leaf") || blockId.contains("petals") || blockId.contains("snow")) {
                         naturalBlocks.add(item);
                     } else {
-                        // Other blocks (mailbox, table, etc.) → Functional
                         functional.add(item);
                     }
                 } else {
-                    // Everything else → Ingredients
                     ingredients.add(item);
                 }
             }
@@ -822,20 +740,15 @@ public class ContentManager {
             });
     }
 
-    /**
-     * Inject resource pack and force re-render after reload completes.
-     */
     public static void injectResourcePackAndReRender(Minecraft client) {
         injectResourcePack();
     }
 
     /**
-     * Register block color providers for dynamically registered blocks.
-     * If the block declares a baseBlockId, we copy the base block's tint sources so that
-     * biome-sensitive colours (foliage, grass, water, …) are inherited correctly.
-     * For blocks with no base, or whose base has no registered tints, we fall back to
-     * the grass tint as a reasonable default.
-     * Registering a tint on a block whose model has no tintindex faces is harmless.
+     * Register block color providers for dynamically registered blocks: tint sources are
+     * copied from the base block so biome-sensitive colours (foliage, grass, water) are
+     * inherited; blocks with no base tints fall back to the grass tint. Registering a
+     * tint on a block whose model has no tintindex faces is harmless.
      */
     private static void registerBlockColors(Minecraft client) {
         if (pendingConfigContent == null) return;
@@ -852,9 +765,8 @@ public class ContentManager {
                 Block block = BuiltInRegistries.BLOCK.getValue(id);
                 if (block == null) continue;
 
-                // Resolve tint sources from the base block when available.
-                // getTintSources() returns the sources registered for that block's
-                // default state, so we get exactly the same biome behaviour.
+                // getTintSources() returns the sources registered for the base block's
+                // default state, so the biome behaviour matches exactly.
                 List<net.minecraft.client.color.block.BlockTintSource> tintSources = null;
 
                 String baseBlockId = entry.baseBlockId();
@@ -893,7 +805,7 @@ public class ContentManager {
                 return;
             }
 
-            // On reconnect, reuse existing block
+            // On reconnect, reuse the existing block
             if (BuiltInRegistries.BLOCK.containsKey(id)) {
                 Block existing = BuiltInRegistries.BLOCK.getValue(id);
                 registeredBlocks.put(id, existing);
@@ -901,7 +813,6 @@ public class ContentManager {
                 return;
             }
 
-            // Clone properties from base block
             Identifier baseId = Identifier.tryParse(entry.baseBlockId());
             BlockBehaviour.Properties props;
             if (baseId != null) {
@@ -920,13 +831,10 @@ public class ContentManager {
             ResourceKey<Block> key = ResourceKey.create(Registries.BLOCK, id);
             props.setId(key);
 
-            // Resolve state properties from the base block or well-known names
             Block baseBlock = baseId != null ? BuiltInRegistries.BLOCK.getValue(baseId) : null;
             List<net.minecraft.world.level.block.state.properties.Property<?>> stateProps = new java.util.ArrayList<>();
             for (String propSpec : entry.stateProperties()) {
-                // Format: "name:type:valuesOrCount"
-                // type: b=boolean, i=integer, e=enum(comma-separated names)
-                // For integers: new format "name:i:min:max"
+                // Wire format: same as in registerBlockConfig above.
                 String[] parts = propSpec.split(":", 3);
                 String propName = parts[0];
                 String propType = "i";
@@ -965,12 +873,10 @@ public class ContentManager {
                 }
             }
 
-            // Create the appropriate block class based on base block type or state properties.
             Block block = createBlock(props, stateProps, baseBlock, entry.stateProperties());
             Registry.register(BuiltInRegistries.BLOCK, id, block);
             registeredBlocks.put(id, block);
 
-            // Apply server-provided VoxelShapes
             DynamicBlock.applyShapeData(block, entry.shapeData());
 
             // Register block states at the exact IDs the server uses
@@ -980,7 +886,7 @@ public class ContentManager {
                     Block.BLOCK_STATE_REGISTRY.addMapping(possibleStates.get(i), entry.stateIds().get(i));
                 }
             } else {
-                // Fallback — append sequentially (IDs may not match server)
+                // Fallback: append sequentially (IDs may not match the server's)
                 for (BlockState state : possibleStates) {
                     Block.BLOCK_STATE_REGISTRY.add(state);
                 }
@@ -1011,20 +917,18 @@ public class ContentManager {
             ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id);
             var props = new Item.Properties().setId(key);
 
-            // Apply durability or stack size (mutually exclusive in MC)
+            // Durability and stack size are mutually exclusive in MC
             if (entry.maxDamage() > 0) {
                 props.durability(entry.maxDamage());
             } else {
                 props.stacksTo(entry.maxStackSize());
             }
 
-            // Apply equipment slot if present (armor)
             if (!entry.equipSlot().isEmpty()) {
                 var slot = net.minecraft.world.entity.EquipmentSlot.byName(entry.equipSlot());
                 props.equippable(slot);
             }
 
-            // If there's a block with the same ID, create a BlockItem.
             Item item;
             Block block = registeredBlocks.get(id);
             if (block == null) {
@@ -1038,7 +942,6 @@ public class ContentManager {
             }
             registerWithHolder(BuiltInRegistries.ITEM, id, item);
 
-            // Log description ID for diagnosis
             if (entry.id().contains("dirt_slab") && !entry.id().contains("coarse")) {
                 Pandorical.LOGGER.info("ITEM DIAG: {} class={} descId='{}' block={}",
                     entry.id(), item.getClass().getSimpleName(),
@@ -1050,22 +953,22 @@ public class ContentManager {
     }
 
     /**
-     * Create the appropriate Block subclass based on the base block type or state property patterns.
-     * Using the correct class (e.g., SlabBlock for slabs) provides proper collision shapes,
-     * placement behavior, and interaction logic that a plain Block/DynamicBlock cannot.
+     * Pick the Block subclass from the base block type or state property patterns:
+     * the right class (e.g. SlabBlock for slabs) provides collision shapes, placement,
+     * and interaction logic that a plain Block/DynamicBlock cannot.
      */
     private static Block createBlock(BlockBehaviour.Properties props,
                                      List<net.minecraft.world.level.block.state.properties.Property<?>> stateProps,
                                      Block baseBlock, List<String> rawPropSpecs) {
-        // All dynamic blocks need noOcclusion — we don't know the shape at construction time.
-        // Server-provided VoxelShapes are applied after construction. Without this, MC assumes
-        // full-cube occlusion and incorrectly culls adjacent block faces.
+        // All dynamic blocks need noOcclusion: the shape isn't known at construction time
+        // (server-provided VoxelShapes arrive after), and without it MC assumes full-cube
+        // occlusion and incorrectly culls adjacent block faces.
         props.noOcclusion();
 
         boolean isSlab = baseBlock instanceof net.minecraft.world.level.block.SlabBlock || isSlabFromProperties(rawPropSpecs);
 
         if (isSlab) {
-            // Filter out type and waterlogged — SlabBlock adds those itself
+            // Filter out type and waterlogged; SlabBlock adds those itself
             List<net.minecraft.world.level.block.state.properties.Property<?>> extraProps = new java.util.ArrayList<>();
             for (var prop : stateProps) {
                 String name = prop.getName();
@@ -1075,10 +978,9 @@ public class ContentManager {
             }
 
             if (extraProps.isEmpty()) {
-                // Pure slab — use vanilla SlabBlock directly
                 return new net.minecraft.world.level.block.SlabBlock(props);
             } else {
-                // Slab with extra properties (snowy, moisture, etc.) — use DynamicSlabBlock
+                // Slab with extra properties (snowy, moisture, etc.)
                 return DynamicSlabBlock.create(props, extraProps);
             }
         }
@@ -1103,13 +1005,11 @@ public class ContentManager {
     }
 
     // ==========================================================================
-    // Stub registration for additional registry types
+    // Stub registration: each registers inert entries so Fabric's registry sync
+    // doesn't reject the server's IDs for registry types the client can't fully
+    // reconstruct. Each returns the number of entries registered.
     // ==========================================================================
 
-    /**
-     * Register stub EntityType entries so Fabric's registry sync doesn't reject them.
-     * Returns the number of entries registered.
-     */
     @SuppressWarnings("unchecked")
     private static int registerEntityTypeStubs(List<String> ids) {
         int count = 0;
@@ -1138,10 +1038,6 @@ public class ContentManager {
         return count;
     }
 
-    /**
-     * Register stub BlockEntityType entries so Fabric's registry sync doesn't reject them.
-     * Returns the number of entries registered.
-     */
     private static int registerBlockEntityTypeStubs(List<String> ids) {
         int count = 0;
         for (String idStr : ids) {
@@ -1167,10 +1063,6 @@ public class ContentManager {
         return count;
     }
 
-    /**
-     * Register stub VillagerProfession entries so Fabric's registry sync doesn't reject them.
-     * Returns the number of entries registered.
-     */
     private static int registerVillagerProfessionStubs(List<String> ids) {
         int count = 0;
         for (String idStr : ids) {
@@ -1184,18 +1076,15 @@ public class ContentManager {
                     Pandorical.LOGGER.debug("Config phase: villager profession '{}' already registered — skipping", idStr);
                     continue;
                 }
-                // Public record constructor: (name, heldJobSite, acquirableJobSite, requestedItems, secondaryPoi, workSound, tradeSetsByLevel)
                 VillagerProfession stub = new VillagerProfession(
                     net.minecraft.network.chat.Component.literal(idStr),
-                    holder -> false,  // heldJobSite — matches nothing
-                    holder -> false,  // acquirableJobSite — matches nothing
+                    holder -> false,  // heldJobSite: matches nothing
+                    holder -> false,  // acquirableJobSite: matches nothing
                     com.google.common.collect.ImmutableSet.of(),
                     com.google.common.collect.ImmutableSet.of(),
-                    null,  // workSound — no sound
+                    null,  // workSound
                     new it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<>()
                 );
-                // Create intrusive holder first, then register
-                
                 registerWithHolder(BuiltInRegistries.VILLAGER_PROFESSION, id, stub);
                 count++;
                 Pandorical.LOGGER.debug("Config phase: registered stub villager profession: {}", idStr);
@@ -1206,10 +1095,6 @@ public class ContentManager {
         return count;
     }
 
-    /**
-     * Register stub PoiType entries so Fabric's registry sync doesn't reject them.
-     * Returns the number of entries registered.
-     */
     private static int registerPoiTypeStubs(List<String> ids) {
         int count = 0;
         for (String idStr : ids) {
@@ -1223,7 +1108,6 @@ public class ContentManager {
                     Pandorical.LOGGER.debug("Config phase: POI type '{}' already registered — skipping", idStr);
                     continue;
                 }
-                // Public record constructor: (matchingStates, maxTickets, validRange)
                 PoiType stub = new PoiType(java.util.Set.of(), 0, 0);
                 registerWithHolder(BuiltInRegistries.POINT_OF_INTEREST_TYPE, id, stub);
                 count++;
@@ -1235,10 +1119,6 @@ public class ContentManager {
         return count;
     }
 
-    /**
-     * Register stub MenuType entries so Fabric's registry sync doesn't reject them.
-     * Returns the number of entries registered.
-     */
     @SuppressWarnings("unchecked")
     private static int registerMenuTypeStubs(List<String> ids) {
         int count = 0;
@@ -1265,10 +1145,6 @@ public class ContentManager {
         return count;
     }
 
-    /**
-     * Register stub RecipeBookCategory entries so Fabric's registry sync doesn't reject them.
-     * Returns the number of entries registered.
-     */
     private static int registerRecipeBookCategoryStubs(List<String> ids) {
         int count = 0;
         for (String idStr : ids) {
@@ -1327,11 +1203,7 @@ public class ContentManager {
         }
     }
 
-    /**
-     * Register an entry into a registry with proper intrusive holder creation.
-     * This handles the case where registries have been unfrozen and need
-     * intrusive holders created manually.
-     */
+    /** Unfrozen registries need intrusive holders created manually before register(). */
     @SuppressWarnings("unchecked")
     private static <T> void registerWithHolder(Registry<T> registry, Identifier id, T entry) {
         if (registry instanceof MappedRegistry<T> mapped) {
@@ -1341,13 +1213,9 @@ public class ContentManager {
     }
 
     /**
-     * Remap block state IDs to match the server's IDs.
-     * Called after Fabric's registry sync has completed (during play-phase JOIN).
-     *
-     * Block.BLOCK_STATE_REGISTRY is an IdMapper that doesn't participate in Fabric's
-     * registry sync. The IDs assigned during config-phase registration via add() may
-     * differ from the server's IDs. This method uses the server's state IDs from the
-     * content sync to re-map entries to the correct positions.
+     * Remap block state IDs to the server's IDs, after Fabric's registry sync completes
+     * (play-phase JOIN). Block.BLOCK_STATE_REGISTRY is an IdMapper outside Fabric's
+     * registry sync, so config-phase IDs may differ from the server's.
      */
     public static void remapBlockStateIds() {
         if (pendingConfigContent == null) return;
@@ -1370,7 +1238,7 @@ public class ContentManager {
 
                 for (int i = 0; i < possibleStates.size(); i++) {
                     int serverId = entry.stateIds().get(i);
-                    // Always use addMapping with server's ID — states may not be in the registry yet
+                    // addMapping, not add: states may not be in the registry yet
                     Block.BLOCK_STATE_REGISTRY.addMapping(possibleStates.get(i), serverId);
                     remapped++;
                 }
@@ -1381,7 +1249,7 @@ public class ContentManager {
 
         if (remapped > 0) {
             Pandorical.LOGGER.info("Remapped {} block state IDs to match server", remapped);
-            // Thorough diagnostics for one block
+            // One-block diagnostic dump (dirt_slab as the sample)
             for (SyncContentS2C.BlockEntry entry : pendingConfigContent.blocks()) {
                 if (entry.id().contains("dirt_slab") && !entry.id().contains("coarse") && !entry.stateIds().isEmpty()) {
                     Identifier testId = Identifier.tryParse(entry.id());
@@ -1393,12 +1261,10 @@ public class ContentManager {
                     int sid = entry.stateIds().get(0);
                     var resolved = Block.BLOCK_STATE_REGISTRY.byId(sid);
                     Pandorical.LOGGER.info("DIAG: stateId[0]={} resolves to {}", sid, resolved);
-                    // Check if the item exists
                     Item testItem = BuiltInRegistries.ITEM.getValue(testId);
                     Pandorical.LOGGER.info("DIAG: item={} class={} maxStack={}",
                         testId, testItem != null ? testItem.getClass().getName() : "null",
                         testItem != null ? testItem.getDefaultMaxStackSize() : -1);
-                    // Check if the virtual pack has the blockstate file
                     var bsId = Identifier.fromNamespaceAndPath("dirt-slab-justfatlard", "blockstates/rooted_dirt_slab.json");
                     var bsResource = virtualPack.getResource(net.minecraft.server.packs.PackType.CLIENT_RESOURCES, bsId);
                     Pandorical.LOGGER.info("DIAG: virtualPack has blockstate file? {}", bsResource != null);
@@ -1409,16 +1275,13 @@ public class ContentManager {
                             Pandorical.LOGGER.info("DIAG: blockstate file size={} content='{}'", bytes.length, new String(bytes).substring(0, Math.min(200, bytes.length)));
                         } catch (Exception ex) { Pandorical.LOGGER.warn("DIAG: couldn't read blockstate", ex); }
                     }
-                    // Also check model
-                    var modelId = Identifier.fromNamespaceAndPath("dirt-slab-justfatlard", "models/block/rooted_dirt_slab.json");
+                                var modelId = Identifier.fromNamespaceAndPath("dirt-slab-justfatlard", "models/block/rooted_dirt_slab.json");
                     var modelResource = virtualPack.getResource(net.minecraft.server.packs.PackType.CLIENT_RESOURCES, modelId);
                     Pandorical.LOGGER.info("DIAG: virtualPack has model file? {}", modelResource != null);
-                    // Check block state toString representation (how MC builds variant keys)
                     for (var state : testBlock.getStateDefinition().getPossibleStates()) {
                         Pandorical.LOGGER.info("DIAG: state.toString()='{}' regId={}", state.toString(), Block.BLOCK_STATE_REGISTRY.getId(state));
-                        break; // Just first one
+                        break;
                     }
-                    // Check each state's variant string
                     for (var state : testBlock.getStateDefinition().getPossibleStates()) {
                         var props = new StringBuilder();
                         for (var prop : state.getProperties()) {

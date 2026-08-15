@@ -34,7 +34,7 @@ public class Pandorical implements ModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     public static final int PROTOCOL_VERSION = 1;
 
-    public static final List<String> SERVER_CAPABILITIES = List.of("screens", "content", "camera", "hud");
+    public static final List<String> SERVER_CAPABILITIES = List.of("screens", "content", "camera", "hud", "structures", "entity_overlays", "keybinds");
 
     /**
      * Tracks player UUIDs (from GameProfile) that completed config-phase content sync.
@@ -53,16 +53,16 @@ public class Pandorical implements ModInitializer {
     @Override
     public void onInitialize() {
         // Auto-detect and register all non-system mod namespaces as server-only.
-        // Only on dedicated server — on client this would incorrectly filter everything.
+        // Only on dedicated server; on the client this would incorrectly filter everything.
         if (net.fabricmc.loader.api.FabricLoader.getInstance().getEnvironmentType() == net.fabricmc.api.EnvType.SERVER) {
             autoRegisterServerOnlyNamespaces();
-            // Auto-scan assets for ALL server-only mods
             PandoricalApi.contentRegistry().autoScanAllModAssets();
         }
 
         registerPayloads();
         registerConfigPhase();
         registerServerHandlers();
+        registerStructureTracking();
 
         LOGGER.info("Pandorical initialized — protocol v{}, server-only namespaces: {}",
             PROTOCOL_VERSION,
@@ -140,11 +140,19 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(SyncAssetsS2C.TYPE, SyncAssetsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(CameraHintS2C.TYPE, CameraHintS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(EntityRenderersS2C.TYPE, EntityRenderersS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(SpawnStructureS2C.TYPE, SpawnStructureS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(UpdateStructurePoseS2C.TYPE, UpdateStructurePoseS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(UpdateStructureBlocksS2C.TYPE, UpdateStructureBlocksS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(SetStructureVisibleS2C.TYPE, SetStructureVisibleS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(DespawnStructureS2C.TYPE, DespawnStructureS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(EntityOverlayS2C.TYPE, EntityOverlayS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(KeybindDeclarationsS2C.TYPE, KeybindDeclarationsS2C.STREAM_CODEC);
 
         // C2S play
         PayloadTypeRegistry.serverboundPlay().register(HelloC2S.TYPE, HelloC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(ScreenActionC2S.TYPE, ScreenActionC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(ContentReadyC2S.TYPE, ContentReadyC2S.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(KeyPressC2S.TYPE, KeyPressC2S.STREAM_CODEC);
     }
 
     /**
@@ -185,8 +193,8 @@ public class Pandorical implements ModInitializer {
                         var poiTypes = contentRegistry.buildPoiTypeEntries();
                         var menuTypes = contentRegistry.buildMenuTypeEntries();
                         var recipeBookCategories = contentRegistry.buildRecipeBookCategoryEntries();
-                        // Use reflection to add task at the FRONT of the queue
-                        // so it runs before Fabric's SynchronizeRegistriesTask
+                        // Reflection puts the task at the FRONT of the queue so it runs
+                        // before Fabric's SynchronizeRegistriesTask
                         var task = new PandoricalSyncTask(blocks, items, assetChunks,
                             entityTypes, blockEntityTypes, villagerProfessions,
                             poiTypes, menuTypes, recipeBookCategories);
@@ -196,7 +204,6 @@ public class Pandorical implements ModInitializer {
                             field.setAccessible(true);
                             @SuppressWarnings("unchecked")
                             var queue = (java.util.Queue<net.minecraft.server.network.ConfigurationTask>) field.get(handler);
-                            // Insert at front by creating a new deque
                             var newQueue = new java.util.ArrayDeque<net.minecraft.server.network.ConfigurationTask>();
                             newQueue.add(task);
                             newQueue.addAll(queue);
@@ -223,7 +230,6 @@ public class Pandorical implements ModInitializer {
             context.server().execute(() -> {
                 var player = context.player();
 
-                // Validate protocol version
                 if (payload.protocolVersion() != PROTOCOL_VERSION) {
                     LOGGER.warn("Player {} has Pandorical protocol v{} (server is v{}) — features may not work correctly",
                         player.getName().getString(), payload.protocolVersion(), PROTOCOL_VERSION);
@@ -238,17 +244,27 @@ public class Pandorical implements ModInitializer {
                     payload.protocolVersion(),
                     payload.capabilities());
 
-                // Sync content if available and not already done in config phase.
                 var contentRegistry = PandoricalApi.contentRegistry();
                 if (contentRegistry.hasContent()
                         && PandoricalApi.hasCapability(player, "content")
-                        && !PandoricalApi.isContentReady(player)) {
+                        && !PandoricalApi.isContentReady(player)
+                        && PandoricalApi.beginContentSync(player.getUUID())) {
                     contentRegistry.syncContentTo(player);
                 }
 
-                // Send entity renderer registrations to the client.
                 sendEntityRenderers(player);
+                // On join, entity tracking starts before this handshake
+                // completes, so replay overlays for already-tracked entities
+                PandoricalApi.entityOverlaysImpl().handlePlayerReady(player);
+                PandoricalApi.keybindsImpl().handlePlayerReady(player);
             });
+        });
+
+        // Pooled keybind presses: all validation (capability, slot, rate
+        // limit) happens inside handleKeyPress, on the server thread
+        ServerPlayNetworking.registerGlobalReceiver(KeyPressC2S.TYPE, (payload, context) -> {
+            context.server().execute(() ->
+                PandoricalApi.keybindsImpl().handleKeyPress(context.player(), payload.slot()));
         });
 
         ServerPlayNetworking.registerGlobalReceiver(ScreenActionC2S.TYPE, (payload, context) -> {
@@ -275,7 +291,7 @@ public class Pandorical implements ModInitializer {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             sender.sendPacket(new HelloS2C(PROTOCOL_VERSION, SERVER_CAPABILITIES));
 
-            // Track config-phase players for later — don't pre-register capabilities yet
+            // Track config-phase players for later; don't pre-register capabilities yet
             // because the client can't deserialize full component data (armor materials, etc.)
             // until after the handshake. Capabilities are registered on HelloC2S arrival.
             var player = handler.getPlayer();
@@ -322,6 +338,26 @@ public class Pandorical implements ModInitializer {
         if (!impl.hasEntries()) return;
         ServerConfigurationNetworking.send(handler, impl.buildPacket());
         LOGGER.debug("Sent {} block tint group(s) during config phase", impl.buildPacket().entries().size());
+    }
+
+    /**
+     * Ties structure visibility to real entity tracking: a player who starts tracking a
+     * structure's anchor entity gets the structure spawned to them; a player who stops
+     * tracking it (out of range, entity removed, or disconnect) gets it despawned.
+     * See {@link justfatlard.pandorical.api.StructureApi} for the broadcast-scoped design.
+     */
+    private void registerStructureTracking() {
+        net.fabricmc.fabric.api.networking.v1.EntityTrackingEvents.START_TRACKING.register(
+            (entity, player) -> {
+                PandoricalApi.structuresImpl().handleStartTracking(entity, player);
+                PandoricalApi.entityOverlaysImpl().handleStartTracking(entity, player);
+            });
+        net.fabricmc.fabric.api.networking.v1.EntityTrackingEvents.STOP_TRACKING.register(
+            (entity, player) -> PandoricalApi.structuresImpl().handleStopTracking(entity, player));
+        // Overlay state does not persist: drop it when the entity unloads and
+        // let the owning mod re-set it on load (see EntityOverlayApi javadoc)
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents.ENTITY_UNLOAD.register(
+            (entity, world) -> PandoricalApi.entityOverlaysImpl().handleEntityUnload(entity));
     }
 
     /**

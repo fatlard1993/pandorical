@@ -145,6 +145,6 @@ public class VirtualResourcePack implements PackResources {
 
     @Override
     public void close() {
-        // No-op — in-memory pack
+        // No-op; in-memory pack
     }
 }

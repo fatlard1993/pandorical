@@ -1,5 +1,5 @@
 plugins {
-    id 'net.fabricmc.fabric-loom' version '1.17.12'
+    id 'net.fabricmc.fabric-loom' version '1.17.17'
     id 'maven-publish'
 }
 
@@ -44,6 +44,19 @@ tasks.withType(JavaCompile).configureEach {
     it.options.release = 25
 }
 
+// Automated join testing: makes runClient connect straight to a server,
+// e.g. ./gradlew runClient -PquickJoin=localhost:25565
+// Appended in doFirst: loom composes its own game args during configuration,
+// and this must land after them, right before exec
+if (project.hasProperty('quickJoin')) {
+    tasks.named('runClient') {
+        doFirst {
+            args('--quickPlayMultiplayer', project.property('quickJoin').toString())
+            logger.lifecycle("runClient game args: {}", args)
+        }
+    }
+}
+
 java {
     withSourcesJar()
 
@@ -59,9 +72,11 @@ jar {
 
 tasks.register('syncClient', Copy) {
     dependsOn build
+    def deployDir = findProperty('devClientModsDir')
+    onlyIf { deployDir != null }
     from("build/libs/${project.archives_base_name}-${project.mod_version}.jar")
-    into('/Users/chase.whitfield/Projects/village-client/mods')
-    description = 'Deploy pandorical JAR to the local dev client mods folder.'
+    into(deployDir ?: layout.buildDirectory.dir('deploy').get())
+    description = 'Deploy pandorical JAR to the dev client mods folder (set -PdevClientModsDir=... or it no-ops).'
 }
 
 publishing {

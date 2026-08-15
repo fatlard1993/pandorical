@@ -16,8 +16,8 @@ public final class EntityRendererRegistry {
 
     /**
      * Supported renderer keys.
-     * "thrown_item" — ThrownItemRenderer (for thrown projectile items)
-     * "invisible"   — NoopRenderer (renders nothing; useful for server-side-only logic entities)
+     * "thrown_item": ThrownItemRenderer (for thrown projectile items)
+     * "invisible":   NoopRenderer (renders nothing; useful for server-side-only logic entities)
      */
     public static final String KEY_THROWN_ITEM = "thrown_item";
     public static final String KEY_INVISIBLE = "invisible";

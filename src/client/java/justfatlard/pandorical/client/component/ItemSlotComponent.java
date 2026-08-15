@@ -8,7 +8,7 @@ import java.util.Map;
 /**
  * Renders a single item slot background with optional lock overlay.
  * When used inside a container screen, the actual item rendering is handled
- * by vanilla's slot overlay system — this just draws the visual frame.
+ * by vanilla's slot overlay system; this draws only the visual frame.
  *
  * Rendering pattern from BackpackInventoryScreen.drawSlotBackground().
  */

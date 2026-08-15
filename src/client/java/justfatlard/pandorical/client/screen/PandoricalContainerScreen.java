@@ -60,6 +60,14 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     }
 
     @Override
+    public void containerTick() {
+        super.containerTick();
+        for (PandoricalComponent component : components) {
+            ScreenHelper.tickTree(component);
+        }
+    }
+
+    @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         // super handles blur/background (can only fire once per frame in 26.3+)
         // and renders vanilla slot overlays (items, hover highlights)
@@ -75,7 +83,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
 
     @Override
     protected void extractLabels(GuiGraphicsExtractor context, int mouseX, int mouseY) {
-        // Labels are handled by TextComponent — suppress defaults
+        // Labels are handled by TextComponent; suppress defaults
     }
 
     @Override
@@ -88,7 +96,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        if (ScreenHelper.dispatchKeyPressed(components, event.key(), event.scancode(), event.modifiers())) {
+        if (ScreenHelper.dispatchKeyPressed(components, event.key(), event.keycode(), event.modifiers())) {
             return true;
         }
         return super.keyPressed(event);

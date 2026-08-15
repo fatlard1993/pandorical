@@ -68,6 +68,15 @@ public final class HudManager {
 		return activeOverlays;
 	}
 
+	/** Advance client-side interpolation for every active overlay's component tree by one client tick. */
+	public static void tick() {
+		for (HudOverlay overlay : activeOverlays.values()) {
+			for (PandoricalComponent root : overlay.roots) {
+				ScreenHelper.tickTree(root);
+			}
+		}
+	}
+
 	public static void clear() {
 		activeOverlays.clear();
 	}

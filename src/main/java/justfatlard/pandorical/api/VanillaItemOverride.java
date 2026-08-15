@@ -70,7 +70,7 @@ public class VanillaItemOverride {
      * namespace, or when the vanilla model chain isn't sufficient for the retexture.
      *
      * If only a texture is provided (no model override), the vanilla items/ JSON and
-     * model chain are preserved — only the texture PNG is replaced.
+     * model chain are preserved; only the texture PNG is replaced.
      */
     public VanillaItemOverride model(String modelPath) {
         this.modelPath = modelPath;

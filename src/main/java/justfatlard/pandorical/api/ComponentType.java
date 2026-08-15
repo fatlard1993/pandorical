@@ -19,13 +19,52 @@ public final class ComponentType {
     public static final String SCROLL_PANEL = "scroll_panel";
     public static final String SPRITE = "sprite";
     public static final String MAP = "map";
+    /** A small burst of particle-like sprites the client simulates locally (currently: orbit motion). */
+    public static final String PARTICLE_BURST = "particle_burst";
 
     // --- Common prop keys ---
 
     /** Background color. Accepts #RRGGBB or #AARRGGBB. Used by: panel, scroll_panel, sprite */
     public static final String PROP_BACKGROUND = "background";
-    /** Text color. Accepts #RRGGBB or #AARRGGBB. Used by: text, button */
+    /**
+     * Full texture identifier including extension for a textured sprite, e.g.
+     * {@code "mymod:textures/gui/my_icon.png"} (synced mod assets resolve through the virtual
+     * resource pack). The texture is stretched to the component's bounds. When absent or
+     * unresolvable the sprite falls back to its color fill, which is also what clients
+     * predating this prop render. Used by: sprite
+     */
+    public static final String PROP_TEXTURE = "texture";
+    /** Text color. Accepts #RRGGBB or #AARRGGBB. Used by: text, button, particle_burst */
     public static final String PROP_COLOR = "color";
+
+    // --- Geometry update keys ---
+    // These are recognized directly by AbstractComponent.updateProps() and applied to the
+    // component's live x/y/width/height fields (in addition to sitting in the generic prop map),
+    // rather than requiring a separate typed field on the ComponentUpdate wire record. This keeps
+    // the wire format unchanged (still Map<String,String>) and matches the existing convention of
+    // encoding all numeric values as parseable strings (as color/int/float props already do).
+
+    /** Absolute new X position (pixels). Recognized by every component type. */
+    public static final String PROP_X = "x";
+    /** Absolute new Y position (pixels). Recognized by every component type. */
+    public static final String PROP_Y = "y";
+    /** Absolute new width (pixels). Recognized by every component type. */
+    public static final String PROP_WIDTH = "width";
+    /** Absolute new height (pixels). Recognized by every component type. */
+    public static final String PROP_HEIGHT = "height";
+    /**
+     * Uniform scale multiplier (1.0 = no scaling), applied around the component's center.
+     * Parsed generically by every component type (needed so the shared render-time interpolation
+     * transform in ScreenHelper always has a valid value), but only officially supported/documented
+     * as a settable prop on: sprite, text.
+     */
+    public static final String PROP_SCALE = "scale";
+    /**
+     * Rotation in degrees, applied around the component's center.
+     * Parsed generically by every component type (see {@link #PROP_SCALE}), but only officially
+     * supported/documented as a settable prop on: sprite, text.
+     */
+    public static final String PROP_ROTATION = "rotation";
 
     // Panel props
     /** Border style: "beveled" (default) or "flat". */
@@ -42,17 +81,16 @@ public final class ComponentType {
     public static final String PROP_LABEL = "label";
     /** Translatable key for button label. */
     public static final String PROP_LABEL_KEY = "label_key";
-    /** "true"/"false" — whether the button is clickable. */
+    /** "true"/"false": whether the button is clickable. */
     public static final String PROP_ENABLED = "enabled";
     /** Button style: "default" or "accepted" (green). */
     public static final String PROP_STYLE = "style";
 
     // Text props
-    /** Display text. */
     public static final String PROP_TEXT = "text";
     /** Translatable key for display text. */
     public static final String PROP_TEXT_KEY = "text_key";
-    /** "true"/"false" — render text with shadow. */
+    /** "true"/"false": render text with shadow. */
     public static final String PROP_SHADOW = "shadow";
     /** Max pixel width before wrapping. 0 = no wrap (default). */
     public static final String PROP_WRAP_WIDTH = "wrap_width";
@@ -66,9 +104,8 @@ public final class ComponentType {
     public static final String PROP_PLACEHOLDER = "placeholder";
     /** Translatable key for placeholder. */
     public static final String PROP_PLACEHOLDER_KEY = "placeholder_key";
-    /** Current input value. */
     public static final String PROP_VALUE = "value";
-    /** "true"/"false" — whether the input accepts text. */
+    /** "true"/"false": whether the input accepts text. */
     public static final String PROP_EDITABLE = "editable";
 
     // ItemIcon props
@@ -80,15 +117,13 @@ public final class ComponentType {
     // ItemSlot props
     /** Slot index in the container. */
     public static final String PROP_SLOT_INDEX = "slot_index";
-    /** "true"/"false" — visual locked state. */
+    /** "true"/"false": visual locked state. */
     public static final String PROP_LOCKED = "locked";
     /** Slot border style: "beveled" (default) or "flat". */
     public static final String PROP_SLOT_STYLE = "slot_style";
 
     // InventoryGrid props
-    /** Number of rows in the grid. */
     public static final String PROP_ROWS = "rows";
-    /** Number of columns in the grid. */
     public static final String PROP_COLS = "cols";
     /** Starting slot index. */
     public static final String PROP_START_SLOT = "start_slot";
@@ -104,12 +139,31 @@ public final class ComponentType {
     public static final String PROP_VISIBLE_ITEMS = "visible_items";
     /** Total item count for scroll bounds. */
     public static final String PROP_TOTAL_ITEMS = "total_items";
-    /** "true"/"false" — show scrollbar. */
+    /** "true"/"false": show scrollbar. */
     public static final String PROP_SHOW_SCROLLBAR = "show_scrollbar";
 
     // Map props
     /** Map ID (integer). The vanilla MapId to render. */
     public static final String PROP_MAP_ID = "map_id";
-    /** "true"/"false" — rotate map with player facing. Requires compass. */
+    /** "true"/"false": rotate map with player facing. Requires compass. */
     public static final String PROP_ROTATE = "rotate";
+
+    // ParticleBurst props
+    /** Number of particles in the burst. Default 8. */
+    public static final String PROP_PARTICLE_COUNT = "particle_count";
+    /** Pixel size of each individual particle square. Default 3. */
+    public static final String PROP_PARTICLE_SIZE = "particle_size";
+    /**
+     * Motion pattern. Only {@code "orbit"} (the default) is implemented: particles are evenly
+     * spaced around a circle centered on the component's bounds and rotate at {@link #PROP_SPEED}
+     * degrees/second. Reserved for future patterns (e.g. burst-and-fade); an unrecognized value
+     * currently falls back to orbit.
+     */
+    public static final String PROP_MOTION = "motion";
+    /** Orbit radius in pixels. Defaults to half the component's shorter bound dimension. */
+    public static final String PROP_RADIUS = "radius";
+    /** Orbit angular speed in degrees/second. Negative values orbit the other direction. Default 90. */
+    public static final String PROP_SPEED = "speed";
+    /** Starting angle offset in degrees for the first particle. Default 0. */
+    public static final String PROP_START_ANGLE = "start_angle";
 }

@@ -2,35 +2,41 @@
 
 Client-side enablement bridge for server-driven UI, content, and rendering on Fabric.
 
-Server mods declare screens, HUD overlays, custom blocks/items, and camera hints. Pandorical handles the protocol, asset sync, and client rendering — vanilla clients join unaffected.
+Server mods declare screens, HUD overlays, custom blocks/items, and camera hints. Pandorical handles the protocol, asset sync, and client rendering; vanilla clients join unaffected.
 
 ## Capabilities
 
 | Capability | What it does |
 |---|---|
 | `screens` | Open, update, and close declarative UI screens per-player |
-| `hud` | Show, update, and hide persistent HUD overlays |
-| `content` | Sync custom blocks, items, and assets to the client on join |
+| `hud` | Show, update, and hide persistent HUD overlays, including animated components (mutable geometry, scale/rotation, and client-side interpolation between updates), and a `particle_burst` component for lightweight local particle effects |
+| `content` | Sync custom blocks, items, and assets to the client on join, and override the appearance of vanilla items for Pandorical clients only |
 | `camera` | Control camera distance and perspective |
+| `playerInventory` | Register extra inventory slots that appear in the vanilla inventory screen and persist across sessions |
+| `blockTints` | Register biome-color and constant tint mappings for custom blocks |
+| `structures` | Display moving, rotating clusters of blocks (e.g. rideable ships) to Pandorical clients as a single batch-rendered object |
+| `entity_overlays` | Overlay an extra texture layer on a specific living entity's model (per-entity cosmetics), pushed automatically to every player tracking that entity |
+| `keybinds` | Server-declared rebindable keybinds: mods claim slots from a fixed client-side pool (category "Pandorical", slot 1 defaults to G), name them via synced lang, and receive presses server-side; the declaring mod ships zero client code |
+| entity rendering | Register simple built-in renderers (`thrown_item`, `invisible`) for custom entity types without needing a full client-side model |
 
 ## Requirements
 
-- Minecraft 26.1
-- Fabric Loader 0.18.5+
-- Fabric API 0.144.3+26.1
-- Java 25
+- Targets the Minecraft, Fabric Loader, and Fabric API versions declared in this mod's `gradle.properties`; check there for the exact currently-supported version
+- Java version as declared in `fabric.mod.json`'s `depends` block
 
 ## Usage
 
 Add Pandorical as a dependency and interact through `PandoricalApi`.
 
 ```java
-// Check before any API call — guards players on vanilla clients
+// Check before any API call; guards players on vanilla clients
 if (!PandoricalApi.isAvailable(player)) return;
 
 // Per-capability guard
 if (!PandoricalApi.hasCapability(player, "screens")) return;
 ```
+
+**Timing:** `isAvailable(player)` and `hasCapability(...)` return false until the client's capability handshake completes, which lands shortly *after* the player's JOIN event, not before. Don't push a screen or HUD straight from a JOIN handler; defer it (a tick or two after join, or trigger off the player's own first action) or the push silently no-ops.
 
 ### Screens
 
@@ -86,7 +92,7 @@ content.registerModAssets("my-mod"); // auto-scans classpath assets/
 content.overrideVanillaItem("minecraft:rabbit_hide", new VanillaItemOverride(...));
 ```
 
-Content readiness is tracked per-player — wait for `isContentReady` before opening screens that depend on synced assets:
+Content readiness is tracked per-player; wait for `isContentReady` before opening screens that depend on synced assets:
 
 ```java
 if (PandoricalApi.isContentReady(player)) {
@@ -104,11 +110,44 @@ camera.setPerspective(player, "third_person_back");
 camera.reset(player);
 ```
 
+### Entity overlays
+
+```java
+// Dress one specific entity in an extra texture layer. The texture must follow
+// the entity model's own texture layout; transparent pixels are not drawn.
+// Broadcast to all current and future trackers of the entity; no player arg.
+PandoricalApi.entityOverlays().set(entity,
+    Identifier.fromNamespaceAndPath("mymod", "textures/entity/my_overlay.png"));
+
+PandoricalApi.entityOverlays().clear(entity);
+```
+
+Overlay state is in-memory only and dropped when the entity unloads: re-call `set` when your entity loads (e.g. from a tick hook reading your own persisted flag). Ship the texture in your mod jar and register it with `content().registerModAssets(...)` so Pandorical syncs it to clients.
+
+### Keybinds
+
+```java
+// Claim a pooled keybind at mod init, before players connect. Key codes use
+// the game's own InputConstants table, not GLFW (10 is KEY_G on this
+// snapshot generation); the preferred key is honored only if a free pool
+// slot has that default (slot 1 is G, the rest start unbound). The display
+// name appears in the client's controls screen for this server. Presses
+// arrive on the server thread, validated and rate-limited by Pandorical.
+PandoricalApi.keybinds().register("mymod:action", 10, "Do The Thing",
+    player -> doTheThing(player));
+```
+
+The pool is fixed at 8 slots because the options system only accepts keybind registration during client startup; a slot's rebind persists in options.txt like any other key. Unclaimed slots are inert and send nothing.
+
+### Other capabilities
+
+`structures`, `playerInventory`, `blockTints`, and custom entity rendering are driven the same way, through `PandoricalApi`. Their contracts (including the traps: server-wide-unique structure IDs, despawning to avoid state leaks, tint registration timing) live in the javadoc on `StructureApi`, `PlayerInventoryApi`, `BlockTintApi`, and `PandoricalApi#registerEntityRenderer` — read those before wiring them up.
+
 ## Components
 
 Screens and HUD overlays are composed from these component types:
 
-`panel` · `scroll-panel` · `text` · `button` · `text-input` · `sprite` · `item-slot` · `inventory-grid` · `map`
+`panel` · `scroll_panel` · `text` · `button` · `text_input` · `sprite` · `item_slot` · `item_icon` · `inventory_grid` · `map` · `particle_burst`
 
 ## License
 

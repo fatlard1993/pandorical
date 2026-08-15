@@ -39,6 +39,7 @@ public class TextComponent extends AbstractComponent {
             displayText = parseString("text", "");
         }
         color = parseColor("color", 0xFFFFFFFF);
+        trackColor("color", color);
         shadow = parseBool("shadow", false);
         wrapWidth = parseInt("wrap_width", 0);
         maxLines = parseInt("max_lines", 0);
@@ -49,16 +50,17 @@ public class TextComponent extends AbstractComponent {
     public void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         if (displayText.isEmpty()) return;
 
+        int renderColor = interpolatedColor("color", 0xFFFFFFFF, delta);
         if (wrapWidth > 0) {
-            renderWrapped(graphics);
+            renderWrapped(graphics, renderColor);
         } else {
-            graphics.text(context.font(), displayText, x, y, color, shadow);
+            graphics.text(context.font(), displayText, x, y, renderColor, shadow);
         }
     }
 
     private static final int LINE_HEIGHT = 11;
 
-    private void renderWrapped(GuiGraphicsExtractor graphics) {
+    private void renderWrapped(GuiGraphicsExtractor graphics, int renderColor) {
         if (cachedLines == null) {
             cachedLines = wrapText(displayText, wrapWidth);
             if (maxLines > 0 && cachedLines.size() > maxLines) {
@@ -72,7 +74,7 @@ public class TextComponent extends AbstractComponent {
 
         int lineY = y;
         for (String line : cachedLines) {
-            graphics.text(context.font(), line, x, lineY, color, shadow);
+            graphics.text(context.font(), line, x, lineY, renderColor, shadow);
             lineY += LINE_HEIGHT;
         }
     }

@@ -16,8 +16,8 @@ import java.util.Map;
 /**
  * Renders a Minecraft map as a HUD minimap component. Always north-up.
  * Props:
- *   map_id  — integer map ID to render
- *   rotate  — "true" when compass is equipped: draws player dot as directional arrow
+ *   map_id: integer map ID to render
+ *   rotate: "true" when compass is equipped, draws player dot as directional arrow
  */
 public class MapComponent extends AbstractComponent {
     private static final float MAP_PIXELS = 128.0f;
@@ -55,7 +55,7 @@ public class MapComponent extends AbstractComponent {
 
     private void parseProps() {
         mapIdValue = parseInt("map_id", -1);
-        compass = parseBool("rotate", false); // prop reused: "rotate" now means "has compass"
+        compass = parseBool("rotate", false); // the "rotate" prop carries "has compass"
         compassTargetX = parseCoord("compass_tx");
         compassTargetZ = parseCoord("compass_tz");
         selfDecX = parseByte("self_dec_x");
@@ -127,9 +127,9 @@ public class MapComponent extends AbstractComponent {
         graphics.map(renderState);
         pose.popMatrix();
 
-        // --- Self dot/arrow: rendered from server-sent selfDecX/Y (always current) ---
+        // --- Self dot/arrow: rendered from server-sent selfDecX/Y ---
         // The client-side mapData decoration bytes are stale (addClientSideDecorations doesn't
-        // update reliably for our custom slot), so we use server-authoritative position props instead.
+        // update reliably for our custom slot), so server-authoritative position props win.
         int selfSi, selfSj;
         if (zoomLevel > 1.0f) {
             selfSi = Math.round(x + width  / 2.0f);
@@ -145,8 +145,8 @@ public class MapComponent extends AbstractComponent {
         float facingDirY =  (float) Math.cos(yawRad);
 
         // --- Compass: smooth screen-space offset from the player dot ---
-        // Compute as (compassTarget - player) in world space → screen pixels.
-        // Using selfDecX/Y as base causes vibration because selfDecX is quantized (server ticks)
+        // Computed as (compassTarget - player) in world space → screen pixels.
+        // Using selfDecX/Y as base causes vibration: selfDecX is quantized (server ticks)
         // while mc.player.getX() is smooth (every frame). Pure offset avoids the mismatch.
         float compassScreenDx = 0, compassScreenDy = 0;
         boolean hasCompassTarget = compass && !Double.isNaN(compassTargetX) && !Double.isNaN(compassTargetZ);
@@ -157,7 +157,7 @@ public class MapComponent extends AbstractComponent {
             compassScreenDy = (float)((compassTargetZ - mc.player.getZ()) / scaleFactor) * zoomScale;
         }
 
-        // --- Mob Sight: render mob dots FIRST so player arrow renders on top ---
+        // --- Mob Sight: mob dots render first so the player arrow lands on top ---
         if (!mobsData.isEmpty()) {
             MapDisplaySettings.ensureLoaded();
             boolean showHostile = MapDisplaySettings.isShowHostile();
@@ -189,7 +189,7 @@ public class MapComponent extends AbstractComponent {
                     int sx = Math.round(originX + (decX / 2.0f + 64f) * zoomScale);
                     int sy = Math.round(originY + (decZ / 2.0f + 64f) * zoomScale);
                     if (sx < x || sx >= x + width || sy < y || sy >= y + height) continue;
-                    // 2×2 dot — small enough not to obscure map detail
+                    // 2×2 dot; small enough not to obscure map detail
                     graphics.fill(sx, sy, sx + 2, sy + 2, color);
                 } catch (NumberFormatException ignored) {}
             }
@@ -198,7 +198,7 @@ public class MapComponent extends AbstractComponent {
         // Draw player arrow with optional compass tip (on top of mob dots)
         drawArrow(graphics, selfSi, selfSj, facingDirX, facingDirY, MARKER_COLOR);
 
-        // --- Compass destination marker — vanilla target_point sprite, centered on target ---
+        // --- Compass destination marker: vanilla target_point sprite, centered on target ---
         if (hasCompassTarget) {
             float cpx = originX + (compassDecX / 2.0f + 64f) * zoomScale;
             float cpy = originY + (compassDecY / 2.0f + 64f) * zoomScale;
@@ -213,14 +213,14 @@ public class MapComponent extends AbstractComponent {
         }
 
         // --- Other decorations (players + landmarks) ---
-        // renderOnFrame=true  → landmarks, banners, treasure X — always show at their position
-        // renderOnFrame=false → player-type; skip the stale self decoration, show all others
+        // renderOnFrame=true  → landmarks, banners, treasure X: always show at their position
+        // renderOnFrame=false → player-type: skip the stale self decoration, show all others,
         //                       clamping off-map positions to the minimap edge (smaller dot)
         for (MapRenderState.MapDecorationRenderState dec : renderState.decorations) {
             boolean isPlayerType = !dec.renderOnFrame;
 
             if (isPlayerType) {
-                // Skip ALL player-type decorations for now — we render self via server-sent selfDecX/Y,
+                // Skip ALL player-type decorations: self renders via server-sent selfDecX/Y,
                 // and other players need proper server-side tracking to avoid stale positions.
                 continue;
             }
@@ -290,17 +290,8 @@ public class MapComponent extends AbstractComponent {
     }
 
     /**
-     * Draw a clean triangular arrow like the vanilla map player marker.
-     * The triangle has a 3-pixel-wide base centered at (cx, cy) and a 1-pixel tip
-     * at distance 3 in the direction (dirX, dirY). Black outline, white fill.
-     *
-     * Rasterisation: for each pixel in a 9×9 bounding box, test which side of the
-     * three triangle edges it falls on. If inside all three, fill white; if within
-     * 1-pixel of the outline, fill black.
-     */
-    /**
      * Draw the vanilla map player marker shape: pointed tip facing direction,
-     * rectangular body, blunt tail — matching the vanilla player.png sprite.
+     * rectangular body, blunt tail, matching the vanilla player.png sprite.
      *
      * Pixels defined in (perp, fwd) coordinates:
      *   fwd+ = toward tip,  perp+/- = perpendicular sides
@@ -310,7 +301,6 @@ public class MapComponent extends AbstractComponent {
     private static void drawArrow(GuiGraphicsExtractor g, int cx, int cy,
                                    float dirX, float dirY, int color,
                                    boolean hasCompassTip, float compassDx, float compassDy) {
-        // Draw the vanilla-style arrow body
         drawArrow(g, cx, cy, dirX, dirY, color);
 
         // Compass tip: a 2-pixel colored spike on the dot pointing toward the compass target
@@ -318,7 +308,6 @@ public class MapComponent extends AbstractComponent {
             float dist = (float) Math.sqrt(compassDx * compassDx + compassDy * compassDy);
             if (dist > 0.01f) {
                 float ndx = compassDx / dist, ndy = compassDy / dist;
-                // Two pixels along the compass direction from center
                 int t1x = Math.round(cx + ndx * 2), t1y = Math.round(cy + ndy * 2);
                 int t2x = Math.round(cx + ndx * 4), t2y = Math.round(cy + ndy * 4);
                 g.fill(t1x - 1, t1y - 1, t1x + 2, t1y + 2, 0xFF000000); // outline
@@ -332,14 +321,14 @@ public class MapComponent extends AbstractComponent {
                                    float dirX, float dirY, int color) {
         float perpX = -dirY, perpY = dirX;
 
-        // Outline pixels (black) — (perp, fwd)
+        // Outline pixels (black), in (perp, fwd)
         int[][] outline = {
             {0,3},                              // tip
             {-1,2},{1,2},                       // narrow outline sides
             {-2,1},{2,1},{-2,0},{2,0},{-2,-1},{2,-1}, // body sides
             {-1,-2},{0,-2},{1,-2}               // tail (all black)
         };
-        // Fill pixels (white) — interior of the shape
+        // Fill pixels (white): interior of the shape
         int[][] fill = {
             {0,2},                              // narrow center
             {-1,1},{0,1},{1,1},                 // body rows

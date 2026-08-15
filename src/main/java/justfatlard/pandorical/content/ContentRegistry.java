@@ -66,7 +66,7 @@ public class ContentRegistry implements ContentApi {
     @Override
     public void registerAsset(String path, byte[] data) {
         assets.put(path, data);
-        cachedAssetChunks = null; // invalidate cache
+        cachedAssetChunks = null;
     }
 
     /**
@@ -80,27 +80,18 @@ public class ContentRegistry implements ContentApi {
         }
     }
 
-    /**
-     * Check if a namespace is registered as server-only through Pandorical.
-     */
     public static boolean isServerOnlyNamespace(String namespace) {
         return serverOnlyNamespaces.contains(namespace);
     }
 
-    /**
-     * Fast check for whether any server-only namespaces are registered.
-     * Used in hot paths to avoid unnecessary work.
-     */
+    /** Hot-path guard: cheaper than materialising the namespace view. */
     public static boolean hasServerOnlyNamespaces() {
         return !serverOnlyNamespaces.isEmpty();
     }
 
-    // Cached unmodifiable view — safe because ConcurrentHashMap.KeySetView is thread-safe
+    // Cached unmodifiable view; safe because ConcurrentHashMap.KeySetView is thread-safe
     private static volatile Set<String> cachedUnmodifiableView = null;
 
-    /**
-     * Get all registered server-only namespaces.
-     */
     public static Set<String> getServerOnlyNamespaces() {
         Set<String> cached = cachedUnmodifiableView;
         if (cached == null) {
@@ -112,14 +103,12 @@ public class ContentRegistry implements ContentApi {
 
     @Override
     public void registerModAssets(String modId) {
-        // Track the mod's namespace as server-only
         if (!modId.equals("minecraft")) {
             serverOnlyNamespaces.add(modId);
             Pandorical.LOGGER.debug("Tracking server-only namespace from mod assets: {}", modId);
         }
 
-        // Scan the mod's jar for assets/{modId}/ files and register them.
-        // Uses Fabric's resource loading to find the mod container.
+        // Scan the mod's jar for assets/{modId}/ files and register them
         try {
             var modContainer = net.fabricmc.loader.api.FabricLoader.getInstance()
                 .getModContainer(modId);
@@ -166,15 +155,11 @@ public class ContentRegistry implements ContentApi {
     /**
      * Generate and register assets for a vanilla item override.
      *
-     * Lang overrides are written into assets/pandorical/lang/en_us.json — lang files
-     * from any namespace can carry keys for any other namespace, and the pandorical
-     * namespace is definitely served by the VirtualResourcePack. Writing to
-     * assets/minecraft/lang/en_us.json risks being shadowed by the built-in vanilla pack.
-     *
-     * Texture overrides are stored in the pandorical namespace and a generated model
-     * references them there. Only the items/ redirect JSON must live in the item's
-     * own namespace (e.g. assets/minecraft/items/rabbit_hide.json), which is a single
-     * file and much less likely to be shadowed than texture atlas entries.
+     * <p>Lang and texture overrides live in the pandorical namespace, which the
+     * VirtualResourcePack definitely serves (lang files from any namespace can carry
+     * keys for any other; writing assets/minecraft/lang/en_us.json risks being shadowed
+     * by the built-in vanilla pack). Only the items/ redirect JSON must live in the
+     * item's own namespace, a single file far less likely to be shadowed.
      */
     private void applyVanillaItemOverrideAssets(String vanillaItemId, justfatlard.pandorical.api.VanillaItemOverride override) {
         String[] parts = vanillaItemId.split(":", 2);
@@ -184,18 +169,16 @@ public class ContentRegistry implements ContentApi {
         String flatKey = namespace + "_" + itemName.replace('/', '_');
 
         if (override.hasTexture()) {
-            // Store texture in pandorical namespace so VirtualResourcePack definitely serves it.
             registerAsset("assets/pandorical/textures/item/" + flatKey + ".png",
                 override.getTextureData());
 
-            // Auto-generate a flat item model in pandorical namespace referencing that texture.
             String autoModel = "{\n  \"parent\": \"minecraft:item/generated\",\n  \"textures\": {\n    \"layer0\": \""
                 + escapeJson("pandorical:item/" + flatKey) + "\"\n  }\n}\n";
             registerAsset("assets/pandorical/models/item/" + flatKey + ".json",
                 autoModel.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
-            // Redirect the vanilla item's definition to our pandorical model (only if no
-            // explicit model override is set — that case is handled below).
+            // Redirect the vanilla item's definition to the generated model, unless an
+            // explicit model override is set (handled below).
             if (!override.hasModel()) {
                 String itemsJson = "{\n  \"model\": {\n    \"type\": \"minecraft:model\",\n    \"model\": \""
                     + escapeJson("pandorical:item/" + flatKey) + "\"\n  }\n}\n";
@@ -216,11 +199,22 @@ public class ContentRegistry implements ContentApi {
         }
     }
 
+    // Extra lang entries contributed outside the vanilla-override path, e.g.
+    // keybind slot names from KeybindApiImpl. Merged into the same synced
+    // pandorical lang file (registerAsset on one path overwrites, so all
+    // contributors must go through the single rebuild below).
+    private final Map<String, String> extraLangEntries = new LinkedHashMap<>();
+
+    /** Add lang entries to the synced pandorical lang file and rebuild it. */
+    public void addLangEntries(Map<String, String> entries) {
+        extraLangEntries.putAll(entries);
+        rebuildVanillaLangFile();
+    }
+
     /**
-     * Rebuild the merged lang file for all vanilla item name overrides.
-     * All overrides (regardless of item namespace) are written into
-     * assets/pandorical/lang/en_us.json so the VirtualResourcePack definitely
-     * serves them — lang keys work across namespaces.
+     * Rebuild the merged lang file for all vanilla item name overrides and
+     * extra contributed entries
+     * (namespace rationale in {@link #applyVanillaItemOverrideAssets}).
      */
     private void rebuildVanillaLangFile() {
         Map<String, String> entries = new LinkedHashMap<>();
@@ -232,6 +226,7 @@ public class ContentRegistry implements ContentApi {
             String langKey = "item." + parts[0] + "." + parts[1].replace('/', '.');
             entries.put(langKey, e.getValue().getDisplayName());
         }
+        entries.putAll(extraLangEntries);
         if (entries.isEmpty()) return;
 
         StringBuilder sb = new StringBuilder("{\n");
@@ -252,21 +247,16 @@ public class ContentRegistry implements ContentApi {
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
-    /**
-     * Check if there's any content to sync.
-     */
     public boolean hasContent() {
         if (!blocks.isEmpty() || !items.isEmpty()) return true;
         if (!vanillaItemOverrides.isEmpty()) return true;
         if (!assets.isEmpty()) return true;
-        // Also check if there are any modded entries in the registries
         return hasServerOnlyNamespaces();
     }
 
     /**
-     * Send content definitions to a player during PLAY phase.
-     * In the new architecture, this only syncs non-registry content (screens, HUD, camera).
-     * Block/item sync is handled in the CONFIGURATION phase via PandoricalSyncTask.
+     * Play-phase sync. Only covers non-registry content (screens, HUD, camera);
+     * block/item sync happens in the configuration phase via PandoricalSyncTask.
      */
     public void syncContentTo(ServerPlayer player) {
         List<SyncContentS2C.BlockEntry> blockEntries = buildBlockEntries();
@@ -274,7 +264,7 @@ public class ContentRegistry implements ContentApi {
 
         if (blockEntries.isEmpty() && itemEntries.isEmpty()) return;
 
-        // Calculate asset chunk count before sending content so client knows what to expect
+        // The content packet carries the chunk count so the client knows what to expect
         int assetChunkCount = 0;
         if (!assets.isEmpty()) {
             try {
@@ -293,7 +283,6 @@ public class ContentRegistry implements ContentApi {
             buildEntityTypeEntries(), buildBlockEntityTypeEntries(), buildVillagerProfessionEntries(),
             buildPoiTypeEntries(), buildMenuTypeEntries(), buildRecipeBookCategoryEntries()));
 
-        // Send assets if any
         if (assetChunkCount > 0) {
             sendAssets(player);
         }
@@ -301,10 +290,7 @@ public class ContentRegistry implements ContentApi {
 
     private static final int CHUNK_SIZE = 900_000;
 
-    /**
-     * Bundle and send all registered assets as gzipped chunks.
-     * Caches the compressed chunks so they aren't recompressed per player.
-     */
+    /** Compressed chunks are cached so they aren't rebuilt per player. */
     private void sendAssets(ServerPlayer player) {
         try {
             List<SyncAssetsS2C> chunks = cachedAssetChunks;
@@ -325,7 +311,7 @@ public class ContentRegistry implements ContentApi {
     }
 
     private List<SyncAssetsS2C> buildAssetChunks() throws IOException {
-        // Build format: [pathUTF][dataLen][data] repeated, then gzip
+        // Wire format: [pathUTF][dataLen][data] repeated, then gzipped and chunked
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(baos);
 
@@ -338,14 +324,12 @@ public class ContentRegistry implements ContentApi {
 
         byte[] raw = baos.toByteArray();
 
-        // Gzip
         ByteArrayOutputStream gzipBaos = new ByteArrayOutputStream();
         try (GZIPOutputStream gzos = new GZIPOutputStream(gzipBaos)) {
             gzos.write(raw);
         }
         byte[] compressed = gzipBaos.toByteArray();
 
-        // Chunk into pieces
         int totalChunks = (compressed.length + CHUNK_SIZE - 1) / CHUNK_SIZE;
         List<SyncAssetsS2C> chunks = new ArrayList<>(totalChunks);
 
@@ -360,10 +344,7 @@ public class ContentRegistry implements ContentApi {
         return chunks;
     }
 
-    /**
-     * Build block entries by scanning all modded blocks in registries.
-     * Used by both play-phase and config-phase sync.
-     */
+    /** Used by both play-phase and config-phase sync. */
     public List<SyncContentS2C.BlockEntry> buildBlockEntries() {
         List<SyncContentS2C.BlockEntry> blockEntries = new java.util.ArrayList<>();
         for (var entry : net.minecraft.core.registries.BuiltInRegistries.BLOCK.entrySet()) {
@@ -394,9 +375,8 @@ public class ContentRegistry implements ContentApi {
                     }
                     stateProps.add(prop.getName() + ":" + type + ":" + names.toString());
                 } else if (prop instanceof net.minecraft.world.level.block.state.properties.IntegerProperty intProp) {
-                    // Send min:max so the client creates IntegerProperty with the correct range.
-                    // e.g. flower_amount [1,4] → "flower_amount:i:1:4" instead of "flower_amount:i:4"
-                    // which would create [0,3] and fail to decode values like 4.
+                    // Send min:max, not just a count: flower_amount [1,4] as "flower_amount:i:4"
+                    // would create [0,3] on the client and fail to decode the value 4.
                     int min = intProp.getPossibleValues().stream().mapToInt(Integer::intValue).min().getAsInt();
                     int max = intProp.getPossibleValues().stream().mapToInt(Integer::intValue).max().getAsInt();
                     stateProps.add(prop.getName() + ":" + type + ":" + min + ":" + max);
@@ -415,15 +395,12 @@ public class ContentRegistry implements ContentApi {
                 modelId = registered.registration().getModelId();
             }
 
-            // For auto-detected blocks (not registered via PandoricalApi), infer the
-            // base block from the class hierarchy so the client can create the correct
-            // block type (e.g., SlabBlock for slabs) and copy appropriate Properties.
+            // Auto-detected blocks (not registered via PandoricalApi) get an inferred base
+            // so the client can still pick the right block class and Properties.
             if (baseBlockId.isEmpty()) {
                 baseBlockId = inferBaseBlockId(block);
             }
 
-            // Serialize VoxelShapes for all states so the client has correct
-            // collision and outline shapes regardless of block class.
             byte[] shapeData = serializeBlockShapes(block);
 
             blockEntries.add(new SyncContentS2C.BlockEntry(id, baseBlockId, stateProps, modelId, stateIds, shapeData));
@@ -445,10 +422,8 @@ public class ContentRegistry implements ContentApi {
             var ctx = net.minecraft.world.phys.shapes.CollisionContext.empty();
 
             for (var state : block.getStateDefinition().getPossibleStates()) {
-                // Outline shape (selection box)
                 var outline = state.getShape(emptyGetter, origin, ctx);
                 writeShape(dos, outline);
-                // Collision shape
                 var collision = state.getCollisionShape(emptyGetter, origin, ctx);
                 writeShape(dos, collision);
             }
@@ -474,10 +449,7 @@ public class ContentRegistry implements ContentApi {
         }
     }
 
-    /**
-     * Build item entries by scanning all modded items in registries.
-     * Used by both play-phase and config-phase sync.
-     */
+    /** Used by both play-phase and config-phase sync. */
     public List<SyncContentS2C.ItemEntry> buildItemEntries() {
         List<SyncContentS2C.ItemEntry> itemEntries = new java.util.ArrayList<>();
         for (var entry : net.minecraft.core.registries.BuiltInRegistries.ITEM.entrySet()) {
@@ -490,19 +462,16 @@ public class ContentRegistry implements ContentApi {
             String modelId = registered != null ? registered.registration().getModelId() : "";
             boolean glint = registered != null && registered.registration().hasGlint();
 
-            // Read durability from item components; use default item's max stack size
             int maxStack = item.getDefaultMaxStackSize();
             Integer maxDamageObj = item.components().get(net.minecraft.core.component.DataComponents.MAX_DAMAGE);
             int maxDamage = maxDamageObj != null ? maxDamageObj : 0;
 
-            // Detect equipment slot from Equippable component
             String equipSlot = "";
             var equippable = item.components().get(net.minecraft.core.component.DataComponents.EQUIPPABLE);
             if (equippable != null) {
                 equipSlot = equippable.slot().getName();
             }
 
-            // Detect tool type from item class or Tool component
             String toolType = inferToolType(item);
 
             itemEntries.add(new SyncContentS2C.ItemEntry(id, modelId, maxStack, maxDamage, glint, equipSlot, toolType));
@@ -510,33 +479,22 @@ public class ContentRegistry implements ContentApi {
         return itemEntries;
     }
 
-    /**
-     * Infer tool type from item class hierarchy.
-     * Returns: "sword", "pickaxe", "axe", "shovel", "hoe", or "" for non-tools.
-     */
+    /** Returns "tool" or "": tools are data-driven via the Tool component in MC 26.1+. */
     private static String inferToolType(net.minecraft.world.item.Item item) {
-        // In MC 26.1, tools are data-driven via the Tool component.
-        // Check if the item has a Tool component to mark it as a tool.
         var tool = item.components().get(net.minecraft.core.component.DataComponents.TOOL);
         if (tool != null) return "tool";
         return "";
     }
 
     /**
-     * Build config-phase asset chunks. Returns a list of SyncAssetsConfigS2C payloads.
-     * Uses the same compression and chunking as play-phase, but with config-phase payload type.
-     */
-    /**
      * Auto-scan and register assets for all server-only mods that haven't
      * explicitly registered their assets via PandoricalApi.content().registerModAssets().
      */
     public void autoScanAllModAssets() {
         for (String namespace : serverOnlyNamespaces) {
-            // Skip if this mod already registered assets explicitly
             boolean hasAssets = assets.keySet().stream().anyMatch(k -> k.startsWith("assets/" + namespace + "/"));
             if (hasAssets) continue;
 
-            // Try to scan the mod's jar for assets
             var modContainer = net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer(namespace);
             if (modContainer.isEmpty()) continue;
 
@@ -548,7 +506,7 @@ public class ContentRegistry implements ContentApi {
         autoScanAllModAssets();
         if (assets.isEmpty()) return List.of();
 
-        // Build format: [pathUTF][dataLen][data] repeated, then gzip
+        // Wire format: [pathUTF][dataLen][data] repeated, then gzipped and chunked
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(baos);
 
@@ -561,14 +519,12 @@ public class ContentRegistry implements ContentApi {
 
         byte[] raw = baos.toByteArray();
 
-        // Gzip
         ByteArrayOutputStream gzipBaos = new ByteArrayOutputStream();
         try (java.util.zip.GZIPOutputStream gzos = new java.util.zip.GZIPOutputStream(gzipBaos)) {
             gzos.write(raw);
         }
         byte[] compressed = gzipBaos.toByteArray();
 
-        // Chunk into pieces
         int totalChunks = (compressed.length + CHUNK_SIZE - 1) / CHUNK_SIZE;
         List<SyncAssetsConfigS2C> chunks = new ArrayList<>(totalChunks);
 
@@ -583,10 +539,6 @@ public class ContentRegistry implements ContentApi {
         return chunks;
     }
 
-    /**
-     * Scan a built-in registry for entries whose namespace is server-only.
-     * Returns a list of identifier strings like "big-boats-justfatlard:ship".
-     */
     private List<String> scanRegistry(net.minecraft.core.Registry<?> registry) {
         List<String> result = new java.util.ArrayList<>();
         for (var entry : registry.entrySet()) {
@@ -597,56 +549,33 @@ public class ContentRegistry implements ContentApi {
         return result;
     }
 
-    /**
-     * Build entity type entries by scanning for modded entity types.
-     */
     public List<String> buildEntityTypeEntries() {
         return scanRegistry(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE);
     }
 
-    /**
-     * Build block entity type entries by scanning for modded block entity types.
-     */
     public List<String> buildBlockEntityTypeEntries() {
         return scanRegistry(net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE);
     }
 
-    /**
-     * Build villager profession entries by scanning for modded villager professions.
-     */
     public List<String> buildVillagerProfessionEntries() {
         return scanRegistry(net.minecraft.core.registries.BuiltInRegistries.VILLAGER_PROFESSION);
     }
 
-    /**
-     * Build POI type entries by scanning for modded POI types.
-     */
     public List<String> buildPoiTypeEntries() {
         return scanRegistry(net.minecraft.core.registries.BuiltInRegistries.POINT_OF_INTEREST_TYPE);
     }
 
-    /**
-     * Build menu type entries by scanning for modded menu types.
-     */
     public List<String> buildMenuTypeEntries() {
         return scanRegistry(net.minecraft.core.registries.BuiltInRegistries.MENU);
     }
 
-    /**
-     * Build recipe book category entries by scanning for modded recipe book categories.
-     */
     public List<String> buildRecipeBookCategoryEntries() {
         return scanRegistry(net.minecraft.core.registries.BuiltInRegistries.RECIPE_BOOK_CATEGORY);
     }
 
-    /**
-     * Infer a base block ID from the block's class hierarchy.
-     * Used for auto-detected blocks so the client can create the correct block type
-     * and copy sensible BlockBehaviour.Properties.
-     */
     private static String inferBaseBlockId(net.minecraft.world.level.block.Block block) {
-        // Match by SoundType to get the right break/place/step sounds and material feel.
-        // The client detects block type (slab, stair, etc.) from state properties independently.
+        // Match by SoundType to get the right break/place/step sounds and material feel;
+        // the client detects block type (slab, stair, etc.) from state properties independently.
         var sound = block.defaultBlockState().getSoundType();
         return inferBaseBlockFromSound(sound);
     }
@@ -680,7 +609,6 @@ public class ContentRegistry implements ContentApi {
         if (sound == net.minecraft.world.level.block.SoundType.TUFF)            return "minecraft:tuff";
         if (sound == net.minecraft.world.level.block.SoundType.DRIPSTONE_BLOCK) return "minecraft:dripstone_block";
         if (sound == net.minecraft.world.level.block.SoundType.AMETHYST)        return "minecraft:amethyst_block";
-        // Fallback to stone — reasonable default for most blocks
         return "minecraft:stone";
     }
 

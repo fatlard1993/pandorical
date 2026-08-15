@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.ModifyArg;
 public class CameraMixin {
 
     @ModifyArg(
-        method = "update",
+        method = "alignWithEntity",
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Camera;getMaxZoom(F)F"),
         index = 0
     )

@@ -146,7 +146,7 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
 
     /**
      * Ensure the player has a mutable slots map and return it.
-     * The returned map is owned by this call — mutate it and then re-attach.
+     * The returned map is owned by this call: mutate it and then re-attach.
      */
     public Map<String, List<ItemStack>> getMutableSlots(ServerPlayer player) {
         Map<String, List<ItemStack>> existing = player.getAttached(EXTRA_SLOTS);

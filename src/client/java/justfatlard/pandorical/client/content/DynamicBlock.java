@@ -60,9 +60,9 @@ public class DynamicBlock extends Block {
         if (outlineShapes != null) {
             VoxelShape shape = outlineShapes.get(state);
             if (shape != null && !Shapes.joinIsNotEmpty(Shapes.block(), shape, net.minecraft.world.phys.shapes.BooleanOp.NOT_SAME)) {
-                return shape; // Full cube — use normal occlusion
+                return shape; // Full cube: use normal occlusion
             }
-            return Shapes.empty(); // Non-full — don't occlude
+            return Shapes.empty(); // Non-full: don't occlude
         }
         return super.getOcclusionShape(state);
     }

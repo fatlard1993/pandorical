@@ -6,8 +6,10 @@
 	"client": [
 		"ItemCountRendererMixin",
 		"CameraMixin",
+		"EntityRenderStateMixin",
 		"InventoryMenuClientMixin",
-		"InventoryScreenMixin"
+		"InventoryScreenMixin",
+		"LivingEntityRendererMixin"
 	],
 	"injectors": {
 		"defaultRequire": 0

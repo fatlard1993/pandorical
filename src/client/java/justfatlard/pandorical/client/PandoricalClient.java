@@ -10,10 +10,13 @@ import justfatlard.pandorical.client.inventory.ClientInventorySlotRegistry;
 import justfatlard.pandorical.client.renderer.ClientEntityRendererRegistry;
 import justfatlard.pandorical.client.screen.PandoricalContainerScreen;
 import justfatlard.pandorical.client.screen.PandoricalScreen;
+import justfatlard.pandorical.client.structure.StructureManager;
+import justfatlard.pandorical.client.structure.StructureRenderer;
 import justfatlard.pandorical.protocol.*;
 import justfatlard.pandorical.screen.PandoricalMenu;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -36,9 +39,9 @@ import java.util.Map;
 import java.util.Objects;
 
 public class PandoricalClient implements ClientModInitializer {
-    private static final List<String> CLIENT_CAPABILITIES = List.of("screens", "content", "hud", "camera");
+    private static final List<String> CLIENT_CAPABILITIES = List.of("screens", "content", "hud", "camera", "structures", "entity_overlays", "keybinds");
 
-    // Pending screen defs keyed by screenId — LinkedHashMap preserves insertion order
+    // Pending screen defs keyed by screenId; LinkedHashMap preserves insertion order
     // so the last entry is always the most recently added.
     // Accessed only on the render thread (via client.execute), so no ConcurrentHashMap needed.
     private static final Map<String, OpenScreenS2C> pendingContainerDefs = new LinkedHashMap<>();
@@ -47,16 +50,24 @@ public class PandoricalClient implements ClientModInitializer {
     public void onInitializeClient() {
         ComponentRegistry.registerDefaults();
 
+        // Keybind pool must register during client init: the options system
+        // does not accept KeyMappings added later (see KeybindApi javadoc)
+        justfatlard.pandorical.client.keybind.KeybindManager.init();
+
         MenuScreens.register(Pandorical.MENU_TYPE, PandoricalClient::createContainerScreen);
 
         registerConfigPhaseReceivers();
         registerClientHandlers();
 
         HudRenderer.register();
+        StructureRenderer.register();
 
         // Tick content manager for sync timeout detection + show sync overlay
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             ContentManager.tick();
+            StructureManager.tick();
+            HudManager.tick();
+            justfatlard.pandorical.client.keybind.KeybindManager.tick(client);
             if (ContentManager.isSyncing() && client.gui != null) {
                 // Show as both title and actionbar for visibility
                 client.gui.hud.setTitle(net.minecraft.network.chat.Component.literal(ContentManager.getSyncStatus())
@@ -77,7 +88,7 @@ public class PandoricalClient implements ClientModInitializer {
         OpenScreenS2C screenDef = null;
         String foundKey = null;
 
-        // LinkedHashMap iteration is insertion-ordered — last entry is newest
+        // LinkedHashMap iteration is insertion-ordered; last entry is newest
         for (var entry : pendingContainerDefs.entrySet()) {
             screenDef = entry.getValue();
             foundKey = entry.getKey();
@@ -141,7 +152,7 @@ public class PandoricalClient implements ClientModInitializer {
         if (source == null) return;
 
         Block[] blocks = entry.blockIds().stream()
-            .map(id -> BuiltInRegistries.BLOCK.getValue(Identifier.of(id)))
+            .map(id -> BuiltInRegistries.BLOCK.getValue(Identifier.parse(id)))
             .filter(Objects::nonNull)
             .toArray(Block[]::new);
         if (blocks.length > 0) BlockColorRegistry.register(List.of(source), blocks);
@@ -165,7 +176,7 @@ public class PandoricalClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(OpenScreenS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> {
                 if (payload.container().isPresent()) {
-                    // Store by screenId — vanilla menu open arrives next
+                    // Store by screenId; the vanilla menu open arrives next
                     pendingContainerDefs.put(payload.screenId(), payload);
                 } else {
                     PandoricalScreen screen = new PandoricalScreen(payload);
@@ -222,9 +233,38 @@ public class PandoricalClient implements ClientModInitializer {
             context.client().execute(() -> CameraManager.handleHint(payload));
         });
 
-        // Entity renderer registrations — apply to EntityRenderers.PROVIDERS
+        // Entity renderer registrations: apply to EntityRenderers.PROVIDERS
         ClientPlayNetworking.registerGlobalReceiver(EntityRenderersS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> ClientEntityRendererRegistry.applyRenderers(payload));
+        });
+
+        // Structure handlers
+        ClientPlayNetworking.registerGlobalReceiver(SpawnStructureS2C.TYPE, (payload, context) -> {
+            context.client().execute(() -> StructureManager.handleSpawn(payload));
+        });
+        ClientPlayNetworking.registerGlobalReceiver(UpdateStructurePoseS2C.TYPE, (payload, context) -> {
+            context.client().execute(() -> StructureManager.handleUpdatePose(payload));
+        });
+        ClientPlayNetworking.registerGlobalReceiver(UpdateStructureBlocksS2C.TYPE, (payload, context) -> {
+            context.client().execute(() -> StructureManager.handleUpdateBlocks(payload));
+        });
+        ClientPlayNetworking.registerGlobalReceiver(SetStructureVisibleS2C.TYPE, (payload, context) -> {
+            context.client().execute(() -> StructureManager.handleSetVisible(payload));
+        });
+        ClientPlayNetworking.registerGlobalReceiver(DespawnStructureS2C.TYPE, (payload, context) -> {
+            context.client().execute(() -> StructureManager.handleDespawn(payload));
+        });
+
+        // Entity overlays
+        ClientPlayNetworking.registerGlobalReceiver(EntityOverlayS2C.TYPE, (payload, context) -> {
+            context.client().execute(() ->
+                justfatlard.pandorical.client.renderer.EntityOverlayStore.handle(payload));
+        });
+
+        // Keybind slot declarations
+        ClientPlayNetworking.registerGlobalReceiver(KeybindDeclarationsS2C.TYPE, (payload, context) -> {
+            context.client().execute(() ->
+                justfatlard.pandorical.client.keybind.KeybindManager.handleDeclarations(payload));
         });
 
         // When entering play phase, inject resource pack if config-phase synced assets
@@ -238,6 +278,26 @@ public class PandoricalClient implements ClientModInitializer {
             }
         });
 
+        // Reset at the START of every new connection, not just on the previous one's
+        // DISCONNECT: a failure during the config->play handshake itself (e.g. Fabric's
+        // own registry-sync rejecting an unknown block) can end a connection without ever
+        // firing ClientPlayConnectionEvents.DISCONNECT, since that event is play-phase-only
+        // and this kind of failure happens before JOIN. Relying solely on cleanup-after-
+        // disconnect left ContentManager's static state (configPhaseSynced in particular)
+        // stuck from the failed attempt, silently no-op'ing every asset chunk on the next
+        // connection attempt and leaving the client stuck on "joining" with no error at all.
+        ClientConfigurationConnectionEvents.INIT.register((handler, client) -> {
+            pendingContainerDefs.clear();
+            ContentManager.reset();
+            CameraManager.onDisconnect();
+            HudManager.clear();
+            ClientInventorySlotRegistry.reset();
+            ClientEntityRendererRegistry.reset();
+            StructureManager.clear();
+            justfatlard.pandorical.client.renderer.EntityOverlayStore.clear();
+            justfatlard.pandorical.client.keybind.KeybindManager.clear();
+        });
+
         // Disconnect cleanup
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             pendingContainerDefs.clear();
@@ -246,6 +306,9 @@ public class PandoricalClient implements ClientModInitializer {
             HudManager.clear();
             ClientInventorySlotRegistry.reset();
             ClientEntityRendererRegistry.reset();
+            StructureManager.clear();
+            justfatlard.pandorical.client.renderer.EntityOverlayStore.clear();
+            justfatlard.pandorical.client.keybind.KeybindManager.clear();
         });
     }
 }
