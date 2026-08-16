@@ -129,7 +129,7 @@ public class PandoricalScreen extends Screen implements justfatlard.pandorical.a
     public List<NavRegion> navRegions() {
         List<NavRegion> regions = new ArrayList<>();
         for (PandoricalComponent component : components) {
-            collectNavRegions(component, regions);
+            collectNavRegions(component, 0, null, regions);
         }
         return regions;
     }
@@ -140,17 +140,49 @@ public class PandoricalScreen extends Screen implements justfatlard.pandorical.a
      * itself is not something to land on. Descends into non-navigable
      * components for the same reason, and does not stop at one that is —
      * nesting a button inside a button is not a shape this forbids.
+     *
+     * <p>Regions must describe where a component is <em>drawn</em>, not where it
+     * was laid out, and inside a scroll panel those differ: children keep their
+     * built positions and the panel draws them shifted up by its scroll
+     * displacement. Reporting the built position sends a navigator to empty
+     * space. This mirrors {@code ScreenHelper.mouseClickedTree} exactly, which
+     * is the contract that matters: a navigator reaches a component by moving
+     * the pointer onto the region and clicking through the ordinary mouse path,
+     * so a region the click path would reject is worse than no region at all.
      */
-    private static void collectNavRegions(PandoricalComponent component, List<NavRegion> into) {
-        if (component.isNavigable()) {
+    private static void collectNavRegions(PandoricalComponent component, int scrollShift,
+                                          int[] clip, List<NavRegion> into) {
+        int drawnY = component.getY() - scrollShift;
+
+        if (component.isNavigable() && clickable(clip, component, drawnY)) {
             into.add(new NavRegion(
                 component.getId(),
-                component.getX(), component.getY(),
+                component.getX(), drawnY,
                 component.getWidth(), component.getHeight()));
         }
-        for (PandoricalComponent child : component.getChildren()) {
-            collectNavRegions(child, into);
+
+        int childShift = scrollShift;
+        int[] childClip = clip;
+        if (component instanceof ScrollPanelComponent panel) {
+            childShift = scrollShift + panel.scrollPixels();
+            childClip = panel.getClipBounds();
         }
+
+        for (PandoricalComponent child : component.getChildren()) {
+            collectNavRegions(child, childShift, childClip, into);
+        }
+    }
+
+    /**
+     * Whether a click at the region's centre would survive the enclosing scroll
+     * panel's clip test. A component scrolled out of view still exists in the
+     * tree; without this it becomes a target that silently swallows presses.
+     */
+    private static boolean clickable(int[] clip, PandoricalComponent component, int drawnY) {
+        if (clip == null) return true;
+        int centerX = component.getX() + component.getWidth() / 2;
+        int centerY = drawnY + component.getHeight() / 2;
+        return centerX >= clip[0] && centerX < clip[2] && centerY >= clip[1] && centerY < clip[3];
     }
 
     private void sendAction(String componentId, Map<String, String> data) {
