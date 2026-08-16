@@ -20,7 +20,7 @@ import java.util.Map;
  * Non-container declarative screen. Used for dialogue, message detail,
  * recipe browsers, and other screens that don't need inventory slots.
  */
-public class PandoricalScreen extends Screen {
+public class PandoricalScreen extends Screen implements justfatlard.pandorical.api.NavigableScreen {
     private final OpenScreenS2C screenDef;
     private final List<PandoricalComponent> components = new ArrayList<>();
     private final Map<String, PandoricalComponent> componentIndex = new HashMap<>();
@@ -123,6 +123,34 @@ public class PandoricalScreen extends Screen {
 
     public String getScreenId() {
         return screenDef.screenId();
+    }
+
+    @Override
+    public List<NavRegion> navRegions() {
+        List<NavRegion> regions = new ArrayList<>();
+        for (PandoricalComponent component : components) {
+            collectNavRegions(component, regions);
+        }
+        return regions;
+    }
+
+    /**
+     * Walks the whole tree rather than the roots, because a navigable
+     * component is usually a child: buttons live inside panels, and a panel
+     * itself is not something to land on. Descends into non-navigable
+     * components for the same reason, and does not stop at one that is —
+     * nesting a button inside a button is not a shape this forbids.
+     */
+    private static void collectNavRegions(PandoricalComponent component, List<NavRegion> into) {
+        if (component.isNavigable()) {
+            into.add(new NavRegion(
+                component.getId(),
+                component.getX(), component.getY(),
+                component.getWidth(), component.getHeight()));
+        }
+        for (PandoricalComponent child : component.getChildren()) {
+            collectNavRegions(child, into);
+        }
     }
 
     private void sendAction(String componentId, Map<String, String> data) {

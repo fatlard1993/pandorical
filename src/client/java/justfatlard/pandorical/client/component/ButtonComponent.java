@@ -87,4 +87,12 @@ public class ButtonComponent extends AbstractComponent {
         }
         return false;
     }
+
+    // Tracks enabled rather than returning a blanket true: mouseClicked above
+    // ignores a disabled button, so navigating onto one would strand the
+    // player on a target that does nothing when pressed.
+    @Override
+    public boolean isNavigable() {
+        return enabled;
+    }
 }

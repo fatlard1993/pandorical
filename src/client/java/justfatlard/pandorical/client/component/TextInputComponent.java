@@ -94,6 +94,14 @@ public class TextInputComponent extends AbstractComponent {
         return false;
     }
 
+    // Reachable only once the edit box exists, matching mouseClicked's own
+    // guard. Note that landing here is as far as a gamepad gets on its own:
+    // focusing the field is navigation, typing into it is not.
+    @Override
+    public boolean isNavigable() {
+        return editBox != null;
+    }
+
     public String getValue() {
         return editBox != null ? editBox.getValue() : "";
     }

@@ -51,4 +51,18 @@ public interface PandoricalComponent {
 
     /** Component ID for event routing and updates. */
     String getId();
+
+    /**
+     * Whether a non-mouse navigator (gamepad, keyboard focus) should be able
+     * to land on this component. Defaults to false, so a component is
+     * unreachable until it opts in — the safe direction, since landing on a
+     * component that ignores clicks is a dead end the player has to back out
+     * of manually.
+     *
+     * <p>Overriding this is the whole contract: anything that handles
+     * {@link #mouseClicked} should return true, and nothing else should.
+     *
+     * @see justfatlard.pandorical.api.NavigableScreen
+     */
+    default boolean isNavigable() { return false; }
 }

@@ -150,6 +150,18 @@ PandoricalApi.keybinds().register("mymod:action", 10, "Do The Thing",
 
 The pool is fixed at 8 slots because the options system only accepts keybind registration during client startup; a slot's rebind persists in options.txt like any other key. Unclaimed slots are inert and send nothing.
 
+### Navigable screens
+
+A Pandorical screen builds its UI from server-sent component definitions rather than vanilla widgets, so `Screen.children()` reports it as empty and anything navigating by keyboard focus or a gamepad finds nothing to press. `NavigableScreen` (in the common API, `justfatlard.pandorical.api`) is how a screen says where its interactive parts are:
+
+```java
+// PandoricalScreen already implements this; a component opts in by overriding
+// isNavigable(), which should be true exactly when it handles mouseClicked.
+List<NavigableScreen.NavRegion> regions = ((NavigableScreen) screen).navRegions();
+```
+
+Regions are geometry only, with no activate hook. A navigator moves the pointer onto one and clicks it through the screen's ordinary mouse path, so vanilla slots, vanilla widgets and Pandorical components are all driven by one mechanism and none of them need to know what is doing the navigating. Regions are computed per call rather than cached, because component geometry is mutable and interpolates for several ticks after a server update.
+
 ### Other capabilities
 
 `structures`, `playerInventory`, `blockTints`, and custom entity rendering are driven the same way, through `PandoricalApi`. Their contracts (including the traps: server-wide-unique structure IDs, despawning to avoid state leaks, tint registration timing) live in the javadoc on `StructureApi`, `PlayerInventoryApi`, `BlockTintApi`, and `PandoricalApi#registerEntityRenderer`: read those before wiring them up.
