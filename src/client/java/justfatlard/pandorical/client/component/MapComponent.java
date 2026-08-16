@@ -23,9 +23,23 @@ public class MapComponent extends AbstractComponent {
     private static final float MAP_PIXELS = 128.0f;
 
     // Vanilla map border colors sampled from textures/map/map_background.png
+    // (verified unchanged in 26.3: torn-parchment redesign kept #99876C / #D6BE96)
     private static final int BORDER_OUTER = 0xFF99876C; // brown
     private static final int BORDER_INNER = 0xFFD6BE96; // light tan
     private static final int MARKER_COLOR = 0xFFFFFFFF; // white default
+
+    /** The vanilla frame art: border plus the unexplored-area checkerboard. */
+    private static final net.minecraft.resources.Identifier CHECKERBOARD_TEXTURE =
+        net.minecraft.resources.Identifier.fromNamespaceAndPath("minecraft", "textures/map/map_background_checkerboard.png");
+
+    // Vanilla 26.3 map frame geometry, measured from the snapshot jar:
+    // FirstPersonHandsAndItemsRenderer.renderMap draws the background quad over
+    // (-7,-7)..(135,135), i.e. a 7 map-px margin around the 128px map content.
+    // In map_background_checkerboard.png (128 tex px stretched over those 142 map px)
+    // that margin is 2 tex px of brown outline + 4 tex px of tan, so brown:total = 1:3.
+    // The border scales with the minimap so its proportions match the vanilla art.
+    private static final float BORDER_TOTAL_MAP_PX = 7.0f;
+    private static final float BORDER_BROWN_FRACTION = 1.0f / 3.0f;
 
     private final MapRenderState renderState = new MapRenderState();
     private int mapIdValue = -1;
@@ -93,13 +107,24 @@ public class MapComponent extends AbstractComponent {
 
         mc.getMapRenderer().extractRenderState(mapId, mapData, renderState);
 
-        // Vanilla-style 2px border (brown outer, tan inner)
-        graphics.fill(x - 2, y - 2, x + width + 2, y + height + 2, BORDER_OUTER);
-        graphics.fill(x - 1, y - 1, x + width + 1, y + height + 1, BORDER_INNER);
+        float scale = Math.min(width, height) / MAP_PIXELS;
+
+        // Vanilla frame + backdrop in one stretched blit of the actual 26.3
+        // map art: map_background_checkerboard.png carries the brown outline,
+        // tan margin, AND the two-tone checkerboard (#C9B28D/#C2AC88) that
+        // vanilla shows behind unexplored map pixels. Using the texture is
+        // both cheaper (one draw, no per-cell quads) and more faithful than
+        // reproducing the pattern with fills; the measured border constants
+        // above remain as documentation of its proportions.
+        int borderTotal = Math.max(2, Math.round(BORDER_TOTAL_MAP_PX * scale));
+        int frameW = width + borderTotal * 2;
+        int frameH = height + borderTotal * 2;
+        graphics.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
+            CHECKERBOARD_TEXTURE,
+            x - borderTotal, y - borderTotal, 0.0F, 0.0F,
+            frameW, frameH, frameW, frameH);
 
         graphics.enableScissor(x, y, x + width, y + height);
-
-        float scale = Math.min(width, height) / MAP_PIXELS;
 
         // --- Zoom support ---
         float zoomLevel = MapDisplaySettings.getZoomLevel();
@@ -206,9 +231,14 @@ public class MapComponent extends AbstractComponent {
                 int pinW = 8, pinH = 8;
                 int cpxi = Math.round(cpx) - pinW / 2;
                 int cpyi = Math.round(cpy) - pinH / 2;
+                // The Identifier blitSprite overload only resolves against the GUI atlas;
+                // map decorations live in the separate map_decorations atlas (26.3), so
+                // fetch the TextureAtlasSprite from that atlas explicitly.
+                net.minecraft.client.renderer.texture.TextureAtlasSprite pinSprite = mc.getAtlasManager()
+                    .getAtlasOrThrow(net.minecraft.data.AtlasIds.MAP_DECORATIONS)
+                    .getSprite(net.minecraft.resources.Identifier.withDefaultNamespace("target_point"));
                 graphics.blitSprite(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
-                    net.minecraft.resources.Identifier.withDefaultNamespace("map/decorations/target_point"),
-                    cpxi, cpyi, pinW, pinH);
+                    pinSprite, cpxi, cpyi, pinW, pinH);
             }
         }
 
@@ -285,7 +315,7 @@ public class MapComponent extends AbstractComponent {
             + " / " + mc.player.getBlockY()
             + " / " + mc.player.getBlockZ();
         int textX = x + width / 2 - mc.font.width(coords) / 2;
-        int textY = y + height + 4; // 2px border + 2px gap
+        int textY = y + height + borderTotal + 2; // border + 2px gap
         graphics.text(mc.font, coords, textX, textY, 0xFFFFFFFF, true);
     }
 

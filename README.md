@@ -10,6 +10,7 @@ Server mods declare screens, HUD overlays, custom blocks/items, and camera hints
 |---|---|
 | `screens` | Open, update, and close declarative UI screens per-player |
 | `hud` | Show, update, and hide persistent HUD overlays, including animated components (mutable geometry, scale/rotation, and client-side interpolation between updates), and a `particle_burst` component for lightweight local particle effects |
+| `hud_elements` | Suppress vanilla HUD elements (the hunger bar, say) per player, so a HUD overlay can stand in for one rather than sit beside it |
 | `content` | Sync custom blocks, items, and assets to the client on join, and override the appearance of vanilla items for Pandorical clients only |
 | `camera` | Control camera distance and perspective |
 | `playerInventory` | Register extra inventory slots that appear in the vanilla inventory screen and persist across sessions |
@@ -74,7 +75,18 @@ HudApi hud = PandoricalApi.hud();
 hud.show(player, new ShowHudS2C(...));
 hud.update(player, overlayId, updates);
 hud.hide(player, overlayId);
+
+// Stand in for a vanilla element instead of drawing next to it
+hud.hideVanillaElements(player, "my-mod", List.of(VanillaHudElement.FOOD_BAR));
+hud.restoreVanillaElements(player, "my-mod");
 ```
+
+Suppression is keyed by the requesting mod, so two mods hiding different elements do not
+clobber each other, and an element stays hidden while any of them still wants it hidden.
+Chat, the player list, the sleep overlay and the demo timer are deliberately not
+suppressible. Clients without the `hud_elements` capability keep drawing vanilla's
+version, so an overlay meant to replace one needs a layout that still works alongside it
+(or should not be pushed to those clients at all).
 
 ### Content
 

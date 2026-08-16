@@ -118,6 +118,19 @@ public abstract class AbstractComponent implements PandoricalComponent {
         }
     }
 
+    /**
+     * Components that draw their own width/height interpolation return true so
+     * ScreenHelper's transform wrapper skips the corner-anchored size scale for
+     * them. A scale is wrong wherever size semantically means "how much is
+     * revealed" rather than "how large": a clip-mode sprite must re-clip at the
+     * interpolated size each frame (see SpriteComponent), or a width-animated
+     * fill renders as a squash/stretch of its full texture instead of a reveal.
+     * Position/scale/rotation interpolation still applies normally.
+     */
+    public boolean selfRendersInterpolatedSize() {
+        return false;
+    }
+
     /** Interpolated geometry for the current render frame. Used by ScreenHelper's transform wrapper. */
     public GeometrySnapshot interpolatedGeometry(float partialTick) {
         float t = clamp01((geomTicksSinceUpdate + partialTick) / INTERPOLATION_TICKS);

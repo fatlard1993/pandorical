@@ -180,6 +180,7 @@ public final class PandoricalApi {
         contentSyncStarted.remove(playerUuid);
         playerScreens.remove(playerUuid);
         KEYBINDS.removePlayer(playerUuid);
+        HUD.forgetPlayer(playerUuid);
     }
 
     /** @hidden */
@@ -402,6 +403,42 @@ public final class PandoricalApi {
             if (!isAvailable(player)) return;
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
                 new justfatlard.pandorical.protocol.HideHudS2C(overlayId));
+        }
+
+        /** player UUID to owner id to that owner's requested element ids. */
+        private final Map<java.util.UUID, Map<String, java.util.Set<String>>> hiddenVanillaElements =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+        @Override
+        public void hideVanillaElements(ServerPlayer player, String ownerId, java.util.Collection<String> elementIds) {
+            if (!hasCapability(player, "hud_elements")) return;
+            Map<String, java.util.Set<String>> byOwner = hiddenVanillaElements
+                .computeIfAbsent(player.getUUID(), k -> new java.util.concurrent.ConcurrentHashMap<>());
+            if (elementIds.isEmpty()) {
+                byOwner.remove(ownerId);
+            } else {
+                byOwner.put(ownerId, java.util.Set.copyOf(elementIds));
+            }
+            sendVanillaElementSet(player, byOwner);
+        }
+
+        @Override
+        public void restoreVanillaElements(ServerPlayer player, String ownerId) {
+            Map<String, java.util.Set<String>> byOwner = hiddenVanillaElements.get(player.getUUID());
+            if (byOwner == null || byOwner.remove(ownerId) == null) return;
+            if (!hasCapability(player, "hud_elements")) return;
+            sendVanillaElementSet(player, byOwner);
+        }
+
+        private static void sendVanillaElementSet(ServerPlayer player, Map<String, java.util.Set<String>> byOwner) {
+            java.util.Set<String> union = new java.util.LinkedHashSet<>();
+            for (java.util.Set<String> ids : byOwner.values()) union.addAll(ids);
+            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
+                new justfatlard.pandorical.protocol.SetVanillaHudElementsS2C(java.util.List.copyOf(union)));
+        }
+
+        void forgetPlayer(java.util.UUID uuid) {
+            hiddenVanillaElements.remove(uuid);
         }
     }
 

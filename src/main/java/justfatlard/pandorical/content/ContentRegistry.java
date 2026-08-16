@@ -344,9 +344,56 @@ public class ContentRegistry implements ContentApi {
         return chunks;
     }
 
+    /** Reported once, not per joining player. */
+    private volatile boolean reportedInferredBlocks = false;
+    private volatile boolean reportedUnsyncedNamespaces = false;
+
+    /**
+     * Name any mod that owns block/item registry entries but is not registered with
+     * Pandorical at all, on every kind of host.
+     *
+     * <p>Severity depends on the host, which is exactly why this cannot be left to
+     * the dedicated-server path: {@code autoRegisterServerOnlyNamespaces()} only runs
+     * on a dedicated server, where an undeclared mod at least gets swept up with a
+     * guessed base block. On an integrated or LAN host that sweep never happens, so
+     * an undeclared mod syncs nothing whatsoever and its blocks simply do not exist
+     * for Pandorical clients. Silent either way without this.
+     */
+    private void reportUnsyncedNamespaces() {
+        if (reportedUnsyncedNamespaces) return;
+        reportedUnsyncedNamespaces = true;
+
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        countUntracked(net.minecraft.core.registries.BuiltInRegistries.BLOCK, counts);
+        countUntracked(net.minecraft.core.registries.BuiltInRegistries.ITEM, counts);
+        if (counts.isEmpty()) return;
+
+        boolean dedicated = net.fabricmc.loader.api.FabricLoader.getInstance()
+            .getEnvironmentType() == net.fabricmc.api.EnvType.SERVER;
+        Pandorical.LOGGER.warn(
+            "{} namespace(s) own registry entries but are not registered with Pandorical: {}. "
+                + "Their blocks/items sync to Pandorical clients only if the client has that mod installed too. "
+                + "{}",
+            counts.size(), counts,
+            dedicated
+                ? "Unexpected on a dedicated server, where every loaded mod is auto-registered."
+                : "This host does not auto-register namespaces, so a server-only mod here must call "
+                    + "PandoricalApi.content().registerServerOnlyNamespace(...) or registerBlock/registerItem.");
+    }
+
+    private static void countUntracked(net.minecraft.core.Registry<?> registry, Map<String, Integer> counts) {
+        for (var entry : registry.entrySet()) {
+            String namespace = entry.getKey().identifier().getNamespace();
+            if (namespace.equals("minecraft") || isServerOnlyNamespace(namespace)) continue;
+            if (net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer(namespace).isEmpty()) continue;
+            counts.merge(namespace, 1, Integer::sum);
+        }
+    }
+
     /** Used by both play-phase and config-phase sync. */
     public List<SyncContentS2C.BlockEntry> buildBlockEntries() {
         List<SyncContentS2C.BlockEntry> blockEntries = new java.util.ArrayList<>();
+        List<String> inferred = new java.util.ArrayList<>();
         for (var entry : net.minecraft.core.registries.BuiltInRegistries.BLOCK.entrySet()) {
             String namespace = entry.getKey().identifier().getNamespace();
             if (!isServerOnlyNamespace(namespace)) continue;
@@ -399,12 +446,30 @@ public class ContentRegistry implements ContentApi {
             // so the client can still pick the right block class and Properties.
             if (baseBlockId.isEmpty()) {
                 baseBlockId = inferBaseBlockId(block);
+                // A sound-inferred base can hand the client a block class carrying
+                // different state properties than this block has, which the client can
+                // only paper over with a fallback state (see ContentManager). Name them
+                // here so the mismatch is diagnosable at boot instead of in someone's world.
+                inferred.add(id);
             }
 
             byte[] shapeData = serializeBlockShapes(block);
 
             blockEntries.add(new SyncContentS2C.BlockEntry(id, baseBlockId, stateProps, modelId, stateIds, shapeData));
         }
+
+        reportUnsyncedNamespaces();
+
+        if (!inferred.isEmpty() && !reportedInferredBlocks) {
+            reportedInferredBlocks = true;
+            int shown = Math.min(inferred.size(), 12);
+            Pandorical.LOGGER.warn(
+                "{} synced block(s) were never registered through PandoricalApi.content().registerBlock(...); "
+                    + "their client-side base block is inferred from sound alone: {}{}",
+                inferred.size(), inferred.subList(0, shown),
+                inferred.size() > shown ? " (+" + (inferred.size() - shown) + " more)" : "");
+        }
+
         return blockEntries;
     }
 

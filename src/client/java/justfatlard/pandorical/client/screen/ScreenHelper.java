@@ -47,19 +47,26 @@ public final class ScreenHelper {
                                             int mouseX, int mouseY, float delta) {
         renderWithGeometryTransform(component, graphics, mouseX, mouseY, delta);
 
-        // Apply scissor clipping for scroll panels
-        boolean clipping = component instanceof ScrollPanelComponent;
-        if (clipping) {
-            int[] bounds = ((ScrollPanelComponent) component).getClipBounds();
+        // Scroll panels scissor-clip their children and translate them by the
+        // scroll displacement; the mouse is counter-shifted so hover states
+        // land on the child actually under the cursor
+        if (component instanceof ScrollPanelComponent panel) {
+            int[] bounds = panel.getClipBounds();
+            int scroll = panel.scrollPixels();
             graphics.enableScissor(bounds[0], bounds[1], bounds[2], bounds[3]);
+            var pose = graphics.pose();
+            pose.pushMatrix();
+            pose.translate(0, -scroll);
+            for (PandoricalComponent child : component.getChildren()) {
+                renderComponentTree(child, graphics, mouseX, mouseY + scroll, delta);
+            }
+            pose.popMatrix();
+            graphics.disableScissor();
+            return;
         }
 
         for (PandoricalComponent child : component.getChildren()) {
             renderComponentTree(child, graphics, mouseX, mouseY, delta);
-        }
-
-        if (clipping) {
-            graphics.disableScissor();
         }
     }
 
@@ -92,12 +99,17 @@ public final class ScreenHelper {
         AbstractComponent.GeometrySnapshot g = ac.interpolatedGeometry(delta);
         int rawX = ac.getX(), rawY = ac.getY(), rawW = ac.getWidth(), rawH = ac.getHeight();
 
+        // Components that re-clip themselves at the interpolated size (see
+        // AbstractComponent.selfRendersInterpolatedSize) must not ALSO be
+        // scaled by it, or the reveal squashes
+        boolean selfSized = ac.selfRendersInterpolatedSize();
+
         boolean needsTransform = Math.abs(g.scale() - 1f) > GEOMETRY_EPSILON
             || Math.abs(g.rotation()) > GEOMETRY_EPSILON
             || Math.abs(g.x() - rawX) > GEOMETRY_EPSILON
             || Math.abs(g.y() - rawY) > GEOMETRY_EPSILON
-            || Math.abs(g.width() - rawW) > GEOMETRY_EPSILON
-            || Math.abs(g.height() - rawH) > GEOMETRY_EPSILON;
+            || (!selfSized && (Math.abs(g.width() - rawW) > GEOMETRY_EPSILON
+                || Math.abs(g.height() - rawH) > GEOMETRY_EPSILON));
 
         if (!needsTransform) {
             component.render(graphics, mouseX, mouseY, delta);
@@ -107,10 +119,10 @@ public final class ScreenHelper {
         Matrix3x2fStack pose = graphics.pose();
         pose.pushMatrix();
         try {
-            if (rawW > 0 && Math.abs(g.width() - rawW) > GEOMETRY_EPSILON) {
+            if (!selfSized && rawW > 0 && Math.abs(g.width() - rawW) > GEOMETRY_EPSILON) {
                 pose.scaleAround(g.width() / rawW, 1f, rawX, rawY);
             }
-            if (rawH > 0 && Math.abs(g.height() - rawH) > GEOMETRY_EPSILON) {
+            if (!selfSized && rawH > 0 && Math.abs(g.height() - rawH) > GEOMETRY_EPSILON) {
                 pose.scaleAround(1f, g.height() / rawH, rawX, rawY);
             }
             pose.translate(g.x() - rawX, g.y() - rawY);
@@ -161,6 +173,25 @@ public final class ScreenHelper {
      * Route mouse click through component tree in reverse order (top-most first).
      */
     public static boolean mouseClickedTree(PandoricalComponent component, double mouseX, double mouseY, int button) {
+        // A scroll panel's clipped-out children are invisible and must not be
+        // clickable: only descend into its children when the click lands
+        // inside the clip region (mirroring the render-time scissor), and
+        // counter-shift the mouse by the scroll displacement so the click
+        // hits the child actually drawn under the cursor
+        if (component instanceof ScrollPanelComponent panel) {
+            int[] clip = panel.getClipBounds();
+            if (mouseX < clip[0] || mouseX >= clip[2] || mouseY < clip[1] || mouseY >= clip[3]) {
+                return false;
+            }
+            double shiftedY = mouseY + panel.scrollPixels();
+            List<PandoricalComponent> panelChildren = component.getChildren();
+            for (int i = panelChildren.size() - 1; i >= 0; i--) {
+                if (mouseClickedTree(panelChildren.get(i), mouseX, shiftedY, button)) {
+                    return true;
+                }
+            }
+            return component.mouseClicked(mouseX, mouseY, button);
+        }
         List<PandoricalComponent> children = component.getChildren();
         for (int i = children.size() - 1; i >= 0; i--) {
             if (mouseClickedTree(children.get(i), mouseX, mouseY, button)) {

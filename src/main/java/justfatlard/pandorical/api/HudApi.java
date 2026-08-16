@@ -38,4 +38,21 @@ public interface HudApi {
      * state associated with the overlay; call {@link #show} again to restore it.
      */
     void hide(ServerPlayer player, String overlayId);
+
+    /**
+     * Ask this player's client to stop drawing the given vanilla HUD elements (see
+     * {@link VanillaHudElement}), so a Pandorical overlay can stand in for one. Replaces
+     * whatever {@code ownerId} previously asked for; other mods' requests are unaffected,
+     * and an element stays hidden while any owner still wants it hidden.
+     *
+     * <p>No-op without the {@code "hud_elements"} capability: those clients keep drawing
+     * vanilla's version, so a replacement overlay must still be legible over it, or the
+     * mod should skip pushing the overlay to them. Suppression is per connection and is
+     * not restored automatically after a rejoin: re-request it when the player rejoins,
+     * exactly like entity overlays.
+     */
+    void hideVanillaElements(ServerPlayer player, String ownerId, java.util.Collection<String> elementIds);
+
+    /** Drop {@code ownerId}'s suppression request, restoring anything no other owner hides. */
+    void restoreVanillaElements(ServerPlayer player, String ownerId);
 }

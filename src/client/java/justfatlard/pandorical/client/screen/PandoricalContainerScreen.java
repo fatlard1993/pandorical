@@ -27,6 +27,10 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     private final List<PandoricalComponent> components = new ArrayList<>();
     private final Map<String, PandoricalComponent> componentIndex = new HashMap<>();
 
+    // Captured per frame for the component pass inside extractSlots, whose
+    // vanilla signature carries no partial tick
+    private float frameDelta;
+
     public PandoricalContainerScreen(PandoricalMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title,
               menu.getScreenDef() != null ? menu.getScreenDef().width() : 176,
@@ -69,16 +73,32 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-        // super handles blur/background (can only fire once per frame in 26.3+)
-        // and renders vanilla slot overlays (items, hover highlights)
+        // super handles blur/background and the vanilla slot pass; the
+        // declarative components render from the extractSlots override below,
+        // UNDER the slot items. Rendering them after super (the pre-26.3
+        // structure) painted panel backgrounds over the already-drawn item
+        // icons: hover tooltips still worked, icons were invisible.
+        this.frameDelta = delta;
         super.extractRenderState(context, mouseX, mouseY, delta);
 
-        // Render declarative components on top
-        for (PandoricalComponent component : components) {
-            ScreenHelper.renderComponentTree(component, context, mouseX, mouseY, delta);
-        }
-
         this.extractTooltip(context, mouseX, mouseY);
+    }
+
+    @Override
+    protected void extractSlots(GuiGraphicsExtractor context, int mouseX, int mouseY) {
+        // extractSlots runs inside extractContents' (leftPos, topPos) pose
+        // translation; components carry absolute screen coordinates, so
+        // translate back for their pass
+        var pose = context.pose();
+        pose.pushMatrix();
+        pose.translate(-this.leftPos, -this.topPos);
+        for (PandoricalComponent component : components) {
+            ScreenHelper.renderComponentTree(component, context, mouseX, mouseY, frameDelta);
+        }
+        pose.popMatrix();
+
+        // Vanilla slot items draw on top of the component panels/frames
+        super.extractSlots(context, mouseX, mouseY);
     }
 
     @Override

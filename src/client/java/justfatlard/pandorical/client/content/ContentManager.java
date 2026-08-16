@@ -551,6 +551,8 @@ public class ContentManager {
                 stubCount += registerMenuTypeStubs(content.menuTypes());
                 stubCount += registerRecipeBookCategoryStubs(content.recipeBookCategories());
 
+                sweepUnmappedStateIds(content.blocks());
+
                 Pandorical.LOGGER.info("Play phase fallback: registered {} blocks, {} items, and {} stubs on client",
                     content.blocks().size(), content.items().size(), stubCount);
             } finally {
@@ -886,12 +888,13 @@ public class ContentManager {
                     Block.BLOCK_STATE_REGISTRY.addMapping(possibleStates.get(i), entry.stateIds().get(i));
                 }
             } else {
-                // Fallback: append sequentially (IDs may not match the server's)
-                for (BlockState state : possibleStates) {
-                    Block.BLOCK_STATE_REGISTRY.add(state);
-                }
-                Pandorical.LOGGER.warn("Block {} state count mismatch: server={}, client={}",
-                    entry.id(), entry.stateIds().size(), possibleStates.size());
+                // Appending sequentially here (the old behaviour) overwrote other
+                // custom blocks' server-assigned slots, see coverStateIdsWithFallback
+                coverStateIdsWithFallback(entry, block.defaultBlockState(),
+                    "state count mismatch (server=" + entry.stateIds().size()
+                        + ", client=" + possibleStates.size()
+                        + ", client properties=" + propertyNames(block)
+                        + ", server properties=" + entry.stateProperties() + ")");
             }
 
             Pandorical.LOGGER.debug("Registered client block: {} (base: {}, states: {}, ids: {})",
@@ -1025,8 +1028,33 @@ public class ContentManager {
                     continue;
                 }
                 ResourceKey<EntityType<?>> key = ResourceKey.create(Registries.ENTITY_TYPE, id);
-                EntityType<?> stub = EntityType.Builder.createNothing(MobCategory.MISC)
-                    .noSave().noSummon().sized(0, 0)
+                // The factory runs at SPAWN TIME, long after EntityRenderersS2C
+                // delivered the renderer keys, so it can pick a client shape:
+                //   "thrown_item" -> a ThrowableItemProjectile-shaped stub, so
+                //     the server's item-stack sync lands and actually renders
+                //   "invisible"   -> a plain Entity stub (exists, rides,
+                //     tracks; NoopRenderer draws nothing)
+                //   no key        -> null, vanilla skips the spawn (an
+                //     unrenderable type must not reach the render dispatcher)
+                // A null-factory stub here (the old createNothing) meant NO
+                // synced entity ever existed client-side at all: every
+                // thrown_item projectile in the suite was invisible.
+                final String typeIdStr = idStr;
+                EntityType<?> stub = EntityType.Builder.of((type, level) -> {
+                        String rendererKey = justfatlard.pandorical.client.renderer.ClientEntityRendererRegistry.getRendererKey(typeIdStr);
+                        Pandorical.LOGGER.debug("Stub entity factory: {} rendererKey={}", typeIdStr, rendererKey);
+                        if (justfatlard.pandorical.api.EntityRendererRegistry.KEY_THROWN_ITEM.equals(rendererKey)) {
+                            @SuppressWarnings({"unchecked", "rawtypes"})
+                            StubThrownItemEntity thrown = new StubThrownItemEntity((EntityType) type, level);
+                            return thrown;
+                        }
+                        if (justfatlard.pandorical.api.EntityRendererRegistry.KEY_INVISIBLE.equals(rendererKey)) {
+                            return new StubEntity(type, level);
+                        }
+                        return null;
+                    }, MobCategory.MISC)
+                    .noSave().noSummon().sized(0.25F, 0.25F)
+                    .clientTrackingRange(4).updateInterval(10)
                     .build(key);
                 registerWithHolder(BuiltInRegistries.ENTITY_TYPE, id, stub);
                 count++;
@@ -1224,15 +1252,24 @@ public class ContentManager {
         for (SyncContentS2C.BlockEntry entry : pendingConfigContent.blocks()) {
             try {
                 Identifier id = Identifier.tryParse(entry.id());
-                if (id == null) continue;
+                if (id == null) {
+                    coverStateIdsWithFallback(entry, null, "unparseable block id");
+                    continue;
+                }
 
                 Block block = BuiltInRegistries.BLOCK.getValue(id);
-                if (block == null) continue;
+                if (block == null) {
+                    coverStateIdsWithFallback(entry, null, "block missing from client registry");
+                    continue;
+                }
 
                 var possibleStates = block.getStateDefinition().getPossibleStates();
                 if (entry.stateIds().size() != possibleStates.size()) {
-                    Pandorical.LOGGER.warn("Block state count mismatch for {}: server={}, client={}",
-                        entry.id(), entry.stateIds().size(), possibleStates.size());
+                    coverStateIdsWithFallback(entry, block.defaultBlockState(),
+                        "state count mismatch (server=" + entry.stateIds().size()
+                            + ", client=" + possibleStates.size()
+                            + ", client properties=" + propertyNames(block)
+                            + ", server properties=" + entry.stateProperties() + ")");
                     continue;
                 }
 
@@ -1244,8 +1281,11 @@ public class ContentManager {
                 }
             } catch (Exception e) {
                 Pandorical.LOGGER.warn("Failed to remap block state IDs for {}: {}", entry.id(), e.getMessage());
+                coverStateIdsWithFallback(entry, null, "remap threw: " + e.getMessage());
             }
         }
+
+        sweepUnmappedStateIds(pendingConfigContent.blocks());
 
         if (remapped > 0) {
             Pandorical.LOGGER.info("Remapped {} block state IDs to match server", remapped);
@@ -1296,6 +1336,99 @@ public class ContentManager {
             }
         } else {
             Pandorical.LOGGER.info("Block state IDs already match server — no remapping needed");
+        }
+    }
+
+    /**
+     * Structural stand-in for a server block state the client could not rebuild.
+     *
+     * <p>Block state IDs normally line up without any help from us: Fabric's
+     * StateIdTracker appends every newly registered block's states to
+     * {@code Block.BLOCK_STATE_REGISTRY} in registration order, and both sides
+     * register the same blocks in the same order. They diverge exactly when a block's
+     * client-side state definition does not match the server's, which shifts that
+     * block and everything registered after it. Chunk section palettes resolve raw IDs
+     * through {@code IdMapper.byIdOrThrow}, so an ID with no mapping at all throws
+     * MissingPaletteEntryException while decoding the chunk. Stone rather than air:
+     * always present, solid, and it renders as the wrong block instead of opening
+     * holes in terrain.
+     */
+    private static BlockState fallbackState() {
+        return net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
+    }
+
+    private static String propertyNames(Block block) {
+        List<String> names = new java.util.ArrayList<>();
+        for (var prop : block.getStateDefinition().getProperties()) names.add(prop.getName());
+        return names.toString();
+    }
+
+    /**
+     * Point every server state ID of a block at a state that actually exists on this
+     * client, so nothing decodes to null. {@code stand} is the block's own default
+     * state when the block exists (right block, wrong variant); null falls back to
+     * {@link #fallbackState()}.
+     *
+     * <p>Never use {@code IdMapper.add} for this (the old fallback did): those states
+     * are already in the mapper, put there by Fabric's StateIdTracker when the block
+     * was registered, so appending them again at the high-water mark rewrites their
+     * reverse mapping to a bogus ID and parks a duplicate in a slot the server may
+     * have assigned to another block.
+     */
+    private static void coverStateIdsWithFallback(SyncContentS2C.BlockEntry entry, BlockState stand, String reason) {
+        BlockState state = stand != null ? stand : fallbackState();
+        for (int serverId : entry.stateIds()) {
+            mapWithoutStealingReverseId(state, serverId);
+        }
+        Pandorical.LOGGER.error(
+            "Block '{}' could not be reproduced on the client ({}) — its {} state ID(s) now decode to {}. "
+                + "The block will look wrong but will not corrupt neighbouring blocks. "
+                + "Register it through PandoricalApi.content().registerBlock(...) with an explicit base block "
+                + "so the client rebuilds the same state definition.",
+            entry.id(), reason, entry.stateIds().size(),
+            stand != null ? "its own default state" : "minecraft:stone");
+    }
+
+    /**
+     * Map {@code state} into slot {@code serverId} for decoding while leaving
+     * {@code getId(state)} alone.
+     *
+     * <p>addMapping writes both directions, so pointing a shared state (stone) at a
+     * foreign ID would also make the client encode stone as that ID. Re-asserting the
+     * state's original mapping afterwards restores the reverse direction; the forward
+     * slot written by the first call survives because the second call only rewrites
+     * its own slot. Order is load-bearing.
+     */
+    private static void mapWithoutStealingReverseId(BlockState state, int serverId) {
+        int originalId = Block.BLOCK_STATE_REGISTRY.getId(state);
+        Block.BLOCK_STATE_REGISTRY.addMapping(state, serverId);
+        if (originalId >= 0 && originalId != serverId) {
+            Block.BLOCK_STATE_REGISTRY.addMapping(state, originalId);
+        }
+    }
+
+    /**
+     * Last line of defence: after every registration path has run, any server state ID
+     * still resolving to null is filled with the fallback. Catches holes left by paths
+     * that failed before reaching the per-block handling above.
+     */
+    private static void sweepUnmappedStateIds(List<SyncContentS2C.BlockEntry> entries) {
+        int holes = 0;
+        String firstHoleBlock = null;
+        for (SyncContentS2C.BlockEntry entry : entries) {
+            for (int serverId : entry.stateIds()) {
+                if (serverId < 0) continue;
+                if (Block.BLOCK_STATE_REGISTRY.byId(serverId) != null) continue;
+                mapWithoutStealingReverseId(fallbackState(), serverId);
+                holes++;
+                if (firstHoleBlock == null) firstHoleBlock = entry.id();
+            }
+        }
+        if (holes > 0) {
+            Pandorical.LOGGER.error(
+                "Filled {} unmapped server block-state ID(s) with minecraft:stone (first offender: '{}'). "
+                    + "Chunks using them would otherwise have decoded to null block states.",
+                holes, firstHoleBlock);
         }
     }
 

@@ -34,7 +34,7 @@ public class Pandorical implements ModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     public static final int PROTOCOL_VERSION = 1;
 
-    public static final List<String> SERVER_CAPABILITIES = List.of("screens", "content", "camera", "hud", "structures", "entity_overlays", "keybinds");
+    public static final List<String> SERVER_CAPABILITIES = List.of("screens", "content", "camera", "hud", "structures", "entity_overlays", "keybinds", "hud_elements");
 
     /**
      * Tracks player UUIDs (from GameProfile) that completed config-phase content sync.
@@ -136,6 +136,7 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(ShowHudS2C.TYPE, ShowHudS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(UpdateHudS2C.TYPE, UpdateHudS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(HideHudS2C.TYPE, HideHudS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(SetVanillaHudElementsS2C.TYPE, SetVanillaHudElementsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SyncContentS2C.TYPE, SyncContentS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SyncAssetsS2C.TYPE, SyncAssetsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(CameraHintS2C.TYPE, CameraHintS2C.STREAM_CODEC);

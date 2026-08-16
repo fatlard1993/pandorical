@@ -69,10 +69,15 @@ public class ScrollPanelComponent extends AbstractComponent {
             graphics.fill(scrollbarX + 1, thumbY, scrollbarX + SCROLLBAR_WIDTH - 1, thumbY + thumbHeight, 0xFFAAAAAA);
         }
 
-        // Children are rendered by ScreenHelper.renderComponentTree, which is called
-        // by the parent screen. The scissor clipping is applied in getClipBounds().
-        // For now, children rendering relies on the server managing which children
-        // are within the visible range based on scroll_offset.
+        // Children are rendered by ScreenHelper.renderComponentTree, which
+        // scissor-clips them to getClipBounds() and translates them up by
+        // scrollPixels(): the scroll is entirely client-side visual state,
+        // children keep the positions they were built with.
+    }
+
+    /** Current scroll displacement in pixels; children draw shifted up by this. */
+    public int scrollPixels() {
+        return scrollOffset * itemHeight;
     }
 
     /**

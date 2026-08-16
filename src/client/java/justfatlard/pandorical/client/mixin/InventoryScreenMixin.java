@@ -5,11 +5,12 @@ import justfatlard.pandorical.protocol.PlayerInventoryRegistrationsS2C;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.inventory.InventoryMenu;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -25,14 +26,22 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  *
  * Injection is at HEAD so backgrounds are drawn before items, ensuring items
  * render on top of (not underneath) the backgrounds.
+ *
+ * <p>Extends {@link AbstractContainerScreen} (a real superclass of the target)
+ * purely to reach the protected {@code leftPos}/{@code topPos} fields: the
+ * backgrounds MUST anchor to the screen's live origin, exactly like the Slot
+ * objects themselves (menu-space x/y drawn and hit-tested against the live
+ * origin by vanilla). Deriving the origin from centered screen math instead
+ * broke when the recipe book pane shifted the panel right: the real slots and
+ * their click targets moved with it, while the drawn boxes stayed centered.
  */
 @Environment(EnvType.CLIENT)
 @Mixin(InventoryScreen.class)
-public abstract class InventoryScreenMixin {
+public abstract class InventoryScreenMixin extends AbstractContainerScreen<InventoryMenu> {
 
-    // Vanilla inventory screen is always 176×166 px.
-    private static final int INV_W = 176;
-    private static final int INV_H = 166;
+    private InventoryScreenMixin() {
+        super(null, null, null);
+    }
 
     // Colors matching ItemSlotComponent.render()
     private static final int SLOT_BORDER_DARK  = 0xFF373737;
@@ -51,10 +60,8 @@ public abstract class InventoryScreenMixin {
     private void pandorical$drawExtraSlotBackgrounds(GuiGraphicsExtractor graphics,
                                                      int mouseX, int mouseY, float delta,
                                                      CallbackInfo ci) {
-        // GuiGraphicsExtractor exposes the scaled screen dimensions; use them to
-        // derive the inventory's top-left corner without needing @Shadow on inherited fields.
-        int leftPos = (graphics.guiWidth()  - INV_W) / 2;
-        int topPos  = (graphics.guiHeight() - INV_H) / 2;
+        int leftPos = this.leftPos;
+        int topPos  = this.topPos;
 
         for (PlayerInventoryRegistrationsS2C.SlotGroup group : ClientInventorySlotRegistry.getGroups()) {
             for (PlayerInventoryRegistrationsS2C.SlotPosition pos : group.slots()) {
@@ -70,10 +77,12 @@ public abstract class InventoryScreenMixin {
                 graphics.fill(bx - 1,  ay,      bx,      by,      SLOT_BORDER_LIGHT);
                 graphics.fill(ax + 1,  ay + 1,  bx - 1,  by - 1,  SLOT_INNER);
 
-                // If the mod supplied a custom sprite, draw it on top of the background
+                // If the mod supplied a custom sprite, draw it on top of the background.
+                // Items render 16x16 at (ax+1, ay+1) inside the 18x18 slot frame; the ghost
+                // sprite must match exactly or its outline overhangs the item by 1px per side.
                 String sprite = pos.backgroundSprite();
                 if (sprite != null && !sprite.isEmpty()) {
-                    graphics.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.parse(sprite), ax, ay, 18, 18);
+                    graphics.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.parse(sprite), ax + 1, ay + 1, 16, 16);
                 }
             }
         }

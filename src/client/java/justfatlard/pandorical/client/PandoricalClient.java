@@ -39,7 +39,7 @@ import java.util.Map;
 import java.util.Objects;
 
 public class PandoricalClient implements ClientModInitializer {
-    private static final List<String> CLIENT_CAPABILITIES = List.of("screens", "content", "hud", "camera", "structures", "entity_overlays", "keybinds");
+    private static final List<String> CLIENT_CAPABILITIES = List.of("screens", "content", "hud", "camera", "structures", "entity_overlays", "keybinds", "hud_elements");
 
     // Pending screen defs keyed by screenId; LinkedHashMap preserves insertion order
     // so the last entry is always the most recently added.
@@ -53,6 +53,21 @@ public class PandoricalClient implements ClientModInitializer {
         // Keybind pool must register during client init: the options system
         // does not accept KeyMappings added later (see KeybindApi javadoc)
         justfatlard.pandorical.client.keybind.KeybindManager.init();
+
+        // Same startup-time constraint as keybinds: Fabric's HUD element registry
+        // is only writable during client init (see the suppressor's javadoc)
+        justfatlard.pandorical.client.hud.VanillaHudElementSuppressor.init();
+
+        // Exact count for oversized stacks (whose slot label is abbreviated
+        // by ItemCountRendererMixin), absorbed from stackz's client
+        net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback.EVENT.register((stack, context, flag, lines) -> {
+            int count = stack.getCount();
+            if (count >= 100) {
+                lines.add(net.minecraft.network.chat.Component.literal(
+                        "Count: " + java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(count))
+                    .withStyle(net.minecraft.ChatFormatting.GRAY));
+            }
+        });
 
         MenuScreens.register(Pandorical.MENU_TYPE, PandoricalClient::createContainerScreen);
 
@@ -219,6 +234,10 @@ public class PandoricalClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(HideHudS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> HudManager.handleHide(payload));
         });
+        ClientPlayNetworking.registerGlobalReceiver(justfatlard.pandorical.protocol.SetVanillaHudElementsS2C.TYPE, (payload, context) -> {
+            context.client().execute(() ->
+                justfatlard.pandorical.client.hud.VanillaHudElementSuppressor.handle(payload));
+        });
 
         // Content sync
         ClientPlayNetworking.registerGlobalReceiver(SyncContentS2C.TYPE, (payload, context) -> {
@@ -296,6 +315,7 @@ public class PandoricalClient implements ClientModInitializer {
             StructureManager.clear();
             justfatlard.pandorical.client.renderer.EntityOverlayStore.clear();
             justfatlard.pandorical.client.keybind.KeybindManager.clear();
+            justfatlard.pandorical.client.hud.VanillaHudElementSuppressor.clear();
         });
 
         // Disconnect cleanup
@@ -309,6 +329,7 @@ public class PandoricalClient implements ClientModInitializer {
             StructureManager.clear();
             justfatlard.pandorical.client.renderer.EntityOverlayStore.clear();
             justfatlard.pandorical.client.keybind.KeybindManager.clear();
+            justfatlard.pandorical.client.hud.VanillaHudElementSuppressor.clear();
         });
     }
 }

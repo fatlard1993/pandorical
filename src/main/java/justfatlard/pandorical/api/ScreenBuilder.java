@@ -79,6 +79,27 @@ public class ScreenBuilder {
         return this;
     }
 
+    /**
+     * Add a scroll panel with child components. Children use panel-relative
+     * coordinates; the client scissor-clips them to the panel's bounds and
+     * scrolls them entirely client-side (mouse wheel), so the server lays
+     * children out once at their unscrolled positions and never repositions
+     * them. The client also reports "scroll_offset" as an action on this
+     * component id, for servers that care. The scrollbar only appears when
+     * total_items exceeds visible_items. Props: scroll_offset, item_height,
+     * visible_items, total_items, show_scrollbar, background.
+     */
+    public ScreenBuilder scrollPanel(String id, int x, int y, int w, int h,
+            Map<String, String> props, List<ComponentDef> children) {
+        ComponentBuilder builder = new ComponentBuilder(id, ComponentType.SCROLL_PANEL)
+            .bounds(x, y, w, h).props(props);
+        for (ComponentDef child : children) {
+            builder.child(child);
+        }
+        this.components.add(builder.build());
+        return this;
+    }
+
     /** Add a button component. Props: label, label_key, enabled, style ("default" or "accepted") */
     public ScreenBuilder button(String id, int x, int y, int w, int h, Map<String, String> props) {
         this.components.add(new ComponentBuilder(id, ComponentType.BUTTON)

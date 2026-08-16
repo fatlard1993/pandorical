@@ -13,6 +13,12 @@ public class BlockRegistration {
 
     /**
      * Base block to clone properties from (strength, sound, etc).
+     *
+     * <p>This one is load-bearing: the client builds its stand-in from this block's
+     * settings and block class. Pick it for material feel (sound, hardness, whether
+     * it is a slab/stair/etc), not for its state properties: those always come from
+     * the real server block over the wire, and a base whose same-named property has a
+     * different value range is rejected rather than followed.
      */
     public BlockRegistration baseBlock(String baseBlockId) {
         this.baseBlockId = baseBlockId;
@@ -21,6 +27,10 @@ public class BlockRegistration {
 
     /**
      * Add a block state property (e.g., "horizontal_facing", "waterlogged").
+     *
+     * <p><b>Advisory only today.</b> The client rebuilds state properties from the real
+     * server block's state definition, which is sent on the wire with exact value
+     * ranges, so listing them here changes nothing.
      */
     public BlockRegistration property(String propertyName) {
         this.stateProperties.add(propertyName);
@@ -29,6 +39,9 @@ public class BlockRegistration {
 
     /**
      * Model resource location (e.g., "big-boats:block/helm").
+     *
+     * <p><b>Advisory only today.</b> Sent on the wire, not acted on by the client:
+     * appearance comes from the synced blockstate/model assets in your jar.
      */
     public BlockRegistration model(String modelId) {
         this.modelId = modelId;

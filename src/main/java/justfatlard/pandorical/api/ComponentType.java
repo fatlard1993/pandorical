@@ -43,6 +43,17 @@ public final class ComponentType {
      */
     public static final String PROP_TEXTURE_WIDTH = "texture_width";
     public static final String PROP_TEXTURE_HEIGHT = "texture_height";
+    /**
+     * Top-left corner of the source region for a clipped sprite (requires
+     * {@link #PROP_TEXTURE_WIDTH}/{@link #PROP_TEXTURE_HEIGHT}), in texture pixels. Clipping alone
+     * always reveals from the top left; moving the source origin in step with the component's
+     * position and size reveals from any edge instead, which is how a gauge that fills upward
+     * works: push {@code y + (full - filled)}, {@code height = filled}, {@code texture_v = full -
+     * filled} together. Clients predating these props draw from the texture's top left. Used by:
+     * sprite
+     */
+    public static final String PROP_TEXTURE_U = "texture_u";
+    public static final String PROP_TEXTURE_V = "texture_v";
     /** Text color. Accepts #RRGGBB or #AARRGGBB. Used by: text, button, particle_burst */
     public static final String PROP_COLOR = "color";
 

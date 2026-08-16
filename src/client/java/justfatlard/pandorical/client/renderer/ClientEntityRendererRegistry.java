@@ -35,6 +35,20 @@ public final class ClientEntityRendererRegistry {
     /** Tracks which entity type IDs we have already registered to avoid duplicates. */
     private static final Set<String> registeredTypes = ConcurrentHashMap.newKeySet();
 
+    /**
+     * Renderer key per entity type id, kept for the stub entity factories:
+     * ContentManager's stub EntityTypes decide AT SPAWN TIME what client
+     * entity to instantiate ("thrown_item" needs a projectile-shaped stub so
+     * the item stack sync lands and renders), and spawn happens well after
+     * this packet arrives.
+     */
+    private static final Map<String, String> rendererKeys = new ConcurrentHashMap<>();
+
+    /** The renderer key declared for an entity type id, or null if none. */
+    public static String getRendererKey(String typeId) {
+        return rendererKeys.get(typeId);
+    }
+
     /** Cached reflection access to {@code EntityRenderers.PROVIDERS}. */
     @SuppressWarnings("rawtypes")
     private static volatile Map providers = null;
@@ -52,9 +66,15 @@ public final class ClientEntityRendererRegistry {
             return;
         }
 
+        boolean addedAny = false;
+
         for (Map.Entry<String, String> entry : packet.renderers().entrySet()) {
             String typeId = entry.getKey();
             String rendererKey = entry.getValue();
+
+            // Recorded before the dedupe check: the stub factories need the
+            // key on every connection, including reconnects
+            rendererKeys.put(typeId, rendererKey);
 
             if (registeredTypes.contains(typeId)) {
                 Pandorical.LOGGER.debug("[pandorical] Skipping already-registered entity renderer for '{}'", typeId);
@@ -82,14 +102,28 @@ public final class ClientEntityRendererRegistry {
 
             providersMap.put(entityType, providerFactory);
             registeredTypes.add(typeId);
+            addedAny = true;
             Pandorical.LOGGER.debug("[pandorical] Registered client renderer '{}' for entity type '{}'",
                 rendererKey, typeId);
+        }
+
+        // The dispatcher builds its per-type renderer map from PROVIDERS at
+        // resource reload, and the post-join reload races (and usually
+        // precedes) this packet: without an explicit rebuild the new types
+        // have entities but no renderer, and the first render frame dies
+        // with a null-renderer NPE. Rebuild through vanilla's own reload
+        // path so the map is complete before any synced entity can render.
+        if (addedAny) {
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            mc.getEntityRenderDispatcher().onResourceManagerReload(mc.getResourceManager());
+            Pandorical.LOGGER.debug("[pandorical] Rebuilt entity renderer dispatcher for synced types");
         }
     }
 
     /** Clear state on disconnect so re-joining re-registers correctly. */
     public static void reset() {
         registeredTypes.clear();
+        rendererKeys.clear();
         // Do NOT clear the providers map itself; that would break vanilla renderers.
     }
 
