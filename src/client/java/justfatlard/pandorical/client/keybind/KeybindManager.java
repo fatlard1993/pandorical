@@ -59,6 +59,28 @@ public final class KeybindManager {
 		Pandorical.LOGGER.debug("Server declared keybind slots: {}", claimedSlots);
 	}
 
+	/** How many slots the pool has. */
+	public static int poolSize() {
+		return MAX_SLOTS;
+	}
+
+	/**
+	 * The pooled mapping for a slot, or null if the slot is out of range.
+	 *
+	 * <p>Exposed so an input source that is not the keyboard can drive a pooled
+	 * keybind the same way a key does. {@link #tick} reads presses through
+	 * {@code consumeClick}, so anything that makes the mapping report a click
+	 * reaches the server by the ordinary path and needs no separate protocol.
+	 */
+	public static KeyMapping poolMapping(int slot) {
+		return slot >= 0 && slot < MAX_SLOTS ? pool[slot] : null;
+	}
+
+	/** Whether the current server declared this slot; unclaimed presses go nowhere. */
+	public static boolean isClaimed(int slot) {
+		return claimedSlots.contains(slot);
+	}
+
 	/** Forward pool presses for claimed slots; drain unclaimed clicks so they cannot pile up. */
 	public static void tick(Minecraft client) {
 		for (int i = 0; i < MAX_SLOTS; i++) {
