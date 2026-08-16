@@ -18,6 +18,11 @@ public class ButtonComponent extends AbstractComponent {
     private boolean hovered;
 
     // Colors
+    /** Wide enough to read across a room, narrow enough not to crowd the label. */
+    private static final int ACCENT_WIDTH = 3;
+
+    private int accent;
+
     private static final int BG_NORMAL = 0xFF666666;
     private static final int BG_HOVER = 0xFF7A7A7A;
     private static final int BG_DISABLED = 0xFF444444;
@@ -48,6 +53,8 @@ public class ButtonComponent extends AbstractComponent {
         }
         enabled = parseBool("enabled", true);
         style = parseString("style", "default");
+        // 0 means no accent, which is the default and the common case.
+        accent = parseColor("accent", 0);
     }
 
     @Override
@@ -62,6 +69,15 @@ public class ButtonComponent extends AbstractComponent {
         graphics.fill(x, y, x + 1, y + height, BORDER_LIGHT);
         graphics.fill(x, y + height - 1, x + width, y + height, BORDER_DARK);
         graphics.fill(x + width - 1, y, x + width, y + height, BORDER_DARK);
+
+        // Accent: a bar down the leading edge rather than a recoloured button.
+        // The background stays the one grey every Pandorical button shares, so a
+        // screen reads as one set of controls and the colour says what kind of
+        // thing this one does. Sits inside the border so it cannot be mistaken
+        // for a selection highlight.
+        if (accent != 0 && enabled) {
+            graphics.fill(x + 1, y + 1, x + 1 + ACCENT_WIDTH, y + height - 1, accent);
+        }
 
         // Text
         int textColor;

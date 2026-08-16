@@ -106,6 +106,9 @@ public final class ComponentType {
     /** Button style: "default" or "accepted" (green). */
     public static final String PROP_STYLE = "style";
 
+    /** Button only: "#RRGGBB" bar down the leading edge, saying what kind of action this is. */
+    public static final String PROP_ACCENT = "accent";
+
     // Text props
     public static final String PROP_TEXT = "text";
     /** Translatable key for display text. */
