@@ -20,10 +20,9 @@ Server mods declare screens, HUD overlays, custom blocks/items, and camera hints
 | `keybinds` | Server-declared rebindable keybinds: mods claim slots from a fixed client-side pool (category "Pandorical", slot 1 defaults to G), name them via synced lang, and receive presses server-side; the declaring mod ships zero client code |
 | entity rendering | Register simple built-in renderers (`thrown_item`, `invisible`) for custom entity types without needing a full client-side model |
 
-## Requirements
+## Installation
 
-- Targets the Minecraft, Fabric Loader, and Fabric API versions declared in this mod's `gradle.properties`; check there for the exact currently-supported version
-- Java version as declared in `fabric.mod.json`'s `depends` block
+Pandorical goes on the server **and** on every client that should see what the server declares. It is the one mod in this suite that belongs on both sides. Version targets live in `gradle.properties` (Minecraft, loader, Fabric API) and `fabric.mod.json` (Java).
 
 ## Usage
 
@@ -153,7 +152,7 @@ The pool is fixed at 8 slots because the options system only accepts keybind reg
 
 ### Other capabilities
 
-`structures`, `playerInventory`, `blockTints`, and custom entity rendering are driven the same way, through `PandoricalApi`. Their contracts (including the traps: server-wide-unique structure IDs, despawning to avoid state leaks, tint registration timing) live in the javadoc on `StructureApi`, `PlayerInventoryApi`, `BlockTintApi`, and `PandoricalApi#registerEntityRenderer` — read those before wiring them up.
+`structures`, `playerInventory`, `blockTints`, and custom entity rendering are driven the same way, through `PandoricalApi`. Their contracts (including the traps: server-wide-unique structure IDs, despawning to avoid state leaks, tint registration timing) live in the javadoc on `StructureApi`, `PlayerInventoryApi`, `BlockTintApi`, and `PandoricalApi#registerEntityRenderer`: read those before wiring them up.
 
 ## Components
 
@@ -163,4 +162,4 @@ Screens and HUD overlays are composed from these component types:
 
 ## License
 
-MIT
+MIT, see [LICENSE](LICENSE).
