@@ -39,7 +39,7 @@ import java.util.Map;
 import java.util.Objects;
 
 public class PandoricalClient implements ClientModInitializer {
-    private static final List<String> CLIENT_CAPABILITIES = List.of("screens", "content", "hud", "camera", "structures", "entity_overlays", "keybinds", "hud_elements");
+    private static final List<String> CLIENT_CAPABILITIES = List.of("screens", "content", "hud", "camera", "structures", "entity_overlays", "chest_overlays", "keybinds", "hud_elements");
 
     // Pending screen defs keyed by screenId; LinkedHashMap preserves insertion order
     // so the last entry is always the most recently added.
@@ -280,6 +280,13 @@ public class PandoricalClient implements ClientModInitializer {
                 justfatlard.pandorical.client.renderer.EntityOverlayStore.handle(payload));
         });
 
+        // Chest overlays
+        ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.ChestOverlayS2C.TYPE, (payload, context) -> {
+                context.client().execute(() ->
+                    justfatlard.pandorical.client.renderer.ChestOverlayStore.handle(payload));
+            });
+
         // Keybind slot declarations
         ClientPlayNetworking.registerGlobalReceiver(KeybindDeclarationsS2C.TYPE, (payload, context) -> {
             context.client().execute(() ->
@@ -314,6 +321,7 @@ public class PandoricalClient implements ClientModInitializer {
             ClientEntityRendererRegistry.reset();
             StructureManager.clear();
             justfatlard.pandorical.client.renderer.EntityOverlayStore.clear();
+            justfatlard.pandorical.client.renderer.ChestOverlayStore.clear();
             justfatlard.pandorical.client.keybind.KeybindManager.clear();
             justfatlard.pandorical.client.hud.VanillaHudElementSuppressor.clear();
         });
@@ -328,6 +336,7 @@ public class PandoricalClient implements ClientModInitializer {
             ClientEntityRendererRegistry.reset();
             StructureManager.clear();
             justfatlard.pandorical.client.renderer.EntityOverlayStore.clear();
+            justfatlard.pandorical.client.renderer.ChestOverlayStore.clear();
             justfatlard.pandorical.client.keybind.KeybindManager.clear();
             justfatlard.pandorical.client.hud.VanillaHudElementSuppressor.clear();
         });

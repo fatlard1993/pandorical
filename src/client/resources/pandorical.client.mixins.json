@@ -1,17 +1,19 @@
 {
-	"required": true,
-	"package": "justfatlard.pandorical.client.mixin",
-	"compatibilityLevel": "JAVA_25",
-	"mixins": [],
-	"client": [
-		"ItemCountRendererMixin",
-		"CameraMixin",
-		"EntityRenderStateMixin",
-		"InventoryMenuClientMixin",
-		"InventoryScreenMixin",
-		"LivingEntityRendererMixin"
-	],
-	"injectors": {
-		"defaultRequire": 0
-	}
+  "required": true,
+  "package": "justfatlard.pandorical.client.mixin",
+  "compatibilityLevel": "JAVA_25",
+  "mixins": [],
+  "client": [
+    "ItemCountRendererMixin",
+    "CameraMixin",
+    "EntityRenderStateMixin",
+    "InventoryMenuClientMixin",
+    "InventoryScreenMixin",
+    "LivingEntityRendererMixin",
+    "ChestRenderStateMixin",
+    "ChestRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
 }

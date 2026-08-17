@@ -34,7 +34,7 @@ public class Pandorical implements ModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
     public static final int PROTOCOL_VERSION = 1;
 
-    public static final List<String> SERVER_CAPABILITIES = List.of("screens", "content", "camera", "hud", "structures", "entity_overlays", "keybinds", "hud_elements");
+    public static final List<String> SERVER_CAPABILITIES = List.of("screens", "content", "camera", "hud", "structures", "entity_overlays", "chest_overlays", "keybinds", "hud_elements");
 
     /**
      * Tracks player UUIDs (from GameProfile) that completed config-phase content sync.
@@ -147,6 +147,9 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(SetStructureVisibleS2C.TYPE, SetStructureVisibleS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(DespawnStructureS2C.TYPE, DespawnStructureS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(EntityOverlayS2C.TYPE, EntityOverlayS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.ChestOverlayS2C.TYPE,
+            justfatlard.pandorical.protocol.ChestOverlayS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(KeybindDeclarationsS2C.TYPE, KeybindDeclarationsS2C.STREAM_CODEC);
 
         // C2S play

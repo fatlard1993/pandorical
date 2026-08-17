@@ -25,6 +25,7 @@ public final class PandoricalApi {
     private static final BlockTintApiImpl BLOCK_TINTS = new BlockTintApiImpl();
     private static final StructureApiImpl STRUCTURES = new StructureApiImpl();
     private static final EntityOverlayApiImpl ENTITY_OVERLAYS = new EntityOverlayApiImpl();
+    private static final ChestOverlayApiImpl CHEST_OVERLAYS = new ChestOverlayApiImpl();
     private static final KeybindApiImpl KEYBINDS = new KeybindApiImpl();
 
     /** Holds the type and ID of the screen currently open for a player. */
@@ -106,6 +107,12 @@ public final class PandoricalApi {
     public static EntityOverlayApi entityOverlays() { return ENTITY_OVERLAYS; }
 
     /**
+     * Returns the chest overlay API for drawing particular chests with a
+     * different texture on Pandorical clients, addressed per player.
+     */
+    public static ChestOverlayApi chestOverlays() { return CHEST_OVERLAYS; }
+
+    /**
      * Returns the keybind API for receiving rebindable keybind presses from
      * Pandorical clients, with no client mod needed on the declaring mod's side.
      */
@@ -131,6 +138,43 @@ public final class PandoricalApi {
     public static void registerEntityRenderer(net.minecraft.world.entity.EntityType<?> entityType,
                                               String rendererKey) {
         EntityRendererRegistry.register(entityType, rendererKey);
+    }
+
+
+    /** @hidden */
+    public static final class ChestOverlayApiImpl implements ChestOverlayApi {
+        @Override
+        public void replace(ServerPlayer player, net.minecraft.resources.Identifier texture,
+                java.util.Collection<net.minecraft.core.BlockPos> positions) {
+            send(player, justfatlard.pandorical.protocol.ChestOverlayS2C.OP_REPLACE, texture, positions);
+        }
+
+        @Override
+        public void add(ServerPlayer player, net.minecraft.resources.Identifier texture,
+                java.util.Collection<net.minecraft.core.BlockPos> positions) {
+            if (positions.isEmpty()) return;
+            send(player, justfatlard.pandorical.protocol.ChestOverlayS2C.OP_ADD, texture, positions);
+        }
+
+        @Override
+        public void remove(ServerPlayer player, java.util.Collection<net.minecraft.core.BlockPos> positions) {
+            if (positions.isEmpty()) return;
+            // The texture is irrelevant to a removal, and the client ignores it.
+            send(player, justfatlard.pandorical.protocol.ChestOverlayS2C.OP_REMOVE,
+                net.minecraft.resources.Identifier.fromNamespaceAndPath("pandorical", "none"), positions);
+        }
+
+        private static void send(ServerPlayer player, byte op, net.minecraft.resources.Identifier texture,
+                java.util.Collection<net.minecraft.core.BlockPos> positions) {
+            if (!hasCapability(player, "chest_overlays")) return;
+
+            long[] packed = new long[positions.size()];
+            int i = 0;
+            for (net.minecraft.core.BlockPos pos : positions) packed[i++] = pos.asLong();
+
+            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
+                new justfatlard.pandorical.protocol.ChestOverlayS2C(op, texture.toString(), packed));
+        }
     }
 
     // --- Internal methods (used by Pandorical core, not for consuming mods) ---
