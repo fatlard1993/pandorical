@@ -78,6 +78,12 @@ public final class ComponentType {
      * transform in ScreenHelper always has a valid value), but only officially supported/documented
      * as a settable prop on: sprite, text.
      */
+    /**
+     * Ticks over which this component blends a changed value in. Defaults to a short
+     * window that hides the gap between server updates; raise it when a change is
+     * rare and meant to be watched rather than smoothed over.
+     */
+    public static final String PROP_INTERP_TICKS = "interp_ticks";
     public static final String PROP_SCALE = "scale";
     /**
      * Rotation in degrees, applied around the component's center.

@@ -31,6 +31,18 @@ public abstract class AbstractComponent implements PandoricalComponent {
      */
     protected static final int INTERPOLATION_TICKS = 3;
 
+    /**
+     * How long this component blends a new value in, in ticks. Defaults to the
+     * short window above, which is right for anything tracking a moving thing:
+     * the blend is there to hide the gap between server updates, not to be seen.
+     *
+     * <p>A component that changes rarely and wants the change *noticed* sets
+     * {@code interp_ticks} higher. A hunger bar that ticks down one point is the
+     * case in point: three ticks is a jump, and the point of drawing a stomach is
+     * to watch it empty.
+     */
+    protected int interpolationTicks = INTERPOLATION_TICKS;
+
     protected String id;
     protected int x, y, width, height;
     protected Map<String, String> props = new HashMap<>();
@@ -69,6 +81,7 @@ public abstract class AbstractComponent implements PandoricalComponent {
         this.height = def.height();
         this.props.putAll(def.props());
         this.context = context;
+        this.interpolationTicks = Math.max(1, parseInt("interp_ticks", INTERPOLATION_TICKS));
 
         parseGeometryStyle();
         GeometrySnapshot initial = currentGeometrySnapshot();
@@ -112,9 +125,9 @@ public abstract class AbstractComponent implements PandoricalComponent {
     /** Advance interpolation progress by one client tick. Called once/tick via HudManager/ScreenHelper. */
     @Override
     public void tick() {
-        if (geomTicksSinceUpdate < INTERPOLATION_TICKS) geomTicksSinceUpdate++;
+        if (geomTicksSinceUpdate < interpolationTicks) geomTicksSinceUpdate++;
         for (ColorAnim anim : colorAnims.values()) {
-            if (anim.ticksSinceUpdate < INTERPOLATION_TICKS) anim.ticksSinceUpdate++;
+            if (anim.ticksSinceUpdate < interpolationTicks) anim.ticksSinceUpdate++;
         }
     }
 
@@ -133,7 +146,7 @@ public abstract class AbstractComponent implements PandoricalComponent {
 
     /** Interpolated geometry for the current render frame. Used by ScreenHelper's transform wrapper. */
     public GeometrySnapshot interpolatedGeometry(float partialTick) {
-        float t = clamp01((geomTicksSinceUpdate + partialTick) / INTERPOLATION_TICKS);
+        float t = clamp01((geomTicksSinceUpdate + partialTick) / (float) interpolationTicks);
         if (t >= 1f) return targetGeom;
         if (t <= 0f) return previousGeom;
         float ix = lerp(t, previousGeom.x(), targetGeom.x());
@@ -159,7 +172,7 @@ public abstract class AbstractComponent implements PandoricalComponent {
             return;
         }
         if (anim.target == newColor) return;
-        float t = clamp01(anim.ticksSinceUpdate / (float) INTERPOLATION_TICKS);
+        float t = clamp01(anim.ticksSinceUpdate / (float) interpolationTicks);
         int current = t >= 1f ? anim.target : lerpArgb(anim.previous, anim.target, t);
         anim.previous = current;
         anim.target = newColor;
@@ -170,7 +183,7 @@ public abstract class AbstractComponent implements PandoricalComponent {
     protected int interpolatedColor(String key, int defaultColor, float partialTick) {
         ColorAnim anim = colorAnims.get(key);
         if (anim == null) return parseColor(key, defaultColor);
-        float t = clamp01((anim.ticksSinceUpdate + partialTick) / INTERPOLATION_TICKS);
+        float t = clamp01((anim.ticksSinceUpdate + partialTick) / (float) interpolationTicks);
         return t >= 1f ? anim.target : lerpArgb(anim.previous, anim.target, t);
     }
 
