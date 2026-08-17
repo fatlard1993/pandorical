@@ -9,7 +9,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Static/dynamic text display. Supports color, shadow, word wrapping, line limits.
+ * Static/dynamic text display. Supports color, shadow, word wrapping, line
+ * limits, and horizontal alignment within the component's own width.
  */
 public class TextComponent extends AbstractComponent {
     private String displayText;
@@ -17,6 +18,7 @@ public class TextComponent extends AbstractComponent {
     private boolean shadow;
     private int wrapWidth;
     private int maxLines;
+    private String align;
     private List<String> cachedLines;
 
     @Override
@@ -43,6 +45,7 @@ public class TextComponent extends AbstractComponent {
         shadow = parseBool("shadow", false);
         wrapWidth = parseInt("wrap_width", 0);
         maxLines = parseInt("max_lines", 0);
+        align = parseString("align", "left");
         cachedLines = null; // invalidate on prop change
     }
 
@@ -54,8 +57,21 @@ public class TextComponent extends AbstractComponent {
         if (wrapWidth > 0) {
             renderWrapped(graphics, renderColor);
         } else {
-            graphics.text(context.font(), displayText, x, y, renderColor, shadow);
+            graphics.text(context.font(), displayText, alignedX(displayText), y, renderColor, shadow);
         }
+    }
+
+    /**
+     * Where a line starts, given the alignment. Only the client can answer this:
+     * text length in pixels depends on the font and on the language the player
+     * reads in, neither of which a server knows.
+     */
+    private int alignedX(String line) {
+        return switch (align) {
+            case "center" -> x + (width - context.font().width(line)) / 2;
+            case "right" -> x + width - context.font().width(line);
+            default -> x;
+        };
     }
 
     private static final int LINE_HEIGHT = 11;
@@ -74,7 +90,7 @@ public class TextComponent extends AbstractComponent {
 
         int lineY = y;
         for (String line : cachedLines) {
-            graphics.text(context.font(), line, x, lineY, renderColor, shadow);
+            graphics.text(context.font(), line, alignedX(line), lineY, renderColor, shadow);
             lineY += LINE_HEIGHT;
         }
     }

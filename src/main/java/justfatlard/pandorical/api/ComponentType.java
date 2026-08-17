@@ -121,6 +121,16 @@ public final class ComponentType {
     public static final String PROP_TEXT_KEY = "text_key";
     /** "true"/"false": render text with shadow. */
     public static final String PROP_SHADOW = "shadow";
+
+    /**
+     * Horizontal alignment of {@link #TEXT} within its own width: {@code "left"}
+     * (the default), {@code "center"} or {@code "right"}.
+     *
+     * <p>Alignment has to happen on the client because that is the only side that
+     * can measure the text. A server sends a translation key and does not know
+     * what language it will be read in, let alone how wide the result is.
+     */
+    public static final String PROP_ALIGN = "align";
     /** Max pixel width before wrapping. 0 = no wrap (default). */
     public static final String PROP_WRAP_WIDTH = "wrap_width";
     /** Max lines to display. 0 = unlimited (default). */
