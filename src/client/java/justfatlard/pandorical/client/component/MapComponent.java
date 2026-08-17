@@ -3,14 +3,18 @@ package justfatlard.pandorical.client.component;
 import justfatlard.pandorical.protocol.ComponentDef;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.state.MapRenderState;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.data.AtlasIds;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.MapItem;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
-import net.minecraft.world.scores.PlayerTeam;
-import net.minecraft.world.scores.TeamColor;
 import org.joml.Matrix3x2fStack;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -22,24 +26,24 @@ import java.util.Map;
 public class MapComponent extends AbstractComponent {
     private static final float MAP_PIXELS = 128.0f;
 
-    // Vanilla map border colors sampled from textures/map/map_background.png
-    // (verified unchanged in 26.3: torn-parchment redesign kept #99876C / #D6BE96)
-    private static final int BORDER_OUTER = 0xFF99876C; // brown
-    private static final int BORDER_INNER = 0xFFD6BE96; // light tan
-    private static final int MARKER_COLOR = 0xFFFFFFFF; // white default
-
     /** The vanilla frame art: border plus the unexplored-area checkerboard. */
-    private static final net.minecraft.resources.Identifier CHECKERBOARD_TEXTURE =
-        net.minecraft.resources.Identifier.fromNamespaceAndPath("minecraft", "textures/map/map_background_checkerboard.png");
+    private static final Identifier CHECKERBOARD_TEXTURE =
+        Identifier.fromNamespaceAndPath("minecraft", "textures/map/map_background_checkerboard.png");
 
     // Vanilla 26.3 map frame geometry, measured from the snapshot jar:
     // FirstPersonHandsAndItemsRenderer.renderMap draws the background quad over
     // (-7,-7)..(135,135), i.e. a 7 map-px margin around the 128px map content.
-    // In map_background_checkerboard.png (128 tex px stretched over those 142 map px)
-    // that margin is 2 tex px of brown outline + 4 tex px of tan, so brown:total = 1:3.
-    // The border scales with the minimap so its proportions match the vanilla art.
     private static final float BORDER_TOTAL_MAP_PX = 7.0f;
-    private static final float BORDER_BROWN_FRACTION = 1.0f / 3.0f;
+
+    /**
+     * Half the on-screen size of a marker. Vanilla scales its decoration quad by
+     * 4 in map space; here the same 4 is applied in screen space instead, so a
+     * marker stays legible on a minimap a third of a full map's size.
+     */
+    private static final float MARKER_HALF_PX = 4.0f;
+
+    /** Vanilla stores decoration facing in sixteenths of a turn. */
+    private static final float DEGREES_PER_ROT_STEP = 360.0f / 16.0f;
 
     private final MapRenderState renderState = new MapRenderState();
     private int mapIdValue = -1;
@@ -107,24 +111,29 @@ public class MapComponent extends AbstractComponent {
 
         mc.getMapRenderer().extractRenderState(mapId, mapData, renderState);
 
-        float scale = Math.min(width, height) / MAP_PIXELS;
+        // The frame is part of the component, not an overhang. Painting it outside
+        // the declared bounds put it past whichever screen edge the minimap was
+        // anchored to, and the anchored edges are the ones that got clipped.
+        int footprint = Math.min(width, height);
+        int mapSize = Math.round(footprint * MAP_PIXELS / (MAP_PIXELS + 2f * BORDER_TOTAL_MAP_PX));
+        int border = Math.max(1, (footprint - mapSize) / 2);
+        int mapX = x + border;
+        int mapY = y + border;
+        float scale = mapSize / MAP_PIXELS;
 
-        // Vanilla frame + backdrop in one stretched blit of the actual 26.3
-        // map art: map_background_checkerboard.png carries the brown outline,
-        // tan margin, AND the two-tone checkerboard (#C9B28D/#C2AC88) that
-        // vanilla shows behind unexplored map pixels. Using the texture is
-        // both cheaper (one draw, no per-cell quads) and more faithful than
-        // reproducing the pattern with fills; the measured border constants
-        // above remain as documentation of its proportions.
-        int borderTotal = Math.max(2, Math.round(BORDER_TOTAL_MAP_PX * scale));
-        int frameW = width + borderTotal * 2;
-        int frameH = height + borderTotal * 2;
-        graphics.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
-            CHECKERBOARD_TEXTURE,
-            x - borderTotal, y - borderTotal, 0.0F, 0.0F,
-            frameW, frameH, frameW, frameH);
+        // Vanilla frame + backdrop in one stretched blit of the actual 26.3 map art:
+        // map_background_checkerboard.png carries the brown outline, tan margin, AND
+        // the two-tone checkerboard vanilla shows behind unexplored map pixels.
+        graphics.blit(RenderPipelines.GUI_TEXTURED, CHECKERBOARD_TEXTURE,
+            x, y, 0.0F, 0.0F, footprint, footprint, footprint, footprint);
 
-        graphics.enableScissor(x, y, x + width, y + height);
+        // Decorations are drawn below, in screen space. Handing them to graphics.map()
+        // as well drew every landmark twice: vanilla's sprite first, then ours on top
+        // of it, which is what made a treasure X read as a white smudge.
+        List<MapRenderState.MapDecorationRenderState> decorations = new ArrayList<>(renderState.decorations);
+        renderState.decorations.clear();
+
+        graphics.enableScissor(mapX, mapY, mapX + mapSize, mapY + mapSize);
 
         // --- Zoom support ---
         float zoomLevel = MapDisplaySettings.getZoomLevel();
@@ -134,14 +143,14 @@ public class MapComponent extends AbstractComponent {
         int clampedSelfDecX = Math.max(-127, Math.min(127, (int) selfDecX));
         int clampedSelfDecY = Math.max(-127, Math.min(127, (int) selfDecY));
 
-        // When zoom > 1 we centre on the player; at 1× top-left is (x, y) as before
+        // When zoom > 1 we centre on the player; at 1x top-left is the map corner
         float originX, originY;
         if (zoomLevel > 1.0f) {
-            originX = x + width  / 2.0f - (clampedSelfDecX / 2.0f + 64f) * zoomScale;
-            originY = y + height / 2.0f - (clampedSelfDecY / 2.0f + 64f) * zoomScale;
+            originX = mapX + mapSize / 2.0f - (clampedSelfDecX / 2.0f + 64f) * zoomScale;
+            originY = mapY + mapSize / 2.0f - (clampedSelfDecY / 2.0f + 64f) * zoomScale;
         } else {
-            originX = x;
-            originY = y;
+            originX = mapX;
+            originY = mapY;
         }
 
         // Map always north-up
@@ -152,45 +161,25 @@ public class MapComponent extends AbstractComponent {
         graphics.map(renderState);
         pose.popMatrix();
 
-        // --- Self dot/arrow: rendered from server-sent selfDecX/Y ---
+        // --- Self marker: positioned from server-sent selfDecX/Y ---
         // The client-side mapData decoration bytes are stale (addClientSideDecorations doesn't
         // update reliably for our custom slot), so server-authoritative position props win.
-        int selfSi, selfSj;
+        float selfSx, selfSy;
         if (zoomLevel > 1.0f) {
-            selfSi = Math.round(x + width  / 2.0f);
-            selfSj = Math.round(y + height / 2.0f);
+            selfSx = mapX + mapSize / 2.0f;
+            selfSy = mapY + mapSize / 2.0f;
         } else {
-            selfSi = Math.round(x + (clampedSelfDecX / 2.0f + 64f) * scale);
-            selfSj = Math.round(y + (clampedSelfDecY / 2.0f + 64f) * scale);
+            selfSx = mapX + (clampedSelfDecX / 2.0f + 64f) * scale;
+            selfSy = mapY + (clampedSelfDecY / 2.0f + 64f) * scale;
         }
 
-        // Player arrow always shows facing direction (yaw=0=south points down, yaw=90=west points left)
-        float yawRad = (float) Math.toRadians(mc.player.getYRot());
-        float facingDirX = -(float) Math.sin(yawRad);
-        float facingDirY =  (float) Math.cos(yawRad);
-
-        // --- Compass: smooth screen-space offset from the player dot ---
-        // Computed as (compassTarget - player) in world space → screen pixels.
-        // Using selfDecX/Y as base causes vibration: selfDecX is quantized (server ticks)
-        // while mc.player.getX() is smooth (every frame). Pure offset avoids the mismatch.
-        float compassScreenDx = 0, compassScreenDy = 0;
-        boolean hasCompassTarget = compass && !Double.isNaN(compassTargetX) && !Double.isNaN(compassTargetZ);
-        if (hasCompassTarget) {
-            float scaleFactor = 1 << mapData.scale;
-            // World-space delta → map-pixel delta → screen-pixel delta (smooth, no quantization)
-            compassScreenDx = (float)((compassTargetX - mc.player.getX()) / scaleFactor) * zoomScale;
-            compassScreenDy = (float)((compassTargetZ - mc.player.getZ()) / scaleFactor) * zoomScale;
-        }
-
-        // --- Mob Sight: mob dots render first so the player arrow lands on top ---
+        // --- Mob Sight: mob dots render first so the player marker lands on top ---
         if (!mobsData.isEmpty()) {
             MapDisplaySettings.ensureLoaded();
             boolean showHostile = MapDisplaySettings.isShowHostile();
             boolean showPassiveOther = MapDisplaySettings.isShowPassiveOther();
             java.util.Set<String> disabledMobTypes = MapDisplaySettings.getDisabledMobTypes();
 
-            int clampedSelfX = Math.max(-127, Math.min(127, (int) selfDecX));
-            int clampedSelfZ = Math.max(-127, Math.min(127, (int) selfDecY));
             String[] entries = mobsData.split(";");
             for (String entry : entries) {
                 // Format: decX,decZ,colorARGB,entityTypeId
@@ -210,101 +199,47 @@ public class MapComponent extends AbstractComponent {
                     // Individual mob type filter
                     if (!entityTypeId.isEmpty() && disabledMobTypes.contains(entityTypeId)) continue;
 
-                    if (Math.abs(decX - clampedSelfX) <= 1 && Math.abs(decZ - clampedSelfZ) <= 1) continue;
+                    if (Math.abs(decX - clampedSelfDecX) <= 1 && Math.abs(decZ - clampedSelfDecY) <= 1) continue;
                     int sx = Math.round(originX + (decX / 2.0f + 64f) * zoomScale);
                     int sy = Math.round(originY + (decZ / 2.0f + 64f) * zoomScale);
-                    if (sx < x || sx >= x + width || sy < y || sy >= y + height) continue;
-                    // 2×2 dot; small enough not to obscure map detail
+                    if (sx < mapX || sx >= mapX + mapSize || sy < mapY || sy >= mapY + mapSize) continue;
+                    // 2x2 dot; small enough not to obscure map detail
                     graphics.fill(sx, sy, sx + 2, sy + 2, color);
                 } catch (NumberFormatException ignored) {}
             }
         }
 
-        // Draw player arrow with optional compass tip (on top of mob dots)
-        drawArrow(graphics, selfSi, selfSj, facingDirX, facingDirY, MARKER_COLOR);
+        // --- Landmarks, banners, treasure X: vanilla's own sprites ---
+        // renderOnFrame=false is the player-type set, which vanilla itself skips in a
+        // GUI; ours is drawn from the server props above and other players need
+        // tracking we do not have.
+        for (MapRenderState.MapDecorationRenderState dec : decorations) {
+            if (!dec.renderOnFrame || dec.atlasSprite == null) continue;
 
-        // --- Compass destination marker: vanilla target_point sprite, centered on target ---
+            float sx = originX + (dec.x / 2.0f + 64f) * zoomScale;
+            float sy = originY + (dec.y / 2.0f + 64f) * zoomScale;
+            if (sx < mapX || sx >= mapX + mapSize || sy < mapY || sy >= mapY + mapSize) continue;
+
+            drawMarker(graphics, dec.atlasSprite, sx, sy, dec.rot * DEGREES_PER_ROT_STEP);
+        }
+
+        // --- Compass destination marker: vanilla target_point, centred on the target ---
+        boolean hasCompassTarget = compass && !Double.isNaN(compassTargetX) && !Double.isNaN(compassTargetZ);
         if (hasCompassTarget) {
             float cpx = originX + (compassDecX / 2.0f + 64f) * zoomScale;
             float cpy = originY + (compassDecY / 2.0f + 64f) * zoomScale;
-            if (cpx >= x && cpx < x + width && cpy >= y && cpy < y + height) {
-                int pinW = 8, pinH = 8;
-                int cpxi = Math.round(cpx) - pinW / 2;
-                int cpyi = Math.round(cpy) - pinH / 2;
-                // The Identifier blitSprite overload only resolves against the GUI atlas;
-                // map decorations live in the separate map_decorations atlas (26.3), so
-                // fetch the TextureAtlasSprite from that atlas explicitly.
-                net.minecraft.client.renderer.texture.TextureAtlasSprite pinSprite = mc.getAtlasManager()
-                    .getAtlasOrThrow(net.minecraft.data.AtlasIds.MAP_DECORATIONS)
-                    .getSprite(net.minecraft.resources.Identifier.withDefaultNamespace("target_point"));
-                graphics.blitSprite(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
-                    pinSprite, cpxi, cpyi, pinW, pinH);
+            if (cpx >= mapX && cpx < mapX + mapSize && cpy >= mapY && cpy < mapY + mapSize) {
+                drawMarker(graphics, mapSprite(mc, "target_point"), cpx, cpy, 0f);
             }
         }
 
-        // --- Other decorations (players + landmarks) ---
-        // renderOnFrame=true  → landmarks, banners, treasure X: always show at their position
-        // renderOnFrame=false → player-type: skip the stale self decoration, show all others,
-        //                       clamping off-map positions to the minimap edge (smaller dot)
-        for (MapRenderState.MapDecorationRenderState dec : renderState.decorations) {
-            boolean isPlayerType = !dec.renderOnFrame;
-
-            if (isPlayerType) {
-                // Skip ALL player-type decorations: self renders via server-sent selfDecX/Y,
-                // and other players need proper server-side tracking to avoid stale positions.
-                continue;
-            }
-
-            float mpx = dec.x / 2.0f;
-            float mpy = dec.y / 2.0f;
-            float rawSx = originX + (mpx + 64f) * zoomScale;
-            float rawSy = originY + (mpy + 64f) * zoomScale;
-            boolean onMap = rawSx >= x && rawSx < x + width && rawSy >= y && rawSy < y + height;
-
-            int color = getDecorationColor(mc, dec);
-
-            // Determine dot size from sprite name (encodes vanilla distance category):
-            //   player          → on map       → r=1 (3×3 dot)
-            //   player_off_map  → near edge    → r=0 with outline only (2×2)
-            //   player_off_limits → far / wrong dim → r=0, half-alpha (1×1)
-            //   anything else (landmark) → r=1
-            int dotRadius = 1; // default: normal
-            boolean offLimits = false;
-            if (isPlayerType && dec.atlasSprite != null) {
-                String spriteName = dec.atlasSprite.contents().name().getPath();
-                if (spriteName.contains("player_off_limits")) {
-                    dotRadius = 0;
-                    offLimits = true;
-                } else if (spriteName.contains("player_off_map")) {
-                    dotRadius = 0;
-                }
-                // "player" → dotRadius stays 1
-            }
-
-            // Clamp off-map positions to minimap edge (landmarks skip this)
-            float displaySx = onMap ? rawSx : Math.max(x + dotRadius + 1, Math.min(x + width - dotRadius - 2, rawSx));
-            float displaySy = onMap ? rawSy : Math.max(y + dotRadius + 1, Math.min(y + height - dotRadius - 2, rawSy));
-            int si = Math.round(displaySx);
-            int sj = Math.round(displaySy);
-
-            if (onMap || isPlayerType) {
-                int outlineAlpha = offLimits ? 0x80000000 : 0xFF000000;
-                int fillAlpha   = offLimits ? (0x80000000 | (color & 0x00FFFFFF)) : color;
-                // Outline: (r+1)px border around the dot
-                graphics.fill(si - dotRadius - 1, sj - dotRadius - 1,
-                               si + dotRadius + 2, sj + dotRadius + 2, outlineAlpha);
-                // Fill: dotRadius px
-                if (dotRadius > 0) {
-                    graphics.fill(si - dotRadius, sj - dotRadius,
-                                   si + dotRadius + 1, sj + dotRadius + 1, fillAlpha);
-                }
-            }
-            // Off-map landmarks are not drawn (would be noise at the edge)
-        }
+        // The player marker last, so it is never hidden under a landmark it is standing on.
+        drawMarker(graphics, mapSprite(mc, "player"), selfSx, selfSy, mc.player.getYRot());
 
         graphics.disableScissor();
 
-        // --- Facing direction + coordinates below the minimap ---
+        // --- Facing direction + coordinates, inside the map so the component
+        // --- never paints outside the bounds it told the layout it occupies.
         if (!MapDisplaySettings.isShowCoords()) return;
         float yaw = mc.player.getYRot();
         // Convert MC yaw (0=south) to degrees-from-north clockwise
@@ -314,81 +249,40 @@ public class MapComponent extends AbstractComponent {
         String coords = facing + "  " + mc.player.getBlockX()
             + " / " + mc.player.getBlockY()
             + " / " + mc.player.getBlockZ();
-        int textX = x + width / 2 - mc.font.width(coords) / 2;
-        int textY = y + height + borderTotal + 2; // border + 2px gap
+        int textX = mapX + mapSize / 2 - mc.font.width(coords) / 2;
+        int textY = mapY + mapSize - mc.font.lineHeight - 1;
         graphics.text(mc.font, coords, textX, textY, 0xFFFFFFFF, true);
     }
 
     /**
-     * Draw the vanilla map player marker shape: pointed tip facing direction,
-     * rectangular body, blunt tail, matching the vanilla player.png sprite.
+     * Draw a map decoration the way vanilla draws it, in screen pixels.
      *
-     * Pixels defined in (perp, fwd) coordinates:
-     *   fwd+ = toward tip,  perp+/- = perpendicular sides
-     * Converted to screen: screenX = cx + perp*perpX + fwd*dirX
-     *                      screenY = cy + perp*perpY + fwd*dirY
+     * <p>The transform is lifted from {@code GuiGraphicsExtractor.map}: translate to
+     * the marker, rotate, scale, then nudge by an eighth of a pixel. Vanilla samples
+     * the sprite with its V coordinates swapped, so the quad is flipped in Y here to
+     * match; without that the arrow points the wrong way down its own axis.
      */
-    private static void drawArrow(GuiGraphicsExtractor g, int cx, int cy,
-                                   float dirX, float dirY, int color,
-                                   boolean hasCompassTip, float compassDx, float compassDy) {
-        drawArrow(g, cx, cy, dirX, dirY, color);
-
-        // Compass tip: a 2-pixel colored spike on the dot pointing toward the compass target
-        if (hasCompassTip) {
-            float dist = (float) Math.sqrt(compassDx * compassDx + compassDy * compassDy);
-            if (dist > 0.01f) {
-                float ndx = compassDx / dist, ndy = compassDy / dist;
-                int t1x = Math.round(cx + ndx * 2), t1y = Math.round(cy + ndy * 2);
-                int t2x = Math.round(cx + ndx * 4), t2y = Math.round(cy + ndy * 4);
-                g.fill(t1x - 1, t1y - 1, t1x + 2, t1y + 2, 0xFF000000); // outline
-                g.fill(t1x,     t1y,     t1x + 1, t1y + 1, 0xFFFF6600); // colored tip
-                g.fill(t2x,     t2y,     t2x + 1, t2y + 1, 0xFFFF6600); // pointed end
-            }
-        }
+    private static void drawMarker(GuiGraphicsExtractor graphics, TextureAtlasSprite sprite,
+                                    float cx, float cy, float rotDegrees) {
+        Matrix3x2fStack pose = graphics.pose();
+        pose.pushMatrix();
+        pose.translate(cx, cy);
+        pose.rotate((float) Math.toRadians(rotDegrees));
+        pose.scale(MARKER_HALF_PX, MARKER_HALF_PX);
+        pose.translate(-0.125f, 0.125f);
+        pose.scale(1f, -1f);
+        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, -1, -1, 2, 2);
+        pose.popMatrix();
     }
 
-    private static void drawArrow(GuiGraphicsExtractor g, int cx, int cy,
-                                   float dirX, float dirY, int color) {
-        float perpX = -dirY, perpY = dirX;
-
-        // Outline pixels (black), in (perp, fwd)
-        int[][] outline = {
-            {0,3},                              // tip
-            {-1,2},{1,2},                       // narrow outline sides
-            {-2,1},{2,1},{-2,0},{2,0},{-2,-1},{2,-1}, // body sides
-            {-1,-2},{0,-2},{1,-2}               // tail (all black)
-        };
-        // Fill pixels (white): interior of the shape
-        int[][] fill = {
-            {0,2},                              // narrow center
-            {-1,1},{0,1},{1,1},                 // body rows
-            {-1,0},{0,0},{1,0},
-            {-1,-1},{0,-1},{1,-1}
-        };
-
-        for (int[] o : outline) {
-            int sx = Math.round(cx + o[0] * perpX + o[1] * dirX);
-            int sy = Math.round(cy + o[0] * perpY + o[1] * dirY);
-            g.fill(sx, sy, sx+1, sy+1, 0xFF000000);
-        }
-        for (int[] f : fill) {
-            int sx = Math.round(cx + f[0] * perpX + f[1] * dirX);
-            int sy = Math.round(cy + f[0] * perpY + f[1] * dirY);
-            g.fill(sx, sy, sx+1, sy+1, color);
-        }
-    }
-
-    private static int getDecorationColor(Minecraft mc, MapRenderState.MapDecorationRenderState dec) {
-        if (dec.name != null && mc.level != null) {
-            String playerName = dec.name.getString();
-            PlayerTeam team = mc.level.getScoreboard().getPlayersTeam(playerName);
-            if (team != null) {
-                var teamColor = team.getColor();
-                if (teamColor.isPresent()) {
-                    return 0xFF000000 | teamColor.get().rgb();
-                }
-            }
-        }
-        return MARKER_COLOR;
+    /**
+     * Map decorations live in their own atlas in 26.3, not the GUI atlas the
+     * Identifier blitSprite overload resolves against, so the sprite is fetched
+     * from that atlas explicitly.
+     */
+    private static TextureAtlasSprite mapSprite(Minecraft mc, String name) {
+        return mc.getAtlasManager()
+            .getAtlasOrThrow(AtlasIds.MAP_DECORATIONS)
+            .getSprite(Identifier.withDefaultNamespace(name));
     }
 }
