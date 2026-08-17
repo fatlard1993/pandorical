@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the village chest textures: vanilla's chest with a villager's nose
-where the clasp goes.
+"""Generate the suite's chest textures: vanilla's chest with a recoloured clasp.
 
 The clasp is already the right shape for it. It is a small nub protruding from
 the middle of the chest front, which is exactly what a villager's nose is, so
@@ -29,26 +28,38 @@ JAR = os.path.expanduser(
 OUT_DIR = os.path.join(HERE, "src/client/resources/assets/pandorical/textures/entity/chest")
 
 # normal.png is the single chest; the other two are the halves of a double chest.
-SOURCES = {
-    "normal.png": "village.png",
-    "normal_left.png": "village_left.png",
-    "normal_right.png": "village_right.png",
-}
+SOURCES = ["normal.png", "normal_left.png", "normal_right.png"]
 
 # The clasp occupies a 6x5 corner at the texture origin: a 2x4x1 box unwrapped at
 # UV (0,0), of which x=1..2, y=1..4 is the face you actually see.
 CLASP = (0, 0, 6, 5)
 
-# Every grey vanilla uses in the clasp, mapped to a villager skin tone of the
-# same lightness. Sampled from the vanilla villager's face so the nose belongs to
-# the same person the player has been trading with.
-SKIN = {
-    (118, 118, 118): (107, 78, 53),
-    (134, 134, 134): (125, 92, 64),
-    (145, 145, 145): (138, 102, 71),
-    (165, 165, 165): (160, 122, 85),
-    (194, 194, 194): (188, 144, 104),
-    (205, 205, 205): (198, 154, 112),
+# Every grey vanilla uses in the clasp, mapped per variant to a tone of matching
+# lightness. Preserving the lightness order is what keeps the nub reading as a
+# lit 3D shape instead of a flat patch of colour.
+#
+#   village: the villager's own skin, sampled from their face, so the nose
+#            belongs to the person the player has been trading with.
+#   looted:  the same clasp with the light gone out of it. Darker and browner
+#            than vanilla at every step, so a chest you have emptied reads as
+#            spent from across a room without looking like a different block.
+VARIANTS = {
+    "village": {
+        (118, 118, 118): (107, 78, 53),
+        (134, 134, 134): (125, 92, 64),
+        (145, 145, 145): (138, 102, 71),
+        (165, 165, 165): (160, 122, 85),
+        (194, 194, 194): (188, 144, 104),
+        (205, 205, 205): (198, 154, 112),
+    },
+    "looted": {
+        (118, 118, 118): (38, 34, 30),
+        (134, 134, 134): (46, 41, 36),
+        (145, 145, 145): (54, 48, 42),
+        (165, 165, 165): (66, 59, 51),
+        (194, 194, 194): (84, 75, 65),
+        (205, 205, 205): (92, 82, 71),
+    },
 }
 
 
@@ -145,7 +156,7 @@ def write_png(path, rows):
     print("wrote %s (%dx%d)" % (path, width, height))
 
 
-def recolour(rows):
+def recolour(rows, palette):
     x0, y0, x1, y1 = CLASP
     missed = set()
     for y in range(y0, y1):
@@ -153,14 +164,14 @@ def recolour(rows):
             r, g, b, a = rows[y][x]
             if a == 0:
                 continue
-            if (r, g, b) in SKIN:
-                rows[y][x] = SKIN[(r, g, b)] + (a,)
+            if (r, g, b) in palette:
+                rows[y][x] = palette[(r, g, b)] + (a,)
             else:
                 missed.add((r, g, b))
     if missed:
         # A grey nobody mapped means the vanilla clasp was retextured upstream and
         # this would silently ship a half-painted nose.
-        raise SystemExit("unmapped clasp colours, update SKIN: %s" % sorted(missed))
+        raise SystemExit("unmapped clasp colours, update VARIANTS: %s" % sorted(missed))
     return rows
 
 
@@ -169,10 +180,12 @@ def main():
         raise SystemExit("client jar not found: %s" % JAR)
 
     with zipfile.ZipFile(JAR) as jar:
-        for source, target in SOURCES.items():
+        for source in SOURCES:
             data = jar.read("assets/minecraft/textures/entity/chest/" + source)
-            _w, _h, rows = read_png(data)
-            write_png(os.path.join(OUT_DIR, target), recolour(rows))
+            for variant, palette in VARIANTS.items():
+                _w, _h, rows = read_png(data)
+                target = source.replace("normal", variant)
+                write_png(os.path.join(OUT_DIR, target), recolour(rows, palette))
 
 
 if __name__ == "__main__":
