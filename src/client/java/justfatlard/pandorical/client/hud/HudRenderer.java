@@ -57,6 +57,10 @@ public final class HudRenderer {
 			// relative to horizontal center: the vanilla hotbar status rows (health, hunger, air)
 			// are laid out center-relative, so overlays meant to sit with them anchor the same way.
 			case "bottom_center" -> guiWidth / 2 + overlay.offsetX;
+			// "top_center" centres the overlay's own width, so offsetX is a nudge
+			// rather than an edge: an overlay whose width changes with its contents
+			// stays put instead of drifting sideways as it grows.
+			case "top_center" -> (guiWidth - overlay.getWidth()) / 2 + overlay.offsetX;
 			default -> overlay.offsetX; // top_left, bottom_left, or unrecognized
 		};
 	}
@@ -65,7 +69,7 @@ public final class HudRenderer {
 		return switch (overlay.anchor) {
 			case "bottom_left", "bottom_right", "bottom_center" -> guiHeight - overlay.offsetY - overlay.getHeight();
 			case "center" -> (guiHeight - overlay.getHeight()) / 2 + overlay.offsetY;
-			default -> overlay.offsetY; // top_left, top_right, or unrecognized
+			default -> overlay.offsetY; // top_left, top_right, top_center, or unrecognized
 		};
 	}
 }
