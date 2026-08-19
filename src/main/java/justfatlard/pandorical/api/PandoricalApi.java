@@ -248,6 +248,24 @@ public final class PandoricalApi {
         playerScreens.remove(playerUuid);
     }
 
+    /**
+     * Forget this player's screen, but only when it is still the one being torn down.
+     *
+     * <p>{@code openMenu} closes the previous container <em>after</em> the incoming
+     * screen has already registered, so the old container's removed-callback runs
+     * while {@link #playerScreens} holds the new screen. Removing unconditionally
+     * there erases that registration, and because {@code handleAction} returns
+     * immediately when a player has no screen, every later click on the screen the
+     * player is looking at is dropped in silence.
+     *
+     * <p>Screen ids are per-open (a random UUID from the builder), so comparing them
+     * is what separates "this screen closed" from "a newer one replaced it".
+     */
+    private static void clearPlayerScreen(UUID playerUuid, String screenId) {
+        playerScreens.computeIfPresent(playerUuid,
+            (uuid, ctx) -> ctx.screenId().equals(screenId) ? null : ctx);
+    }
+
     // --- ScreenApi implementation ---
 
     public static final class ScreenApiImpl implements ScreenApi {
@@ -282,6 +300,22 @@ public final class PandoricalApi {
                     player.getName().getString());
                 return;
             }
+            // Tear down whatever is already open before registering this screen.
+            //
+            // openMenu closes the current container itself, but it does that *after*
+            // the new screen has registered, so the outgoing screen's removed-handler
+            // runs while this player's state already describes the incoming one. A
+            // consumer that keeps per-player state then cleans up the session it just
+            // created: player-trade cancels the new trade and returns its items,
+            // village-mail returns the new screen's attachment, fletch-craft empties
+            // the new grid. Closing first means every teardown sees its own state.
+            //
+            // Guarded on our own menu type so an unrelated vanilla container is never
+            // closed out from under the player.
+            if (player.containerMenu instanceof justfatlard.pandorical.screen.PandoricalMenu) {
+                player.closeContainer();
+            }
+
             setPlayerScreen(player.getUUID(), screen.screenType(), screen.screenId());
 
             // The screen definition must be sent before openMenu: the client stores it in
@@ -289,6 +323,9 @@ public final class PandoricalApi {
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, screen);
 
             String screenType = screen.screenType();
+            // Captured so the removed-callback can tell its own teardown from being
+            // replaced by a newer screen; see clearPlayerScreen(UUID, String).
+            String openedScreenId = screen.screenId();
             int slotCount = screen.container().map(c -> c.slotCount()).orElse(0);
             player.openMenu(new PandoricalMenuProvider(screen, serverContainer, readOnlySlots,
                 // slot change callback (reports every slot, not just changed ones)
@@ -304,7 +341,7 @@ public final class PandoricalApi {
                 () -> {
                     Consumer<ServerPlayer> handler = containerRemovedHandlers.get(screenType);
                     if (handler != null) handler.accept(player);
-                    clearPlayerScreen(player.getUUID());
+                    clearPlayerScreen(player.getUUID(), openedScreenId);
                 }
             ));
         }
