@@ -58,6 +58,8 @@ public class ContentManager {
         syncing = false;
         configPhaseSynced = false;
         registeredBlocks.clear();
+        climbable.clear();
+        interactive.clear();
         pendingConfigContent = null;
         configAssetChunks.clear();
         expectedConfigAssetChunks = -1;
@@ -289,6 +291,36 @@ public class ContentManager {
      * Config-phase variant of registerBlock: leaves block state IDs unassigned so
      * {@link #remapBlockStateIds()} can map them to the server's IDs at JOIN time.
      */
+    /**
+     * Blocks the server says carry a player upward.
+     *
+     * <p>Held here rather than left to {@code #minecraft:climbable} because climbing is decided
+     * client-side, and these blocks enter the client's registry at connection time: depending on a
+     * tag would mean depending on tag membership surviving that. Cleared and refilled on every
+     * connection so a second server's answer never inherits the first's.
+     */
+    private static final java.util.Set<Block> climbable =
+        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+
+    /**
+     * Synced blocks whose right-click the server handles.
+     *
+     * <p>Kept per block rather than set on construction, because a reconnect reuses the block
+     * object from the previous session and never runs a constructor again.
+     */
+    private static final java.util.Set<Block> interactive =
+        java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+
+    /** Whether this is a synced block whose right-click belongs to the server. */
+    public static boolean isInteractive(BlockState state) {
+        return !interactive.isEmpty() && interactive.contains(state.getBlock());
+    }
+
+    /** Whether this is a synced block the server declared climbable. */
+    public static boolean isClimbable(BlockState state) {
+        return !climbable.isEmpty() && climbable.contains(state.getBlock());
+    }
+
     private static void registerBlockConfig(SyncContentS2C.BlockEntry entry) {
         try {
             Identifier id = Identifier.tryParse(entry.id());
@@ -303,6 +335,8 @@ public class ContentManager {
                 Block existing = BuiltInRegistries.BLOCK.getValue(id);
                 registeredBlocks.put(id, existing);
                 DynamicBlock.applyShapeData(existing, entry.shapeData());
+                if (entry.climbable()) climbable.add(existing);
+                if (entry.interactive()) interactive.add(existing);
                 Pandorical.LOGGER.debug("Config phase: block {} already registered — reusing", entry.id());
                 return;
             }
@@ -321,6 +355,11 @@ public class ContentManager {
             } else {
                 props = BlockBehaviour.Properties.of();
             }
+
+            // Before the block exists, because vanilla settles collision from this flag when the
+            // state cache is built, and that happens during registration - long before the shapes
+            // arriving with this entry are ever applied.
+            if (!DynamicBlock.declaresCollision(entry.shapeData())) props.noCollision();
 
             ResourceKey<Block> key = ResourceKey.create(Registries.BLOCK, id);
             props.setId(key);
@@ -373,6 +412,8 @@ public class ContentManager {
             Block block = createBlock(props, stateProps, baseBlock, entry.stateProperties());
             Registry.register(BuiltInRegistries.BLOCK, id, block);
             registeredBlocks.put(id, block);
+            if (entry.climbable()) climbable.add(block);
+            if (entry.interactive()) interactive.add(block);
 
             DynamicBlock.applyShapeData(block, entry.shapeData());
 
@@ -756,7 +797,6 @@ public class ContentManager {
         if (pendingConfigContent == null) return;
 
         var blockColors = client.getBlockColors();
-        var grassTint = List.of(net.minecraft.client.color.block.BlockTintSources.grass());
         int registered = 0;
 
         for (SyncContentS2C.BlockEntry entry : pendingConfigContent.blocks()) {
@@ -785,9 +825,21 @@ public class ContentManager {
                     }
                 }
 
-                if (tintSources == null) {
-                    tintSources = grassTint;
-                }
+                // A base block with no tint of its own gets no tint here either.
+                //
+                // This used to fall back to the grass tint, which meant every synced block whose
+                // base is untinted - stone, planks, wool, snow, which is nearly all of them - was
+                // registered as biome-tinted foliage. The block itself looked right, because tint
+                // only reaches model faces that ask for it with a tintindex and none of these do,
+                // so the bug hid for as long as nobody looked at the particles: break particles
+                // apply the block's colour whether the model asked for a tint or not. It surfaced
+                // on cloud-kingdoms' cloud, where grass-green dust off a pure white block is not
+                // something you can talk yourself out of seeing.
+                //
+                // Blocks that genuinely want a tint either name a base block that carries one, the
+                // way dirt-slab hands over the real vanilla source, or set it explicitly through
+                // BlockTintApi.
+                if (tintSources == null) continue;
 
                 blockColors.register(tintSources, block);
                 registered++;
@@ -812,6 +864,8 @@ public class ContentManager {
                 Block existing = BuiltInRegistries.BLOCK.getValue(id);
                 registeredBlocks.put(id, existing);
                 DynamicBlock.applyShapeData(existing, entry.shapeData());
+                if (entry.climbable()) climbable.add(existing);
+                if (entry.interactive()) interactive.add(existing);
                 return;
             }
 
@@ -829,6 +883,11 @@ public class ContentManager {
             } else {
                 props = BlockBehaviour.Properties.of();
             }
+
+            // Before the block exists, because vanilla settles collision from this flag when the
+            // state cache is built, and that happens during registration - long before the shapes
+            // arriving with this entry are ever applied.
+            if (!DynamicBlock.declaresCollision(entry.shapeData())) props.noCollision();
 
             ResourceKey<Block> key = ResourceKey.create(Registries.BLOCK, id);
             props.setId(key);
@@ -878,6 +937,8 @@ public class ContentManager {
             Block block = createBlock(props, stateProps, baseBlock, entry.stateProperties());
             Registry.register(BuiltInRegistries.BLOCK, id, block);
             registeredBlocks.put(id, block);
+            if (entry.climbable()) climbable.add(block);
+            if (entry.interactive()) interactive.add(block);
 
             DynamicBlock.applyShapeData(block, entry.shapeData());
 
