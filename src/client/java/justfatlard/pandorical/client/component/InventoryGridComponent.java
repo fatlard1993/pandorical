@@ -13,8 +13,18 @@ import java.util.Map;
  * vanilla renders items at the correct positions.
  */
 public class InventoryGridComponent extends AbstractComponent {
+    /**
+     * Vanilla's slot geometry: an eighteen pixel cell with a one pixel border, leaving exactly
+     * the sixteen an item is drawn at.
+     *
+     * <p>The background used to be drawn sixteen wide inside an eighteen wide cell while the item
+     * still went in at +1, so every item overhung its own box by a pixel to the bottom and right
+     * and its stack count landed in the trough between cells. Two pixels of slack per cell, on
+     * every grid Pandorical draws.
+     */
     private static final int CELL_SIZE = 18;
-    private static final int SLOT_SIZE = 16;
+    private static final int BORDER = 1;
+    private static final int ITEM_SIZE = CELL_SIZE - BORDER * 2;
     private static final int SLOT_BORDER_DARK = 0xFF373737;
     private static final int SLOT_BORDER_LIGHT = 0xFFFFFFFF;
     private static final int SLOT_INNER = 0xFF8B8B8B;
@@ -57,8 +67,8 @@ public class InventoryGridComponent extends AbstractComponent {
                 int slotIndex = startSlot + row * cols + col;
                 // Slot positions are relative to the screen origin (leftPos/topPos)
                 // Our x/y are absolute, so subtract the screen offset
-                int slotX = (x - context.screenX()) + col * CELL_SIZE + 1; // +1 for border
-                int slotY = (y - context.screenY()) + row * CELL_SIZE + 1;
+                int slotX = (x - context.screenX()) + col * CELL_SIZE + BORDER;
+                int slotY = (y - context.screenY()) + row * CELL_SIZE + BORDER;
                 context.menu().repositionSlot(slotIndex, slotX, slotY);
             }
         }
@@ -75,7 +85,8 @@ public class InventoryGridComponent extends AbstractComponent {
                 drawSlotBackground(graphics, slotX, slotY);
 
                 if (slotIndex >= lockedAbove) {
-                    graphics.fill(slotX + 1, slotY + 1, slotX + SLOT_SIZE - 1, slotY + SLOT_SIZE - 1, LOCKED_OVERLAY);
+                    graphics.fill(slotX + BORDER, slotY + BORDER,
+                        slotX + BORDER + ITEM_SIZE, slotY + BORDER + ITEM_SIZE, LOCKED_OVERLAY);
                 }
             }
         }
@@ -83,13 +94,13 @@ public class InventoryGridComponent extends AbstractComponent {
 
     private void drawSlotBackground(GuiGraphicsExtractor graphics, int slotX, int slotY) {
         if ("beveled".equals(slotStyle)) {
-            graphics.fill(slotX, slotY, slotX + SLOT_SIZE, slotY + 1, SLOT_BORDER_DARK);
-            graphics.fill(slotX, slotY, slotX + 1, slotY + SLOT_SIZE, SLOT_BORDER_DARK);
-            graphics.fill(slotX, slotY + SLOT_SIZE - 1, slotX + SLOT_SIZE, slotY + SLOT_SIZE, SLOT_BORDER_LIGHT);
-            graphics.fill(slotX + SLOT_SIZE - 1, slotY, slotX + SLOT_SIZE, slotY + SLOT_SIZE, SLOT_BORDER_LIGHT);
-            graphics.fill(slotX + 1, slotY + 1, slotX + SLOT_SIZE - 1, slotY + SLOT_SIZE - 1, SLOT_INNER);
+            graphics.fill(slotX, slotY, slotX + CELL_SIZE, slotY + 1, SLOT_BORDER_DARK);
+            graphics.fill(slotX, slotY, slotX + 1, slotY + CELL_SIZE, SLOT_BORDER_DARK);
+            graphics.fill(slotX, slotY + CELL_SIZE - 1, slotX + CELL_SIZE, slotY + CELL_SIZE, SLOT_BORDER_LIGHT);
+            graphics.fill(slotX + CELL_SIZE - 1, slotY, slotX + CELL_SIZE, slotY + CELL_SIZE, SLOT_BORDER_LIGHT);
+            graphics.fill(slotX + 1, slotY + 1, slotX + CELL_SIZE - 1, slotY + CELL_SIZE - 1, SLOT_INNER);
         } else {
-            graphics.fill(slotX, slotY, slotX + SLOT_SIZE, slotY + SLOT_SIZE, SLOT_INNER);
+            graphics.fill(slotX, slotY, slotX + CELL_SIZE, slotY + CELL_SIZE, SLOT_INNER);
         }
     }
 }

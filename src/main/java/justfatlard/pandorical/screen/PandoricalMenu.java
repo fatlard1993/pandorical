@@ -30,17 +30,42 @@ public class PandoricalMenu extends AbstractContainerMenu {
     private Runnable removedCallback;
 
     /**
+     * How many mod slots the menu about to be built will have.
+     *
+     * <p>Answered on the client by the screen definition, which is always sent immediately
+     * before the menu is opened. Left alone on the server, where the count is passed in
+     * directly. A negative answer means nobody knows, and the constructor falls back.
+     */
+    private static java.util.function.IntSupplier incomingModSlots = () -> -1;
+
+    /** Installed once by the client, which is the only side that can see the pending definition. */
+    public static void setIncomingModSlots(java.util.function.IntSupplier supplier) {
+        incomingModSlots = supplier == null ? () -> -1 : supplier;
+    }
+
+    /**
      * Client constructor, called by the MenuType factory.
-     * Creates max slots backed by a temp container. Vanilla sync will populate them.
-     * The actual slot count and positions come from screenDef set later.
+     *
+     * <p>The slot count has to match the server's exactly. Vanilla addresses slots by index
+     * and nothing reconciles the two lists: with a different number of mod slots here, every
+     * index the server sends lands on the wrong slot, and since the player inventory slots on
+     * this side are backed by the real {@link Inventory}, the contents of the server's slots
+     * get written straight into it. That is not a display fault - opening a container with a
+     * mismatched count rearranges the player's own inventory.
+     *
+     * <p>So the count comes from the screen definition, which openContainer sends before it
+     * opens the menu. Only when there is no definition to read does this fall back to the
+     * old fixed maximum.
      */
     public PandoricalMenu(int syncId, Inventory playerInventory) {
         super(justfatlard.pandorical.Pandorical.MENU_TYPE, syncId);
-        this.modContainer = new SimpleContainer(MAX_MOD_SLOTS);
+        int declared = incomingModSlots.getAsInt();
+        int modSlots = declared < 0 ? MAX_MOD_SLOTS : Math.min(declared, MAX_MOD_SLOTS);
+
+        this.modContainer = new KeepsWhatItIsGiven(Math.max(modSlots, 1));
         this.readOnlySlots = Set.of();
 
-        // Create max mod slots; vanilla will sync the ones the server actually uses
-        for (int i = 0; i < MAX_MOD_SLOTS; i++) {
+        for (int i = 0; i < modSlots; i++) {
             this.addSlot(new PandoricalSlot(modContainer, i, -1000, -1000, true));
         }
 
@@ -170,6 +195,42 @@ public class PandoricalMenu extends AbstractContainerMenu {
     public void repositionSlot(int slotIndex, int x, int y) {
         if (slotIndex >= 0 && slotIndex < this.slots.size()) {
             ((IMutableSlot) this.slots.get(slotIndex)).pandorical$setPosition(x, y);
+        }
+    }
+
+    /**
+     * The client's copy of the mod's slots, which keeps whatever the server put in them.
+     *
+     * <p>{@code SimpleContainer.setItem} ends with {@code stack.limitSize(getMaxStackSize(stack))},
+     * and on a client the answer to that is sixty-four: the mod that lifts stack limits runs on
+     * the server only, so the client has vanilla's numbers. Every oversized stack the server sent
+     * was therefore trimmed the moment it arrived, and a slot holding a hundred and ten of
+     * something drew as sixty-four while the screen's own text, computed server-side, correctly
+     * said a hundred and ten.
+     *
+     * <p>Nothing is decided here - the server owns what is in its container - so the honest thing
+     * for this side to do is carry the number across unaltered rather than second-guess it with a
+     * limit it is not the authority on.
+     */
+    private static class KeepsWhatItIsGiven extends SimpleContainer {
+        /**
+         * Not {@link Integer#MAX_VALUE}: vanilla multiplies a stack limit by a hundred in places
+         * and that overflows into a negative. A hundredth of it is still past any real stack.
+         */
+        private static final int NO_LIMIT = Integer.MAX_VALUE / 100;
+
+        KeepsWhatItIsGiven(int size) {
+            super(size);
+        }
+
+        @Override
+        public int getMaxStackSize() {
+            return NO_LIMIT;
+        }
+
+        @Override
+        public int getMaxStackSize(ItemStack stack) {
+            return NO_LIMIT;
         }
     }
 
