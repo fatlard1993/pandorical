@@ -3,7 +3,7 @@
     "id": "pandorical",
     "version": "${version}",
     "name": "Pandorical",
-    "description": "Client-side enablement bridge for server-driven UI, content, and rendering.",
+    "description": "One install lets a server show you custom screens, HUD, blocks and keys. Required by servers that use it, harmless everywhere else.",
     "authors": ["justfatlard"],
     "contact": {},
     "license": "MIT",

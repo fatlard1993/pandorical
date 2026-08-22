@@ -31,6 +31,13 @@ public interface StructureApi {
      * Sent immediately to every player currently tracking {@code anchorEntity}, and to any
      * player who starts tracking it afterward.
      *
+     * <p><b>The anchor cannot be a player who should see the structure.</b> A player is not
+     * among their own trackers, so anchoring to one produces a structure that exists
+     * server-side, broadcasts to everyone nearby, and is invisible to the one person it was
+     * built for. Nothing errors. Anchor to the entity the structure belongs to (the boat, the
+     * mob, a marker entity spawned for the purpose) and the owning player sees it like anyone
+     * else.
+     *
      * @param anchorEntity the real server entity whose tracking radius drives visibility
      * @param structureId  a server-wide unique id for this structure
      * @param blocks       the blocks making up the structure, relative to the origin

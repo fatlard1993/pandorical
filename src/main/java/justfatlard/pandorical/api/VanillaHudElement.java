@@ -5,6 +5,16 @@ package justfatlard.pandorical.api;
  * drawing, via {@link HudApi#hideVanillaElements}. They mirror Fabric's
  * {@code VanillaHudElements} identifiers; the client resolves them by id, so an id
  * a given client build does not know is ignored rather than fatal.
+ *
+ * <p><b>Four of these are declared but never suppressed.</b> {@link #CHAT},
+ * {@link #PLAYER_LIST}, {@link #SLEEP} and {@link #DEMO_TIMER} are refused by the
+ * client on purpose, so a server cannot blind a player to the things they need in
+ * order to leave or to speak. {@link #SPECTATOR_MENU} and {@link #SPECTATOR_TOOLTIP}
+ * are refused for the same reason while spectating. Passing any of them is not an
+ * error: the client logs a warning and keeps drawing the element, so a HUD overlay
+ * meant to replace one needs a layout that survives it staying put. They are listed
+ * here because the constant existing and the suppression working are different
+ * questions, and only one of them is visible from your side.
  */
 public final class VanillaHudElement {
     private VanillaHudElement() {}

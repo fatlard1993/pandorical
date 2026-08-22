@@ -10,13 +10,20 @@ import net.minecraft.server.level.ServerPlayer;
  * marking the ones a village generated with so a player can tell them from
  * their own.
  *
- * <p>The texture is a sprite base in the vanilla chests atlas: no extension, and
+ * <p>The texture is a sprite id in the vanilla chests atlas: no extension, and
  * no {@code _left} / {@code _right} suffix, which the client appends itself for
  * each half of a double chest. That atlas is assembled from a directory source
  * covering every namespace, so shipping
  * {@code assets/<yourmod>/textures/entity/chest/<name>.png} is the whole of the
  * registration. All three files are needed: {@code <name>.png},
  * {@code <name>_left.png} and {@code <name>_right.png}.
+ *
+ * <p><b>The id keeps the atlas's directory prefix.</b> It is
+ * {@code <yourmod>:entity/chest/<name>}, not the bare {@code <yourmod>:<name>}:
+ * the atlas names its sprites by their path under the source directory. A bare
+ * name resolves to no sprite and the chest draws as missing-texture magenta,
+ * which is the only symptom you get. Vanilla's own bases follow the same rule,
+ * so a christmas chest is {@code minecraft:entity/chest/christmas}.
  *
  * <p>Unlike {@link EntityOverlayApi}, these are addressed to one player rather
  * than broadcast, because whether a chest deserves marking can depend on who is
