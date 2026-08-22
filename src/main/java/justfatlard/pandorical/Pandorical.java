@@ -167,14 +167,32 @@ public class Pandorical implements ModInitializer {
         // Server: handle client acknowledgment during config phase
         ServerConfigurationNetworking.registerGlobalReceiver(ContentReadyConfigC2S.TYPE, (payload, context) -> {
             var handler = context.packetListener();
-            var profile = handler.getOwner();
-            if (profile != null) {
-                configPhaseSyncedPlayers.add(profile.id());
-                LOGGER.info("Client {} completed config-phase content sync", profile.name());
-            } else {
-                LOGGER.info("Client completed config-phase content sync (unknown profile)");
-            }
-            handler.completeTask(PandoricalSyncTask.TYPE);
+
+            // completeTask starts the next configuration task, which is vanilla's
+            // SynchronizeRegistriesTask reading server registries. That belongs on the
+            // server thread, like every other handler here.
+            context.server().execute(() -> {
+                var profile = handler.getOwner();
+
+                // Only the first ack may complete the task. A second one finds the task
+                // already gone and throws, and on this thread nothing catches it: running
+                // here means a client that acks twice takes the server down rather than
+                // just itself. The set's own add() is the dedupe.
+                if (profile != null && !configPhaseSyncedPlayers.add(profile.id())) {
+                    LOGGER.debug("Ignoring repeat config-phase ack from {}", profile.name());
+                    return;
+                }
+                LOGGER.info("Client {} completed config-phase content sync",
+                    profile != null ? profile.name() : "(unknown profile)");
+
+                try {
+                    handler.completeTask(PandoricalSyncTask.TYPE);
+                } catch (IllegalStateException e) {
+                    // Belt and braces: nothing a peer sends should be able to reach the
+                    // server thread with an uncaught throw.
+                    LOGGER.warn("Could not complete config-phase task: {}", e.getMessage());
+                }
+            });
         });
 
         // Server: add our sync task BEFORE Fabric's registry sync
@@ -197,8 +215,11 @@ public class Pandorical implements ModInitializer {
                         var poiTypes = contentRegistry.buildPoiTypeEntries();
                         var menuTypes = contentRegistry.buildMenuTypeEntries();
                         var recipeBookCategories = contentRegistry.buildRecipeBookCategoryEntries();
-                        // Reflection puts the task at the FRONT of the queue so it runs
-                        // before Fabric's SynchronizeRegistriesTask
+                        // BEFORE_CONFIGURE fires before vanilla populates the task queue, so
+                        // this queue is empty here and an ordinary addTask would already run
+                        // first. The front-insertion is insurance for the day that stops being
+                        // true: content has to reach the client before the registry sync that
+                        // assigns its IDs.
                         var task = new PandoricalSyncTask(blocks, items, assetChunks,
                             entityTypes, blockEntityTypes, villagerProfessions,
                             poiTypes, menuTypes, recipeBookCategories);

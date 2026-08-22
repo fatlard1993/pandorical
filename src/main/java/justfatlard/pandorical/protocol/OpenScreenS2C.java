@@ -22,6 +22,9 @@ public record OpenScreenS2C(
     public static final Type<OpenScreenS2C> TYPE =
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "open_screen"));
 
+    /** Matches ComponentDef.MAX_CHILDREN: a screen root is not more permissive than a node. */
+    private static final int MAX_ROOT_COMPONENTS = 256;
+
     public static final StreamCodec<ByteBuf, OpenScreenS2C> STREAM_CODEC = new StreamCodec<>() {
         @Override
         public OpenScreenS2C decode(ByteBuf buf) {
@@ -32,7 +35,13 @@ public record OpenScreenS2C(
             boolean pauseGame = ByteBufCodecs.BOOL.decode(buf);
             String title = ByteBufCodecs.STRING_UTF8.decode(buf);
             int compCount = ByteBufCodecs.VAR_INT.decode(buf);
-            List<ComponentDef> components = new java.util.ArrayList<>(compCount);
+            // Never size the list from the wire: ComponentDef caps its own children and
+            // depth, but this root count was allocating before a single component decoded.
+            if (compCount < 0 || compCount > MAX_ROOT_COMPONENTS) {
+                throw new io.netty.handler.codec.DecoderException(
+                    "OpenScreenS2C component count " + compCount + " exceeds " + MAX_ROOT_COMPONENTS);
+            }
+            List<ComponentDef> components = new java.util.ArrayList<>();
             for (int i = 0; i < compCount; i++) {
                 components.add(ComponentDef.STREAM_CODEC.decode(buf));
             }

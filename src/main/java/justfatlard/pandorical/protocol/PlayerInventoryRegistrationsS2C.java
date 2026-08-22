@@ -38,16 +38,29 @@ public record PlayerInventoryRegistrationsS2C(
      */
     public record SlotPosition(int slotIndex, int screenX, int screenY, @Nullable String backgroundSprite) {}
 
+    // Both counts arrive as raw VarInts in the configuration phase, before a player
+    // exists to disconnect. Size the lists by what is decoded, not by what is claimed.
+    private static final int MAX_GROUPS = 64;
+    private static final int MAX_SLOTS_PER_GROUP = 256;
+
     public static final StreamCodec<ByteBuf, PlayerInventoryRegistrationsS2C> STREAM_CODEC =
         new StreamCodec<>() {
             @Override
             public PlayerInventoryRegistrationsS2C decode(ByteBuf buf) {
                 int groupCount = ByteBufCodecs.VAR_INT.decode(buf);
-                List<SlotGroup> groups = new ArrayList<>(groupCount);
+                if (groupCount < 0 || groupCount > MAX_GROUPS) {
+                    throw new io.netty.handler.codec.DecoderException(
+                        "slot group count " + groupCount + " exceeds " + MAX_GROUPS);
+                }
+                List<SlotGroup> groups = new ArrayList<>();
                 for (int g = 0; g < groupCount; g++) {
                     String namespace = ByteBufCodecs.STRING_UTF8.decode(buf);
                     int slotCount = ByteBufCodecs.VAR_INT.decode(buf);
-                    List<SlotPosition> slots = new ArrayList<>(slotCount);
+                    if (slotCount < 0 || slotCount > MAX_SLOTS_PER_GROUP) {
+                        throw new io.netty.handler.codec.DecoderException(
+                            "slot count " + slotCount + " exceeds " + MAX_SLOTS_PER_GROUP);
+                    }
+                    List<SlotPosition> slots = new ArrayList<>();
                     for (int s = 0; s < slotCount; s++) {
                         int idx    = ByteBufCodecs.VAR_INT.decode(buf);
                         int x      = ByteBufCodecs.VAR_INT.decode(buf);

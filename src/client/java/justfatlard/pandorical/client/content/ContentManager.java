@@ -45,6 +45,8 @@ public class ContentManager {
     // Registry lookups on unfrozen registries may not find recently registered entries.
     private static final Map<Identifier, Block> registeredBlocks = new HashMap<>();
 
+    /** A server claiming more chunks than this is malformed or hostile, not verbose. */
+    private static final int MAX_ASSET_CHUNKS = 8192;
     private static final int MAX_ASSET_BYTES = 50 * 1024 * 1024;
     private static final int MAX_SINGLE_ASSET = 10 * 1024 * 1024;
     private static final long SYNC_TIMEOUT_MS = 30_000;
@@ -63,7 +65,24 @@ public class ContentManager {
         pendingConfigContent = null;
         configAssetChunks.clear();
         expectedConfigAssetChunks = -1;
+
+        // Clearing the map is not unloading the pack. Whatever the last server sent is
+        // already baked into the atlases and the Language table, and the injected pack sits
+        // above vanilla AND above the player's own packs, so without a reload the server's
+        // textures and strings follow the player to the title screen, into singleplayer,
+        // and onto the next server. Only reload when there was something to drop: a
+        // resource reload is seconds long and most disconnects have nothing to undo.
+        boolean hadResources = virtualPack.hasResources();
         virtualPack.clear();
+        if (hadResources) {
+            net.minecraft.client.Minecraft client = net.minecraft.client.Minecraft.getInstance();
+            if (client != null) {
+                client.execute(() -> {
+                    Pandorical.LOGGER.info("Dropping synced assets from the previous server");
+                    client.reloadResourcePacks();
+                });
+            }
+        }
     }
 
     private static volatile boolean syncing = false;
@@ -120,8 +139,14 @@ public class ContentManager {
         expectedAssetChunks = payload.totalChunks();
         if (syncStartTime == 0) syncStartTime = System.currentTimeMillis();
 
-        if (payload.chunkIndex() < 0 || payload.chunkIndex() >= payload.totalChunks()) {
-            Pandorical.LOGGER.warn("Invalid asset chunk index {}/{}", payload.chunkIndex(), payload.totalChunks());
+        // totalChunks is the sender's own number, so bounding chunkIndex by it bounds
+        // nothing: a peer that claims 400_000_001 chunks and sends index 400_000_000
+        // passes, and the fill loop below allocates that many slots. Bound both against
+        // a constant before either is trusted.
+        if (payload.totalChunks() < 0 || payload.totalChunks() > MAX_ASSET_CHUNKS
+                || payload.chunkIndex() < 0 || payload.chunkIndex() >= payload.totalChunks()) {
+            Pandorical.LOGGER.warn("Rejecting asset chunk {}/{} (max {})",
+                payload.chunkIndex(), payload.totalChunks(), MAX_ASSET_CHUNKS);
             return;
         }
 
@@ -175,8 +200,10 @@ public class ContentManager {
 
         expectedConfigAssetChunks = payload.totalChunks();
 
-        if (payload.chunkIndex() < 0 || payload.chunkIndex() >= payload.totalChunks()) {
-            Pandorical.LOGGER.warn("Config phase: invalid asset chunk index {}/{}", payload.chunkIndex(), payload.totalChunks());
+        if (payload.totalChunks() < 0 || payload.totalChunks() > MAX_ASSET_CHUNKS
+                || payload.chunkIndex() < 0 || payload.chunkIndex() >= payload.totalChunks()) {
+            Pandorical.LOGGER.warn("Rejecting config asset chunk {}/{} (max {})",
+                payload.chunkIndex(), payload.totalChunks(), MAX_ASSET_CHUNKS);
             return;
         }
 
@@ -597,8 +624,19 @@ public class ContentManager {
                 Pandorical.LOGGER.info("Play phase fallback: registered {} blocks, {} items, and {} stubs on client",
                     content.blocks().size(), content.items().size(), stubCount);
             } finally {
-                // Don't re-freeze: 26.1 validates that tags aren't present before freezing,
-                // and client tags are already loaded from initial startup.
+                // Re-freeze, same as the config-phase path. This used to be skipped because
+                // freeze() rejects a registry whose tags are already bound, which is always
+                // the case here. freezeRegistry now expects that throw, so leaving eight
+                // vanilla registries unfrozen for the rest of the session is no longer the
+                // price of getting past it.
+                freezeRegistry(BuiltInRegistries.BLOCK);
+                freezeRegistry(BuiltInRegistries.ITEM);
+                freezeRegistry(BuiltInRegistries.ENTITY_TYPE);
+                freezeRegistry(BuiltInRegistries.BLOCK_ENTITY_TYPE);
+                freezeRegistry(BuiltInRegistries.VILLAGER_PROFESSION);
+                freezeRegistry(BuiltInRegistries.POINT_OF_INTEREST_TYPE);
+                freezeRegistry(BuiltInRegistries.MENU);
+                freezeRegistry(BuiltInRegistries.RECIPE_BOOK_CATEGORY);
             }
         } else {
             Pandorical.LOGGER.debug("Play phase: skipping block/item/stub registration — already done in config phase");
@@ -1274,20 +1312,33 @@ public class ContentManager {
         }
     }
 
+    /**
+     * Re-freeze a registry this class unfroze, without disturbing its tag bindings.
+     *
+     * <p>{@code MappedRegistry.freeze} sets {@code frozen} before it validates anything,
+     * then throws {@code "Tags already present before freezing"} if tags are bound. The
+     * registry is therefore frozen either way; the throw only skips the tag-refresh tail,
+     * which is the outcome we want. Re-binding is vanilla's job on its own reload, not ours.
+     *
+     * <p>This used to null {@code allTags} by reflection first. That never avoided the
+     * error it named: {@code freeze} reads {@code allTags.isBound()} unconditionally, so a
+     * null turned an IllegalStateException into a NullPointerException at the same
+     * instruction, and left the field null afterwards. On an integrated server the client
+     * shares one static {@code BuiltInRegistries} with the server it is connected to, so
+     * that null was the server's tag set: it then failed to serialize its own tags during
+     * SynchronizeRegistriesTask, the error was swallowed as a suppressed packet failure,
+     * and the player waited on "Loading terrain" forever. Catching the throw does the same
+     * job with no reflection and no window where the field is null.
+     */
     private static void freezeRegistry(Registry<?> registry) {
         if (registry instanceof MappedRegistry<?> mapped) {
             try {
-                // Clear allTags to avoid "tags already present before freezing" error
-                var allTagsField = MappedRegistry.class.getDeclaredField("allTags");
-                allTagsField.setAccessible(true);
-                allTagsField.set(mapped, null);
-            } catch (Exception e) {
-                // Field might not exist in this MC version
-            }
-            try {
                 mapped.freeze();
-            } catch (Exception e) {
-                Pandorical.LOGGER.debug("Could not freeze registry {}: {}", registry, e.getMessage());
+            } catch (IllegalStateException e) {
+                // "Tags already present before freezing" is the expected path on a
+                // re-freeze; frozen is set before the check, so this is not a failure.
+                Pandorical.LOGGER.debug("Registry {} kept its existing tag bindings: {}",
+                    registry.key(), e.getMessage());
             }
         }
     }
