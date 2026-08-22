@@ -246,10 +246,14 @@ public class MapComponent extends AbstractComponent {
         float fromNorth = ((yaw + 180) % 360 + 360) % 360;
         String[] dirs = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
         String facing = dirs[(int)((fromNorth + 22.5f) / 45f) % 8];
-        String coords = facing + "  " + mc.player.getBlockX()
-            + " / " + mc.player.getBlockY()
-            + " / " + mc.player.getBlockZ();
-        int textX = mapX + mapSize / 2 - mc.font.width(coords) / 2;
+        int bx = mc.player.getBlockX(), by = mc.player.getBlockY(), bz = mc.player.getBlockZ();
+        // Centring alone does not keep the readout inside a small map: step down to
+        // shorter forms until one fits, and draw nothing rather than overflow.
+        String coords = facing + "  " + bx + " / " + by + " / " + bz;
+        if (mc.font.width(coords) > mapSize) coords = facing + " " + bx + "/" + by + "/" + bz;
+        if (mc.font.width(coords) > mapSize) coords = facing;
+        if (mc.font.width(coords) > mapSize) return;
+        int textX = mapX + (mapSize - mc.font.width(coords)) / 2;
         int textY = mapY + mapSize - mc.font.lineHeight - 1;
         graphics.text(mc.font, coords, textX, textY, 0xFFFFFFFF, true);
     }

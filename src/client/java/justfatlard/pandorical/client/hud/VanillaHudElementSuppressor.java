@@ -44,6 +44,7 @@ public final class VanillaHudElementSuppressor {
         VanillaHudElements.EXPERIENCE_LEVEL,
         VanillaHudElements.HELD_ITEM_TOOLTIP,
         VanillaHudElements.MOB_EFFECTS,
+        VanillaHudElements.BOSS_BAR,
         VanillaHudElements.SCOREBOARD,
         VanillaHudElements.OVERLAY_MESSAGE,
         VanillaHudElements.TITLE_AND_SUBTITLE,

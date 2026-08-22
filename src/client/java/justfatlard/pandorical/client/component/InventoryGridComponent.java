@@ -13,6 +13,8 @@ import java.util.Map;
  * vanilla renders items at the correct positions.
  */
 public class InventoryGridComponent extends AbstractComponent {
+    private static final int MAX_GRID_SIDE = 64;
+
     /**
      * Vanilla's slot geometry: an eighteen pixel cell with a one pixel border, leaving exactly
      * the sixteen an item is drawn at.
@@ -48,8 +50,9 @@ public class InventoryGridComponent extends AbstractComponent {
     }
 
     private void parseStyle() {
-        rows = parseInt("rows", 3);
-        cols = parseInt("cols", 9);
+        // Nested loops below iterate rows*cols each frame; neither was bounded.
+        rows = Math.clamp(parseInt("rows", 3), 0, MAX_GRID_SIDE);
+        cols = Math.clamp(parseInt("cols", 9), 0, MAX_GRID_SIDE);
         startSlot = parseInt("start_slot", 0);
         lockedAbove = parseInt("locked_above", Integer.MAX_VALUE);
         slotStyle = parseString("slot_style", "beveled");

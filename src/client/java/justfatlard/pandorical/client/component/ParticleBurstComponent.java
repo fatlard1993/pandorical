@@ -24,6 +24,9 @@ import java.util.Map;
  * angle is captured first so the orbit continues smoothly rather than jumping.
  */
 public class ParticleBurstComponent extends AbstractComponent {
+    private static final int MAX_PARTICLES = 512;
+    private static final int MAX_PARTICLE_SIZE = 32;
+
     private int count;
     private int particleSize;
     private float radius;
@@ -51,8 +54,10 @@ public class ParticleBurstComponent extends AbstractComponent {
     }
 
     private void parseStyle() {
-        count = Math.max(1, parseInt("particle_count", 8));
-        particleSize = Math.max(1, parseInt("particle_size", 3));
+        // Clamped at the top as well as the bottom: this count drives a trig+fill loop
+        // every frame, so an unbounded value from a server is a render-thread freeze.
+        count = Math.clamp(parseInt("particle_count", 8), 1, MAX_PARTICLES);
+        particleSize = Math.clamp(parseInt("particle_size", 3), 1, MAX_PARTICLE_SIZE);
         radius = parseFloat("radius", defaultRadius());
         speed = parseFloat("speed", 90f);
         color = parseColor("color", 0xFFFFFFFF);
