@@ -11,7 +11,7 @@ import net.minecraft.resources.Identifier;
  *
  * <p>{@code texture} is a sprite base in the chests atlas, without the
  * {@code _left} / {@code _right} suffix and without an extension, e.g.
- * {@code "pandorical:entity/chest/village"}. The client appends the suffix for
+ * {@code "yourmod:entity/chest/hoard"}. The client appends the suffix for
  * whichever half of a double chest it is drawing. Any namespace works: the
  * vanilla chests atlas is built from a directory source, so a texture at
  * {@code assets/<namespace>/textures/entity/chest/<name>.png} is picked up
