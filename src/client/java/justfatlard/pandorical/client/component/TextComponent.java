@@ -81,10 +81,7 @@ public class TextComponent extends AbstractComponent {
             cachedLines = wrapText(displayText, wrapWidth);
             if (maxLines > 0 && cachedLines.size() > maxLines) {
                 cachedLines = new ArrayList<>(cachedLines.subList(0, maxLines));
-                String last = cachedLines.get(maxLines - 1);
-                if (last.length() > 3) {
-                    cachedLines.set(maxLines - 1, last.substring(0, last.length() - 3) + "...");
-                }
+                cachedLines.set(maxLines - 1, ellipsise(cachedLines.get(maxLines - 1)));
             }
         }
 
@@ -93,6 +90,24 @@ public class TextComponent extends AbstractComponent {
             graphics.text(context.font(), line, alignedX(line), lineY, renderColor, shadow);
             lineY += LINE_HEIGHT;
         }
+    }
+
+    private static final String ELLIPSIS = "...";
+
+    /**
+     * Marks a line as cut short, giving up only as many characters as the mark actually costs.
+     *
+     * <p>The line handed here already fits: it is the lines after it that are being dropped. Paying
+     * for the mark in characters rather than pixels was throwing away three every time, so a name
+     * with room to spare still arrived shortened, and one whose last characters were wide could
+     * still overrun the edge it was being trimmed to fit.
+     */
+    private String ellipsise(String line) {
+        String trimmed = line;
+        while (!trimmed.isEmpty() && context.font().width(trimmed + ELLIPSIS) > wrapWidth) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed + ELLIPSIS;
     }
 
     private List<String> wrapText(String text, int maxWidth) {

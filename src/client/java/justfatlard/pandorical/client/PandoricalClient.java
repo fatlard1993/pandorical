@@ -50,6 +50,16 @@ public class PandoricalClient implements ClientModInitializer {
     public void onInitializeClient() {
         ComponentRegistry.registerDefaults();
 
+        // The menu is built by vanilla's MenuType factory, which is handed nothing but a sync
+        // id and an inventory - so the slot count has to be fetched from the definition that
+        // arrived just before it. See PandoricalMenu's client constructor for what a wrong
+        // count does to the player's inventory.
+        justfatlard.pandorical.screen.PandoricalMenu.setIncomingModSlots(() -> {
+            OpenScreenS2C newest = null;
+            for (var entry : pendingContainerDefs.entrySet()) newest = entry.getValue();
+            return newest == null ? -1 : newest.container().map(c -> c.slotCount()).orElse(-1);
+        });
+
         // Keybind pool must register during client init: the options system
         // does not accept KeyMappings added later (see KeybindApi javadoc)
         justfatlard.pandorical.client.keybind.KeybindManager.init();

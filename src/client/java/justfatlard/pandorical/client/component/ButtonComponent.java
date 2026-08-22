@@ -89,10 +89,54 @@ public class ButtonComponent extends AbstractComponent {
             textColor = TEXT_NORMAL;
         }
 
-        int textWidth = context.font().width(label);
-        int textX = x + (width - textWidth) / 2;
-        int textY = y + (height - 8) / 2;
-        graphics.text(context.font(), label, textX, textY, textColor, true);
+        drawLabel(graphics, textColor);
+    }
+
+    /** Room left for the label once the button's own edges are accounted for. */
+    private static final int LABEL_INSET = 4;
+
+    /** Below this the text is too small to read, and trimming is the lesser loss. */
+    private static final float MIN_LABEL_SCALE = 0.55F;
+
+    private static final String ELLIPSIS = "...";
+
+    /**
+     * Draw the label so that all of it is on the button.
+     *
+     * <p>It used to be centred at full size and left to overrun: a label wider than its button
+     * spilled past both ends, and inside a scrolling list the clip cut it off mid-word. A button
+     * whose text you cannot finish reading is a button you cannot choose from.
+     *
+     * <p>Shrinking is tried before trimming, because the end of a sentence is usually the half that
+     * says what the choice actually does. Only when it is still too wide at the smallest readable
+     * size does it lose its tail.
+     */
+    private void drawLabel(GuiGraphicsExtractor graphics, int textColor) {
+        var font = context.font();
+        int room = Math.max(1, width - LABEL_INSET * 2);
+
+        String shown = label;
+        int textWidth = font.width(shown);
+        float scale = 1.0F;
+
+        if (textWidth > room) {
+            scale = Math.max(MIN_LABEL_SCALE, room / (float) textWidth);
+            while (shown.length() > ELLIPSIS.length() && font.width(shown + ELLIPSIS) * scale > room) {
+                shown = shown.substring(0, shown.length() - 1);
+            }
+            if (!shown.equals(label)) shown = shown + ELLIPSIS;
+            textWidth = font.width(shown);
+        }
+
+        float centerX = x + width / 2.0F;
+        float centerY = y + height / 2.0F;
+
+        var pose = graphics.pose();
+        pose.pushMatrix();
+        pose.translate(centerX, centerY);
+        pose.scale(scale, scale);
+        graphics.text(font, shown, -textWidth / 2, -4, textColor, true);
+        pose.popMatrix();
     }
 
     @Override
