@@ -1,0 +1,400 @@
+# Pandorical Development
+
+Pandorical is a bridge, not a content mod. Your mod runs entirely server-side and
+*describes* what it wants: a screen, an overlay, a block, a keybind. Pandorical carries
+that description to the client and renders it. Your mod ships no client code, no client
+entrypoint, and no mixins.
+
+The bet is the inverse of the usual one. You require players to have Pandorical
+installed, and in exchange you get real UI instead of whatever can be disguised as a
+vanilla container.
+
+Everything below is also demonstrated running, in one place:
+[pandorical-demo](https://github.com/fatlard1993/pandorical-demo) puts every component
+type in a single screen and every world capability in a single frame. Clone it beside
+this repo and `./gradlew runClient` if you would rather read a working screen than a
+description of one.
+
+## Adding it as a dependency
+
+Pandorical is not published to a Maven repository. Depend on it as a Gradle subproject
+pointed at a checkout beside yours:
+
+```groovy
+// settings.gradle
+include ':pandorical'
+project(':pandorical').projectDir = new File(rootProject.projectDir, '../pandorical')
+```
+
+```groovy
+// build.gradle
+dependencies {
+    implementation(project(':pandorical'))
+}
+```
+
+```json
+// fabric.mod.json
+"depends": {
+    "pandorical": ">=1.0.0"
+}
+```
+
+This compiles against Pandorical's working tree rather than a pinned release, so an API
+change surfaces as a compile error immediately. That is deliberate, and it is why there
+is no published artifact to pin against.
+
+Version targets live in `gradle.properties` (Minecraft, loader, Fabric API) and
+`fabric.mod.json` (Java). Match them.
+
+## Strings that fail silently
+
+Three string shapes in this API look right and are not. Get any of them wrong and
+nothing throws, nothing logs, and the feature is absent. That is why they come
+before anything else.
+
+**Capability strings are a fixed list.** Only these nine are ever sent in the handshake:
+
+`screens` · `content` · `camera` · `hud` · `structures` · `entity_overlays` ·
+`chest_overlays` · `keybinds` · `hud_elements`
+
+`hasCapability(player, "blockTints")` returns false forever, because `blockTints` is an
+API surface, not a capability. Player inventory slots, block tints, and built-in entity
+renderers have no capability string and are not guarded that way.
+
+**Chest overlay ids keep their atlas prefix.** `minecraft:christmas` is not a sprite;
+`minecraft:entity/chest/christmas` is. The wrong one draws magenta and logs nothing. See
+[Chest overlays](#chest-overlays).
+
+**Screen types and screen IDs are different keys.** Handlers register against the
+*screen type* you passed to the `ScreenBuilder` constructor. Updates and closes address
+a *screen ID*, which is generated per screen instance:
+
+```java
+screens.onAction("mymod:hello", "ok", handler);        // screen TYPE
+screens.update(player, screenId, updates);             // screen ID
+screens.close(player, screenId);                       // screen ID
+```
+
+A handler does not receive the ID. Get it from the player:
+
+```java
+String screenId = PandoricalApi.getOpenScreenId(player.getUUID());
+if (screenId == null) return;
+```
+
+## Guards and timing
+
+```java
+// Guards players on vanilla clients
+if (!PandoricalApi.isAvailable(player)) return;
+
+// Per-capability guard, for anything a client might lack
+if (!PandoricalApi.hasCapability(player, "hud_elements")) return;
+```
+
+`isAvailable(player)` and `hasCapability(...)` return false until the client's capability
+handshake completes, which lands shortly *after* the player's JOIN event, not before.
+Do not push a screen or HUD straight from a JOIN handler. Defer it a tick or two, or
+trigger off the player's own first action, or the push silently no-ops.
+
+Content sync is tracked separately. Wait for it before opening anything that draws your
+own blocks, items, or textures:
+
+```java
+if (PandoricalApi.isContentReady(player)) {
+    screens.open(player, ...);
+}
+```
+
+## Quick start
+
+The whole path, from mod init to a screen a player can click:
+
+```java
+public class MyMod implements ModInitializer {
+    private static final String SCREEN_TYPE = "mymod:hello";
+
+    @Override
+    public void onInitialize() {
+        // Register handlers once, at init. They key on the screen TYPE.
+        PandoricalApi.screens().onAction(SCREEN_TYPE, "ok", (player, data) -> {
+            player.sendSystemMessage(Component.literal("Clicked."));
+
+            String screenId = PandoricalApi.getOpenScreenId(player.getUUID());
+            if (screenId != null) PandoricalApi.screens().close(player, screenId);
+        });
+    }
+
+    public static void openHello(ServerPlayer player) {
+        if (!PandoricalApi.isAvailable(player)) return;
+
+        ScreenBuilder screen = new ScreenBuilder(SCREEN_TYPE)
+            .size(176, 100)
+            .title("Hello");
+
+        screen.panel("bg", 0, 0, 176, 100, Map.of("border", "beveled"));
+        screen.text("greeting", 8, 24, "Hello from the server.");
+        screen.button("ok", 8, 60, 60, 20, Map.of("label", "OK"));
+
+        PandoricalApi.screens().open(player, screen.build());
+    }
+}
+```
+
+Everything else in this document is a variation on that shape: build a description,
+hand it to an API, register handlers for what comes back.
+
+For the same thing at full size - every component type at once, with the code that
+produced it - see [ShowcaseScreen.java](https://github.com/fatlard1993/pandorical-demo/blob/main/src/main/java/justfatlard/pandorical_demo/ShowcaseScreen.java)
+in the demo.
+
+## Component types
+
+![Every component type on one screen](screenshot-components.png)
+
+Screens and HUD overlays are composed from eleven component types:
+
+`panel` · `scroll_panel` · `text` · `button` · `text_input` · `sprite` · `item_slot` ·
+`item_icon` · `inventory_grid` · `map` · `particle_burst`
+
+`ScreenBuilder` and `HudBuilder` carry shorthand for the ones used most. The rest,
+`text_input` and `item_slot` among them, are built with `ComponentBuilder` and passed to
+`component(...)`. There is no `.textInput(...)`; do not go looking for one.
+
+## Screens
+
+`ScreenBuilder` produces the `OpenScreenS2C` payload. It carries shorthand for the
+common components, and `component(ComponentBuilder)` for anything needing nesting,
+scale, or rotation.
+
+```java
+new ScreenBuilder(SCREEN_TYPE)
+    .id("explicit-id")              // defaults to a fresh UUID per builder
+    .size(280, 180)
+    .title("Fletching Table")
+    .pauseGame(false)
+    .container(10, true);           // 10 server-backed slots + player inventory
+```
+
+Shorthand: `panel` · `scrollPanel` · `button` · `text` · `inventoryGrid` · `itemIcon` ·
+`sprite`. Nested or animated components go through `ComponentBuilder`:
+
+```java
+screen.component(new ComponentBuilder("badge", "sprite")
+    .bounds(10, 10, 16, 16)
+    .scale(1.5f)
+    .rotation(45f)
+    .prop("texture", "mymod:textures/gui/badge.png")
+    .child(new ComponentBuilder("label", "text").pos(2, 2).prop("text", "!")));
+```
+
+### Opening
+
+```java
+ScreenApi screens = PandoricalApi.screens();
+
+screens.open(player, screen.build());
+
+// Backed by a real server-side Container; slot 0 is read-only here
+screens.openContainer(player, screen.build(), container, Set.of(0));
+```
+
+### Updating
+
+Updates address components by ID inside an already-open screen. `ComponentUpdateBuilder`
+builds them; the client interpolates geometry changes over the following ticks.
+
+```java
+String screenId = PandoricalApi.getOpenScreenId(player.getUUID());
+if (screenId == null) return;
+
+screens.update(player, screenId, List.of(
+    new ComponentUpdateBuilder("greeting").prop("text", "Updated.").build(),
+    new ComponentUpdateBuilder("badge").pos(20, 10).scale(2.0f).build()
+));
+```
+
+### Handlers
+
+All key on screen type, all registered once at init.
+
+```java
+screens.onAction(SCREEN_TYPE, "confirm-button", (player, data) -> { ... });
+
+// Catch-all for generated IDs, e.g. "recipe_0", "recipe_1", ...
+screens.onActionFallback(SCREEN_TYPE, (player, data) -> {
+    String componentId = data.get(ScreenApi.FALLBACK_COMPONENT_ID_KEY);
+});
+
+screens.onClose(SCREEN_TYPE, player -> { ... });
+screens.onSlotChange(SCREEN_TYPE, (player, slotIndex, stack) -> { ... });
+screens.onContainerRemoved(SCREEN_TYPE, player -> { /* return items */ });
+```
+
+`onContainerRemoved` is where items get handed back. A container screen closed without
+returning its contents strands them on the server.
+
+## HUD
+
+Shown working in [ShowcaseHud.java](https://github.com/fatlard1993/pandorical-demo/blob/main/src/main/java/justfatlard/pandorical_demo/ShowcaseHud.java), including suppressing a vanilla element and animating one by update.
+
+```java
+HudApi hud = PandoricalApi.hud();
+
+HudBuilder overlay = new HudBuilder("mymod:unread")
+    .anchor("bottom_center")
+    .offset(-40, 60);
+
+overlay.text("count", 0, 0, "3 unread");
+
+hud.show(player, overlay.build());
+hud.update(player, "mymod:unread", updates);
+hud.hide(player, "mymod:unread");
+```
+
+Anchors: `top_left`, `top_right`, `bottom_left`, `bottom_right` (offset is a margin from
+that corner), `center` (offset is a nudge from true screen center, for prompts that need
+to sit near the crosshair), `bottom_center` (offsetX positions the overlay's left edge
+relative to horizontal center, for sitting with the hotbar rows). See the javadoc on
+`HudBuilder#anchor` for the full contract.
+
+`particleBurst` draws lightweight local particle effects; `map` renders a map component.
+
+### Standing in for vanilla elements
+
+```java
+hud.hideVanillaElements(player, "mymod", List.of(VanillaHudElement.FOOD_BAR));
+hud.restoreVanillaElements(player, "mymod");
+```
+
+Suppression is keyed by the requesting mod, so two mods hiding different elements do not
+clobber each other, and an element stays hidden while any of them still wants it hidden.
+Chat, the player list, the sleep overlay and the demo timer are deliberately not
+suppressible.
+
+Clients lacking the `hud_elements` capability keep drawing vanilla's version. An overlay
+meant to *replace* a vanilla element needs a layout that still works alongside it, or
+should not be pushed to those clients at all.
+
+## Content
+
+Register during `onInitialize`. Content syncs to clients in the configuration phase,
+before Fabric's registry sync.
+
+```java
+ContentApi content = PandoricalApi.content();
+
+content.registerBlock("mymod:my-block", new BlockRegistration(...));
+content.registerItem("mymod:my-item", new ItemRegistration(...));
+content.registerAsset("mymod/models/block/my-block.json", jsonBytes);
+content.registerModAssets("mymod");   // auto-scans classpath assets/
+
+// Repaint a vanilla item for Pandorical clients only
+content.overrideVanillaItem("minecraft:rabbit_hide", new VanillaItemOverride(...));
+```
+
+`registerModAssets` is the usual call. Anything your mod draws (textures for entity
+overlays, chest overlays, custom blocks) must be registered here or the client has
+nothing to load.
+
+## Camera
+
+```java
+CameraApi camera = PandoricalApi.camera();
+
+camera.setDistance(player, 6.0f);
+camera.setPerspective(player, "third_person_back");
+camera.reset(player);
+```
+
+## Entity overlays
+
+An extra texture layer on one specific living entity, for per-entity cosmetics. The
+texture must follow that entity model's own texture layout; transparent pixels are not
+drawn.
+
+```java
+PandoricalApi.entityOverlays().set(entity,
+    Identifier.fromNamespaceAndPath("mymod", "textures/entity/my_overlay.png"));
+
+PandoricalApi.entityOverlays().clear(entity);
+```
+
+Broadcast to every current and future tracker of the entity, so there is no player
+argument. State is in-memory only and dropped when the entity unloads: re-call `set`
+when your entity loads, from a tick hook reading your own persisted flag.
+
+## Chest overlays
+
+Draw particular chests with a different texture, so a player can tell (say) the ones a
+village generated from their own.
+
+```java
+ChestOverlayApi chests = PandoricalApi.chestOverlays();
+
+chests.replace(player, texture, positions);  // state the whole truth; the call for a join
+chests.add(player, texture, positions);      // mark more, leave existing marks alone
+chests.remove(player, positions);            // unmark, whatever texture they carried
+```
+
+Unlike entity overlays these are addressed to one player, because whether a chest
+deserves marking can depend on who is looking.
+
+The texture is a sprite **id** in the vanilla chests atlas, and it keeps the atlas's
+directory prefix: `<yourmod>:entity/chest/<name>`, not the bare `<yourmod>:<name>`. A
+bare name resolves to no sprite and the chest draws as missing-texture magenta, which is
+the only symptom you get. No extension, and no `_left` / `_right` suffix: the client
+appends those itself for each half of a double chest. Ship all three files
+(`<name>.png`, `<name>_left.png`, `<name>_right.png`) under
+`assets/<yourmod>/textures/entity/chest/`.
+
+Nothing is persisted across a reconnect. Send the marks again on join.
+
+## Keybinds
+
+Server-declared rebindable keys. Your mod claims a slot from a fixed client-side pool and
+ships zero client code.
+
+```java
+// At mod init, before players connect. Key codes use the game's own InputConstants
+// table, not GLFW: 10 is KEY_G on this snapshot generation.
+PandoricalApi.keybinds().register("mymod:action", 10, "Do The Thing",
+    player -> doTheThing(player));
+```
+
+The preferred key is honored only if a free pool slot carries that default. Slot 1
+defaults to G; the rest start unbound. The display name appears in the client's controls
+screen under category "Pandorical", and a rebind persists in `options.txt` like any other
+key. Presses arrive on the server thread, validated and rate-limited.
+
+The pool is fixed at 8 slots because the options system only accepts keybind registration
+during client startup. Unclaimed slots are inert and send nothing.
+
+## Navigable screens
+
+A Pandorical screen builds its UI from server-sent component definitions rather than
+vanilla widgets, so `Screen.children()` reports it as empty and anything navigating by
+keyboard focus or a gamepad finds nothing to press. `NavigableScreen` (in the common API,
+`justfatlard.pandorical.api`) is how a screen says where its interactive parts are:
+
+```java
+// PandoricalScreen already implements this; a component opts in by overriding
+// isNavigable(), which should be true exactly when it handles mouseClicked.
+List<NavigableScreen.NavRegion> regions = ((NavigableScreen) screen).navRegions();
+```
+
+Regions are geometry only, with no activate hook. A navigator moves the pointer onto one
+and clicks it through the screen's ordinary mouse path, so vanilla slots, vanilla widgets
+and Pandorical components are all driven by one mechanism and none of them need to know
+what is doing the navigating. Regions are computed per call rather than cached, because
+component geometry is mutable and interpolates for several ticks after a server update.
+
+## Documented in the javadoc, not here
+
+`structures`, `playerInventory`, `blockTints`, and built-in entity renderers work the
+same way, through `PandoricalApi`. Each carries a trap this page will not save you from:
+structure IDs must be unique server-wide, structures must be despawned or they leak
+state, tints must be registered before the client asks. Read the javadoc on
+`StructureApi`, `PlayerInventoryApi`, `BlockTintApi`, and
+`PandoricalApi#registerEntityRenderer` before wiring them up.
