@@ -436,10 +436,12 @@ public class ContentRegistry implements ContentApi {
             }
             String baseBlockId = "";
             String modelId = "";
+            boolean interactive = false;
             var registered = blocks.get(id);
             if (registered != null) {
                 baseBlockId = registered.registration().getBaseBlockId();
                 modelId = registered.registration().getModelId();
+                interactive = registered.registration().isInteractive();
             }
 
             // Auto-detected blocks (not registered via PandoricalApi) get an inferred base
@@ -455,7 +457,12 @@ public class ContentRegistry implements ContentApi {
 
             byte[] shapeData = serializeBlockShapes(block);
 
-            blockEntries.add(new SyncContentS2C.BlockEntry(id, baseBlockId, stateProps, modelId, stateIds, shapeData));
+            // Read off the block's own default state: climbability is a property of the block, and
+            // no vanilla climbable varies it by state.
+            boolean climbable = block.defaultBlockState().is(net.minecraft.tags.BlockTags.CLIMBABLE);
+
+            blockEntries.add(new SyncContentS2C.BlockEntry(
+                id, baseBlockId, stateProps, modelId, stateIds, shapeData, climbable, interactive));
         }
 
         reportUnsyncedNamespaces();

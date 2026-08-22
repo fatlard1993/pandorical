@@ -34,7 +34,23 @@ public record SyncContentS2C(
         List<String> stateProperties,
         String modelId,
         List<Integer> stateIds,
-        byte[] shapeData
+        byte[] shapeData,
+        /**
+         * Whether this block carries players up it.
+         *
+         * <p>Climbing is decided by the client, off {@code #minecraft:climbable}, and a tag is a
+         * poor thing to depend on for a block the client only learns about here: tag membership
+         * travels as numeric registry ids against a registry these stand-ins are appended to at
+         * connection time. Sending the fact outright costs a bit and needs no such agreement.
+         */
+        boolean climbable,
+        /**
+         * Whether a right-click on this block is the server's business.
+         *
+         * <p>Without it the client predicts a block placement against anything it has no
+         * behaviour for, which is every synced block. See {@code BlockRegistration#interactive}.
+         */
+        boolean interactive
     ) {
         public static final StreamCodec<ByteBuf, BlockEntry> STREAM_CODEC = new StreamCodec<>() {
             @Override
@@ -45,7 +61,10 @@ public record SyncContentS2C(
                 String modelId = ByteBufCodecs.STRING_UTF8.decode(buf);
                 var stateIds = ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list()).decode(buf);
                 var shapeData = ByteBufCodecs.BYTE_ARRAY.decode(buf);
-                return new BlockEntry(id, baseBlockId, stateProperties, modelId, stateIds, shapeData);
+                boolean climbable = ByteBufCodecs.BOOL.decode(buf);
+                boolean interactive = ByteBufCodecs.BOOL.decode(buf);
+                return new BlockEntry(id, baseBlockId, stateProperties, modelId, stateIds, shapeData,
+                    climbable, interactive);
             }
 
             @Override
@@ -56,6 +75,8 @@ public record SyncContentS2C(
                 ByteBufCodecs.STRING_UTF8.encode(buf, value.modelId());
                 ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list()).encode(buf, value.stateIds());
                 ByteBufCodecs.BYTE_ARRAY.encode(buf, value.shapeData());
+                ByteBufCodecs.BOOL.encode(buf, value.climbable());
+                ByteBufCodecs.BOOL.encode(buf, value.interactive());
             }
         };
     }

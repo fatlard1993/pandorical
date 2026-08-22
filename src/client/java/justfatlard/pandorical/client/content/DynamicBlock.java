@@ -119,6 +119,35 @@ public class DynamicBlock extends Block {
         }
     }
 
+    /**
+     * Whether the server's first state collides with anything at all.
+     *
+     * <p>Asked before the block is built, because collision is decided by a flag on
+     * {@code Properties} and not only by the shape. A stand-in copies its base block's
+     * properties, so a beanstalk standing in for bamboo inherited bamboo's collision and stayed
+     * solid to walk into no matter that the shape arriving alongside it was empty.
+     *
+     * <p>The first state speaks for the block: nothing in the suite collides in one state and
+     * passes through in another.
+     */
+    public static boolean declaresCollision(byte[] shapeData) {
+        if (shapeData == null || shapeData.length == 0) return true;
+
+        try {
+            DataInputStream dis = new DataInputStream(new ByteArrayInputStream(shapeData));
+            int outlineBoxes = dis.readByte() & 0xFF;
+            dis.skipBytes(outlineBoxes * BYTES_PER_BOX);
+            return (dis.readByte() & 0xFF) > 0;
+        } catch (IOException e) {
+            // Unreadable means unknown, and solid is the safer unknown: a block you cannot walk
+            // into is a nuisance, one you fall through is a hole in the world.
+            return true;
+        }
+    }
+
+    /** minX/minY/minZ/maxX/maxY/maxZ, four bytes each. */
+    private static final int BYTES_PER_BOX = 24;
+
     private static VoxelShape readShape(DataInputStream dis) throws IOException {
         int numBoxes = dis.readByte() & 0xFF;
         if (numBoxes == 0) return Shapes.empty();

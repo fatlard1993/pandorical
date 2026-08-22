@@ -6,6 +6,8 @@
   "client": [
     "ItemCountRendererMixin",
     "CameraMixin",
+    "ClimbableSyncMixin",
+    "InteractiveSyncMixin",
     "EntityRenderStateMixin",
     "InventoryMenuClientMixin",
     "InventoryScreenMixin",

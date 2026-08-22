@@ -32,7 +32,7 @@ import java.util.Set;
 public class Pandorical implements ModInitializer {
     public static final String MOD_ID = "pandorical";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-    public static final int PROTOCOL_VERSION = 1;
+    public static final int PROTOCOL_VERSION = 3;
 
     public static final List<String> SERVER_CAPABILITIES = List.of("screens", "content", "camera", "hud", "structures", "entity_overlays", "chest_overlays", "keybinds", "hud_elements");
 

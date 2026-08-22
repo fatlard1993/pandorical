@@ -10,6 +10,7 @@ public class BlockRegistration {
     private String baseBlockId = "minecraft:stone";
     private final List<String> stateProperties = new ArrayList<>();
     private String modelId = "";
+    private boolean interactive = false;
 
     /**
      * Base block to clone properties from (strength, sound, etc).
@@ -43,6 +44,26 @@ public class BlockRegistration {
      * <p><b>Advisory only today.</b> Sent on the wire, not acted on by the client:
      * appearance comes from the synced blockstate/model assets in your jar.
      */
+    /**
+     * Say that right-clicking this block does something, so the client stops guessing.
+     *
+     * <p>The client's copy of a synced block is a plain stand-in: it has none of the server
+     * block's behaviour, so a right-click on it looks unhandled and the client goes ahead and
+     * predicts what an unhandled right-click means - placing whatever is in hand. The server
+     * opens a screen instead and places nothing, and the player watches a block appear, vanish,
+     * and leave a stack count that stays wrong until something forces a resync.
+     *
+     * <p>Declared rather than worked out from the block, because the only honest way to detect
+     * it is to ask whether the class overrides useItemOn, and method names are intermediary at
+     * runtime - a lookup by the name written here would find nothing and quietly answer no.
+     */
+    public BlockRegistration interactive() {
+        this.interactive = true;
+        return this;
+    }
+
+    public boolean isInteractive() { return interactive; }
+
     public BlockRegistration model(String modelId) {
         this.modelId = modelId;
         return this;
