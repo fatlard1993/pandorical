@@ -14,7 +14,8 @@
     "LivingEntityRendererMixin",
     "ChestRenderStateMixin",
     "ChestRendererMixin",
-    "MerchantStackSizeMixin"
+    "MerchantStackSizeMixin",
+    "ContainerStackSizeMixin"
   ],
   "injectors": {
     "defaultRequire": 0
