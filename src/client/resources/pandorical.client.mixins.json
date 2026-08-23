@@ -13,7 +13,8 @@
     "InventoryScreenMixin",
     "LivingEntityRendererMixin",
     "ChestRenderStateMixin",
-    "ChestRendererMixin"
+    "ChestRendererMixin",
+    "MerchantStackSizeMixin"
   ],
   "injectors": {
     "defaultRequire": 0
