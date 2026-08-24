@@ -548,6 +548,14 @@ public class ContentRegistry implements ContentApi {
             var equippable = item.components().get(net.minecraft.core.component.DataComponents.EQUIPPABLE);
             if (equippable != null) {
                 equipSlot = equippable.slot().getName();
+                // The asset id as well, because the slot alone only says where a thing is worn.
+                // Without it the client has nothing to hang an armour model on and falls back to
+                // pasting the item's own sprite flat on the wearer: a quartz helmet came out as a
+                // white square standing up on the player's head.
+                var asset = equippable.assetId();
+                if (asset.isPresent()) {
+                    equipSlot = equipSlot + "|" + asset.get().identifier();
+                }
             }
 
             // A declared tool carries the material's numbers; the bare "tool" from

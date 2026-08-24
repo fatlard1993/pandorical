@@ -1015,6 +1015,42 @@ public class ContentManager {
      * leaves the item as it was. That is the same nothing it did before, so a client that has not
      * been updated is no worse off than it is today.
      */
+    /**
+     * Make a synced item wearable, and give it something to be drawn as.
+     *
+     * <p>The slot on its own says only where it goes. Armour is drawn from an equipment asset,
+     * and a stand-in built without one leaves the renderer nothing to use: it falls back to
+     * laying the item's flat sprite on the wearer, which is a helmet standing upright on your
+     * head. The id travels beside the slot as "slot|asset".
+     */
+    private static void applyEquippable(Item.Properties props, String spec) {
+        if (spec.isEmpty()) return;
+
+        String[] parts = spec.split("\\|", 2);
+        var slot = net.minecraft.world.entity.EquipmentSlot.byName(parts[0]);
+        if (slot == null) {
+            Pandorical.LOGGER.warn("Unknown equipment slot '{}' — item left unwearable", parts[0]);
+            return;
+        }
+
+        if (parts.length < 2 || parts[1].isEmpty()) {
+            props.equippable(slot);
+            return;
+        }
+
+        Identifier asset = Identifier.tryParse(parts[1]);
+        if (asset == null) {
+            props.equippable(slot);
+            return;
+        }
+
+        props.component(net.minecraft.core.component.DataComponents.EQUIPPABLE,
+            net.minecraft.world.item.equipment.Equippable.builder(slot)
+                .setAsset(ResourceKey.create(
+                    net.minecraft.world.item.equipment.EquipmentAssets.ROOT_ID, asset))
+                .build());
+    }
+
     private static void applyTool(Item.Properties props, String spec) {
         if (spec.isEmpty() || !spec.contains("|")) return;
 
@@ -1071,10 +1107,7 @@ public class ContentManager {
                 props.stacksTo(entry.maxStackSize());
             }
 
-            if (!entry.equipSlot().isEmpty()) {
-                var slot = net.minecraft.world.entity.EquipmentSlot.byName(entry.equipSlot());
-                props.equippable(slot);
-            }
+            applyEquippable(props, entry.equipSlot());
 
             applyTool(props, entry.toolType());
 
