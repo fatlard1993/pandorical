@@ -49,6 +49,43 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
 
     // --- PlayerInventoryApi implementation ---
 
+    /** Buttons mods have asked for on the inventory screen, in registration order. */
+    private final List<justfatlard.pandorical.protocol.InventoryButtonsS2C.Button> buttons =
+        new java.util.ArrayList<>();
+
+    private final Map<String, java.util.function.Consumer<ServerPlayer>> buttonHandlers =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    @Override
+    public void registerButton(Identifier namespace, String id, int x, int y, int size, String glyph) {
+        buttons.add(new justfatlard.pandorical.protocol.InventoryButtonsS2C.Button(
+            namespace.toString(), id, x, y, size, glyph));
+        Pandorical.LOGGER.info("[pandorical] Registered inventory button '{}' for namespace '{}'",
+            id, namespace);
+    }
+
+    @Override
+    public void onButton(Identifier namespace, String id, java.util.function.Consumer<ServerPlayer> handler) {
+        buttonHandlers.put(namespace + "/" + id, handler);
+    }
+
+    /** Everything registered, for the packet sent during configuration. */
+    public List<justfatlard.pandorical.protocol.InventoryButtonsS2C.Button> declaredButtons() {
+        return List.copyOf(buttons);
+    }
+
+    /** Route a press back to whoever asked for the button. */
+    public void handleButton(ServerPlayer player, String namespace, String id) {
+        var handler = buttonHandlers.get(namespace + "/" + id);
+        if (handler == null) return;
+        try {
+            handler.accept(player);
+        } catch (Exception e) {
+            Pandorical.LOGGER.error("[pandorical] Exception in inventory button '{}/{}': {}",
+                namespace, id, e.getMessage(), e);
+        }
+    }
+
     @Override
     public void registerSlots(Identifier namespace, List<SlotEntry> slots) {
         // Defensive copy so callers cannot mutate after registration.

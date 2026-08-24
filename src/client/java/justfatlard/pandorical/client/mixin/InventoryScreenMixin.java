@@ -14,6 +14,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Draws slot backgrounds for Pandorical's extra inventory slots.
@@ -43,6 +44,11 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
         super(null, null, null);
     }
 
+    /** Button faces, matching the slot colours so the two read as one panel. */
+    private static final int BUTTON_FACE  = 0xFF8B8B8B;
+    private static final int BUTTON_HOVER = 0xFFA8A8A8;
+    private static final int BUTTON_TEXT  = 0xFF373737;
+
     // Colors matching ItemSlotComponent.render()
     private static final int SLOT_BORDER_DARK  = 0xFF373737;
     private static final int SLOT_BORDER_LIGHT = 0xFFFFFFFF;
@@ -56,6 +62,58 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
      * background origin ({@code leftPos}, {@code topPos}), so we add those offsets before
      * calling {@code graphics.fill()} or {@code graphics.blitSprite()}.
      */
+    /**
+     * Draw the buttons this server asked for, and answer clicks on them.
+     *
+     * <p>Anchored to {@code leftPos}/{@code topPos} for the same reason the slot backgrounds
+     * are: the recipe book pane shifts the panel sideways, and anything positioned from screen
+     * centre parts company with the panel the moment it opens.
+     */
+    @Inject(method = "extractRenderState", at = @At("TAIL"))
+    private void pandorical$drawInventoryButtons(GuiGraphicsExtractor graphics,
+            int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+        var buttons = justfatlard.pandorical.client.inventory.ClientInventoryButtons.all();
+        if (buttons.isEmpty()) return;
+
+        var font = net.minecraft.client.Minecraft.getInstance().font;
+        for (var button : buttons) {
+            int bx = this.leftPos + button.screenX();
+            int by = this.topPos + button.screenY();
+            int size = button.size();
+            boolean over = mouseX >= bx && mouseX < bx + size && mouseY >= by && mouseY < by + size;
+
+            graphics.fill(bx, by, bx + size, by + size, SLOT_BORDER_DARK);
+            graphics.fill(bx + 1, by + 1, bx + size - 1, by + size - 1,
+                over ? BUTTON_HOVER : BUTTON_FACE);
+
+            String glyph = button.glyph();
+            int gx = bx + (size - font.width(glyph)) / 2;
+            int gy = by + (size - font.lineHeight) / 2 + 1;
+            graphics.text(font, glyph, gx, gy, BUTTON_TEXT, false);
+        }
+    }
+
+    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
+    private void pandorical$clickInventoryButton(net.minecraft.client.input.MouseButtonEvent click,
+            boolean handled, CallbackInfoReturnable<Boolean> cir) {
+        if (handled) return;
+
+        for (var button : justfatlard.pandorical.client.inventory.ClientInventoryButtons.all()) {
+            int bx = this.leftPos + button.screenX();
+            int by = this.topPos + button.screenY();
+            int size = button.size();
+            if (click.x() < bx || click.x() >= bx + size) continue;
+            if (click.y() < by || click.y() >= by + size) continue;
+
+            justfatlard.pandorical.client.inventory.ClientInventoryButtons.press(button);
+            net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
+                net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+                    net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+            cir.setReturnValue(true);
+            return;
+        }
+    }
+
     @Inject(method = "extractRenderState", at = @At("HEAD"))
     private void pandorical$drawExtraSlotBackgrounds(GuiGraphicsExtractor graphics,
                                                      int mouseX, int mouseY, float delta,

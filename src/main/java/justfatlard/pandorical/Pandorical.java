@@ -123,6 +123,9 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundConfiguration().register(SyncContentConfigS2C.TYPE, SyncContentConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(SyncAssetsConfigS2C.TYPE, SyncAssetsConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(PlayerInventoryRegistrationsS2C.TYPE, PlayerInventoryRegistrationsS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundConfiguration().register(
+            justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE,
+            justfatlard.pandorical.protocol.InventoryButtonsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(BlockTintsConfigS2C.TYPE, BlockTintsConfigS2C.STREAM_CODEC);
         // C2S config
         PayloadTypeRegistry.serverboundConfiguration().register(ContentReadyConfigC2S.TYPE, ContentReadyConfigC2S.STREAM_CODEC);
@@ -157,6 +160,9 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.serverboundPlay().register(ScreenActionC2S.TYPE, ScreenActionC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(ContentReadyC2S.TYPE, ContentReadyC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(KeyPressC2S.TYPE, KeyPressC2S.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(
+            justfatlard.pandorical.protocol.InventoryButtonC2S.TYPE,
+            justfatlard.pandorical.protocol.InventoryButtonC2S.STREAM_CODEC);
     }
 
     /**
@@ -292,6 +298,12 @@ public class Pandorical implements ModInitializer {
                 PandoricalApi.keybindsImpl().handleKeyPress(context.player(), payload.slot()));
         });
 
+        ServerPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.InventoryButtonC2S.TYPE, (payload, context) -> {
+                context.server().execute(() -> PandoricalApi.playerInventoryImpl()
+                    .handleButton(context.player(), payload.namespace(), payload.id()));
+            });
+
         ServerPlayNetworking.registerGlobalReceiver(ScreenActionC2S.TYPE, (payload, context) -> {
             context.server().execute(() -> {
                 PandoricalApi.screensImpl().handleAction(context.player(), payload);
@@ -354,6 +366,15 @@ public class Pandorical implements ModInitializer {
         }
 
         ServerConfigurationNetworking.send(handler, new PlayerInventoryRegistrationsS2C(groups));
+
+        // Only to a client that has said it understands them. An older one simply gets no
+        // buttons, rather than a packet it cannot read.
+        var buttons = PandoricalApi.playerInventoryImpl().declaredButtons();
+        if (!buttons.isEmpty() && ServerConfigurationNetworking.canSend(
+                handler, justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE)) {
+            ServerConfigurationNetworking.send(handler,
+                new justfatlard.pandorical.protocol.InventoryButtonsS2C(buttons));
+        }
         LOGGER.debug("Sent {} extra inventory slot group(s) during config phase", groups.size());
     }
 

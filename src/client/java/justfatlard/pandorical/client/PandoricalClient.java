@@ -156,6 +156,12 @@ public class PandoricalClient implements ClientModInitializer {
             ClientInventorySlotRegistry.receive(payload);
         });
 
+        ClientConfigurationNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE, (payload, context) -> {
+                justfatlard.pandorical.client.inventory.ClientInventoryButtons.set(payload.buttons());
+                Pandorical.LOGGER.debug("Inventory buttons received: {}", payload.buttons().size());
+            });
+
         ClientConfigurationNetworking.registerGlobalReceiver(BlockTintsConfigS2C.TYPE, (payload, context) -> {
             Pandorical.LOGGER.debug("Config phase: received {} block tint group(s)", payload.entries().size());
             payload.entries().forEach(PandoricalClient::applyBlockTints);

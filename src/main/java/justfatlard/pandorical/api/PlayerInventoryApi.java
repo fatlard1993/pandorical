@@ -88,5 +88,21 @@ public interface PlayerInventoryApi {
      */
     void onSlotChange(Identifier namespace, BiConsumer<ServerPlayer, SlotChangeEvent> handler);
 
+    /**
+     * Put a button on the player's own inventory screen.
+     *
+     * <p>For the actions that belong to a player rather than to a container: sorting your own
+     * pack is wanted while standing in a field, not only while looking into a chest.
+     *
+     * @param x     offset from the inventory panel's top-left corner, in gui pixels
+     * @param size  width and height; buttons here are square
+     * @param glyph the character to draw on it - no texture to ship, and it reads at 16 pixels
+     *              where a word does not
+     */
+    void registerButton(Identifier namespace, String id, int x, int y, int size, String glyph);
+
+    /** Called when somebody presses one of {@link #registerButton}'s buttons. */
+    void onButton(Identifier namespace, String id, java.util.function.Consumer<ServerPlayer> handler);
+
     record SlotChangeEvent(int slotIndex, ItemStack newStack) {}
 }
