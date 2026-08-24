@@ -396,10 +396,16 @@ public class ContentRegistry implements ContentApi {
         List<String> inferred = new java.util.ArrayList<>();
         for (var entry : net.minecraft.core.registries.BuiltInRegistries.BLOCK.entrySet()) {
             String namespace = entry.getKey().identifier().getNamespace();
-            if (!isServerOnlyNamespace(namespace)) continue;
+            String id = entry.getKey().identifier().toString();
+
+            // Namespace decides it for the blocks this server invented, but a mod can also claim
+            // a vanilla block by naming it outright - which is the only way to say that a
+            // right-click on, say, a player head is the server's to answer. The client already
+            // handles an id it owns: it finds the block present, keeps its own, and takes only
+            // the flags. Nothing is registered twice and no protocol changed to allow it.
+            if (!isServerOnlyNamespace(namespace) && !blocks.containsKey(id)) continue;
 
             var block = entry.getValue();
-            String id = entry.getKey().identifier().toString();
             List<Integer> stateIds = new java.util.ArrayList<>();
             List<String> stateProps = new java.util.ArrayList<>();
             for (var prop : block.getStateDefinition().getProperties()) {
