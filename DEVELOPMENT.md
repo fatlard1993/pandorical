@@ -398,3 +398,10 @@ structure IDs must be unique server-wide, structures must be despawned or they l
 state, tints must be registered before the client asks. Read the javadoc on
 `StructureApi`, `PlayerInventoryApi`, `BlockTintApi`, and
 `PandoricalApi#registerEntityRenderer` before wiring them up.
+
+`playerInventory` covers more than slots, and the rest is easy to miss looking for it:
+`registerButton` puts a square glyph button on the vanilla inventory panel, `onButton`
+answers a press, and `setButtonGlyph` changes what one player sees on one button - which
+is how a button that is a switch says which way it is set. `registeredSlots` walks every
+slot group, for the mods that have to empty the whole extra inventory rather than one
+slot they already know the name of.

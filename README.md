@@ -22,6 +22,9 @@ download.
 - **Moving structures**, like a ship built out of blocks that sails as one piece.
 - **Camera control**, when a server wants to pull the view back.
 - **Cosmetic overlays** on particular mobs or chests, so you can tell one from another.
+- **Extra squares and buttons on your own inventory screen**: a slot that only takes a
+  map, a compass slot beside it, a button that tidies your pack. They sit in the vanilla
+  panel and behave like the rest of it.
 
 None of this is Pandorical's own content: no items, no blocks, no recipes, nothing
 added to a world. Everything you see through it comes from a mod on the server.
@@ -51,17 +54,21 @@ raft floating as one piece. The client installed one mod.
 ## Mods that use it
 
 Around thirty server-side mods are built on Pandorical, all at
-[github.com/justfatlard](https://github.com/justfatlard). The ones where you will see
+[github.com/fatlard1993](https://github.com/fatlard1993). The ones where you will see
 it most:
 
-- [village-mail](https://github.com/justfatlard/village-mail): a postal system with a
+- [village-mail](https://github.com/fatlard1993/village-mail): a postal system with a
   full mailbox interface and an unread-mail badge
-- [village-quests](https://github.com/justfatlard/village-quests): villager dialogue and
+- [village-quests](https://github.com/fatlard1993/village-quests): villager dialogue and
   quest screens
-- [player-trade](https://github.com/justfatlard/player-trade): player-to-player trading
+- [player-trade](https://github.com/fatlard1993/player-trade): player-to-player trading
   windows
-- [fletch-craft](https://github.com/justfatlard/fletch-craft): a working fletching table
+- [fletch-craft](https://github.com/fatlard1993/fletch-craft): a working fletching table
   with its own crafting layout
+- [map-plus-plus](https://github.com/fatlard1993/map-plus-plus): map and compass slots on
+  the inventory screen, and a live minimap
+- [chest-utils](https://github.com/fatlard1993/chest-utils): sort and transfer buttons on
+  every chest, and sixteen colours of paint on the chests themselves
 
 ## For mod developers
 
