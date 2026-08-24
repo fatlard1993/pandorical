@@ -133,6 +133,10 @@ public class Pandorical implements ModInitializer {
         // --- Play phase ---
         // S2C play
         PayloadTypeRegistry.clientboundPlay().register(HelloS2C.TYPE, HelloS2C.STREAM_CODEC);
+        // Also in play, so a button that is a switch can change its face while somebody watches.
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE,
+            justfatlard.pandorical.protocol.InventoryButtonsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(OpenScreenS2C.TYPE, OpenScreenS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(UpdateScreenS2C.TYPE, UpdateScreenS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(CloseScreenS2C.TYPE, CloseScreenS2C.STREAM_CODEC);

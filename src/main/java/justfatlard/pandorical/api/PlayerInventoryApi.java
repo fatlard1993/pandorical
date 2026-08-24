@@ -104,5 +104,17 @@ public interface PlayerInventoryApi {
     /** Called when somebody presses one of {@link #registerButton}'s buttons. */
     void onButton(Identifier namespace, String id, java.util.function.Consumer<ServerPlayer> handler);
 
+    /**
+     * Change what one player sees drawn on a button.
+     *
+     * <p>For a button that is a switch rather than a command. A switch has to say which way it is
+     * set, and the only surface it has to say it on is its own face - so the glyph is the state,
+     * and it is per player because the state is.
+     *
+     * <p>Takes effect on an inventory screen already open. A client too old to be told simply
+     * keeps the glyph it was given at registration.
+     */
+    void setButtonGlyph(ServerPlayer player, Identifier namespace, String id, String glyph);
+
     record SlotChangeEvent(int slotIndex, ItemStack newStack) {}
 }

@@ -225,6 +225,7 @@ public final class PandoricalApi {
         playerScreens.remove(playerUuid);
         KEYBINDS.removePlayer(playerUuid);
         HUD.forgetPlayer(playerUuid);
+        PLAYER_INVENTORY.forgetButtonGlyphs(playerUuid);
     }
 
     /** @hidden */

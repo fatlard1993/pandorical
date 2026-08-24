@@ -69,9 +69,48 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
         buttonHandlers.put(namespace + "/" + id, handler);
     }
 
+    /** Faces a player has been shown instead of the registered one, keyed namespace/id. */
+    private final Map<java.util.UUID, Map<String, String>> glyphs =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    @Override
+    public void setButtonGlyph(ServerPlayer player, Identifier namespace, String id, String glyph) {
+        glyphs.computeIfAbsent(player.getUUID(), key -> new java.util.concurrent.ConcurrentHashMap<>())
+            .put(namespace + "/" + id, glyph);
+
+        if (!net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(
+                player, justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE)) {
+            return;
+        }
+        net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
+            new justfatlard.pandorical.protocol.InventoryButtonsS2C(buttonsFor(player.getUUID())));
+    }
+
     /** Everything registered, for the packet sent during configuration. */
     public List<justfatlard.pandorical.protocol.InventoryButtonsS2C.Button> declaredButtons() {
         return List.copyOf(buttons);
+    }
+
+    /** The same buttons, wearing whatever faces this player has been switched to. */
+    public List<justfatlard.pandorical.protocol.InventoryButtonsS2C.Button> buttonsFor(java.util.UUID player) {
+        Map<String, String> mine = glyphs.get(player);
+        if (mine == null || mine.isEmpty()) return declaredButtons();
+
+        List<justfatlard.pandorical.protocol.InventoryButtonsS2C.Button> shown =
+            new java.util.ArrayList<>(buttons.size());
+        for (var button : buttons) {
+            String glyph = mine.get(button.namespace() + "/" + button.id());
+            shown.add(glyph == null ? button
+                : new justfatlard.pandorical.protocol.InventoryButtonsS2C.Button(
+                    button.namespace(), button.id(), button.screenX(), button.screenY(),
+                    button.size(), glyph));
+        }
+        return List.copyOf(shown);
+    }
+
+    /** Dropped on disconnect: whoever set them will set them again on the next join. */
+    public void forgetButtonGlyphs(java.util.UUID player) {
+        glyphs.remove(player);
     }
 
     /** Route a press back to whoever asked for the button. */

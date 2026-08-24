@@ -162,6 +162,12 @@ public class PandoricalClient implements ClientModInitializer {
                 Pandorical.LOGGER.debug("Inventory buttons received: {}", payload.buttons().size());
             });
 
+        // The same list again, mid-game, when a button that is a switch has been thrown. The
+        // screen reads the list every frame, so an open inventory shows the new face at once.
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE, (payload, context) ->
+                justfatlard.pandorical.client.inventory.ClientInventoryButtons.set(payload.buttons()));
+
         ClientConfigurationNetworking.registerGlobalReceiver(BlockTintsConfigS2C.TYPE, (payload, context) -> {
             Pandorical.LOGGER.debug("Config phase: received {} block tint group(s)", payload.entries().size());
             payload.entries().forEach(PandoricalClient::applyBlockTints);
