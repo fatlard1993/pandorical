@@ -550,7 +550,10 @@ public class ContentRegistry implements ContentApi {
                 equipSlot = equippable.slot().getName();
             }
 
-            String toolType = inferToolType(item);
+            // A declared tool carries the material's numbers; the bare "tool" from
+            // inferToolType only ever said yes-or-no, which the client could do nothing with.
+            String declaredTool = registered != null ? registered.registration().getToolSpec() : "";
+            String toolType = declaredTool.isEmpty() ? inferToolType(item) : declaredTool;
 
             itemEntries.add(new SyncContentS2C.ItemEntry(id, modelId, maxStack, maxDamage, glint, equipSlot, toolType));
         }

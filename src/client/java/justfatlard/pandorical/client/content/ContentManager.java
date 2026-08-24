@@ -1003,6 +1003,51 @@ public class ContentManager {
         }
     }
 
+    /**
+     * Rebuild a synced tool so the client mines the way the server does.
+     *
+     * <p>The stand-in is otherwise a bare item, which swings at hand speed: the server knows the
+     * axe is an axe and the client does not, and the whole dig is spent disagreeing. What arrives
+     * is the material's own numbers rather than a finished component, so the tool is rebuilt here
+     * through the same vanilla helpers the real item used - one implementation, no drift.
+     *
+     * <p>Anything older or unrecognised, including the plain "tool" this field used to carry,
+     * leaves the item as it was. That is the same nothing it did before, so a client that has not
+     * been updated is no worse off than it is today.
+     */
+    private static void applyTool(Item.Properties props, String spec) {
+        if (spec.isEmpty() || !spec.contains("|")) return;
+
+        String[] p = spec.split("\\|");
+        if (p.length != 9) {
+            Pandorical.LOGGER.warn("Unreadable tool spec '{}' — leaving the item plain", spec);
+            return;
+        }
+
+        try {
+            var material = new net.minecraft.world.item.ToolMaterial(
+                net.minecraft.tags.TagKey.create(Registries.BLOCK, Identifier.parse(p[1])),
+                Integer.parseInt(p[2]),
+                Float.parseFloat(p[3]),
+                Float.parseFloat(p[4]),
+                Integer.parseInt(p[5]),
+                net.minecraft.tags.TagKey.create(Registries.ITEM, Identifier.parse(p[6])));
+            float damage = Float.parseFloat(p[7]);
+            float speed = Float.parseFloat(p[8]);
+
+            switch (p[0]) {
+                case "axe"     -> props.axe(material, damage, speed);
+                case "pickaxe" -> props.pickaxe(material, damage, speed);
+                case "shovel"  -> props.shovel(material, damage, speed);
+                case "hoe"     -> props.hoe(material, damage, speed);
+                case "sword"   -> props.sword(material, damage, speed);
+                default -> Pandorical.LOGGER.warn("Unknown tool kind '{}' — leaving the item plain", p[0]);
+            }
+        } catch (RuntimeException e) {
+            Pandorical.LOGGER.warn("Could not rebuild tool from '{}': {}", spec, e.toString());
+        }
+    }
+
     private static void registerItem(SyncContentS2C.ItemEntry entry) {
         try {
             Identifier id = Identifier.tryParse(entry.id());
@@ -1030,6 +1075,8 @@ public class ContentManager {
                 var slot = net.minecraft.world.entity.EquipmentSlot.byName(entry.equipSlot());
                 props.equippable(slot);
             }
+
+            applyTool(props, entry.toolType());
 
             Item item;
             Block block = registeredBlocks.get(id);
