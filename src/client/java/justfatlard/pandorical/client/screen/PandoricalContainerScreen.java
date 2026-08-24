@@ -13,7 +13,12 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 
+import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.inventory.Slot;
+
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +35,14 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     // Captured per frame for the component pass inside extractSlots, whose
     // vanilla signature carries no partial tick
     private float frameDelta;
+
+    /**
+     * Slots this drag has already emptied, so one sweep moves each stack once.
+     *
+     * <p>A drag fires every frame the mouse moves, and a slot the pointer lingers on would
+     * otherwise be sent across, refilled by the shuffle behind it, and sent across again.
+     */
+    private final Set<Integer> swept = new HashSet<>();
 
     public PandoricalContainerScreen(PandoricalMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title,
@@ -135,7 +148,56 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
         if (ScreenHelper.dispatchMouseScrolled(components, mouseX, mouseY, verticalAmount)) {
             return true;
         }
+        // A component that wanted the scroll has had it; what is left is the slot underneath.
+        if (transferHovered(false)) return true;
+
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
+    }
+
+    /**
+     * Drag across slots to send them across, the way scroll sends one.
+     *
+     * <p>Only with an empty hand. A drag while carrying something is vanilla's own gesture for
+     * dealing a stack out over several slots, and taking it here would break the more useful of
+     * the two.
+     */
+    @Override
+    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+        if (!this.isQuickCrafting && this.menu.getCarried().isEmpty() && transferHovered(true)) {
+            return true;
+        }
+        return super.mouseDragged(event, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(MouseButtonEvent event) {
+        swept.clear();
+        return super.mouseReleased(event);
+    }
+
+    /**
+     * Send whatever is under the pointer to the other half of the screen.
+     *
+     * <p>Vanilla's own quick-move, which is what shift-click already does: the menu decides where
+     * a stack belongs and the move travels by the same packet a shift-click would. Nothing new
+     * crosses the wire, and a server that has never heard of this behaves as if the player were
+     * unusually quick with the shift key.
+     *
+     * <p>Direction is deliberately ignored. Quick-move already knows which way a stack goes -
+     * out of the container or into it - so asking the wheel to say the same thing again only
+     * makes half the gesture do nothing.
+     */
+    private boolean transferHovered(boolean sweeping) {
+        Slot slot = this.hoveredSlot;
+        if (slot == null || !slot.hasItem()) return false;
+        if (this.minecraft == null || this.minecraft.player == null) return false;
+        if (!slot.mayPickup(this.minecraft.player)) return false;
+        // Only a drag remembers where it has been. A wheel click is its own event, and a
+        // second turn on the same slot means the player wants the next stack too.
+        if (sweeping && !swept.add(slot.index)) return true;
+
+        this.slotClicked(slot, slot.index, 0, ContainerInput.QUICK_MOVE);
+        return true;
     }
 
     public void applyUpdates(List<ComponentUpdate> updates) {

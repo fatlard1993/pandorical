@@ -68,9 +68,17 @@ public interface PlayerInventoryApi {
     ItemStack getSlot(ServerPlayer player, Identifier namespace, int slotIndex);
 
     /**
-     * Replace the item in a player's extra slot. Does not trigger {@link #onSlotChange}
-     * listeners: use this for programmatic writes (initialisation, reward logic) where
-     * re-triggering your own listener is unwanted.
+     * Replace the item in a player's extra slot, and tell {@link #onSlotChange} listeners.
+     *
+     * <p>It used to stay quiet, on the grounds that a programmatic write should not re-trigger
+     * its own listener. What that actually bought was a slot with two readers and only one of
+     * them told: a mod writing here updated what the inventory screen showed and not the mirror
+     * another mod was reading, so a death compass placed in map-plus-plus's slot left its needle
+     * pointing at spawn. A store that informs half its readers is worse than one that informs
+     * none, because the disagreement is invisible.
+     *
+     * <p>Re-entrancy is handled where it belongs: a listener writing back into the slot it was
+     * just told about is ignored rather than looped.
      */
     void setSlot(ServerPlayer player, Identifier namespace, int slotIndex, ItemStack stack);
 

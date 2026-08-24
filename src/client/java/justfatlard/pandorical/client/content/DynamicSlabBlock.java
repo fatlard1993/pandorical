@@ -27,7 +27,11 @@ public class DynamicSlabBlock extends SlabBlock {
     private DynamicSlabBlock(Properties props, List<Property<?>> extraProperties) {
         super(props);
         this.extraProperties = extraProperties;
-        this.registerDefaultState(this.stateDefinition.any());
+        // No registerDefaultState here. SlabBlock's constructor has already pinned type=bottom
+        // and waterlogged=false; stateDefinition.any() would replace that with the first state
+        // in property order, and SlabType is declared TOP, BOTTOM, DOUBLE while a boolean
+        // property yields true first — so the default became a waterlogged top slab, which is
+        // the state client-side placement prediction reaches for.
     }
 
     public void setShapes(Map<BlockState, VoxelShape> outline, Map<BlockState, VoxelShape> collision) {

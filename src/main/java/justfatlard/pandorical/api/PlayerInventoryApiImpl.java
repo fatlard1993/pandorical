@@ -89,6 +89,8 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
 
         // Sync via vanilla container mechanism
         player.inventoryMenu.broadcastChanges();
+    
+        notifyListeners(player, namespace, slotIndex, stack);
     }
 
     @Override
@@ -102,6 +104,40 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
     public List<SlotRegistration> getRegistrations() {
         return Collections.unmodifiableList(registrations);
     }
+
+    /**
+     * Tell this namespace's listeners what a slot now holds.
+     *
+     * <p>Guarded against a listener that writes back into the slot it was told about: without
+     * that, a mirror kept in step by one of these would answer its own notification for ever.
+     */
+    private void notifyListeners(ServerPlayer player, Identifier namespace, int slotIndex,
+            ItemStack newStack) {
+        String key = namespace.toString();
+        String guard = player.getUUID() + "/" + key + "/" + slotIndex;
+        if (!notifying.add(guard)) return;
+
+        try {
+            List<BiConsumer<ServerPlayer, SlotChangeEvent>> handlers = listeners.get(key);
+            if (handlers == null) return;
+
+            SlotChangeEvent event = new SlotChangeEvent(slotIndex, newStack.copy());
+            for (BiConsumer<ServerPlayer, SlotChangeEvent> h : handlers) {
+                try {
+                    h.accept(player, event);
+                } catch (Exception e) {
+                    Pandorical.LOGGER.error("[pandorical] Exception in slot-change listener for namespace '{}': {}",
+                        key, e.getMessage(), e);
+                }
+            }
+        } finally {
+            notifying.remove(guard);
+        }
+    }
+
+    /** Slots a notification is already in flight for. See {@link #notifyListeners}. */
+    private final java.util.Set<String> notifying =
+        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
 
     /**
      * Called by the server-side mixin after a slot click has been processed.

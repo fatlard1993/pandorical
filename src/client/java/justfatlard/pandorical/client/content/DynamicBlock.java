@@ -116,7 +116,23 @@ public class DynamicBlock extends Block {
             db.setShapes(outlineMap, collisionMap);
         } else if (block instanceof DynamicSlabBlock dsb) {
             dsb.setShapes(outlineMap, collisionMap);
+        } else {
+            // Say so rather than drop them. A stand-in built as a stock Block or SlabBlock has
+            // nowhere to put these, and the block then wears vanilla geometry for the rest of
+            // the session while the server believes it sent the real thing.
+            justfatlard.pandorical.Pandorical.LOGGER.warn(
+                "Block {} is a {} and cannot hold server shapes — it keeps stand-in geometry",
+                block, block.getClass().getSimpleName());
+            return;
         }
+
+        // BlockStateBase caches everything it derives from a block's shape — collision-full-block,
+        // occlusion, sturdy faces, light — when the state is built, which is before these shapes
+        // arrive. The cached guess then outranks the real shape forever: a sliced-top slab whose
+        // double state was guessed as a full cube reads as collision-full to the renderer, which
+        // moves the top face's light and ambient occlusion samples to the block above it and
+        // renders it flat and full-bright, unlike the vanilla block it stands in for.
+        for (BlockState state : states) state.initCache();
     }
 
     /**

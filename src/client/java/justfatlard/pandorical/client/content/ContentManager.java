@@ -1126,17 +1126,14 @@ public class ContentManager {
                 }
             }
 
-            if (extraProps.isEmpty()) {
-                return new net.minecraft.world.level.block.SlabBlock(props);
-            } else {
-                // Slab with extra properties (snowy, moisture, etc.)
-                return DynamicSlabBlock.create(props, extraProps);
-            }
+            // A DynamicSlabBlock even with no extra properties. DynamicBlock#applyShapeData
+            // recognises the blocks that can take the server's shapes by type, so a stock
+            // SlabBlock here drops them without a word and keeps vanilla slab geometry.
+            return DynamicSlabBlock.create(props, extraProps);
         }
 
-        if (stateProps.isEmpty()) {
-            return new Block(props);
-        }
+        // Same reason a propertyless block is still a DynamicBlock: it is the type that can
+        // hold the shapes the server is about to send.
         return DynamicBlock.create(props, stateProps);
     }
 
