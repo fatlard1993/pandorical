@@ -58,6 +58,10 @@ public class MapComponent extends AbstractComponent {
     private byte compassDecY = 0;
     // Mob Sight enchantment: serialized mob dot list from server
     private String mobsData = "";
+    /** A heading arrow to lay in the corner, when the server supplies one. */
+    private Identifier needleTexture = null;
+    /** Whether the compass is pointing past the edge of this map. */
+    private boolean compassOffMap = false;
 
     @Override
     public void init(ComponentDef def, ComponentContext context) {
@@ -81,6 +85,8 @@ public class MapComponent extends AbstractComponent {
         compassDecX = parseByte("compass_dec_x");
         compassDecY = parseByte("compass_dec_y");
         mobsData = props.getOrDefault("mobs", "");
+        needleTexture = Identifier.tryParse(props.getOrDefault("needle", ""));
+        compassOffMap = parseBool("compass_off_map", false);
     }
 
     /**
@@ -153,6 +159,18 @@ public class MapComponent extends AbstractComponent {
             originY = mapY;
         }
 
+        // Drawn by vanilla rather than by us. It is the same sprite either way, but the
+        // transform, the scale and the way the quad is sampled then come from the map renderer
+        // instead of from a copy of it down here - so the marker on the minimap is the marker on
+        // the map in your hand, and stays that way when Mojang next changes it.
+        MapRenderState.MapDecorationRenderState self = new MapRenderState.MapDecorationRenderState();
+        self.atlasSprite = mapSprite(mc, "player");
+        self.x = (byte) clampedSelfDecX;
+        self.y = (byte) clampedSelfDecY;
+        self.rot = (byte) Math.round(mc.player.getYRot() * 16.0F / 360.0F);
+        self.renderOnFrame = true;
+        renderState.decorations.add(self);
+
         // Map always north-up
         Matrix3x2fStack pose = graphics.pose();
         pose.pushMatrix();
@@ -160,18 +178,6 @@ public class MapComponent extends AbstractComponent {
         pose.scale(zoomScale, zoomScale);
         graphics.map(renderState);
         pose.popMatrix();
-
-        // --- Self marker: positioned from server-sent selfDecX/Y ---
-        // The client-side mapData decoration bytes are stale (addClientSideDecorations doesn't
-        // update reliably for our custom slot), so server-authoritative position props win.
-        float selfSx, selfSy;
-        if (zoomLevel > 1.0f) {
-            selfSx = mapX + mapSize / 2.0f;
-            selfSy = mapY + mapSize / 2.0f;
-        } else {
-            selfSx = mapX + (clampedSelfDecX / 2.0f + 64f) * scale;
-            selfSy = mapY + (clampedSelfDecY / 2.0f + 64f) * scale;
-        }
 
         // --- Mob Sight: mob dots render first so the player marker lands on top ---
         if (!mobsData.isEmpty()) {
@@ -229,12 +235,36 @@ public class MapComponent extends AbstractComponent {
             float cpx = originX + (compassDecX / 2.0f + 64f) * zoomScale;
             float cpy = originY + (compassDecY / 2.0f + 64f) * zoomScale;
             if (cpx >= mapX && cpx < mapX + mapSize && cpy >= mapY && cpy < mapY + mapSize) {
-                drawMarker(graphics, mapSprite(mc, "target_point"), cpx, cpy, 0f);
+                // Past the edge the server has already walked the point back along its own
+                // bearing to the border, so the marker sits where the thing actually lies rather
+                // than in whichever corner two independent clamps happened to meet. Turned to
+                // face outward there, which is the only way a marker on a border says "further".
+                float turn = compassOffMap ? (float) Math.toDegrees(Math.atan2(
+                    compassDecX - clampedSelfDecX, -(compassDecY - clampedSelfDecY))) : 0f;
+                drawMarker(graphics, mapSprite(mc, compassOffMap ? "target_x" : "target_point"),
+                    cpx, cpy, turn);
             }
         }
 
-        // The player marker last, so it is never hidden under a landmark it is standing on.
-        drawMarker(graphics, mapSprite(mc, "player"), selfSx, selfSy, mc.player.getYRot());
+        // The heading arrow, small, in the corner the map has least to say in. Only with a
+        // compass: without one there is no heading to point along and an arrow would be a
+        // decoration pretending to be information.
+        if (compass && needleTexture != null) {
+            int size = Math.max(8, mapSize / 5);
+            int nx = mapX + 2;
+            int ny = mapY + mapSize - size - 2;
+            float bearing = (float) Math.toDegrees(Math.atan2(
+                compassDecX - clampedSelfDecX, -(compassDecY - clampedSelfDecY)));
+
+            Matrix3x2fStack npose = graphics.pose();
+            npose.pushMatrix();
+            npose.translate(nx + size / 2.0f, ny + size / 2.0f);
+            npose.rotate((float) Math.toRadians(bearing));
+            npose.translate(-size / 2.0f, -size / 2.0f);
+            graphics.blit(RenderPipelines.GUI_TEXTURED, needleTexture, 0, 0, 0.0F, 0.0F,
+                size, size, size, size);
+            npose.popMatrix();
+        }
 
         graphics.disableScissor();
 
