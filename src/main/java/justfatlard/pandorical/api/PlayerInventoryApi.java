@@ -62,6 +62,14 @@ public interface PlayerInventoryApi {
     void registerSlots(Identifier namespace, List<SlotEntry> slots);
 
     /**
+     * Every slot group registered, in registration order.
+     *
+     * <p>For the mods that have to walk the whole extra inventory rather than one slot they
+     * already know the name of - taking everything out of it on death, say.
+     */
+    List<SlotRegistration> registeredSlots();
+
+    /**
      * Return the item currently in a player's extra slot,
      * or {@link ItemStack#EMPTY}.
      */

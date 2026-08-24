@@ -41,11 +41,24 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
             ItemStack.OPTIONAL_CODEC.listOf()
         );
 
+    /**
+     * Carried across a death, which the default for a persistent attachment is not.
+     *
+     * <p>A respawn builds a new player rather than loading the old one, so without this the
+     * extra slots were simply gone - and gone silently, because a mod keeping its own mirror of
+     * a slot (map-plus-plus does) copies the mirror across and then disagrees with the empty
+     * store behind it. An equipped map went on driving the minimap while the slot that held it
+     * read empty.
+     *
+     * <p>Emptying these on death, where that is what should happen, is the business of whatever
+     * takes the items: dead-heads clears them into the head it leaves behind, and what is copied
+     * across is then correctly nothing.
+     */
     public static final AttachmentType<Map<String, List<ItemStack>>> EXTRA_SLOTS =
-        AttachmentRegistry.createPersistent(
-            Identifier.fromNamespaceAndPath(Pandorical.MOD_ID, "extra_slots"),
-            SLOTS_CODEC
-        );
+        AttachmentRegistry.<Map<String, List<ItemStack>>>builder()
+            .persistent(SLOTS_CODEC)
+            .copyOnDeath()
+            .buildAndRegister(Identifier.fromNamespaceAndPath(Pandorical.MOD_ID, "extra_slots"));
 
     // --- PlayerInventoryApi implementation ---
 
@@ -175,6 +188,11 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
     }
 
     // --- Package-private helpers used by the InventoryMenuMixin ---
+
+    @Override
+    public List<SlotRegistration> registeredSlots() {
+        return getRegistrations();
+    }
 
     /** All registrations, in order. Called by the server-side mixin. */
     public List<SlotRegistration> getRegistrations() {
