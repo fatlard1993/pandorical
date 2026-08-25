@@ -5,6 +5,7 @@ import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.MenuType;
@@ -84,6 +85,9 @@ public class PandoricalMenu extends AbstractContainerMenu {
     /**
      * Server constructor, called by Pandorical.createMenu().
      */
+    /** Whether this menu told its container it was opened, so it knows to say when it closes. */
+    private boolean ranContainerLifecycle = false;
+
     public PandoricalMenu(MenuType<?> menuType, int syncId, Inventory playerInventory,
                           Container serverContainer, Set<Integer> readOnlySlots, OpenScreenS2C screenDef) {
         super(menuType, syncId);
@@ -91,15 +95,22 @@ public class PandoricalMenu extends AbstractContainerMenu {
         this.modContainer = serverContainer;
         this.readOnlySlots = readOnlySlots != null ? readOnlySlots : Set.of();
 
-        // A container is entitled to know it has been opened.
+        // A container a mod built is entitled to know it has been opened.
         //
-        // Vanilla's own menus call this, and containers rely on it: a chest counts its openers
-        // here to move its lid, a hopper to lock itself, and loot-ender to notice that a copy
-        // came back empty. Wrapping somebody's Container without running its lifecycle meant
-        // every one of those was skipped - a loot chest emptied through one of these screens was
-        // never marked spent, so its clasp stayed bright and block-tip went on offering it.
-        if (playerInventory.player instanceof ServerPlayer opener && serverContainer != null) {
+        // Containers rely on this: loot-ender notices a copy came back empty here, and it is
+        // where a mod gets to draw a conclusion about what is left. Wrapping somebody's
+        // Container without running its lifecycle skipped all of it, so a loot chest emptied
+        // through one of these screens was never marked spent and its clasp stayed bright.
+        //
+        // Never for a block entity, though. A chest's opener count is vanilla's, and vanilla
+        // keeps it honest by periodically recounting the players it can see holding that
+        // container open - through menus it recognises, which this is not. Telling it we opened
+        // a chest it then cannot find an opener for leaves the count fighting itself, and the
+        // lid ends up showing the opposite of the truth. Whatever owns the block owns its lid.
+        if (playerInventory.player instanceof ServerPlayer opener
+                && serverContainer != null && !(serverContainer instanceof BlockEntity)) {
             serverContainer.startOpen(opener);
+            this.ranContainerLifecycle = true;
         }
 
         int slotCount = screenDef.container().map(c -> c.slotCount()).orElse(0);
@@ -196,9 +207,8 @@ public class PandoricalMenu extends AbstractContainerMenu {
     public void removed(Player player) {
         super.removed(player);
 
-        // The other half of the contract. Closed is where a container gets to draw a conclusion
-        // about what it has left, and it only gets told if somebody tells it.
-        if (player instanceof ServerPlayer closer && modContainer != null) {
+        // The other half, and only where we ran the first half.
+        if (this.ranContainerLifecycle && player instanceof ServerPlayer closer) {
             modContainer.stopOpen(closer);
         }
 
