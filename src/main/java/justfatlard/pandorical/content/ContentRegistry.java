@@ -23,6 +23,9 @@ public class ContentRegistry implements ContentApi {
     private final Map<String, RegisteredBlock> blocks = new LinkedHashMap<>();
     private final Map<String, RegisteredItem> items = new LinkedHashMap<>();
     private final Map<String, byte[]> assets = new ConcurrentHashMap<>();
+
+    /** Who claimed each vanilla-namespace path, so a genuine clash between two mods is audible. */
+    private final Map<String, String> vanillaAssetOwners = new ConcurrentHashMap<>();
     private volatile List<SyncAssetsS2C> cachedAssetChunks = null;
 
     /** Vanilla item overrides: keyed by full item ID, e.g. "minecraft:rabbit_hide" */
@@ -142,11 +145,16 @@ public class ContentRegistry implements ContentApi {
 
                                 // Two mods writing one vanilla path is a real possibility now
                                 // that this namespace is in scope, and the loser would fail
-                                // invisibly. Say so rather than let the last one silently win.
-                                if (namespace.equals("minecraft") && assets.containsKey(relativePath)) {
-                                    Pandorical.LOGGER.warn(
-                                        "[pandorical] '{}' overwrites a vanilla asset another mod"
-                                        + " already registered: {}", modId, relativePath);
+                                // invisibly. Only worth saying when the other one is somebody
+                                // else: this runs again every time a mod registers a block or an
+                                // item, so a mod meets its own files constantly.
+                                if (namespace.equals("minecraft")) {
+                                    String previous = vanillaAssetOwners.put(relativePath, modId);
+                                    if (previous != null && !previous.equals(modId)) {
+                                        Pandorical.LOGGER.warn(
+                                            "[pandorical] '{}' overwrites a vanilla asset '{}'"
+                                            + " already registered: {}", modId, previous, relativePath);
+                                    }
                                 }
                                 registerAsset(relativePath, data);
                             } catch (IOException e) {
