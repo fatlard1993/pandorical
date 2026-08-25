@@ -1,10 +1,11 @@
 package justfatlard.pandorical.client.mixin;
 
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.AbstractRecipeBookScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.world.inventory.RecipeBookMenu;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -23,12 +24,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  *
  * <p>{@code require = 1} deliberately overrides the package default. A button nobody can press is
  * not worth failing quietly over twice.
+ *
+ * <p>Extends the container screen for the same reason its neighbour does: purely to reach the
+ * protected {@code leftPos}/{@code topPos} the buttons are anchored to.
  */
 @Mixin(AbstractRecipeBookScreen.class)
-public abstract class InventoryButtonClickMixin {
+public abstract class InventoryButtonClickMixin extends AbstractContainerScreen<RecipeBookMenu> {
 
-	@Shadow protected int leftPos;
-	@Shadow protected int topPos;
+	private InventoryButtonClickMixin() {
+		super(null, null, null);
+	}
 
 	@Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true, require = 1)
 	private void pandorical$clickInventoryButton(MouseButtonEvent click, boolean handled,
