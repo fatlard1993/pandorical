@@ -4,6 +4,7 @@ import justfatlard.pandorical.protocol.OpenScreenS2C;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.MenuType;
@@ -89,6 +90,17 @@ public class PandoricalMenu extends AbstractContainerMenu {
         this.screenDef = screenDef;
         this.modContainer = serverContainer;
         this.readOnlySlots = readOnlySlots != null ? readOnlySlots : Set.of();
+
+        // A container is entitled to know it has been opened.
+        //
+        // Vanilla's own menus call this, and containers rely on it: a chest counts its openers
+        // here to move its lid, a hopper to lock itself, and loot-ender to notice that a copy
+        // came back empty. Wrapping somebody's Container without running its lifecycle meant
+        // every one of those was skipped - a loot chest emptied through one of these screens was
+        // never marked spent, so its clasp stayed bright and block-tip went on offering it.
+        if (playerInventory.player instanceof ServerPlayer opener && serverContainer != null) {
+            serverContainer.startOpen(opener);
+        }
 
         int slotCount = screenDef.container().map(c -> c.slotCount()).orElse(0);
         boolean includePlayerInv = screenDef.container().map(c -> c.includePlayerInventory()).orElse(false);
@@ -183,6 +195,13 @@ public class PandoricalMenu extends AbstractContainerMenu {
     @Override
     public void removed(Player player) {
         super.removed(player);
+
+        // The other half of the contract. Closed is where a container gets to draw a conclusion
+        // about what it has left, and it only gets told if somebody tells it.
+        if (player instanceof ServerPlayer closer && modContainer != null) {
+            modContainer.stopOpen(closer);
+        }
+
         if (removedCallback != null) removedCallback.run();
     }
 
