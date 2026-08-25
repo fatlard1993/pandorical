@@ -119,19 +119,41 @@ public class ContentRegistry implements ContentApi {
 
             var rootPaths = modContainer.get().getRootPaths();
             for (var root : rootPaths) {
-                var assetsDir = root.resolve("assets").resolve(modId);
-                if (!java.nio.file.Files.exists(assetsDir)) continue;
+                // The mod's own namespace, and the vanilla one it may have had to borrow.
+                //
+                // Some assets are not free to live under a mod's name. An armour layer is looked
+                // up from the equipment asset the material names, and a villager profession's
+                // skin from a path the game builds itself - both land under assets/minecraft/,
+                // and scanning only assets/<modId>/ left them on the server. The item icon
+                // arrived and the thing worn on the body did not: a quartz helmet you could hold
+                // and could not see, in three mods at once.
+                for (String namespace : new String[] {modId, "minecraft"}) {
+                    if (namespace.equals("minecraft") && modId.equals("minecraft")) continue;
 
-                try (var walk = java.nio.file.Files.walk(assetsDir)) {
-                    walk.filter(java.nio.file.Files::isRegularFile).forEach(file -> {
-                        try {
-                            String relativePath = "assets/" + modId + "/" + assetsDir.relativize(file).toString();
-                            byte[] data = java.nio.file.Files.readAllBytes(file);
-                            registerAsset(relativePath, data);
-                        } catch (IOException e) {
-                            Pandorical.LOGGER.warn("Failed to read asset file {}: {}", file, e.getMessage());
-                        }
-                    });
+                    var assetsDir = root.resolve("assets").resolve(namespace);
+                    if (!java.nio.file.Files.exists(assetsDir)) continue;
+
+                    try (var walk = java.nio.file.Files.walk(assetsDir)) {
+                        walk.filter(java.nio.file.Files::isRegularFile).forEach(file -> {
+                            try {
+                                String relativePath = "assets/" + namespace + "/"
+                                    + assetsDir.relativize(file).toString();
+                                byte[] data = java.nio.file.Files.readAllBytes(file);
+
+                                // Two mods writing one vanilla path is a real possibility now
+                                // that this namespace is in scope, and the loser would fail
+                                // invisibly. Say so rather than let the last one silently win.
+                                if (namespace.equals("minecraft") && assets.containsKey(relativePath)) {
+                                    Pandorical.LOGGER.warn(
+                                        "[pandorical] '{}' overwrites a vanilla asset another mod"
+                                        + " already registered: {}", modId, relativePath);
+                                }
+                                registerAsset(relativePath, data);
+                            } catch (IOException e) {
+                                Pandorical.LOGGER.warn("Failed to read asset file {}: {}", file, e.getMessage());
+                            }
+                        });
+                    }
                 }
             }
 

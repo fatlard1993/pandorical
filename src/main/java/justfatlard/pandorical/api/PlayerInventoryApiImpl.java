@@ -82,6 +82,24 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
         buttonHandlers.put(namespace + "/" + id, handler);
     }
 
+    /**
+     * Where this namespace's slot sits in the inventory menu, or -1 if it is not registered.
+     *
+     * <p>The inverse of the walk {@link #fireSlotChangeListeners} does: extras follow vanilla's
+     * own 46, in registration order, each group as long as it declared itself.
+     */
+    private int menuSlotOf(Identifier namespace, int slotIndex) {
+        int offset = 0;
+        for (SlotRegistration reg : registrations) {
+            if (reg.namespace().equals(namespace)) {
+                if (slotIndex < 0 || slotIndex >= reg.slots().size()) return -1;
+                return VANILLA_INVENTORY_MENU_SLOT_COUNT + offset + slotIndex;
+            }
+            offset += reg.slots().size();
+        }
+        return -1;
+    }
+
     /** Faces a player has been shown instead of the registered one, keyed namespace/id. */
     private final Map<java.util.UUID, Map<String, String>> glyphs =
         new java.util.concurrent.ConcurrentHashMap<>();
@@ -158,6 +176,22 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
 
     @Override
     public void setSlot(ServerPlayer player, Identifier namespace, int slotIndex, ItemStack stack) {
+        // Through the open menu where there is one, because the menu does not read this store -
+        // it copies out of it when it is built and its slots answer from that copy ever after.
+        // Writing the store alone left the two disagreeing: broadcastChanges asks each slot
+        // whether it has changed, the slot answered from the stale copy and said no, and nothing
+        // was sent. A death compass handed to the compass slot drove the minimap from a square
+        // the player could see was empty, until a relog rebuilt the menu and it appeared.
+        //
+        // The menu's own container writes back here and fires the listeners on the way, so this
+        // is the same path a player dragging an item into the slot takes.
+        int menuSlot = menuSlotOf(namespace, slotIndex);
+        if (menuSlot >= 0 && player.inventoryMenu != null && menuSlot < player.inventoryMenu.slots.size()) {
+            player.inventoryMenu.getSlot(menuSlot).set(stack == null ? ItemStack.EMPTY : stack);
+            player.inventoryMenu.broadcastChanges();
+            return;
+        }
+
         Map<String, List<ItemStack>> map = getMutableSlots(player);
         String key = namespace.toString();
         List<ItemStack> list = map.computeIfAbsent(key, k -> {
