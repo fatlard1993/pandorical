@@ -204,6 +204,17 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
         ScreenHelper.applyUpdates(updates, componentIndex);
     }
 
+    /**
+     * The recipe book category this screen crafts from, or empty if it is not a station.
+     *
+     * <p>Public so a recipe-book mod can ask. Pandorical draws nothing for this itself: it has no
+     * book of its own and no opinion about whose should appear, only the answer to "what is this
+     * screen for" that a book needs before it can offer anything.
+     */
+    public java.util.Optional<String> getRecipeStation() {
+        return screenDef == null ? java.util.Optional.empty() : screenDef.recipeStation();
+    }
+
     public String getScreenId() {
         return screenDef != null ? screenDef.screenId() : null;
     }

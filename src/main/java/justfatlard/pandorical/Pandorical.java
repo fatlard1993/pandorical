@@ -32,7 +32,34 @@ import java.util.Set;
 public class Pandorical implements ModInitializer {
     public static final String MOD_ID = "pandorical";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-    public static final int PROTOCOL_VERSION = 3;
+    /**
+     * The wire format, bumped whenever what goes over it changes shape.
+     *
+     * <p>v4 because v3 covered two incompatible content formats: an equippable item's slot gained
+     * the id of its armour asset partway through and this number did not move, so a server and a
+     * client could agree they were both speaking v3 and disagree about every piece of armour. The
+     * number is only worth having if it is bumped, and the check below is only worth having if
+     * the number is honest.
+     */
+    public static final int PROTOCOL_VERSION = 4;
+
+    /**
+     * The oldest client this server can still be understood by.
+     *
+     * <p>Equal to the current version, because the format that changed - equippable slots - is
+     * one every armour item in the sync goes through, and a client that cannot read it does not
+     * get a degraded experience, it gets a failed join. When a future change is additive this can
+     * lag behind {@link #PROTOCOL_VERSION} and old clients can keep connecting.
+     */
+    public static final int MINIMUM_PROTOCOL = 4;
+
+    /** What the jar calls itself, so a refusal can name the version to go and install. */
+    public static String modVersion() {
+        return net.fabricmc.loader.api.FabricLoader.getInstance()
+            .getModContainer(MOD_ID)
+            .map(container -> container.getMetadata().getVersion().getFriendlyString())
+            .orElse("unknown");
+    }
 
     public static final List<String> SERVER_CAPABILITIES = List.of("screens", "content", "camera", "hud", "structures", "entity_overlays", "chest_overlays", "keybinds", "hud_elements");
 
@@ -124,6 +151,9 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundConfiguration().register(SyncAssetsConfigS2C.TYPE, SyncAssetsConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(PlayerInventoryRegistrationsS2C.TYPE, PlayerInventoryRegistrationsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(
+            justfatlard.pandorical.protocol.RequirementS2C.TYPE,
+            justfatlard.pandorical.protocol.RequirementS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundConfiguration().register(
             justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE,
             justfatlard.pandorical.protocol.InventoryButtonsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(BlockTintsConfigS2C.TYPE, BlockTintsConfigS2C.STREAM_CODEC);
@@ -207,6 +237,8 @@ public class Pandorical implements ModInitializer {
 
         // Server: add our sync task BEFORE Fabric's registry sync
         ServerConfigurationConnectionEvents.BEFORE_CONFIGURE.register((handler, server) -> {
+            if (!agreeOnVersion(handler)) return;
+
             if (ServerConfigurationNetworking.canSend(handler, SyncContentConfigS2C.TYPE)) {
                 // Send inventory slot registrations during config phase so the client
                 // has them BEFORE InventoryMenu is constructed on play-phase entry.
@@ -353,6 +385,53 @@ public class Pandorical implements ModInitializer {
      * constructs {@code InventoryMenu} on play-phase entry, avoiding the
      * {@code IndexOutOfBoundsException} caused by mismatched slot counts.
      */
+    /**
+     * Settle whether this client can be talked to before anything is said to it.
+     *
+     * <p>Three kinds of client arrive here. A vanilla one cannot receive the content sync at all,
+     * has never been sent any, and is let through untouched - that is the whole promise of this
+     * mod and nothing here may break it. A current one is told what this server speaks and
+     * carries on. Between them is the one this exists for: Pandorical installed, old enough that
+     * the content about to be sent will throw on the way in.
+     *
+     * <p>That one is told, in the disconnect box, which version it has and which to install.
+     * Before this it read the content, threw inside its own config phase and closed the
+     * connection with no reason given, which looks from the outside like the server rejecting
+     * you over whichever mod happened to be first in the list.
+     *
+     * @return false if the client was turned away and nothing more should be sent to it
+     */
+    private static boolean agreeOnVersion(
+            net.minecraft.server.network.ServerConfigurationPacketListenerImpl handler) {
+        // No Pandorical at all: not our business, and never was.
+        if (!ServerConfigurationNetworking.canSend(handler, SyncContentConfigS2C.TYPE)) return true;
+
+        // No exemption for a content-free server any more. That carve-out was written when the
+        // only thing that had changed shape was the content sync; the screen payload has since
+        // grown a field of its own, so an old client would misread the first screen it was sent
+        // whether or not this server has any blocks to give it. Anything speaking this protocol
+        // at all has to be current.
+
+        if (ServerConfigurationNetworking.canSend(handler,
+                justfatlard.pandorical.protocol.RequirementS2C.TYPE)) {
+            ServerConfigurationNetworking.send(handler,
+                new justfatlard.pandorical.protocol.RequirementS2C(
+                    PROTOCOL_VERSION, MINIMUM_PROTOCOL, modVersion()));
+            return true;
+        }
+
+        // It cannot even be told what is wrong with it, which is itself the answer: this type has
+        // existed for as long as the current content format has.
+        String needed = modVersion();
+        LOGGER.warn("Refused a client running a Pandorical older than {}: it cannot read this"
+            + " server's content format", needed);
+        handler.disconnect(net.minecraft.network.chat.Component.literal(
+            "Your Pandorical is out of date.\n\n"
+            + "This server needs Pandorical " + needed + " or newer.\n"
+            + "Replace the pandorical jar in your mods folder and reconnect."));
+        return false;
+    }
+
     private static void sendConfigPhaseInventoryRegistrations(
             net.minecraft.server.network.ServerConfigurationPacketListenerImpl handler) {
         List<PlayerInventoryApi.SlotRegistration> regs = PandoricalApi.playerInventoryImpl().getRegistrations();

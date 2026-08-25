@@ -17,8 +17,28 @@ public record OpenScreenS2C(
     boolean pauseGame,
     String title,
     List<ComponentDef> components,
-    Optional<ContainerDef> container
+    Optional<ContainerDef> container,
+    Optional<String> recipeStation
 ) implements CustomPacketPayload {
+
+    /**
+     * A screen that is a crafting station, and the recipe book category it works from.
+     *
+     * <p>A Pandorical screen has no vanilla recipe book and cannot have one: the book is bolted
+     * to {@code RecipeBookMenu}, and this is not one. So a station says what it is and leaves the
+     * showing to whoever is listening - the client's own book, or a mod that replaces it. Without
+     * this a fletching table could only ever browse its recipes by growing a browser of its own,
+     * which is how the last one ended up as a grid of two-letter buttons.
+     *
+     * <p>An id, not a category object: the client resolves it against its own registry, and a
+     * client that has never heard of the category simply shows nothing rather than failing.
+     */
+    public OpenScreenS2C(String screenId, String screenType, int width, int height,
+            boolean pauseGame, String title, List<ComponentDef> components,
+            Optional<ContainerDef> container) {
+        this(screenId, screenType, width, height, pauseGame, title, components, container,
+            Optional.empty());
+    }
     public static final Type<OpenScreenS2C> TYPE =
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "open_screen"));
 
@@ -49,6 +69,10 @@ public record OpenScreenS2C(
             Optional<ContainerDef> container = hasContainer
                 ? Optional.of(ContainerDef.STREAM_CODEC.decode(buf))
                 : Optional.empty();
+
+            Optional<String> recipeStation = ByteBufCodecs.BOOL.decode(buf)
+                ? Optional.of(ByteBufCodecs.STRING_UTF8.decode(buf))
+                : Optional.empty();
             return new OpenScreenS2C(screenId, screenType, width, height, pauseGame, title, components, container);
         }
 
@@ -66,6 +90,9 @@ public record OpenScreenS2C(
             }
             ByteBufCodecs.BOOL.encode(buf, payload.container().isPresent());
             payload.container().ifPresent(c -> ContainerDef.STREAM_CODEC.encode(buf, c));
+
+            ByteBufCodecs.BOOL.encode(buf, payload.recipeStation().isPresent());
+            payload.recipeStation().ifPresent(id -> ByteBufCodecs.STRING_UTF8.encode(buf, id));
         }
     };
 

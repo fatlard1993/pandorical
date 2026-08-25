@@ -390,6 +390,29 @@ and Pandorical components are all driven by one mechanism and none of them need 
 what is doing the navigating. Regions are computed per call rather than cached, because
 component geometry is mutable and interpolates for several ticks after a server update.
 
+## Crafting stations
+
+A screen that is a crafting bench can say so, and a recipe book will speak for it:
+
+```java
+new ScreenBuilder("my-mod:bench")
+    .container(10, true)
+    .recipeStation("my-mod:my_category")
+```
+
+The category is a registered `RecipeBookCategory` id. Your recipes must return a real
+`RecipeDisplay` from `Recipe#display()` and carry that category from `recipeBookCategory()` -
+without a display the client cannot see the recipe at all, and without the category a workbench's
+book will offer it and then fail to craft it.
+
+Pandorical draws nothing for this. It has no book of its own and no opinion about whose should
+appear; it only answers "what is this screen for", through
+`PandoricalContainerScreen#getRecipeStation()`, which is what a book needs before it can offer
+anything. smart-recipe-book puts a button on any screen that declares one.
+
+Browsing only. Filling a grid goes through `ServerboundPlaceRecipePacket`, which the server
+answers for menus carrying a recipe book, and a Pandorical menu does not.
+
 ## Documented in the javadoc, not here
 
 `structures`, `playerInventory`, `blockTints`, and built-in entity renderers work the

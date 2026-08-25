@@ -24,6 +24,9 @@ public class ScreenBuilder {
     private final List<ComponentDef> components = new ArrayList<>();
     private ContainerDef containerDef = null;
 
+    /** Set when this screen is a crafting station; see {@link #recipeStation(String)}. */
+    private String recipeStation = null;
+
     public ScreenBuilder(String screenType) {
         this.screenType = screenType;
         this.screenId = UUID.randomUUID().toString();
@@ -56,6 +59,26 @@ public class ScreenBuilder {
      */
     public ScreenBuilder container(int slotCount, boolean includePlayerInventory) {
         this.containerDef = new ContainerDef(slotCount, includePlayerInventory);
+        return this;
+    }
+
+    /**
+     * Declare this screen a crafting station, so a recipe book can speak for it.
+     *
+     * <p>A Pandorical screen cannot carry the vanilla recipe book - that is bolted to
+     * {@code RecipeBookMenu} and this is not one - so instead it says which recipe book category
+     * it works from and leaves the showing to the client. A mod that replaces the book can put
+     * one on this screen; a client with nothing listening shows nothing and loses only the
+     * browsing.
+     *
+     * <p>Without this the only way to browse a custom station's recipes was to draw a browser
+     * into the screen by hand, which is how fletch-craft ended up with a grid of buttons labelled
+     * with the first two letters of each result.
+     *
+     * @param categoryId a registered {@code RecipeBookCategory} id, e.g. {@code fletch_craft:fletching}
+     */
+    public ScreenBuilder recipeStation(String categoryId) {
+        this.recipeStation = categoryId;
         return this;
     }
 
@@ -156,7 +179,8 @@ public class ScreenBuilder {
         return new OpenScreenS2C(
             screenId, screenType, width, height, pauseGame, title,
             List.copyOf(components),
-            Optional.ofNullable(containerDef)
+            Optional.ofNullable(containerDef),
+            Optional.ofNullable(recipeStation)
         );
     }
 }
