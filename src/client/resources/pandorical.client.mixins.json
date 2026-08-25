@@ -4,18 +4,19 @@
   "compatibilityLevel": "JAVA_25",
   "mixins": [],
   "client": [
-    "ItemCountRendererMixin",
     "CameraMixin",
-    "ClimbableSyncMixin",
-    "InteractiveSyncMixin",
-    "EntityRenderStateMixin",
-    "InventoryMenuClientMixin",
-    "InventoryScreenMixin",
-    "LivingEntityRendererMixin",
     "ChestRenderStateMixin",
     "ChestRendererMixin",
-    "MerchantStackSizeMixin",
-    "ContainerStackSizeMixin"
+    "ClimbableSyncMixin",
+    "ContainerStackSizeMixin",
+    "EntityRenderStateMixin",
+    "InteractiveSyncMixin",
+    "InventoryButtonClickMixin",
+    "InventoryMenuClientMixin",
+    "InventoryScreenMixin",
+    "ItemCountRendererMixin",
+    "LivingEntityRendererMixin",
+    "MerchantStackSizeMixin"
   ],
   "injectors": {
     "defaultRequire": 0
