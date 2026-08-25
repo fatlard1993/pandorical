@@ -94,7 +94,7 @@ public final class StructureRenderer {
         // already camera-relative incoming PoseStack).
         poseStack.pushPose();
         poseStack.translate(pose.x() - camPos.x, pose.y() - camPos.y, pose.z() - camPos.z);
-        poseStack.mulPose(Axis.YP.rotationDegrees(-pose.yaw()));
+        poseStack.rotateDegrees(Axis.YP, -pose.yaw());
 
         for (Map.Entry<StructureManager.RelPosKey, BlockState> entry : structure.blocks.entrySet()) {
             StructureManager.RelPosKey rel = entry.getKey();
