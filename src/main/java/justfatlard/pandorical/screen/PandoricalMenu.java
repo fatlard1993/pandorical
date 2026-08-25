@@ -271,8 +271,18 @@ public class PandoricalMenu extends AbstractContainerMenu {
             this.editable = editable;
         }
 
+        /**
+         * Read-only slots refuse everything; the rest ask the container.
+         *
+         * <p>Vanilla's own slot delegates to {@code canPlaceItem} and this one did not, so a mod
+         * handing over a Container had no way to refuse an item short of taking it back
+         * afterwards. Anything that wants to be picky - a builder's table that only accepts what
+         * the next build needs - can just say so now, the way it would to any other menu.
+         */
         @Override
-        public boolean mayPlace(ItemStack stack) { return editable; }
+        public boolean mayPlace(ItemStack stack) {
+            return editable && this.container.canPlaceItem(this.getContainerSlot(), stack);
+        }
 
         @Override
         public boolean mayPickup(Player player) { return editable; }
