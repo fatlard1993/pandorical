@@ -16,7 +16,8 @@
     "InventoryScreenMixin",
     "ItemCountRendererMixin",
     "LivingEntityRendererMixin",
-    "MerchantStackSizeMixin"
+    "MerchantStackSizeMixin",
+    "StackValidationMixin"
   ],
   "injectors": {
     "defaultRequire": 0
