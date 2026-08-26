@@ -168,6 +168,22 @@ public class PandoricalClient implements ClientModInitializer {
             justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE, (payload, context) ->
                 justfatlard.pandorical.client.inventory.ClientInventoryButtons.set(payload.buttons()));
 
+        // The server refuses any client it cannot send this to, on the grounds that a client
+        // too old to receive it is too old to read the content that follows. That test only
+        // measures anything if a receiver exists: Fabric advertises a channel to the server
+        // only when something is listening on it, so for as long as this was missing the check
+        // turned away every client, current ones included.
+        ClientConfigurationNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.RequirementS2C.TYPE, (payload, context) -> {
+                if (Pandorical.PROTOCOL_VERSION < payload.minimumProtocol()) {
+                    Pandorical.LOGGER.warn("Server needs Pandorical {} (protocol v{}); this client speaks v{}",
+                        payload.serverModVersion(), payload.minimumProtocol(), Pandorical.PROTOCOL_VERSION);
+                } else {
+                    Pandorical.LOGGER.debug("Server runs Pandorical {} — protocol v{}, minimum v{}",
+                        payload.serverModVersion(), payload.protocolVersion(), payload.minimumProtocol());
+                }
+            });
+
         ClientConfigurationNetworking.registerGlobalReceiver(BlockTintsConfigS2C.TYPE, (payload, context) -> {
             Pandorical.LOGGER.debug("Config phase: received {} block tint group(s)", payload.entries().size());
             payload.entries().forEach(PandoricalClient::applyBlockTints);
