@@ -76,6 +76,19 @@ public class ContentRegistry implements ContentApi {
      * Register an entire mod namespace as server-only for registry sync bypass.
      * Call this during onInitialize for mods that register custom content via Pandorical.
      */
+    private boolean solidRails;
+
+    @Override
+    public void solidRails() {
+        solidRails = true;
+        justfatlard.pandorical.rail.RailCollision.setSolid(true);
+        Pandorical.LOGGER.info("Rails are solid for players");
+    }
+
+    public boolean railsSolid() {
+        return solidRails;
+    }
+
     public void registerServerOnlyNamespace(String namespace) {
         if (!namespace.equals("minecraft")) {
             serverOnlyNamespaces.add(namespace);
@@ -311,7 +324,7 @@ public class ContentRegistry implements ContentApi {
 
         ServerPlayNetworking.send(player, new SyncContentS2C(blockEntries, itemEntries, assetChunkCount,
             buildEntityTypeEntries(), buildBlockEntityTypeEntries(), buildVillagerProfessionEntries(),
-            buildPoiTypeEntries(), buildMenuTypeEntries(), buildRecipeBookCategoryEntries()));
+            buildPoiTypeEntries(), buildMenuTypeEntries(), buildRecipeBookCategoryEntries(), solidRails));
 
         if (assetChunkCount > 0) {
             sendAssets(player);
@@ -421,6 +434,48 @@ public class ContentRegistry implements ContentApi {
     }
 
     /** Used by both play-phase and config-phase sync. */
+    /**
+     * One-time note of how much of the content packet the block table is using.
+     *
+     * <p>Block and item content goes out as a single custom payload, and a custom payload stops at
+     * a megabyte. Every state of every registered block puts an id in it, so the packet grows with
+     * the suite rather than with any one mod - and a mod registering a block with a large state
+     * space (a pair of materials in one block is ten thousand states on its own) spends a chunk of
+     * a budget nobody is watching.
+     *
+     * <p>Silence is the failure mode worth fearing here: over the limit the payload does not
+     * truncate, it fails to send, and every Pandorical feature goes missing at once with nothing to
+     * connect it back to the mod that tipped it over.
+     */
+    private static boolean loggedContentScale = false;
+
+    private static void logContentScale(List<SyncContentS2C.BlockEntry> entries) {
+        if (loggedContentScale) return;
+        loggedContentScale = true;
+
+        int states = 0;
+        int approximateBytes = 0;
+        SyncContentS2C.BlockEntry largest = null;
+
+        for (SyncContentS2C.BlockEntry entry : entries) {
+            states += entry.stateIds().size();
+            // A state id is a var-int into the global block state registry - three bytes once a
+            // suite this size is registered - and the rest is the id and the property spellings.
+            approximateBytes += entry.stateIds().size() * 3 + entry.id().length() + 64;
+            for (String property : entry.stateProperties()) approximateBytes += property.length();
+
+            if (largest == null || entry.stateIds().size() > largest.stateIds().size()) largest = entry;
+        }
+
+        Pandorical.LOGGER.info("Content sync: {} blocks, {} block states, ~{} KB of the 1024 KB packet{}",
+            entries.size(), states, approximateBytes / 1024,
+            largest == null ? "" : " (largest: " + largest.id() + " at " + largest.stateIds().size() + " states)");
+
+        if (approximateBytes > 700_000) {
+            Pandorical.LOGGER.warn("Content sync is nearing the payload limit; past it nothing syncs at all.");
+        }
+    }
+
     public List<SyncContentS2C.BlockEntry> buildBlockEntries() {
         List<SyncContentS2C.BlockEntry> blockEntries = new java.util.ArrayList<>();
         List<String> inferred = new java.util.ArrayList<>();
@@ -439,9 +494,15 @@ public class ContentRegistry implements ContentApi {
             List<Integer> stateIds = new java.util.ArrayList<>();
             List<String> stateProps = new java.util.ArrayList<>();
             for (var prop : block.getStateDefinition().getProperties()) {
-                String type = "i";
+                // Anything that is not a boolean or an integer range is described by its value
+                // names, not by a count. An EnumProperty is the usual case, but a mod can define a
+                // Property of its own whose values read as words - and sending "i:101" for one of
+                // those would hand the client a property numbered 0..100 with the names thrown
+                // away, which is exactly the shape the client's NamedIntegerProperty exists to be
+                // rebuilt into. The names are the only part the blockstate JSON can match on.
+                String type = "e";
                 if (prop instanceof net.minecraft.world.level.block.state.properties.BooleanProperty) type = "b";
-                else if (prop instanceof net.minecraft.world.level.block.state.properties.EnumProperty) type = "e";
+                else if (prop instanceof net.minecraft.world.level.block.state.properties.IntegerProperty) type = "i";
                 // For enums, send the value names so the client can create matching properties
                 if ("e".equals(type)) {
                     var names = new java.util.StringJoiner(",");
@@ -457,7 +518,8 @@ public class ContentRegistry implements ContentApi {
                         }
                     }
                     stateProps.add(prop.getName() + ":" + type + ":" + names.toString());
-                } else if (prop instanceof net.minecraft.world.level.block.state.properties.IntegerProperty intProp) {
+                } else if ("i".equals(type)
+                        && prop instanceof net.minecraft.world.level.block.state.properties.IntegerProperty intProp) {
                     // Send min:max, not just a count: flower_amount [1,4] as "flower_amount:i:4"
                     // would create [0,3] on the client and fail to decode the value 4.
                     int min = intProp.getPossibleValues().stream().mapToInt(Integer::intValue).min().getAsInt();
@@ -473,11 +535,15 @@ public class ContentRegistry implements ContentApi {
             String baseBlockId = "";
             String modelId = "";
             boolean interactive = false;
+            float destroyTime = justfatlard.pandorical.api.BlockRegistration.INHERIT;
+            int requiresCorrectTool = justfatlard.pandorical.api.BlockRegistration.INHERIT_FLAG;
             var registered = blocks.get(id);
             if (registered != null) {
                 baseBlockId = registered.registration().getBaseBlockId();
                 modelId = registered.registration().getModelId();
                 interactive = registered.registration().isInteractive();
+                destroyTime = registered.registration().getDestroyTime();
+                requiresCorrectTool = registered.registration().getRequiresCorrectTool();
             }
 
             // Auto-detected blocks (not registered via PandoricalApi) get an inferred base
@@ -492,13 +558,15 @@ public class ContentRegistry implements ContentApi {
             }
 
             byte[] shapeData = serializeBlockShapes(block);
+            byte[] lightData = serializeBlockLight(block);
 
             // Read off the block's own default state: climbability is a property of the block, and
             // no vanilla climbable varies it by state.
             boolean climbable = block.defaultBlockState().is(net.minecraft.tags.BlockTags.CLIMBABLE);
 
             blockEntries.add(new SyncContentS2C.BlockEntry(
-                id, baseBlockId, stateProps, modelId, stateIds, shapeData, climbable, interactive));
+                id, baseBlockId, stateProps, modelId, stateIds, shapeData, lightData, climbable, interactive,
+                destroyTime, requiresCorrectTool));
         }
 
         reportUnsyncedNamespaces();
@@ -513,7 +581,18 @@ public class ContentRegistry implements ContentApi {
                 inferred.size() > shown ? " (+" + (inferred.size() - shown) + " more)" : "");
         }
 
+        logContentScale(blockEntries);
         return blockEntries;
+    }
+
+    /** One byte of light per state, in the order the block's own definition lists its states. */
+    private static byte[] serializeBlockLight(net.minecraft.world.level.block.Block block) {
+        var states = block.getStateDefinition().getPossibleStates();
+        byte[] light = new byte[states.size()];
+        for (int i = 0; i < light.length; i++) {
+            light[i] = (byte) states.get(i).getLightEmission();
+        }
+        return light;
     }
 
     /**
@@ -593,9 +672,34 @@ public class ContentRegistry implements ContentApi {
             String declaredTool = registered != null ? registered.registration().getToolSpec() : "";
             String toolType = declaredTool.isEmpty() ? inferToolType(item) : declaredTool;
 
-            itemEntries.add(new SyncContentS2C.ItemEntry(id, modelId, maxStack, maxDamage, glint, equipSlot, toolType));
+            itemEntries.add(new SyncContentS2C.ItemEntry(
+                id, modelId, maxStack, maxDamage, glint, equipSlot, toolType, foodSpec(item)));
         }
         return itemEntries;
+    }
+
+    /**
+     * What the client needs to eat this the way the server does, or "" for anything inedible.
+     *
+     * <p>Read off the item's own components rather than declared by the mod, for the same reason
+     * the equipment slot is: the server item already carries the answer, and a second place to say
+     * it is a second place to say it differently.
+     *
+     * <p>Without this the client's stand-in is a bare item with no food component, so a synced
+     * edible has no eating animation, no eating sound and no hunger restored on the client's own
+     * reckoning - you hold right-click and nothing whatsoever happens on screen while the server
+     * quietly feeds you.
+     */
+    private static String foodSpec(net.minecraft.world.item.Item item) {
+        var food = item.components().get(net.minecraft.core.component.DataComponents.FOOD);
+        if (food == null) return "";
+
+        var consumable = item.components().get(net.minecraft.core.component.DataComponents.CONSUMABLE);
+        float seconds = consumable != null ? consumable.consumeSeconds() : 1.6F;
+
+        return String.join("|", String.valueOf(food.nutrition()),
+            String.valueOf(food.saturation()), String.valueOf(food.canAlwaysEat()),
+            String.valueOf(seconds));
     }
 
     /** Returns "tool" or "": tools are data-driven via the Tool component in MC 26.1+. */

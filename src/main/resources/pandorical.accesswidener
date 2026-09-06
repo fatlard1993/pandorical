@@ -21,3 +21,11 @@ accessible method net/minecraft/world/level/block/entity/BlockEntityType <init> 
 
 # Allow constructing stub MenuType for client-side registry stubs
 accessible method net/minecraft/world/inventory/MenuType <init> (Lnet/minecraft/world/inventory/MenuType$MenuSupplier;Lnet/minecraft/world/flag/FeatureFlagSet;)V
+
+# Let a synced block state its own mining feel. Breaking is predicted entirely on the client, off
+# the stand-in's properties, so a stand-in cloned from a base that disagrees with the real block
+# digs at the wrong speed for the whole dig. Properties can set this flag but has no way to clear
+# it, and the case that matters is exactly clearing it: a block deciding drops per-part wants no
+# tool requirement while its base block, chosen for sound and feel, has one.
+accessible field net/minecraft/world/level/block/state/BlockBehaviour$Properties requiresCorrectToolForDrops Z
+mutable field net/minecraft/world/level/block/state/BlockBehaviour$Properties requiresCorrectToolForDrops Z

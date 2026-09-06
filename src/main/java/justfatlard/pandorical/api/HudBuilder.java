@@ -29,7 +29,10 @@ public class HudBuilder {
 	 * need to sit near the crosshair, which no corner anchor can reach), or
 	 * {@code "bottom_center"} (offsetX is the signed position of the overlay's LEFT edge relative
 	 * to horizontal center, offsetY a margin up from the bottom edge; made for sitting with the
-	 * vanilla hotbar/status rows, whose layout is center-relative). Defaults to "top_right".
+	 * vanilla hotbar/status rows, whose layout is center-relative), or {@code "top_center"}
+	 * (the overlay's own width is centred, offsetX is a nudge, offsetY a margin down from the top;
+	 * this is where the player list drops, so the overlay is not drawn while that list is open).
+	 * Defaults to "top_right".
 	 * Clients predating an anchor value fall back to top-left placement.
 	 */
 	public HudBuilder anchor(String anchor) {

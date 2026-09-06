@@ -47,6 +47,9 @@ public class DynamicBlock extends Block {
 
     @Override
     protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
+        // A stand-in for a rail is a rail: same floor for a player, when the server has asked.
+        VoxelShape floor = justfatlard.pandorical.rail.RailCollision.shapeFor(state, context);
+        if (floor != null) return floor;
         if (collisionShapes != null) {
             VoxelShape shape = collisionShapes.get(state);
             if (shape != null) return shape;
@@ -89,12 +92,37 @@ public class DynamicBlock extends Block {
     }
 
     /**
+     * The light the server declared for this state.
+     *
+     * <p>Called while the state is being built, before the block can list its states, so the
+     * state's place in the table is worked out from its values: the game lays states out as
+     * the cartesian product of the properties in name order, the last property varying fastest,
+     * and both sides sort property names the same way.
+     */
+    public static int lightFor(BlockState state, byte[] light) {
+        int index = 0;
+        for (Property<?> property : state.getProperties()) {
+            var values = property.getPossibleValues();
+            Comparable<?> mine = state.getValue(property);
+            int at = 0;
+            for (var value : values) {
+                if (value.equals(mine)) break;
+                at++;
+            }
+            index = index * values.size() + at;
+        }
+        return index < light.length ? light[index] & 0xFF : 0;
+    }
+
+    /**
      * Deserialize shape data from server into per-state shape maps.
      * Format per state: [numOutlineBoxes:byte][boxes...][numCollisionBoxes:byte][boxes...]
      * Each box: [minX:float][minY:float][minZ:float][maxX:float][maxY:float][maxZ:float]
      */
     public static void applyShapeData(Block block, byte[] shapeData) {
         if (shapeData == null || shapeData.length == 0) return;
+        // A vanilla-classed stand-in draws its shapes from its class; the table is for the rest.
+        if (VanillaShapedBlocks.isOne(block)) return;
 
         var states = block.getStateDefinition().getPossibleStates();
         Map<BlockState, VoxelShape> outlineMap = new IdentityHashMap<>();

@@ -2,6 +2,7 @@ package justfatlard.pandorical.client.hud;
 
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.client.component.PandoricalComponent;
+import justfatlard.pandorical.client.mixin.PlayerTabOverlayAccessor;
 import justfatlard.pandorical.client.screen.ScreenHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.DeltaTracker;
@@ -29,8 +30,10 @@ public final class HudRenderer {
 
 		int guiWidth = context.guiWidth();
 		int guiHeight = context.guiHeight();
+		boolean tabListShowing = ((PlayerTabOverlayAccessor) mc.gui.hud.getTabList()).pandorical$visible();
 
 		for (HudOverlay overlay : HudManager.getActiveOverlays().values()) {
+			if (tabListShowing && yieldsToTabList(overlay)) continue;
 			int baseX = resolveX(overlay, guiWidth);
 			int baseY = resolveY(overlay, guiHeight);
 
@@ -44,6 +47,17 @@ public final class HudRenderer {
 
 			pose.popMatrix();
 		}
+	}
+
+	/**
+	 * The player list drops over the top centre of the screen, so an overlay anchored there is
+	 * drawn on top of it for as long as the key is held. It steps aside instead: the list is
+	 * something the player asked for by name, and nothing a server sends to that anchor outranks
+	 * it. Vanilla decides whether the list is actually up (a lone player on a local server holding
+	 * the key gets nothing), and this reads that decision rather than the key.
+	 */
+	private static boolean yieldsToTabList(HudOverlay overlay) {
+		return "top_center".equals(overlay.anchor);
 	}
 
 	private static int resolveX(HudOverlay overlay, int guiWidth) {

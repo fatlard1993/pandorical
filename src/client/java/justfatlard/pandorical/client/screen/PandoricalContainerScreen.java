@@ -32,9 +32,8 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     private final List<PandoricalComponent> components = new ArrayList<>();
     private final Map<String, PandoricalComponent> componentIndex = new HashMap<>();
 
-    // Captured per frame for the component pass inside extractSlots, whose
-    // vanilla signature carries no partial tick
-    private float frameDelta;
+    /** Chat without leaving the screen; see {@link ScreenChatBar} for the ordering contract. */
+    private final ScreenChatBar chatBar = new ScreenChatBar();
 
     /**
      * Slots this drag has already emptied, so one sweep moves each stack once.
@@ -79,6 +78,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     @Override
     public void containerTick() {
         super.containerTick();
+        chatBar.tick();
         for (PandoricalComponent component : components) {
             ScreenHelper.tickTree(component);
         }
@@ -86,32 +86,37 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-        // super handles blur/background and the vanilla slot pass; the
-        // declarative components render from the extractSlots override below,
-        // UNDER the slot items. Rendering them after super (the pre-26.3
-        // structure) painted panel backgrounds over the already-drawn item
-        // icons: hover tooltips still worked, icons were invisible.
-        this.frameDelta = delta;
         super.extractRenderState(context, mouseX, mouseY, delta);
 
+        // Over the items, under the tooltip: the one layer a veil on a slot can live in
+        for (PandoricalComponent component : components) {
+            ScreenHelper.renderOverlayTree(component, context, mouseX, mouseY, delta);
+        }
         this.extractTooltip(context, mouseX, mouseY);
+        chatBar.render(this, context, mouseX, mouseY, delta);
     }
 
+    /**
+     * The declarative components, drawn before anything else this screen puts up.
+     *
+     * <p>Order is the whole point of overriding here. {@code extractContents} runs the widget
+     * pass first and the slot pass second, and the components used to go in with the slots -
+     * which put this screen's own background over every widget on it. Pandorical adds no widgets
+     * of its own, so nothing looked wrong until another mod put a button on one of these screens
+     * (a recipe book toggle on a crafting station) and watched the panel paint over it every
+     * frame: added, laid out, answering clicks, and invisible.
+     *
+     * <p>Drawn here they land under the widgets AND under the slot items, which is what a
+     * background is. Not after super, which is where they were before 26.3 and which painted the
+     * panels over the item icons instead - tooltips still worked, the items were not there.
+     */
     @Override
-    protected void extractSlots(GuiGraphicsExtractor context, int mouseX, int mouseY) {
-        // extractSlots runs inside extractContents' (leftPos, topPos) pose
-        // translation; components carry absolute screen coordinates, so
-        // translate back for their pass
-        var pose = context.pose();
-        pose.pushMatrix();
-        pose.translate(-this.leftPos, -this.topPos);
+    public void extractContents(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        // No pose translation is in effect yet; components carry absolute screen coordinates
         for (PandoricalComponent component : components) {
-            ScreenHelper.renderComponentTree(component, context, mouseX, mouseY, frameDelta);
+            ScreenHelper.renderComponentTree(component, context, mouseX, mouseY, delta);
         }
-        pose.popMatrix();
-
-        // Vanilla slot items draw on top of the component panels/frames
-        super.extractSlots(context, mouseX, mouseY);
+        super.extractContents(context, mouseX, mouseY, delta);
     }
 
     @Override
@@ -129,7 +134,15 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
 
     @Override
     public boolean keyPressed(KeyEvent event) {
+        // An open chat bar owns the keyboard; the chat key only opens it once no
+        // component (a focused text field) has claimed the key for itself
+        if (chatBar.keyPressed(event)) {
+            return true;
+        }
         if (ScreenHelper.dispatchKeyPressed(components, event.key(), event.keycode(), event.modifiers())) {
+            return true;
+        }
+        if (chatBar.tryOpen(event)) {
             return true;
         }
         return super.keyPressed(event);
@@ -137,6 +150,9 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
 
     @Override
     public boolean charTyped(CharacterEvent event) {
+        if (chatBar.charTyped(event)) {
+            return true;
+        }
         if (ScreenHelper.dispatchCharTyped(components, event.codepoint())) {
             return true;
         }
@@ -172,6 +188,9 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
         swept.clear();
+        if (ScreenHelper.dispatchMouseReleased(components, event.x(), event.y(), event.button())) {
+            return true;
+        }
         return super.mouseReleased(event);
     }
 
@@ -213,6 +232,22 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
      */
     public java.util.Optional<String> getRecipeStation() {
         return screenDef == null ? java.util.Optional.empty() : screenDef.recipeStation();
+    }
+
+    /**
+     * Top-left corner of the panel on screen.
+     *
+     * <p>Public because {@link #getRecipeStation()} is: a mod told what this bench crafts will
+     * want to put a control on it, and the panel moves with the window and with the recipe book
+     * pane. Working it out from screen centre instead only holds while the panel is one
+     * particular size.
+     */
+    public int getPanelX() {
+        return this.leftPos;
+    }
+
+    public int getPanelY() {
+        return this.topPos;
     }
 
     public String getScreenId() {

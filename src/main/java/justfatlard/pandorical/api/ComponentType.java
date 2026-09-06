@@ -21,6 +21,21 @@ public final class ComponentType {
     public static final String MAP = "map";
     /** A small burst of particle-like sprites the client simulates locally (currently: orbit motion). */
     public static final String PARTICLE_BURST = "particle_burst";
+    /**
+     * A sprite that turns to follow the mouse about its own centre, within a sweep, and reports
+     * what it is doing: the angle as it moves, and the mouse button or space bar going down and
+     * coming up. A pick in a lock, a dial on a safe, anything worked by hand in real time. The
+     * turning is the client's, so it never waits on the server; only the reports cross the wire.
+     */
+    public static final String DIAL = "dial";
+    /** Dial: the full range it turns through, in degrees, centred on straight up. */
+    public static final String PROP_SWEEP = "sweep";
+    /** Dial: whether it is drawn trembling, as a pick does against a jammed cylinder. */
+    public static final String PROP_SHAKE = "shake";
+    /** Dial: the key in every report saying which it is - "aim", "press" or "release". */
+    public static final String DIAL_ACTION = "action";
+    /** Dial: the key carrying the angle, in degrees, in every report. */
+    public static final String DIAL_ANGLE = "angle";
 
     // --- Common prop keys ---
 
@@ -56,6 +71,17 @@ public final class ComponentType {
     public static final String PROP_TEXTURE_V = "texture_v";
     /** Text color. Accepts #RRGGBB or #AARRGGBB. Used by: text, button, particle_burst */
     public static final String PROP_COLOR = "color";
+
+    /**
+     * "true"/"false": whether the component is there at all. Recognized by every component type.
+     *
+     * <p>A hidden component is not drawn, takes no click, key or scroll, and a navigator cannot
+     * land on it; its children go with it. This is how a screen swaps one set of controls for
+     * another in place - a row of buttons for a search field, say - without reopening: build
+     * both at open time, hide one, and flip the two on a press. Hidden is not the same as
+     * {@link #PROP_ENABLED} false, which still draws the button and merely refuses the click.
+     */
+    public static final String PROP_VISIBLE = "visible";
 
     // --- Geometry update keys ---
     // These are recognized directly by AbstractComponent.updateProps() and applied to the
@@ -107,9 +133,26 @@ public final class ComponentType {
     public static final String PROP_LABEL = "label";
     /** Translatable key for button label. */
     public static final String PROP_LABEL_KEY = "label_key";
+    /**
+     * GUI atlas sprite drawn centred on the button instead of a label, e.g.
+     * {@code "mymod:icon_sort"} for {@code assets/mymod/textures/gui/sprites/icon_sort.png}.
+     *
+     * <p>For the small square buttons a row of controls is made of, where a word will not fit.
+     * A font glyph is the obvious thing to reach for there and it is the wrong one: vanilla's
+     * arrows and symbols are hairlines a single pixel wide, and a row of them beside vanilla's
+     * own chunky widget art reads as a web page bolted to a game. Sprite art is drawn at the
+     * weight the rest of the screen is.
+     *
+     * <p>Takes precedence over {@link #PROP_LABEL}; the sprite is drawn at its native size.
+     */
+    public static final String PROP_ICON = "icon";
     /** "true"/"false": whether the button is clickable. */
     public static final String PROP_ENABLED = "enabled";
-    /** Button style: "default" or "accepted" (green). */
+    /** Button only: text shown beside the pointer while it rests on the button. What an icon cannot say. */
+    public static final String PROP_TOOLTIP = "tooltip";
+    /** Translatable key for {@link #PROP_TOOLTIP}; takes precedence over it. */
+    public static final String PROP_TOOLTIP_KEY = "tooltip_key";
+    /** Button style: "default", "accepted" (green), or "pressed" (sunken: the choice already made). */
     public static final String PROP_STYLE = "style";
 
     /** Button only: "#RRGGBB" bar down the leading edge, saying what kind of action this is. */
@@ -146,6 +189,12 @@ public final class ComponentType {
     public static final String PROP_VALUE = "value";
     /** "true"/"false": whether the input accepts text. */
     public static final String PROP_EDITABLE = "editable";
+    /**
+     * "true"/"false": give the field the keyboard, or take it away. A field a screen has just
+     * revealed wants the first keystroke without a click to find it first; a field being hidden
+     * must let go, or the keys keep landing in something nobody can see. Used by: text_input
+     */
+    public static final String PROP_FOCUSED = "focused";
 
     // ItemIcon props
     /** Registry ID of the item to display, e.g. "minecraft:red_shrub". */
@@ -158,7 +207,14 @@ public final class ComponentType {
     public static final String PROP_SLOT_INDEX = "slot_index";
     /** "true"/"false": visual locked state. */
     public static final String PROP_LOCKED = "locked";
-    /** Slot border style: "beveled" (default) or "flat". */
+    /**
+     * Slot border style: "beveled" (default), "flat", or "none".
+     *
+     * <p>"none" draws no slot background at all, for a grid laid over a screen that already has
+     * the slots in its own backdrop - a vanilla container texture used as the panel, say. The
+     * grid still places the menu slots and vanilla still draws the items and the hover
+     * highlight; only the frame under them is somebody else's to draw.
+     */
     public static final String PROP_SLOT_STYLE = "slot_style";
 
     // InventoryGrid props
@@ -168,6 +224,16 @@ public final class ComponentType {
     public static final String PROP_START_SLOT = "start_slot";
     /** Slot index above which all slots are locked. */
     public static final String PROP_LOCKED_ABOVE = "locked_above";
+    /**
+     * Comma-separated container slot indices to draw a dark veil over, on top of the item in
+     * each, so everything else in the grid stands out. Empty string veils nothing.
+     *
+     * <p>The grid draws its frames under the items, which is why the lock overlay reads as a
+     * shut slot; this one is drawn after the items, which is what a search result needs: the
+     * item is still there and still hoverable, it has just stepped back. A server answering a
+     * search names the slots that did NOT match. Used by: inventory_grid
+     */
+    public static final String PROP_DIM_SLOTS = "dim_slots";
 
     // ScrollPanel props
     /** Current scroll position in items. */
@@ -186,6 +252,14 @@ public final class ComponentType {
     public static final String PROP_MAP_ID = "map_id";
     /** "true"/"false": rotate map with player facing. Requires compass. */
     public static final String PROP_ROTATE = "rotate";
+    /** Magnification of the map's centre, 1.0 for the whole map. Default 1.0. */
+    public static final String PROP_MAP_ZOOM = "zoom";
+    /** "true"/"false": the facing and coordinates line under the map. Default true. */
+    public static final String PROP_MAP_SHOW_COORDS = "show_coords";
+    /** "true"/"false": hostile mob dots, the red ones. Default true. */
+    public static final String PROP_MAP_SHOW_HOSTILE = "show_hostile";
+    /** "true"/"false": passive and other mob dots, the green and orange ones. Default true. */
+    public static final String PROP_MAP_SHOW_PASSIVE = "show_passive";
 
     // ParticleBurst props
     /** Number of particles in the burst. Default 8. */

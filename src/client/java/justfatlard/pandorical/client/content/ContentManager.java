@@ -47,12 +47,16 @@ public class ContentManager {
 
     /** A server claiming more chunks than this is malformed or hostile, not verbose. */
     private static final int MAX_ASSET_CHUNKS = 8192;
+
+    /** A sanity bound on the content split, so a malformed total cannot make the client allocate. */
+    private static final int MAX_CONTENT_CHUNKS = 512;
     private static final int MAX_ASSET_BYTES = 50 * 1024 * 1024;
     private static final int MAX_SINGLE_ASSET = 10 * 1024 * 1024;
     private static final long SYNC_TIMEOUT_MS = 30_000;
 
     public static void reset() {
         pendingContent = null;
+        justfatlard.pandorical.rail.RailCollision.setSolid(false);
         assetChunks.clear();
         expectedAssetChunks = -1;
         contentRegistered = false;
@@ -65,24 +69,17 @@ public class ContentManager {
         pendingConfigContent = null;
         configAssetChunks.clear();
         expectedConfigAssetChunks = -1;
+        configContentChunks.clear();
+        expectedConfigContentChunks = -1;
 
-        // Clearing the map is not unloading the pack. Whatever the last server sent is
-        // already baked into the atlases and the Language table, and the injected pack sits
-        // above vanilla AND above the player's own packs, so without a reload the server's
-        // textures and strings follow the player to the title screen, into singleplayer,
-        // and onto the next server. Only reload when there was something to drop: a
-        // resource reload is seconds long and most disconnects have nothing to undo.
-        boolean hadResources = virtualPack.hasResources();
+        // Clearing the map is not unloading the pack: whatever the last server sent stays baked
+        // into the atlases and the Language table until the next reload. That reload used to be
+        // forced here, on the disconnect itself, and it wedged: the loading screen sat at zero
+        // with every worker finished and nothing left to wait on, and the only way out was
+        // killing the game. Left to the next join instead, which reloads with the new server's
+        // pack and has never failed. The cost is cosmetic - a server's textures and strings
+        // follow the player to the title screen and into singleplayer until then.
         virtualPack.clear();
-        if (hadResources) {
-            net.minecraft.client.Minecraft client = net.minecraft.client.Minecraft.getInstance();
-            if (client != null) {
-                client.execute(() -> {
-                    Pandorical.LOGGER.info("Dropping synced assets from the previous server");
-                    client.reloadResourcePacks();
-                });
-            }
-        }
     }
 
     private static volatile boolean syncing = false;
@@ -90,6 +87,17 @@ public class ContentManager {
 
     // Config-phase state (separate from play-phase to avoid mixing)
     private static volatile SyncContentConfigS2C pendingConfigContent = null;
+
+    /**
+     * Content chunks seen so far, and how many are coming.
+     *
+     * <p>The blocks and items arrive across however many packets it took to stay under the size a
+     * single one may carry, so nothing may be registered until the last of them lands - a client
+     * that registered what it had at the first packet would be missing whatever followed, and would
+     * fail Fabric's registry sync with no sign that anything was still in flight.
+     */
+    private static final List<SyncContentConfigS2C> configContentChunks = new ArrayList<>();
+    private static volatile int expectedConfigContentChunks = -1;
     private static final List<byte[]> configAssetChunks = new ArrayList<>();
     private static volatile int expectedConfigAssetChunks = -1;
 
@@ -179,16 +187,95 @@ public class ContentManager {
     // Configuration-phase handlers
     // ==========================================================================
 
+    /**
+     * Give the stand-in the real block's mining feel, where the server bothered to say.
+     *
+     * <p>Everything else about a stand-in is cosmetic - it stands in front of you and the server
+     * decides what happens to it. Breaking is the exception: the client predicts the whole dig
+     * itself, off these two numbers, and the server never corrects it until the block is gone. A
+     * stand-in cloned from the wrong base therefore digs at the wrong speed for its entire
+     * duration, and the mismatch is visible against anything drawn from the server's own view of
+     * the same block.
+     *
+     * <p>Both are tri-state: a block that says nothing keeps whatever the base block had, which is
+     * nearly all of them.
+     */
+    private static void applyMiningProperties(BlockBehaviour.Properties props,
+            SyncContentS2C.BlockEntry entry) {
+        if (entry.destroyTime() >= 0.0F) {
+            props.destroyTime(entry.destroyTime());
+        }
+        // Set through the field rather than the builder method, because the builder can only turn
+        // this on. Clearing it is the case that matters: a block deciding its drops per-part wants
+        // no tool requirement, while the base block it borrows its sound and feel from has one.
+        if (entry.requiresCorrectTool() >= 0) {
+            props.requiresCorrectToolForDrops = entry.requiresCorrectTool() == 1;
+        }
+    }
+
     /** Runs on the network thread, never the render thread. */
     public static void handleConfigSyncContent(SyncContentConfigS2C payload) {
-        pendingConfigContent = payload;
+        if (configPhaseSynced) {
+            Pandorical.LOGGER.warn("Config phase: received content chunk after already synced — ignoring");
+            return;
+        }
+
+        int total = payload.totalChunks();
+        if (total <= 0 || total > MAX_CONTENT_CHUNKS
+                || payload.chunkIndex() < 0 || payload.chunkIndex() >= total) {
+            Pandorical.LOGGER.warn("Rejecting config content chunk {}/{} (max {})",
+                payload.chunkIndex(), total, MAX_CONTENT_CHUNKS);
+            return;
+        }
+
+        expectedConfigContentChunks = total;
         expectedConfigAssetChunks = payload.expectedAssetChunks();
         syncStartTime = System.currentTimeMillis();
         syncing = true;
-        Pandorical.LOGGER.info("Config phase: received {} blocks, {} items, expecting {} asset chunks",
-            payload.blocks().size(), payload.items().size(), expectedConfigAssetChunks);
+
+        while (configContentChunks.size() <= payload.chunkIndex()) {
+            configContentChunks.add(null);
+        }
+        configContentChunks.set(payload.chunkIndex(), payload);
+
+        Pandorical.LOGGER.info("Config phase: content chunk {}/{} ({} blocks, {} items), expecting {} asset chunks",
+            payload.chunkIndex() + 1, total, payload.blocks().size(), payload.items().size(),
+            expectedConfigAssetChunks);
+
+        if (allConfigContentReceived()) {
+            pendingConfigContent = joinConfigContent();
+        }
 
         tryFinalizeConfig();
+    }
+
+    private static boolean allConfigContentReceived() {
+        if (expectedConfigContentChunks <= 0) return false;
+        return configContentChunks.size() == expectedConfigContentChunks
+            && configContentChunks.stream().noneMatch(Objects::isNull);
+    }
+
+    /**
+     * Put the chunks back into one payload.
+     *
+     * <p>The registry-stub lists are identical on every chunk, so any of them will do; the blocks
+     * and items are the parts that were split and are concatenated in chunk order.
+     */
+    private static SyncContentConfigS2C joinConfigContent() {
+        var blocks = new ArrayList<SyncContentS2C.BlockEntry>();
+        var items = new ArrayList<SyncContentS2C.ItemEntry>();
+        for (SyncContentConfigS2C chunk : configContentChunks) {
+            blocks.addAll(chunk.blocks());
+            items.addAll(chunk.items());
+        }
+
+        SyncContentConfigS2C first = configContentChunks.get(0);
+        Pandorical.LOGGER.info("Config phase: {} content chunk(s) assembled — {} blocks, {} items",
+            configContentChunks.size(), blocks.size(), items.size());
+
+        return new SyncContentConfigS2C(blocks, items, 0, 1, first.expectedAssetChunks(),
+            first.entityTypes(), first.blockEntityTypes(), first.villagerProfessions(),
+            first.poiTypes(), first.menuTypes(), first.recipeBookCategories(), first.solidRails());
     }
 
     /** Runs on the network thread, never the render thread. */
@@ -226,6 +313,7 @@ public class ContentManager {
 
     private static void tryFinalizeConfig() {
         if (pendingConfigContent == null) return;
+        if (!allConfigContentReceived()) return;
         if (configPhaseSynced) return;
         if (!allConfigAssetsReceived()) return;
         forceFinalizeConfig();
@@ -273,6 +361,7 @@ public class ContentManager {
             unfreezeRegistry(BuiltInRegistries.RECIPE_BOOK_CATEGORY);
 
             try {
+                justfatlard.pandorical.rail.RailCollision.setSolid(content.solidRails());
                 for (SyncContentS2C.BlockEntry entry : content.blocks()) {
                     registerBlockConfig(entry);
                 }
@@ -388,6 +477,8 @@ public class ContentManager {
             // arriving with this entry are ever applied.
             if (!DynamicBlock.declaresCollision(entry.shapeData())) props.noCollision();
 
+            applyMiningProperties(props, entry);
+
             ResourceKey<Block> key = ResourceKey.create(Registries.BLOCK, id);
             props.setId(key);
 
@@ -436,6 +527,12 @@ public class ContentManager {
                 }
             }
 
+            // Light is fixed into each state as the block is built, so it has to be on the
+            // properties before createBlock, not applied after like the shapes are
+            byte[] light = entry.lightData();
+            if (light != null && light.length > 0) {
+                props.lightLevel(state -> DynamicBlock.lightFor(state, light));
+            }
             Block block = createBlock(props, stateProps, baseBlock, entry.stateProperties());
             Registry.register(BuiltInRegistries.BLOCK, id, block);
             registeredBlocks.put(id, block);
@@ -604,6 +701,7 @@ public class ContentManager {
             unfreezeRegistry(BuiltInRegistries.RECIPE_BOOK_CATEGORY);
 
             try {
+                justfatlard.pandorical.rail.RailCollision.setSolid(content.solidRails());
                 for (SyncContentS2C.BlockEntry entry : content.blocks()) {
                     registerBlock(entry);
                 }
@@ -927,6 +1025,8 @@ public class ContentManager {
             // arriving with this entry are ever applied.
             if (!DynamicBlock.declaresCollision(entry.shapeData())) props.noCollision();
 
+            applyMiningProperties(props, entry);
+
             ResourceKey<Block> key = ResourceKey.create(Registries.BLOCK, id);
             props.setId(key);
 
@@ -972,6 +1072,12 @@ public class ContentManager {
                 }
             }
 
+            // Light is fixed into each state as the block is built, so it has to be on the
+            // properties before createBlock, not applied after like the shapes are
+            byte[] light = entry.lightData();
+            if (light != null && light.length > 0) {
+                props.lightLevel(state -> DynamicBlock.lightFor(state, light));
+            }
             Block block = createBlock(props, stateProps, baseBlock, entry.stateProperties());
             Registry.register(BuiltInRegistries.BLOCK, id, block);
             registeredBlocks.put(id, block);
@@ -1051,6 +1157,37 @@ public class ContentManager {
                 .build());
     }
 
+    /**
+     * Make a synced edible edible here too.
+     *
+     * <p>The stand-in is otherwise a bare item with no food component, and the two ends then
+     * disagree about what right-clicking it does: the server feeds the player, and the client
+     * plays no animation, no sound and shows no hand moving - the item just sits there while
+     * hunger silently refills. Rebuilt from the server's own numbers so there is nothing to drift.
+     */
+    private static void applyFood(Item.Properties props, String spec) {
+        if (spec.isEmpty()) return;
+
+        String[] p = spec.split("\\|");
+        if (p.length != 4) {
+            Pandorical.LOGGER.warn("Unreadable food spec '{}' — leaving the item inedible", spec);
+            return;
+        }
+
+        try {
+            var food = new net.minecraft.world.food.FoodProperties.Builder()
+                .nutrition(Integer.parseInt(p[0]))
+                .saturationModifier(Float.parseFloat(p[1]));
+            if (Boolean.parseBoolean(p[2])) food.alwaysEdible();
+
+            props.food(food.build(), net.minecraft.world.item.component.Consumable.builder()
+                .consumeSeconds(Float.parseFloat(p[3]))
+                .build());
+        } catch (RuntimeException e) {
+            Pandorical.LOGGER.warn("Unreadable food spec '{}' — leaving the item inedible", spec, e);
+        }
+    }
+
     private static void applyTool(Item.Properties props, String spec) {
         if (spec.isEmpty() || !spec.contains("|")) return;
 
@@ -1111,6 +1248,8 @@ public class ContentManager {
 
             applyTool(props, entry.toolType());
 
+            applyFood(props, entry.foodSpec());
+
             Item item;
             Block block = registeredBlocks.get(id);
             if (block == null) {
@@ -1146,6 +1285,11 @@ public class ContentManager {
         // (server-provided VoxelShapes arrive after), and without it MC assumes full-cube
         // occlusion and incorrectly culls adjacent block faces.
         props.noOcclusion();
+
+        // A door or trapdoor is vanilla's own class: it knows its shapes, and a table of them
+        // did not serve. Its states are the base block's, which is what the server has too.
+        Block vanillaShaped = VanillaShapedBlocks.forBase(baseBlock, props);
+        if (vanillaShaped != null) return vanillaShaped;
 
         boolean isSlab = baseBlock instanceof net.minecraft.world.level.block.SlabBlock || isSlabFromProperties(rawPropSpecs);
 

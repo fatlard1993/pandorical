@@ -42,6 +42,9 @@ public class TextInputComponent extends AbstractComponent {
                 context.sendAction().accept(id, Map.of("text", text));
             }
         });
+        if (parseBool("focused", false)) {
+            editBox.setFocused(true);
+        }
     }
 
     @Override
@@ -53,6 +56,15 @@ public class TextInputComponent extends AbstractComponent {
             }
             if (changedProps.containsKey("editable")) {
                 editBox.setEditable(parseBool("editable", true));
+            }
+            if (changedProps.containsKey("focused")) {
+                editBox.setFocused(parseBool("focused", false));
+            }
+            // A hidden field must let go of the keyboard, or every key the screen gets from
+            // here on lands in something nobody can see. Setting the value on the way out is
+            // the server's job; only the focus is taken.
+            if (!visible && editBox.isFocused()) {
+                editBox.setFocused(false);
             }
         }
     }
@@ -81,7 +93,12 @@ public class TextInputComponent extends AbstractComponent {
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (editBox != null && editBox.isFocused()) {
             // keyPressed takes a KeyEvent; we construct one manually from the raw codes.
-            return editBox.keyPressed(new net.minecraft.client.input.KeyEvent(keyCode, scanCode, modifiers));
+            boolean handled = editBox.keyPressed(new net.minecraft.client.input.KeyEvent(keyCode, scanCode, modifiers));
+            // A focused field owns the keyboard, escape aside. A letter the box has no use for
+            // would otherwise fall through to the screen, and on a container screen the
+            // inventory key is one of those letters: typing "e" into a search would close the
+            // chest. Vanilla's anvil makes the same claim through canConsumeInput().
+            return handled || keyCode != com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE;
         }
         return false;
     }

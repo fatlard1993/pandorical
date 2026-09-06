@@ -29,7 +29,7 @@ public record ComponentDef(
         );
 
     private static final int MAX_DEPTH = 32;
-    private static final int MAX_CHILDREN = 256;
+    private static final int MAX_CHILDREN = 1024;
     private static final int MAX_PROPS = 64;
 
     public static final StreamCodec<ByteBuf, ComponentDef> STREAM_CODEC = new StreamCodec<>() {

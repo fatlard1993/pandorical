@@ -1,26 +1,36 @@
 {
-    "schemaVersion": 1,
-    "id": "pandorical",
-    "version": "${version}",
-    "name": "Pandorical",
-    "description": "One install lets a server show you custom screens, HUD, blocks and keys. Required by servers that use it, harmless everywhere else.",
-    "authors": ["justfatlard"],
-    "contact": {},
-    "license": "MIT",
-    "icon": "assets/pandorical/icon.png",
-    "environment": "*",
-    "entrypoints": {
-        "main": ["justfatlard.pandorical.Pandorical"],
-        "client": ["justfatlard.pandorical.client.PandoricalClient"]
-    },
-    "mixins": [
-        "pandorical.mixins.json",
-        "pandorical.client.mixins.json"
-    ],
-    "depends": {
-        "fabricloader": ">=${loaderVersion}",
-        "minecraft": "${minecraftDependency}",
-        "java": ">=25",
-        "fabric-api": "${fabricApiVersion}"
-    }
+	"schemaVersion": 1,
+	"id": "pandorical",
+	"version": "${version}",
+	"name": "Pandorical",
+	"description": "One install lets a server show you custom screens, HUD, blocks and keys. Required by servers that use it, harmless everywhere else.",
+	"authors": [
+		"justfatlard"
+	],
+	"contact": {},
+	"license": "MIT",
+	"icon": "assets/pandorical/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"justfatlard.pandorical.Pandorical"
+		],
+		"client": [
+			"justfatlard.pandorical.client.PandoricalClient"
+		]
+	},
+	"accessWidener": "pandorical.accesswidener",
+	"mixins": [
+		"pandorical.mixins.json",
+		{
+			"config": "pandorical.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=${loaderVersion}",
+		"minecraft": "${minecraftDependency}",
+		"java": ">=25",
+		"fabric-api": "${fabricApiVersion}"
+	}
 }

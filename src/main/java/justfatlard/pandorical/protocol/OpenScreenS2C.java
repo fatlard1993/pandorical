@@ -43,7 +43,7 @@ public record OpenScreenS2C(
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "open_screen"));
 
     /** Matches ComponentDef.MAX_CHILDREN: a screen root is not more permissive than a node. */
-    private static final int MAX_ROOT_COMPONENTS = 256;
+    private static final int MAX_ROOT_COMPONENTS = 1024;
 
     public static final StreamCodec<ByteBuf, OpenScreenS2C> STREAM_CODEC = new StreamCodec<>() {
         @Override
@@ -73,7 +73,13 @@ public record OpenScreenS2C(
             Optional<String> recipeStation = ByteBufCodecs.BOOL.decode(buf)
                 ? Optional.of(ByteBufCodecs.STRING_UTF8.decode(buf))
                 : Optional.empty();
-            return new OpenScreenS2C(screenId, screenType, width, height, pauseGame, title, components, container);
+            // Pass it. This read the station off the wire correctly and then dropped it on the
+            // floor, calling the eight-argument convenience constructor that defaults it to
+            // empty - so every screen arrived saying it was no kind of crafting station, and the
+            // one feature that asks (a recipe book offering to open on the bench you are stood
+            // at) was never offered on any screen, with nothing to see anywhere but its absence.
+            return new OpenScreenS2C(screenId, screenType, width, height, pauseGame, title,
+                components, container, recipeStation);
         }
 
         @Override

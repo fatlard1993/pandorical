@@ -4,6 +4,8 @@ import justfatlard.pandorical.protocol.ComponentDef;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 
 /**
  * Renders a grid of item slots and positions the menu's Slot objects to match.
@@ -31,9 +33,12 @@ public class InventoryGridComponent extends AbstractComponent {
     private static final int SLOT_BORDER_LIGHT = 0xFFFFFFFF;
     private static final int SLOT_INNER = 0xFF8B8B8B;
     private static final int LOCKED_OVERLAY = 0xCC1A1A1A;
+    /** Dark enough that the lit slots are the ones the eye lands on; the item still shows through. */
+    private static final int DIM_OVERLAY = 0xA0000000;
 
     private int rows, cols, startSlot, lockedAbove;
     private String slotStyle;
+    private Set<Integer> dimSlots = Set.of();
 
     @Override
     public void init(ComponentDef def, ComponentContext context) {
@@ -56,6 +61,18 @@ public class InventoryGridComponent extends AbstractComponent {
         startSlot = parseInt("start_slot", 0);
         lockedAbove = parseInt("locked_above", Integer.MAX_VALUE);
         slotStyle = parseString("slot_style", "beveled");
+        dimSlots = parseSlotSet("dim_slots");
+    }
+
+    private Set<Integer> parseSlotSet(String key) {
+        String val = props.get(key);
+        if (val == null || val.isBlank()) return Set.of();
+        Set<Integer> out = new HashSet<>();
+        for (String part : val.split(",")) {
+            try { out.add(Integer.parseInt(part.trim())); }
+            catch (NumberFormatException ignored) { /* a bad entry veils nothing */ }
+        }
+        return out;
     }
 
     /**
@@ -95,7 +112,30 @@ public class InventoryGridComponent extends AbstractComponent {
         }
     }
 
+    /**
+     * The veil, drawn after vanilla has put the items in: a slot named in {@code dim_slots}
+     * steps back behind a dark pane and the rest of the grid is what is left lit. Over the
+     * item cell only, not the frame, so a run of veiled slots still reads as slots.
+     */
+    @Override
+    public void renderOverlay(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+        if (dimSlots.isEmpty()) return;
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                if (!dimSlots.contains(startSlot + row * cols + col)) continue;
+                int slotX = x + col * CELL_SIZE + BORDER;
+                int slotY = y + row * CELL_SIZE + BORDER;
+                graphics.fill(slotX, slotY, slotX + ITEM_SIZE, slotY + ITEM_SIZE, DIM_OVERLAY);
+            }
+        }
+    }
+
     private void drawSlotBackground(GuiGraphicsExtractor graphics, int slotX, int slotY) {
+        // "none": the backdrop already has slots in it and this grid is only placing the menu's
+        // own slots over them. Drawing here would be a second frame on top of the first.
+        if ("none".equals(slotStyle)) {
+            return;
+        }
         if ("beveled".equals(slotStyle)) {
             graphics.fill(slotX, slotY, slotX + CELL_SIZE, slotY + 1, SLOT_BORDER_DARK);
             graphics.fill(slotX, slotY, slotX + 1, slotY + CELL_SIZE, SLOT_BORDER_DARK);

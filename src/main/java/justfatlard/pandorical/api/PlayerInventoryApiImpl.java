@@ -164,6 +164,38 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
             slots.size(), namespace);
     }
 
+    /**
+     * Re-reads the persisted attachment into the live inventory menu.
+     *
+     * <p>The menu copies the attachment out when the {@code ServerPlayer} is constructed -
+     * which is before the player's saved data has loaded, so on a fresh join the copy is
+     * always empty. The attachment catches up when the NBT loads, but nothing pushed it
+     * back into the menu, and the client faithfully mirrored the stale empty copy: the
+     * minimap (fed from mod-side state) showed an equipped map in a slot the player could
+     * see was empty. Called on JOIN, after the load, writing through the menu slot so the
+     * change listeners fire and {@code broadcastChanges} carries it to the client.
+     */
+    public void syncMenuFromAttachment(ServerPlayer player) {
+        Map<String, List<ItemStack>> map = player.getAttached(EXTRA_SLOTS);
+        if (map == null) return;
+
+        var menu = player.inventoryMenu;
+        boolean changed = false;
+        for (SlotRegistration reg : registrations) {
+            List<ItemStack> stored = map.get(reg.namespace().toString());
+            if (stored == null) continue;
+            for (int i = 0; i < reg.slots().size() && i < stored.size(); i++) {
+                int menuSlot = menuSlotOf(reg.namespace(), i);
+                if (menuSlot < 0 || menuSlot >= menu.slots.size()) continue;
+                ItemStack want = stored.get(i) != null ? stored.get(i) : ItemStack.EMPTY;
+                if (ItemStack.matches(want, menu.getSlot(menuSlot).getItem())) continue;
+                menu.getSlot(menuSlot).set(want.copy());
+                changed = true;
+            }
+        }
+        if (changed) menu.broadcastChanges();
+    }
+
     @Override
     public ItemStack getSlot(ServerPlayer player, Identifier namespace, int slotIndex) {
         Map<String, List<ItemStack>> map = player.getAttached(EXTRA_SLOTS);

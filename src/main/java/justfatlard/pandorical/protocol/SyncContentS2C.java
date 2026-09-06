@@ -23,7 +23,8 @@ public record SyncContentS2C(
     List<String> villagerProfessions,
     List<String> poiTypes,
     List<String> menuTypes,
-    List<String> recipeBookCategories
+    List<String> recipeBookCategories,
+    boolean solidRails
 ) implements CustomPacketPayload {
     public static final Type<SyncContentS2C> TYPE =
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "sync_content"));
@@ -35,6 +36,16 @@ public record SyncContentS2C(
         String modelId,
         List<Integer> stateIds,
         byte[] shapeData,
+        /**
+         * Light given off, one byte per state in the block's own state order.
+         *
+         * <p>Light is the client's to compute, from its own copy of the block, and a stand-in
+         * copied from a base block gives off what the base does: nothing, for nearly all of
+         * them. A torch sharing a slab's block was dark on every client while the server
+         * believed it lit. Sent per state because that is how the game caches it - each state
+         * fixes its emission as it is built - and the stand-in's states are built from this.
+         */
+        byte[] lightData,
         /**
          * Whether this block carries players up it.
          *
@@ -50,7 +61,26 @@ public record SyncContentS2C(
          * <p>Without it the client predicts a block placement against anything it has no
          * behaviour for, which is every synced block. See {@code BlockRegistration#interactive}.
          */
-        boolean interactive
+        boolean interactive,
+        /**
+         * How long this block takes to break, or a negative number to keep the base block's.
+         *
+         * <p>Sent because breaking is predicted on the client, off the stand-in's properties, while
+         * everything the server decides is measured against the real block. A stand-in whose
+         * hardness differs breaks at a different speed than the server thinks it does - the two
+         * disagree for the whole dig, and any progress bar drawn from the server's side disagrees
+         * with the player's own screen.
+         */
+        float destroyTime,
+        /**
+         * Whether the client should apply the wrong-tool penalty, or -1 to keep the base block's.
+         *
+         * <p>Its own field rather than part of the base block, because it is the larger of the two
+         * mining mismatches: a stand-in that wants a pickaxe predicts roughly five times the dig
+         * a server that does not care will actually perform. Sent as a tri-state so a block that
+         * has no opinion still inherits, which is nearly all of them.
+         */
+        int requiresCorrectTool
     ) {
         public static final StreamCodec<ByteBuf, BlockEntry> STREAM_CODEC = new StreamCodec<>() {
             @Override
@@ -61,10 +91,13 @@ public record SyncContentS2C(
                 String modelId = ByteBufCodecs.STRING_UTF8.decode(buf);
                 var stateIds = ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list()).decode(buf);
                 var shapeData = ByteBufCodecs.BYTE_ARRAY.decode(buf);
+                var lightData = ByteBufCodecs.BYTE_ARRAY.decode(buf);
                 boolean climbable = ByteBufCodecs.BOOL.decode(buf);
                 boolean interactive = ByteBufCodecs.BOOL.decode(buf);
+                float destroyTime = ByteBufCodecs.FLOAT.decode(buf);
+                int requiresCorrectTool = ByteBufCodecs.VAR_INT.decode(buf) - 1;
                 return new BlockEntry(id, baseBlockId, stateProperties, modelId, stateIds, shapeData,
-                    climbable, interactive);
+                    lightData, climbable, interactive, destroyTime, requiresCorrectTool);
             }
 
             @Override
@@ -75,8 +108,13 @@ public record SyncContentS2C(
                 ByteBufCodecs.STRING_UTF8.encode(buf, value.modelId());
                 ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list()).encode(buf, value.stateIds());
                 ByteBufCodecs.BYTE_ARRAY.encode(buf, value.shapeData());
+                ByteBufCodecs.BYTE_ARRAY.encode(buf, value.lightData());
                 ByteBufCodecs.BOOL.encode(buf, value.climbable());
                 ByteBufCodecs.BOOL.encode(buf, value.interactive());
+                ByteBufCodecs.FLOAT.encode(buf, value.destroyTime());
+                // Shifted by one so the "no opinion" case is zero rather than a negative, which
+                // VAR_INT spends five bytes on.
+                ByteBufCodecs.VAR_INT.encode(buf, value.requiresCorrectTool() + 1);
             }
         };
     }
@@ -88,7 +126,8 @@ public record SyncContentS2C(
         int maxDamage,
         boolean hasGlint,
         String equipSlot,
-        String toolType
+        String toolType,
+        String foodSpec
     ) {
         public static final StreamCodec<ByteBuf, ItemEntry> STREAM_CODEC = new StreamCodec<>() {
             @Override
@@ -99,6 +138,7 @@ public record SyncContentS2C(
                     ByteBufCodecs.VAR_INT.decode(buf),
                     ByteBufCodecs.VAR_INT.decode(buf),
                     ByteBufCodecs.BOOL.decode(buf),
+                    ByteBufCodecs.STRING_UTF8.decode(buf),
                     ByteBufCodecs.STRING_UTF8.decode(buf),
                     ByteBufCodecs.STRING_UTF8.decode(buf)
                 );
@@ -113,6 +153,7 @@ public record SyncContentS2C(
                 ByteBufCodecs.BOOL.encode(buf, value.hasGlint());
                 ByteBufCodecs.STRING_UTF8.encode(buf, value.equipSlot());
                 ByteBufCodecs.STRING_UTF8.encode(buf, value.toolType());
+                ByteBufCodecs.STRING_UTF8.encode(buf, value.foodSpec());
             }
         };
     }
@@ -132,8 +173,10 @@ public record SyncContentS2C(
             var poiTypes = STRING_LIST_CODEC.decode(buf);
             var menuTypes = STRING_LIST_CODEC.decode(buf);
             var recipeBookCategories = STRING_LIST_CODEC.decode(buf);
+            boolean solidRails = ByteBufCodecs.BOOL.decode(buf);
             return new SyncContentS2C(blocks, items, expectedAssetChunks,
-                entityTypes, blockEntityTypes, villagerProfessions, poiTypes, menuTypes, recipeBookCategories);
+                entityTypes, blockEntityTypes, villagerProfessions, poiTypes, menuTypes, recipeBookCategories,
+                solidRails);
         }
 
         @Override
@@ -147,6 +190,7 @@ public record SyncContentS2C(
             STRING_LIST_CODEC.encode(buf, value.poiTypes());
             STRING_LIST_CODEC.encode(buf, value.menuTypes());
             STRING_LIST_CODEC.encode(buf, value.recipeBookCategories());
+            ByteBufCodecs.BOOL.encode(buf, value.solidRails());
         }
     };
 

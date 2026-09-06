@@ -25,6 +25,9 @@ public class PandoricalScreen extends Screen implements justfatlard.pandorical.a
     private final List<PandoricalComponent> components = new ArrayList<>();
     private final Map<String, PandoricalComponent> componentIndex = new HashMap<>();
 
+    /** Chat without leaving the screen; see {@link ScreenChatBar} for the ordering contract. */
+    private final ScreenChatBar chatBar = new ScreenChatBar();
+
     public PandoricalScreen(OpenScreenS2C screenDef) {
         super(Component.literal(screenDef.title()));
         this.screenDef = screenDef;
@@ -57,6 +60,7 @@ public class PandoricalScreen extends Screen implements justfatlard.pandorical.a
     @Override
     public void tick() {
         super.tick();
+        chatBar.tick();
         for (PandoricalComponent component : components) {
             ScreenHelper.tickTree(component);
         }
@@ -70,6 +74,7 @@ public class PandoricalScreen extends Screen implements justfatlard.pandorical.a
         for (PandoricalComponent component : components) {
             ScreenHelper.renderComponentTree(component, graphics, mouseX, mouseY, delta);
         }
+        chatBar.render(this, graphics, mouseX, mouseY, delta);
     }
 
     @Override
@@ -83,8 +88,24 @@ public class PandoricalScreen extends Screen implements justfatlard.pandorical.a
     }
 
     @Override
+    public boolean mouseReleased(MouseButtonEvent click) {
+        if (ScreenHelper.dispatchMouseReleased(components, click.x(), click.y(), click.button())) {
+            return true;
+        }
+        return super.mouseReleased(click);
+    }
+
+    @Override
     public boolean keyPressed(KeyEvent event) {
+        // An open chat bar owns the keyboard; the chat key only opens it once no
+        // component (a focused text field) has claimed the key for itself
+        if (chatBar.keyPressed(event)) {
+            return true;
+        }
         if (ScreenHelper.dispatchKeyPressed(components, event.key(), event.keycode(), event.modifiers())) {
+            return true;
+        }
+        if (chatBar.tryOpen(event)) {
             return true;
         }
         return super.keyPressed(event);
@@ -92,6 +113,9 @@ public class PandoricalScreen extends Screen implements justfatlard.pandorical.a
 
     @Override
     public boolean charTyped(CharacterEvent event) {
+        if (chatBar.charTyped(event)) {
+            return true;
+        }
         if (ScreenHelper.dispatchCharTyped(components, event.codepoint())) {
             return true;
         }
@@ -125,6 +149,10 @@ public class PandoricalScreen extends Screen implements justfatlard.pandorical.a
         return screenDef.screenId();
     }
 
+    public String getScreenType() {
+        return screenDef.screenType();
+    }
+
     @Override
     public List<NavRegion> navRegions() {
         List<NavRegion> regions = new ArrayList<>();
@@ -152,6 +180,11 @@ public class PandoricalScreen extends Screen implements justfatlard.pandorical.a
      */
     private static void collectNavRegions(PandoricalComponent component, int scrollShift,
                                           int[] clip, List<NavRegion> into) {
+        // Hidden is hidden for the navigator too, children included: the click path
+        // this mirrors rejects the whole subtree, so a region for any of it would be
+        // a target that swallows presses
+        if (!component.isVisible()) return;
+
         int drawnY = component.getY() - scrollShift;
 
         if (component.isNavigable() && clickable(clip, component, drawnY)) {

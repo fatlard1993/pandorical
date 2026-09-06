@@ -156,7 +156,7 @@ in the demo.
 Screens and HUD overlays are composed from eleven component types:
 
 `panel` · `scroll_panel` · `text` · `button` · `text_input` · `sprite` · `item_slot` ·
-`item_icon` · `inventory_grid` · `map` · `particle_burst`
+`item_icon` · `inventory_grid` · `map` · `particle_burst` · `dial`
 
 `ScreenBuilder` and `HudBuilder` carry shorthand for the ones used most. The rest,
 `text_input` and `item_slot` among them, are built with `ComponentBuilder` and passed to
@@ -215,6 +215,26 @@ screens.update(player, screenId, List.of(
 ));
 ```
 
+Two props ride the same update path and are worth knowing by name. `visible`
+(`ComponentType.PROP_VISIBLE`, any component) takes a component and its children out of
+the screen entirely: not drawn, not clickable, not a navigator target. It is how a screen
+swaps one set of controls for another in place - build both at open time, hide one, flip
+them on a press - without reopening and losing whatever the player was carrying. A
+`text_input` being revealed usually wants `focused` (`PROP_FOCUSED`) sent with it, so the
+first keystroke lands without a click. `dim_slots` (`PROP_DIM_SLOTS`, `inventory_grid`)
+names container slots to veil over their items, which is what a search result looks like:
+the server names the slots that did not match and the rest of the grid is what is left lit.
+
+```java
+screens.update(player, screenId, List.of(
+    new ComponentUpdateBuilder("sort").prop(ComponentType.PROP_VISIBLE, "false").build(),
+    new ComponentUpdateBuilder("search_box")
+        .prop(ComponentType.PROP_VISIBLE, "true")
+        .prop(ComponentType.PROP_FOCUSED, "true").build(),
+    new ComponentUpdateBuilder("chest").prop(ComponentType.PROP_DIM_SLOTS, "0,1,5").build()
+));
+```
+
 ### Handlers
 
 All key on screen type, all registered once at init.
@@ -256,8 +276,9 @@ hud.hide(player, "mymod:unread");
 Anchors: `top_left`, `top_right`, `bottom_left`, `bottom_right` (offset is a margin from
 that corner), `center` (offset is a nudge from true screen center, for prompts that need
 to sit near the crosshair), `bottom_center` (offsetX positions the overlay's left edge
-relative to horizontal center, for sitting with the hotbar rows). See the javadoc on
-`HudBuilder#anchor` for the full contract.
+relative to horizontal center, for sitting with the hotbar rows), `top_center` (the overlay's
+own width is centred; hidden while the player list is open, since that is where it drops). See
+the javadoc on `HudBuilder#anchor` for the full contract.
 
 `particleBurst` draws lightweight local particle effects; `map` renders a map component.
 
@@ -279,8 +300,18 @@ should not be pushed to those clients at all.
 
 ## Content
 
+A synced block's light is the server's: each state's emission travels with the block and
+the client stand-in is built with it, so a torch on a slab glows on every client that has
+Pandorical. Nothing to declare; the block's own `lightLevel` is what gets sent.
+
 Register during `onInitialize`. Content syncs to clients in the configuration phase,
 before Fabric's registry sync.
+
+`content.solidRails()` makes every rail hold a player up: two pixels of deck on a flat one,
+a ramp of steps on a slope, for players only, so carts and mobs are untouched. It rides the
+content sync as a flag, and the same shape (`RailCollision`) is applied on both sides through
+one mixin on `BaseRailBlock` plus the client's stand-in blocks, because a floor the client
+cannot predict is one it keeps dropping the player through.
 
 ```java
 ContentApi content = PandoricalApi.content();
@@ -351,7 +382,35 @@ appends those itself for each half of a double chest. Ship all three files
 
 Nothing is persisted across a reconnect. Send the marks again on join.
 
+## Context models
+
+A block can be drawn differently for what stands beside it. The client swaps the model where
+the chunk compiler looks it up, with the neighbours in hand; each case is a provider that names
+the extra models it wants (found by scanning, so nothing is loaded that nobody shipped) and
+picks one at render time. Three ship today.
+
+**Rail diagonals.** A run of alternating curved rails is drawn as the straight diagonal it stands for. The
+client swaps a curve's model for a chord when both of its connected neighbours are the
+complementary curve; the chord models come from whichever mod ships the rail, named
+`<block>_diagonal_<se|sw|nw|ne>` beside its block models (`<block>_on_diagonal_...` for a
+powered state). A rail without them keeps its bend. Any block with a `shape` property of
+`RailShape` is a rail here, so a server-defined stand-in qualifies as readily as vanilla's.
+Minecart Mania ships chords for vanilla's four rails and its own.
+
+**Joined fence gates.** A gate with the same gate beside it on its line takes a joined model,
+named `<gate>[_wall][_open]_join_<left|right|both>_<facing>`, the facing baked in because a
+model picked here has no blockstate rotation. More Doors ships them for every vanilla gate.
+
+**Door jambs.** A door with a fence connecting on its left or right takes a model with a
+post where the fence arm arrives and rails across to the panel, named
+`<door>_<lower|upper>_<hinge>[_open]_jamb_<left|right|both>_<facing>`. More Doors ships them
+for the wooden doors and iron.
+
 ## Keybinds
+
+A keybind reports its press through `onPress`; a handler that needs the other edge, a
+handbrake or anything held, overrides `onRelease` too. Two pool slots come pre-bound: token
+10 is G, token 11 is B; name the token to claim the slot.
 
 Server-declared rebindable keys. Your mod claims a slot from a fixed client-side pool and
 ships zero client code.
@@ -413,12 +472,77 @@ anything. smart-recipe-book puts a button on any screen that declares one.
 Browsing only. Filling a grid goes through `ServerboundPlaceRecipePacket`, which the server
 answers for menus carrying a recipe book, and a Pandorical menu does not.
 
+## Banner decals
+
+`PandoricalApi.bannerDecals()` lays banner pattern layers flat on a block, per player and
+per position, drawn by the client with vanilla's own pattern sprites through the banner's
+flag model laid on its back. No base colour is drawn: the block's own texture is the ground,
+which is what makes a patterned bed read as a bed. A decal is described from its anchor block
+(`toHead`, `lift`, `fromHead`, `length`, `width`) and cleared by sending the position with no
+layers. Clients skip a decal whose chunk is not loaded or whose block is gone. Vanilla clients
+see nothing; a mod keeping an item display as their fallback marks the displayed item's custom
+data with `BannerDecalApi.HIDDEN_ITEM_KEY` and Pandorical clients leave that display undrawn.
+
+## Settings
+
+Per-player settings a server mod would otherwise put behind a command, on the mod's own page of
+the mod menu. A mod declares its settings once at init, under its own name; `/pandorical settings`
+reaches the same values as text on a vanilla client.
+
+```java
+PandoricalApi.settings().group("block-tip", "Block Tip")
+    .choice("mode", "Show tips", options, "always")
+    .describe("Names what you are looking at")
+    .backedBy(player -> ..., (player, value) -> ...);
+```
+
+A client-side mod, with no server half to declare anything, declares from the client instead:
+`PandoricalClientApi.settings().group(...)` takes the same three kinds, each as a getter and a
+setter over whatever the mod already keeps. The client tells the server what it has after the
+hello, the mod appears in the same menu marked *this client*, and a change made there is handed
+back to the client to apply. `changed()` tells the server the values moved some other way.
+
+`serverGroup` declares a mod's **server settings**: one value for everyone, shown to ops alone
+under their own heading on the mod's page, and refused to anyone else from the command too. They
+are for what a mod would otherwise keep in a config file - rates, cooldowns, world-shaping
+switches - and `backedBy` points each at the mod's own config with a setter that writes the file,
+so the file stays the record. Unbacked ones are kept by Pandorical on the overworld.
+
+A setting can say when it is shown: `shownWith("village-mail")` only while that mod is
+installed, `shownWhen(other, value)` only while a setting declared before it has that value, or
+`shownWhen(player -> ...)` for anything else. A setting not shown is not counted, not listed, and
+refused from the command, and the page is laid out again when a change may have shown or hidden
+one.
+
+Four kinds of setting: a **toggle**, a **choice** among named options, a **number** with a
+range and step, and a **list** of the player's own entries, each with a button that takes it
+off - for what a mod collects by command or by play, where seeing the list and pruning it is
+the whole ask. Each is read with `get(player)` and written with `set(player, value)`, and takes
+`onChange` listeners. Values are kept per player by Pandorical, on the overworld, unless the
+mod already keeps them, in which case `backedBy` makes the screen another way to reach the mod's
+own store and the two can never disagree. A change from the screen re-labels the control in
+place, and lays the page out again only when a setting may have appeared or gone.
+
 ## Documented in the javadoc, not here
 
 `structures`, `playerInventory`, `blockTints`, and built-in entity renderers work the
 same way, through `PandoricalApi`. Each carries a trap this page will not save you from:
 structure IDs must be unique server-wide, structures must be despawned or they leak
-state, tints must be registered before the client asks. Read the javadoc on
+state, tints must be registered before the client asks. One more for structures: anything
+that has to be drawn on a moving structure must blend between positions by the structure's
+own rule (`StructureInterpolationHandler`, over `StructureManager.INTERPOLATION_TICKS`),
+because a vanilla blend sits a different distance behind the server and the gap is what a
+rider sees. Server-only entity stubs and cushions already do; push their position every tick
+(cushions need `needsSync`, vanilla never expects one to move). `BlockTintApi#positional` has a
+trap of its own worth naming here, because nothing reports it: a tint only reaches model
+faces carrying a `tintindex`, and most vanilla models carry none. And a tint multiplies, so
+over a coloured texture half the palette disappears; drain the texture to grey and give
+`positional(fallbackArgb, ...)` the colour every unpainted position should keep. Particles a
+painted block throws from its animate tick wear the paint too, brightness kept. Painting a vanilla
+block means also shipping a model override that adds one, through
+`ContentApi#registerAsset` under the `minecraft` namespace - the synced pack sits at
+`Pack.Position.TOP`, so it wins over vanilla's copy. Without that the colours arrive,
+land nowhere, and the block stays exactly as it was. Read the javadoc on
 `StructureApi`, `PlayerInventoryApi`, `BlockTintApi`, and
 `PandoricalApi#registerEntityRenderer` before wiring them up.
 

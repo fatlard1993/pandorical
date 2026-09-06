@@ -14,7 +14,22 @@ import org.spongepowered.asm.mixin.Unique;
  * cannot leak an overlay.
  */
 @Mixin(EntityRenderState.class)
-public class EntityRenderStateMixin implements OverlayTextureHolder {
+public class EntityRenderStateMixin implements OverlayTextureHolder,
+		justfatlard.pandorical.client.renderer.AnimationHolder {
+
+	@Unique
+	private justfatlard.pandorical.client.animation.EntityAnimations.Active pandorical$animation;
+
+	@Override
+	public void pandorical$setAnimation(
+			justfatlard.pandorical.client.animation.EntityAnimations.Active animation) {
+		this.pandorical$animation = animation;
+	}
+
+	@Override
+	public justfatlard.pandorical.client.animation.EntityAnimations.Active pandorical$getAnimation() {
+		return this.pandorical$animation;
+	}
 	@Unique
 	private Identifier pandorical$overlayTexture;
 

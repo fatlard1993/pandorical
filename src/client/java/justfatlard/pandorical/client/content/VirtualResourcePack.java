@@ -19,7 +19,9 @@ import java.util.*;
 public class VirtualResourcePack implements PackResources {
     private static final String PACK_ID = "pandorical_virtual";
 
-    private final Map<Identifier, byte[]> resources = new HashMap<>();
+    // Concurrent: a resource reload lists this on a worker thread while a content sync, or a
+    // disconnect clearing it, writes on another. A plain map iterated then throws mid-reload.
+    private final Map<Identifier, byte[]> resources = new java.util.concurrent.ConcurrentHashMap<>();
 
     /**
      * Add a resource. Path format: "assets/{namespace}/{type}/{name}"

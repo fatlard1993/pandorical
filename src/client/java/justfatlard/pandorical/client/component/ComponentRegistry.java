@@ -42,5 +42,6 @@ public final class ComponentRegistry {
         register(ComponentType.SPRITE, SpriteComponent::new);
         register(ComponentType.MAP, MapComponent::new);
         register(ComponentType.PARTICLE_BURST, ParticleBurstComponent::new);
+        register(ComponentType.DIAL, DialComponent::new);
     }
 }

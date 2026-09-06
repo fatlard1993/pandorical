@@ -3,6 +3,7 @@ package justfatlard.pandorical.client.keybind;
 import com.mojang.blaze3d.platform.InputConstants;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.protocol.KeyPressC2S;
+import justfatlard.pandorical.protocol.KeyReleaseC2S;
 import justfatlard.pandorical.protocol.KeybindDeclarationsS2C;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -36,7 +37,9 @@ public final class KeybindManager {
 	 * 71 is scroll lock); 0 is the unbound/unknown keyboard code.
 	 */
 	private static final int MAX_SLOTS = 8;
-	private static final int[] POOL_DEFAULT_KEYS = {InputConstants.KEY_G, 0, 0, 0, 0, 0, 0, 0};
+	private static final int[] POOL_DEFAULT_KEYS = {InputConstants.KEY_G, InputConstants.KEY_B, 0, 0, 0, 0, 0, 0};
+	/** Whether each slot was down on the last tick, so the release edge can be reported. */
+	private static final boolean[] wasDown = new boolean[MAX_SLOTS];
 
 	private static final KeyMapping[] pool = new KeyMapping[MAX_SLOTS];
 	private static final Set<Integer> claimedSlots = ConcurrentHashMap.newKeySet();
@@ -89,6 +92,13 @@ public final class KeybindManager {
 					ClientPlayNetworking.send(new KeyPressC2S(i));
 				}
 			}
+			// The other edge. A held key is a press followed, some ticks later, by this.
+			boolean down = pool[i].isDown();
+			if (wasDown[i] && !down && claimedSlots.contains(i)
+					&& ClientPlayNetworking.canSend(KeyReleaseC2S.TYPE)) {
+				ClientPlayNetworking.send(new KeyReleaseC2S(i));
+			}
+			wasDown[i] = down;
 		}
 	}
 

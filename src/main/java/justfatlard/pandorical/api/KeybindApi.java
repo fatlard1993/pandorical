@@ -47,5 +47,14 @@ public interface KeybindApi {
     @FunctionalInterface
     interface KeybindHandler {
         void onPress(ServerPlayer player);
+
+        /**
+         * The key came back up. A press is the default unit because most actions are one; a
+         * handbrake or a push-to-talk is the exception, and it needs both edges. The client
+         * reports the release only for a slot the server claimed, and a release with no press
+         * before it (a key held across the join) is delivered too, so a handler should treat it
+         * as "not held now" rather than as the end of something it saw start.
+         */
+        default void onRelease(ServerPlayer player) {}
     }
 }

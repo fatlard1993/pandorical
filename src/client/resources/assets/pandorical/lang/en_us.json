@@ -7,5 +7,21 @@
   "key.pandorical.action5": "Pandorical Action 5",
   "key.pandorical.action6": "Pandorical Action 6",
   "key.pandorical.action7": "Pandorical Action 7",
-  "key.pandorical.action8": "Pandorical Action 8"
+  "key.pandorical.action8": "Pandorical Action 8",
+  "pandorical.settings.title": "Server Settings",
+  "pandorical.settings.close": "Done",
+  "pandorical.settings.on": "On",
+  "pandorical.settings.off": "Off",
+  "pandorical.settings.none": "Nothing on this server asks for a setting.",
+  "pandorical.settings.no_client": "The settings screen needs the Pandorical client. Here they are as a list; change one with /pandorical settings <mod> <key> <value>.",
+  "pandorical.settings.unknown": "No setting called %s.",
+  "pandorical.settings.bad_value": "%s is not a value that setting takes.",
+  "pandorical.settings.set": "%s: %s",
+  "pandorical.mods.button": "Mods",
+  "pandorical.mods.title": "Server Mods",
+  "pandorical.settings.ops_only": "That is a server setting; ops only.",
+  "pandorical.settings.hidden": "That setting is not in play right now.",
+  "pandorical.settings.remove": "Remove",
+  "pandorical.mods.readme": "Readme",
+  "pandorical.mods.settings": "Settings"
 }

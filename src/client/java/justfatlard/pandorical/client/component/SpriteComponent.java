@@ -24,15 +24,27 @@ public class SpriteComponent extends AbstractComponent {
     private int textureHeight;
     private int textureU;
     private int textureV;
+    // The source origin blends on the geometry's own clock: a reveal that moves its v in step with
+    // its height (a bottom-anchored gauge) must see both interpolate together, or the anchored edge
+    // detaches for the length of the blend window
+    private float prevU;
+    private float prevV;
 
     @Override
     public void init(ComponentDef def, ComponentContext context) {
         super.init(def, context);
         parseStyle();
+        prevU = textureU;
+        prevV = textureV;
     }
 
     @Override
     public void updateProps(Map<String, String> changedProps) {
+        // Capture the origin currently displayed (possibly mid-blend) before the geometry blend
+        // restarts, same in-flight capture AbstractComponent does for geometry itself
+        float t = geometryBlend(0f);
+        prevU = prevU + (textureU - prevU) * t;
+        prevV = prevV + (textureV - prevV) * t;
         super.updateProps(changedProps);
         parseStyle();
     }
@@ -75,12 +87,19 @@ public class SpriteComponent extends AbstractComponent {
                 // Native-size draw clipped to bounds; size interpolation is
                 // applied here as a per-frame re-clip, a true reveal
                 GeometrySnapshot g = interpolatedGeometry(delta);
+                // The origin blends on the same clock as the geometry: a server that moves v with
+                // height (v = textureHeight - height, the bottom-anchored gauge) then sees
+                // textureHeight - v == height at every point of the blend, keeping the anchored
+                // edge pinned instead of gapping while the size clamp below chases a snapped origin
+                float t = geometryBlend(delta);
+                int drawU = Math.round(prevU + (textureU - prevU) * t);
+                int drawV = Math.round(prevV + (textureV - prevV) * t);
                 // Clamped against the region left of the source origin, so a sprite
                 // revealing from a non-zero u/v can never sample past the texture
-                int drawW = Math.min(Math.round(g.width()), textureWidth - textureU);
-                int drawH = Math.min(Math.round(g.height()), textureHeight - textureV);
+                int drawW = Math.min(Math.round(g.width()), textureWidth - drawU);
+                int drawH = Math.min(Math.round(g.height()), textureHeight - drawV);
                 if (drawW > 0 && drawH > 0) {
-                    graphics.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, textureU, textureV,
+                    graphics.blit(RenderPipelines.GUI_TEXTURED, texture, x, y, drawU, drawV,
                         drawW, drawH, textureWidth, textureHeight);
                 }
             } else {

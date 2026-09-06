@@ -13,6 +13,7 @@ public class CameraManager {
     private static float overrideDistance = -1; // -1 = no override
     private static CameraType savedPerspective = null;
     private static boolean perspectiveForced = false;
+    private static float zoomFactor = 1.0F;
 
     /**
      * Handle a camera hint from the server.
@@ -27,6 +28,15 @@ public class CameraManager {
                     } catch (NumberFormatException e) {
                         justfatlard.pandorical.Pandorical.LOGGER.warn("Invalid camera distance value: '{}'", distStr);
                     }
+                }
+            }
+            case "zoom" -> {
+                String value = hint.params().get("factor");
+                try {
+                    zoomFactor = value == null ? 1.0F : Float.parseFloat(value);
+                } catch (NumberFormatException e) {
+                    justfatlard.pandorical.Pandorical.LOGGER.warn("Invalid camera zoom factor: '{}'", value);
+                    zoomFactor = 1.0F;
                 }
             }
             case "perspective" -> {
@@ -56,6 +66,11 @@ public class CameraManager {
      * Called by CameraMixin to get the overridden camera distance.
      * Returns -1 if no override is active.
      */
+    /** How much the field of view is narrowed, 1.0 being not at all. */
+    public static float getZoomFactor() {
+        return zoomFactor;
+    }
+
     public static float getOverrideDistance() {
         return overrideDistance;
     }
@@ -64,6 +79,7 @@ public class CameraManager {
      * Reset all camera overrides.
      */
     public static void reset() {
+        zoomFactor = 1.0F;
         overrideDistance = -1;
         if (perspectiveForced && savedPerspective != null) {
             Minecraft.getInstance().options.setCameraType(savedPerspective);

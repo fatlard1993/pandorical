@@ -16,9 +16,24 @@ public interface PandoricalComponent {
     /** Called every frame. */
     void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta);
 
+    /**
+     * A second pass a container screen makes after vanilla has drawn the slot items, for the
+     * few things that belong over an item rather than under it. Nothing by default.
+     */
+    default void renderOverlay(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {}
+
+    /**
+     * Whether the component is there at all. A hidden component is skipped by every tree walk:
+     * not drawn, not hit, not navigable, children included. See
+     * {@link justfatlard.pandorical.api.ComponentType#PROP_VISIBLE}.
+     */
+    default boolean isVisible() { return true; }
+
     // Input handlers return true when the event is consumed.
 
     default boolean mouseClicked(double mouseX, double mouseY, int button) { return false; }
+    /** Offered to every component, not only the one under the pointer: what was pressed must hear its release wherever the mouse went. */
+    default boolean mouseReleased(double mouseX, double mouseY, int button) { return false; }
 
     default boolean keyPressed(int keyCode, int scanCode, int modifiers) { return false; }
 

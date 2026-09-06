@@ -9,7 +9,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.InterpolationHandler;
-import net.minecraft.world.entity.SteppedInterpolationHandler;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -47,14 +46,14 @@ public class StubEntity extends Entity {
 	}
 
 	/**
-	 * Vanilla's stepped position lerp instead of the base Entity's snap:
-	 * server position updates arrive at tracking cadence, and a rider (e.g.
-	 * on big-boats' ship anchor) must glide with them, not jitter against
-	 * the smoothly interpolated structure rendering.
+	 * The structure's own blend rather than vanilla's stepped one: a rider on big-boats' ship
+	 * anchor is drawn wherever the anchor is, and the anchor has to be drawn wherever the deck
+	 * is. Vanilla's blend sat a different distance behind the server's position than the
+	 * structure's did, and the pilot stood that difference off the helm.
 	 */
 	@Override
 	protected InterpolationHandler createInterpolationHandler() {
-		return SteppedInterpolationHandler.create(this);
+		return new StructureInterpolationHandler(this);
 	}
 
 	/**

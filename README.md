@@ -22,6 +22,8 @@ download.
 - **Moving structures**, like a ship built out of blocks that sails as one piece.
 - **Camera control**, when a server wants to pull the view back.
 - **Cosmetic overlays** on particular mobs or chests, so you can tell one from another.
+- **One block at one place a different colour**, so two of the same block in two places can
+  be told apart on sight.
 - **Extra squares and buttons on your own inventory screen**: a slot that only takes a
   map, a compass slot beside it, a button that tidies your pack. They sit in the vanilla
   panel and behave like the rest of it.
@@ -39,6 +41,23 @@ added to a world. Everything you see through it comes from a mod on the server.
   Action" rows in your controls screen, which sit there unused until a server names them.
 - **Running a server**: install it on the server too, alongside whichever mods depend on
   it. It is the one mod in this suite that belongs on both sides.
+
+## The Mod Menu
+
+Every mod on the server, in-game. A **Mods** button on the pause menu and the options menu opens
+it on a Pandorical client: the mods down the left, and the chosen one on the right with its
+description, its settings if it has any, and its readme, read straight out of its jar - every mod
+in this suite ships its README beside its licence. `/pandorical mods` opens the same screen, or
+lists the mods as text on a vanilla client. The screen is built to the size of the window it
+will show in, so a readme gets the room the window has. The readme is rendered by block: titles
+with a rule beneath, list items hanging off their markers, code in an inset with its spacing
+kept, quotes with a bar down their side, tables as a list of their rows.
+
+A mod's settings sit in sections by whose they are: **Your settings**, kept on this server for
+the player alone; **Your client's settings**, kept by the player's own game wherever they play;
+and **Server settings**, one value for everyone, which only an op is shown. `/pandorical
+settings` opens the menu on a mod with settings, or lists them as text on a vanilla client,
+where `/pandorical settings <mod> <key> <value>` changes them.
 
 ## Installation
 
@@ -75,8 +94,8 @@ it most:
 Your mod stays server-side and describes what it wants drawn. Pandorical does the rest,
 so you ship no client code.
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for the API, the capability handshake, and the two
-string mistakes that fail silently.
+See [DEVELOPMENT.md](DEVELOPMENT.md) for the API, the capability handshake, the settings a
+mod can put on its page of the mod menu, and the two string mistakes that fail silently.
 
 For a worked example, [pandorical-demo](https://github.com/fatlard1993/pandorical-demo)
 puts every component type in one screen and every world capability in one frame, and it

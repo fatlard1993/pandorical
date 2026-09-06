@@ -62,6 +62,30 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
      * background origin ({@code leftPos}, {@code topPos}), so we add those offsets before
      * calling {@code graphics.fill()} or {@code graphics.blitSprite()}.
      */
+    @Inject(method = "extractRenderState", at = @At("HEAD"))
+    private void pandorical$drawExtraSlotBackgrounds(GuiGraphicsExtractor graphics,
+            int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+        for (PlayerInventoryRegistrationsS2C.SlotGroup group : ClientInventorySlotRegistry.getGroups()) {
+            for (PlayerInventoryRegistrationsS2C.SlotPosition pos : group.slots()) {
+                int ax = this.leftPos + pos.screenX() - 1;
+                int ay = this.topPos + pos.screenY() - 1;
+
+                int bx = ax + 18;
+                int by = ay + 18;
+                graphics.fill(ax,      ay,      bx,      ay + 1,  SLOT_BORDER_DARK);
+                graphics.fill(ax,      ay,      ax + 1,  by,      SLOT_BORDER_DARK);
+                graphics.fill(ax,      by - 1,  bx,      by,      SLOT_BORDER_LIGHT);
+                graphics.fill(bx - 1,  ay,      bx,      by,      SLOT_BORDER_LIGHT);
+                graphics.fill(ax + 1,  ay + 1,  bx - 1,  by - 1,  SLOT_INNER);
+
+                String sprite = pos.backgroundSprite();
+                if (sprite != null && !sprite.isEmpty()) {
+                    graphics.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.parse(sprite), ax, ay, 18, 18);
+                }
+            }
+        }
+    }
+
     /**
      * Draw the buttons this server asked for, and answer clicks on them.
      *
@@ -86,10 +110,18 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
             graphics.fill(bx + 1, by + 1, bx + size - 1, by + size - 1,
                 over ? BUTTON_HOVER : BUTTON_FACE);
 
-            String glyph = button.glyph();
-            int gx = bx + (size - font.width(glyph)) / 2;
+            // A face is either a sprite id or a character to draw. Only the former can carry a
+            // colon, so that is the whole test - and sprite art is what these should be wearing:
+            // a font arrow is a one-pixel hairline against vanilla's chunky widgets.
+            String face = button.glyph();
+            if (face.indexOf(':') >= 0) {
+                graphics.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.parse(face),
+                    bx + 1, by + 1, size - 2, size - 2);
+                continue;
+            }
+            int gx = bx + (size - font.width(face)) / 2;
             int gy = by + (size - font.lineHeight) / 2 + 1;
-            graphics.text(font, glyph, gx, gy, BUTTON_TEXT, false);
+            graphics.text(font, face, gx, gy, BUTTON_TEXT, false);
         }
     }
 }

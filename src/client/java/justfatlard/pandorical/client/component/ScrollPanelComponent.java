@@ -11,6 +11,7 @@ import java.util.Map;
  *
  * Props:
  *   scroll_offset: current scroll position in items (default 0)
+ *   scroll_step: items per wheel notch (default 1)
  *   item_height: height per item (default 22)
  *   visible_items: how many items fit (default 5)
  *   total_items: total item count for scroll bounds
@@ -19,6 +20,8 @@ import java.util.Map;
  */
 public class ScrollPanelComponent extends AbstractComponent {
     private int scrollOffset;
+    /** Items per wheel notch: one by default, more for a panel whose items are lines of text. */
+    private int scrollStep;
     private int itemHeight;
     private int visibleItems;
     private int totalItems;
@@ -42,6 +45,7 @@ public class ScrollPanelComponent extends AbstractComponent {
 
     private void parseStyle() {
         scrollOffset = parseInt("scroll_offset", 0);
+        scrollStep = Math.max(1, parseInt("scroll_step", 1));
         itemHeight = parseInt("item_height", 22);
         visibleItems = parseInt("visible_items", 5);
         totalItems = parseInt("total_items", 0);
@@ -88,25 +92,29 @@ public class ScrollPanelComponent extends AbstractComponent {
         return new int[]{ x, y, x + width, y + height };
     }
 
+    /**
+     * Wheel travel not yet spent on a whole item. A notch is one event of one on a plain wheel
+     * and a run of small fractions on a high-resolution wheel or a touchpad; stepping a whole
+     * item on every event made those fly through the pane several items a notch.
+     */
+    private double pending;
+
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
-        if (isMouseOver(mouseX, mouseY) && totalItems > visibleItems) {
-            int newOffset = scrollOffset;
-            if (amount > 0 && scrollOffset > 0) {
-                newOffset = scrollOffset - 1;
-            } else if (amount < 0 && scrollOffset < totalItems - visibleItems) {
-                newOffset = scrollOffset + 1;
-            }
-            if (newOffset != scrollOffset) {
-                scrollOffset = newOffset;
-                if (context != null && context.sendAction() != null) {
-                    context.sendAction().accept(id, Map.of(
-                        "scroll_offset", String.valueOf(scrollOffset)
-                    ));
-                }
-                return true;
+        if (!isMouseOver(mouseX, mouseY) || totalItems <= visibleItems) return false;
+        pending -= amount * scrollStep;
+        int steps = (int) pending;
+        if (steps == 0) return true;
+        pending -= steps;
+        int newOffset = Math.clamp(scrollOffset + steps, 0, totalItems - visibleItems);
+        if (newOffset != scrollOffset) {
+            scrollOffset = newOffset;
+            if (context != null && context.sendAction() != null) {
+                context.sendAction().accept(id, Map.of(
+                    "scroll_offset", String.valueOf(scrollOffset)
+                ));
             }
         }
-        return false;
+        return true;
     }
 }

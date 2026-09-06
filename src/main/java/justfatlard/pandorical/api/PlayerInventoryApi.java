@@ -109,6 +109,12 @@ public interface PlayerInventoryApi {
      */
     void registerButton(Identifier namespace, String id, int x, int y, int size, String glyph);
 
+    // A glyph may instead be a GUI atlas sprite id, e.g. "mymod:icon_sort" for
+    // assets/mymod/textures/gui/sprites/icon_sort.png, drawn to fill the button's face. Anything
+    // containing a colon is read that way, which no single character ever is. Prefer it: font
+    // arrows and symbols are one-pixel hairlines beside vanilla's own widget art. Same for
+    // setButtonGlyph below, so a switch can change its face between two sprites.
+
     /** Called when somebody presses one of {@link #registerButton}'s buttons. */
     void onButton(Identifier namespace, String id, java.util.function.Consumer<ServerPlayer> handler);
 

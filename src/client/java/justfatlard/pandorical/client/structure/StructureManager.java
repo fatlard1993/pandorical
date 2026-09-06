@@ -25,6 +25,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * ({@link #INTERPOLATION_TICKS} ticks), the same general technique vanilla uses for networked
  * entity movement. {@link #tick()} advances that window once per client tick; the renderer
  * samples the interpolated pose once per render frame using the current partial tick.
+ *
+ * <p>Sampled the way an entity is drawn: between where the structure stood after the previous
+ * tick and where it stands after this one, by the partial tick. It used to sample ahead of the
+ * ticked state instead, a third of a tick further along the blend per frame, which put the deck
+ * a tick in front of every entity riding on it - and at a boat's speed a tick is half a block.
+ * Anything meant to stay on a structure ({@code StructureInterpolationHandler}) blends by the
+ * same rule, so the two are drawn in the same place.
  */
 public final class StructureManager {
     private StructureManager() {}
@@ -34,7 +41,7 @@ public final class StructureManager {
      * the actual interval between server updates; simple, and adequate for a first version
      * since callers are documented to call {@code updatePose} roughly once per server tick.
      */
-    private static final int INTERPOLATION_TICKS = 3;
+    public static final int INTERPOLATION_TICKS = 3;
 
     private static final Map<String, ClientStructure> structures = new ConcurrentHashMap<>();
 
@@ -108,36 +115,53 @@ public final class StructureManager {
         // Start "arrived" so the very first pose renders immediately with no bogus lerp-in.
         private int ticksSinceUpdate = INTERPOLATION_TICKS;
 
+        /** Where the structure stood after the previous tick, and after this one. */
+        private StructurePoseSnapshot lastTick;
+        private StructurePoseSnapshot thisTick;
+
         ClientStructure(Map<RelPosKey, BlockState> blocks, StructurePoseSnapshot initialPose, boolean visible) {
             this.blocks = blocks;
             this.previousPose = initialPose;
             this.targetPose = initialPose;
+            this.lastTick = initialPose;
+            this.thisTick = initialPose;
             this.visible = visible;
         }
 
         void pushPose(StructurePoseSnapshot newPose) {
-            // Resume interpolation from wherever we currently are (tick-accurate, not
-            // sub-tick, a small documented simplification) rather than snapping to the old
-            // target, so a steady stream of updates blends continuously instead of stair-stepping.
-            this.previousPose = interpolated(0.0f);
+            // Resume the blend from where this tick left the structure rather than snapping to
+            // the old target, so a steady stream of updates blends continuously instead of
+            // stair-stepping.
+            this.previousPose = thisTick;
             this.targetPose = newPose;
             this.ticksSinceUpdate = 0;
         }
 
         void tick() {
+            lastTick = thisTick;
             if (ticksSinceUpdate < INTERPOLATION_TICKS) ticksSinceUpdate++;
+            thisTick = blended(ticksSinceUpdate / (float) INTERPOLATION_TICKS);
         }
 
-        /** Interpolated pose for the current render frame. */
+        /** Pose for the current render frame: between the last two ticks, like an entity. */
         public StructurePoseSnapshot interpolated(float partialTick) {
-            float t = (ticksSinceUpdate + partialTick) / INTERPOLATION_TICKS;
+            if (partialTick >= 1.0f) return thisTick;
+            if (partialTick <= 0.0f) return lastTick;
+            return between(lastTick, thisTick, partialTick);
+        }
+
+        private StructurePoseSnapshot blended(float t) {
             if (t >= 1.0f) return targetPose;
             if (t <= 0.0f) return previousPose;
-            double x = lerp(t, previousPose.x(), targetPose.x());
-            double y = lerp(t, previousPose.y(), targetPose.y());
-            double z = lerp(t, previousPose.z(), targetPose.z());
-            float yaw = lerpAngle(t, previousPose.yaw(), targetPose.yaw());
-            return new StructurePoseSnapshot(x, y, z, yaw);
+            return between(previousPose, targetPose, t);
+        }
+
+        private static StructurePoseSnapshot between(StructurePoseSnapshot from, StructurePoseSnapshot to, float t) {
+            return new StructurePoseSnapshot(
+                lerp(t, from.x(), to.x()),
+                lerp(t, from.y(), to.y()),
+                lerp(t, from.z(), to.z()),
+                lerpAngle(t, from.yaw(), to.yaw()));
         }
 
         private static double lerp(float t, double start, double end) {

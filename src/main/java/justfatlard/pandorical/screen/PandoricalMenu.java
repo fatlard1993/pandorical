@@ -1,6 +1,7 @@
 package justfatlard.pandorical.screen;
 
 import justfatlard.pandorical.protocol.OpenScreenS2C;
+import net.minecraft.world.CompoundContainer;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
@@ -102,13 +103,14 @@ public class PandoricalMenu extends AbstractContainerMenu {
         // Container without running its lifecycle skipped all of it, so a loot chest emptied
         // through one of these screens was never marked spent and its clasp stayed bright.
         //
-        // Never for a block entity, though. A chest's opener count is vanilla's, and vanilla
-        // keeps it honest by periodically recounting the players it can see holding that
-        // container open - through menus it recognises, which this is not. Telling it we opened
-        // a chest it then cannot find an opener for leaves the count fighting itself, and the
-        // lid ends up showing the opposite of the truth. Whatever owns the block owns its lid.
+        // Never where the container is a block's own, though. A chest's opener count is
+        // vanilla's, and vanilla keeps it honest by periodically recounting the players it can
+        // see holding that container open - through menus it recognises, which this is not.
+        // Telling it we opened a chest it then cannot find an opener for leaves the count
+        // fighting itself, and the lid ends up showing the opposite of the truth. Whatever owns
+        // the block owns its lid.
         if (playerInventory.player instanceof ServerPlayer opener
-                && serverContainer != null && !(serverContainer instanceof BlockEntity)) {
+                && serverContainer != null && !ownsItsOwnLid(serverContainer)) {
             serverContainer.startOpen(opener);
             this.ranContainerLifecycle = true;
         }
@@ -196,6 +198,19 @@ public class PandoricalMenu extends AbstractContainerMenu {
         }
         super.clicked(slotIndex, button, actionType, player);
         if (slotChangeCallback != null) slotChangeCallback.run();
+    }
+
+    /**
+     * Whether this container belongs to a block that is already keeping its own open state.
+     *
+     * <p>Testing for a {@link BlockEntity} alone is the single-chest half of the question. A
+     * DOUBLE chest is handed over as a {@link CompoundContainer} wrapping the two halves, which is
+     * not a block entity and sailed straight past that test into vanilla's opener count - so
+     * double chests opened through a Pandorical screen had their lids driven by a count vanilla
+     * could not see an opener for, and left them standing open.
+     */
+    private static boolean ownsItsOwnLid(Container container) {
+        return container instanceof BlockEntity || container instanceof CompoundContainer;
     }
 
     @Override

@@ -52,5 +52,10 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extend
 	private void pandorical$extractOverlay(T entity, S state, float partialTick, CallbackInfo ci) {
 		((OverlayTextureHolder) state).pandorical$setOverlayTexture(
 			EntityOverlayStore.get(entity.getId()));
+
+		// The model is posed from the state alone, long after the entity is out of reach, so what
+		// it is playing has to travel with it.
+		((justfatlard.pandorical.client.renderer.AnimationHolder) state).pandorical$setAnimation(
+			justfatlard.pandorical.client.animation.EntityAnimations.playing(entity.getId()));
 	}
 }

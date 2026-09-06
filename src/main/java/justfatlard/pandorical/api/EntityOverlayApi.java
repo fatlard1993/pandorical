@@ -25,6 +25,7 @@ import net.minecraft.world.entity.Entity;
  * flag.
  */
 public interface EntityOverlayApi {
+    // Living entities and minecarts honour the overlay; other renderers draw their own texture.
     /**
      * Set (or replace) the overlay texture for an entity. Pushed immediately
      * to all current trackers and automatically to future trackers.

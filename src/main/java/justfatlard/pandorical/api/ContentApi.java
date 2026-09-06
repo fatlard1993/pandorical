@@ -39,6 +39,14 @@ public interface ContentApi {
     void registerServerOnlyNamespace(String namespace);
 
     /**
+     * Rails hold players up. Every rail, vanilla's and synced stand-ins alike: two pixels of deck
+     * on a flat one, a ramp of steps on a slope, offered to players and to nothing else, so carts
+     * and mobs ride and wander exactly as before. Synced to clients with the rest of the content,
+     * because a floor the client cannot predict is a floor it keeps dropping the player through.
+     */
+    void solidRails();
+
+    /**
      * Override a vanilla item's appearance (name, texture, model) for Pandorical
      * clients. Injected into the VirtualResourcePack at TOP priority, so it wins
      * over vanilla resources; vanilla clients are unaffected. Multiple name

@@ -53,6 +53,7 @@ public abstract class AbstractComponent implements PandoricalComponent {
 
     protected float scale = 1f;
     protected float rotation = 0f;
+    protected boolean visible = true;
 
     private GeometrySnapshot previousGeom;
     private GeometrySnapshot targetGeom;
@@ -116,7 +117,11 @@ public abstract class AbstractComponent implements PandoricalComponent {
     private void parseGeometryStyle() {
         scale = parseFloat(ComponentType.PROP_SCALE, 1f);
         rotation = parseFloat(ComponentType.PROP_ROTATION, 0f);
+        visible = parseBool(ComponentType.PROP_VISIBLE, true);
     }
+
+    @Override
+    public boolean isVisible() { return visible; }
 
     private GeometrySnapshot currentGeometrySnapshot() {
         return new GeometrySnapshot(x, y, width, height, scale, rotation);
@@ -144,9 +149,19 @@ public abstract class AbstractComponent implements PandoricalComponent {
         return false;
     }
 
+    /**
+     * Blend fraction of the current geometry interpolation window, 0..1. Subclasses with props that
+     * must move in lockstep with geometry (a clip-mode sprite's texture_u/v, which arrive in the
+     * same update as the width/height they mirror) sample this so their own blend can never drift
+     * from the geometry's.
+     */
+    protected float geometryBlend(float partialTick) {
+        return clamp01((geomTicksSinceUpdate + partialTick) / (float) interpolationTicks);
+    }
+
     /** Interpolated geometry for the current render frame. Used by ScreenHelper's transform wrapper. */
     public GeometrySnapshot interpolatedGeometry(float partialTick) {
-        float t = clamp01((geomTicksSinceUpdate + partialTick) / (float) interpolationTicks);
+        float t = geometryBlend(partialTick);
         if (t >= 1f) return targetGeom;
         if (t <= 0f) return previousGeom;
         float ix = lerp(t, previousGeom.x(), targetGeom.x());

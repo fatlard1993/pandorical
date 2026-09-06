@@ -3,8 +3,12 @@
 	"package": "justfatlard.pandorical.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
+		"RailCollisionMixin",
 		"SlotMixin",
-		"InventoryMenuMixin"
+		"InventoryMenuMixin",
+		"HorseSteeringMixin",
+		"HorsePillionMixin",
+		"MountCapacityMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

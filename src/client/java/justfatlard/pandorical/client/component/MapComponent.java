@@ -58,6 +58,11 @@ public class MapComponent extends AbstractComponent {
     private byte compassDecY = 0;
     // Mob Sight enchantment: serialized mob dot list from server
     private String mobsData = "";
+    /** How the map is shown, as the server says for this player: nothing here is the client's own choice. */
+    private float zoom = 1.0f;
+    private boolean showCoords = true;
+    private boolean showHostile = true;
+    private boolean showPassive = true;
     /** A heading arrow to lay in the corner, when the server supplies one. */
     private Identifier needleTexture = null;
     /** Whether the compass is pointing past the edge of this map. */
@@ -87,6 +92,10 @@ public class MapComponent extends AbstractComponent {
         mobsData = props.getOrDefault("mobs", "");
         needleTexture = Identifier.tryParse(props.getOrDefault("needle", ""));
         compassOffMap = parseBool("compass_off_map", false);
+        zoom = parseFloat("zoom", 1.0f);
+        showCoords = parseBool("show_coords", true);
+        showHostile = parseBool("show_hostile", true);
+        showPassive = parseBool("show_passive", true);
     }
 
     /**
@@ -141,9 +150,7 @@ public class MapComponent extends AbstractComponent {
 
         graphics.enableScissor(mapX, mapY, mapX + mapSize, mapY + mapSize);
 
-        // --- Zoom support ---
-        float zoomLevel = MapDisplaySettings.getZoomLevel();
-        float zoomScale = scale * zoomLevel;
+        float zoomScale = scale * zoom;
 
         // Belt-and-suspenders clamp of self decoration bytes
         int clampedSelfDecX = Math.max(-127, Math.min(127, (int) selfDecX));
@@ -151,7 +158,7 @@ public class MapComponent extends AbstractComponent {
 
         // When zoom > 1 we centre on the player; at 1x top-left is the map corner
         float originX, originY;
-        if (zoomLevel > 1.0f) {
+        if (zoom > 1.0f) {
             originX = mapX + mapSize / 2.0f - (clampedSelfDecX / 2.0f + 64f) * zoomScale;
             originY = mapY + mapSize / 2.0f - (clampedSelfDecY / 2.0f + 64f) * zoomScale;
         } else {
@@ -181,11 +188,6 @@ public class MapComponent extends AbstractComponent {
 
         // --- Mob Sight: mob dots render first so the player marker lands on top ---
         if (!mobsData.isEmpty()) {
-            MapDisplaySettings.ensureLoaded();
-            boolean showHostile = MapDisplaySettings.isShowHostile();
-            boolean showPassiveOther = MapDisplaySettings.isShowPassiveOther();
-            java.util.Set<String> disabledMobTypes = MapDisplaySettings.getDisabledMobTypes();
-
             String[] entries = mobsData.split(";");
             for (String entry : entries) {
                 // Format: decX,decZ,colorARGB,entityTypeId
@@ -196,14 +198,10 @@ public class MapComponent extends AbstractComponent {
                     int decX = Integer.parseInt(parts[0]);
                     int decZ = Integer.parseInt(parts[1]);
                     int color = Integer.parseInt(parts[2]);
-                    String entityTypeId = parts.length >= 4 ? parts[3] : "";
 
-                    // Category filters
+                    // Category filters, by the colour the server gave the dot
                     if (!showHostile && color == 0xFFFF3333) continue;
-                    if (!showPassiveOther && (color == 0xFF33FF33 || color == 0xFFFFAA00)) continue;
-
-                    // Individual mob type filter
-                    if (!entityTypeId.isEmpty() && disabledMobTypes.contains(entityTypeId)) continue;
+                    if (!showPassive && (color == 0xFF33FF33 || color == 0xFFFFAA00)) continue;
 
                     if (Math.abs(decX - clampedSelfDecX) <= 1 && Math.abs(decZ - clampedSelfDecY) <= 1) continue;
                     int sx = Math.round(originX + (decX / 2.0f + 64f) * zoomScale);
@@ -240,7 +238,7 @@ public class MapComponent extends AbstractComponent {
                 // than in whichever corner two independent clamps happened to meet. Turned to
                 // face outward there, which is the only way a marker on a border says "further".
                 float turn = compassOffMap ? (float) Math.toDegrees(Math.atan2(
-                    compassDecX - clampedSelfDecX, -(compassDecY - clampedSelfDecY))) : 0f;
+                    compassTargetX - mapData.centerX, -(compassTargetZ - mapData.centerZ))) : 0f;
                 drawMarker(graphics, mapSprite(mc, compassOffMap ? "target_x" : "target_point"),
                     cpx, cpy, turn);
             }
@@ -249,12 +247,26 @@ public class MapComponent extends AbstractComponent {
         // The heading arrow, small, in the corner the map has least to say in. Only with a
         // compass: without one there is no heading to point along and an arrow would be a
         // decoration pretending to be information.
-        if (compass && needleTexture != null) {
+        if (compass && needleTexture != null && hasCompassTarget) {
             int size = Math.max(8, mapSize / 5);
             int nx = mapX + 2;
             int ny = mapY + mapSize - size - 2;
+
+            // Taken from world coordinates, not from the map's decoration bytes.
+            //
+            // Those bytes are the target's position ON THE MAP, and a target off the map has
+            // already been walked back to the border before they are written - so past the edge
+            // the needle was reading the border point rather than the thing, and pointing at a
+            // spot on the frame. Worse the further out it was: the clamped point converges on
+            // the map's own rim, so out of range the needle swung toward the rim regardless of
+            // where the target actually lay, and near the rim the difference against the
+            // player's own clamped position collapsed toward zero and the heading became noise.
+            //
+            // The real coordinates are already here, sent beside those bytes, and they are
+            // subject to no clamp, no map scale and no edge. The needle is a heading; it should
+            // never have been asking the map.
             float bearing = (float) Math.toDegrees(Math.atan2(
-                compassDecX - clampedSelfDecX, -(compassDecY - clampedSelfDecY)));
+                compassTargetX - mc.player.getX(), -(compassTargetZ - mc.player.getZ())));
 
             Matrix3x2fStack npose = graphics.pose();
             npose.pushMatrix();
@@ -270,7 +282,7 @@ public class MapComponent extends AbstractComponent {
 
         // --- Facing direction + coordinates, inside the map so the component
         // --- never paints outside the bounds it told the layout it occupies.
-        if (!MapDisplaySettings.isShowCoords()) return;
+        if (!showCoords) return;
         float yaw = mc.player.getYRot();
         // Convert MC yaw (0=south) to degrees-from-north clockwise
         float fromNorth = ((yaw + 180) % 360 + 360) % 360;
@@ -280,11 +292,23 @@ public class MapComponent extends AbstractComponent {
         // Centring alone does not keep the readout inside a small map: step down to
         // shorter forms until one fits, and draw nothing rather than overflow.
         String coords = facing + "  " + bx + " / " + by + " / " + bz;
-        if (mc.font.width(coords) > mapSize) coords = facing + " " + bx + "/" + by + "/" + bz;
-        if (mc.font.width(coords) > mapSize) coords = facing;
-        if (mc.font.width(coords) > mapSize) return;
-        int textX = mapX + (mapSize - mc.font.width(coords)) / 2;
-        int textY = mapY + mapSize - mc.font.lineHeight - 1;
+        // Below the map when the component was handed room for it, over the map when it was not.
+        // The map is square at min(width, height), so any height beyond that is space the caller
+        // asked for on purpose, and a readout sitting under the frame beats one painted across
+        // the ground it is describing. A caller that declares a square still gets the old
+        // placement rather than text over the edge of its own bounds.
+        int spare = height - footprint;
+        boolean below = spare >= mc.font.lineHeight + 1;
+        int room = below ? footprint : mapSize;
+
+        if (mc.font.width(coords) > room) coords = facing + " " + bx + "/" + by + "/" + bz;
+        if (mc.font.width(coords) > room) coords = facing;
+        if (mc.font.width(coords) > room) return;
+
+        int textX = (below ? x : mapX) + (room - mc.font.width(coords)) / 2;
+        int textY = below
+            ? y + footprint + (spare - mc.font.lineHeight) / 2
+            : mapY + mapSize - mc.font.lineHeight - 1;
         graphics.text(mc.font, coords, textX, textY, 0xFFFFFFFF, true);
     }
 

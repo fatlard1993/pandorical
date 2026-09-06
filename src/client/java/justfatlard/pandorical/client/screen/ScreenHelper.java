@@ -45,6 +45,7 @@ public final class ScreenHelper {
 
     public static void renderComponentTree(PandoricalComponent component, GuiGraphicsExtractor graphics,
                                             int mouseX, int mouseY, float delta) {
+        if (!component.isVisible()) return;
         renderWithGeometryTransform(component, graphics, mouseX, mouseY, delta);
 
         // Scroll panels scissor-clip their children and translate them by the
@@ -67,6 +68,37 @@ public final class ScreenHelper {
 
         for (PandoricalComponent child : component.getChildren()) {
             renderComponentTree(child, graphics, mouseX, mouseY, delta);
+        }
+    }
+
+    /**
+     * The over-the-items pass, walked the same way as {@link #renderComponentTree} so a grid
+     * inside a scroll panel veils the slots where they are drawn, not where they were laid out.
+     * No geometry transform: what this pass draws sits on vanilla's slot positions, which the
+     * grid has already placed from its raw bounds.
+     */
+    public static void renderOverlayTree(PandoricalComponent component, GuiGraphicsExtractor graphics,
+                                         int mouseX, int mouseY, float delta) {
+        if (!component.isVisible()) return;
+        component.renderOverlay(graphics, mouseX, mouseY, delta);
+
+        if (component instanceof ScrollPanelComponent panel) {
+            int[] bounds = panel.getClipBounds();
+            int scroll = panel.scrollPixels();
+            graphics.enableScissor(bounds[0], bounds[1], bounds[2], bounds[3]);
+            var pose = graphics.pose();
+            pose.pushMatrix();
+            pose.translate(0, -scroll);
+            for (PandoricalComponent child : component.getChildren()) {
+                renderOverlayTree(child, graphics, mouseX, mouseY + scroll, delta);
+            }
+            pose.popMatrix();
+            graphics.disableScissor();
+            return;
+        }
+
+        for (PandoricalComponent child : component.getChildren()) {
+            renderOverlayTree(child, graphics, mouseX, mouseY, delta);
         }
     }
 
@@ -173,6 +205,7 @@ public final class ScreenHelper {
      * Route mouse click through component tree in reverse order (top-most first).
      */
     public static boolean mouseClickedTree(PandoricalComponent component, double mouseX, double mouseY, int button) {
+        if (!component.isVisible()) return false;
         // A scroll panel's clipped-out children are invisible and must not be
         // clickable: only descend into its children when the click lands
         // inside the clip region (mirroring the render-time scissor), and
@@ -205,6 +238,7 @@ public final class ScreenHelper {
      * Route key press through component tree.
      */
     public static boolean keyPressedTree(PandoricalComponent component, int keyCode, int scanCode, int modifiers) {
+        if (!component.isVisible()) return false;
         for (PandoricalComponent child : component.getChildren()) {
             if (keyPressedTree(child, keyCode, scanCode, modifiers)) {
                 return true;
@@ -217,6 +251,7 @@ public final class ScreenHelper {
      * Route character typed through component tree.
      */
     public static boolean charTypedTree(PandoricalComponent component, int codepoint) {
+        if (!component.isVisible()) return false;
         for (PandoricalComponent child : component.getChildren()) {
             if (charTypedTree(child, codepoint)) {
                 return true;
@@ -229,6 +264,7 @@ public final class ScreenHelper {
      * Route mouse scroll through component tree.
      */
     public static boolean mouseScrolledTree(PandoricalComponent component, double mouseX, double mouseY, double amount) {
+        if (!component.isVisible()) return false;
         for (PandoricalComponent child : component.getChildren()) {
             if (mouseScrolledTree(child, mouseX, mouseY, amount)) {
                 return true;
@@ -247,6 +283,26 @@ public final class ScreenHelper {
             }
         }
         return false;
+    }
+
+    /**
+     * Dispatch a mouse release through a list of root components: to all of them, so a
+     * component holding a press hears the release however far the pointer has wandered.
+     */
+    public static boolean dispatchMouseReleased(List<PandoricalComponent> roots, double mouseX, double mouseY, int button) {
+        boolean consumed = false;
+        for (int i = roots.size() - 1; i >= 0; i--) {
+            consumed |= mouseReleasedTree(roots.get(i), mouseX, mouseY, button);
+        }
+        return consumed;
+    }
+
+    private static boolean mouseReleasedTree(PandoricalComponent component, double mouseX, double mouseY, int button) {
+        boolean consumed = false;
+        for (PandoricalComponent child : component.getChildren()) {
+            consumed |= mouseReleasedTree(child, mouseX, mouseY, button);
+        }
+        return component.mouseReleased(mouseX, mouseY, button) || consumed;
     }
 
     /**

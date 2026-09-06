@@ -35,23 +35,33 @@ public class Pandorical implements ModInitializer {
     /**
      * The wire format, bumped whenever what goes over it changes shape.
      *
+     * <p>v5 because an item entry now carries whether the item is food, and what kind. A v4 client
+     * decoding a v5 entry stops one field short and reads the next item's id as this one's, so the
+     * whole content sync comes apart - the change is a new field in the middle of a stream, which
+     * is never something an older reader can skip.
+     *
      * <p>v4 because v3 covered two incompatible content formats: an equippable item's slot gained
      * the id of its armour asset partway through and this number did not move, so a server and a
      * client could agree they were both speaking v3 and disagree about every piece of armour. The
      * number is only worth having if it is bumped, and the check below is only worth having if
      * the number is honest.
      */
-    public static final int PROTOCOL_VERSION = 4;
+    public static final int PROTOCOL_VERSION = 15;
 
     /**
      * The oldest client this server can still be understood by.
      *
-     * <p>Equal to the current version, because the format that changed - equippable slots - is
-     * one every armour item in the sync goes through, and a client that cannot read it does not
-     * get a degraded experience, it gets a failed join. When a future change is additive this can
-     * lag behind {@link #PROTOCOL_VERSION} and old clients can keep connecting.
+     * <p>Eleven, because v11 added two fields to every block entry and v10 put two varints in the
+     * middle of the config content payload. Either one shifts everything after it, so an older
+     * client does not read a slightly wrong packet - it reads garbage and fails somewhere
+     * unrelated. There is no reading past these.
+     *
+     * <p>It was five for a long while, and the reasoning is worth keeping: v6 only added a payload
+     * type nobody older asks for, which is the additive case this floor is meant to allow. A
+     * version bump is not automatically a compatibility break; a change to the shape of an existing
+     * payload is.
      */
-    public static final int MINIMUM_PROTOCOL = 4;
+    public static final int MINIMUM_PROTOCOL = 11;
 
     /** What the jar calls itself, so a refusal can name the version to go and install. */
     public static String modVersion() {
@@ -61,13 +71,28 @@ public class Pandorical implements ModInitializer {
             .orElse("unknown");
     }
 
-    public static final List<String> SERVER_CAPABILITIES = List.of("screens", "content", "camera", "hud", "structures", "entity_overlays", "chest_overlays", "keybinds", "hud_elements");
+    public static final List<String> SERVER_CAPABILITIES = List.of("screens", "content", "camera", "hud", "structures", "entity_overlays", "chest_overlays", "keybinds", "hud_elements", "skins", "render_policy", "animations", "mount_policy", "settings", "block_marks");
 
     /**
      * Tracks player UUIDs (from GameProfile) that completed config-phase content sync.
      * Entries are consumed (removed) when the player transitions to play phase.
+     *
+     * <p>An id left here by a connection that never reached the play phase is harmless: the next
+     * attempt acks on a new connection, re-adds it, and joins, and the join is what clears it.
+     * That was NOT true while this set also served as the guard against a second acknowledgement,
+     * which made one successful sync a permanent fact about the player - a connection that died
+     * between the ack and the join left the id behind, every later attempt was read as a repeat
+     * and ignored, the task was never completed, and that player hung on "Joining world" forever,
+     * on any client, until the server restarted. The repeat guard is per-connection now, which is
+     * the thing it was always describing.
      */
     private static final Set<java.util.UUID> configPhaseSyncedPlayers = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * Connections that have already acknowledged, so a second ack on the SAME connection is
+     * ignored rather than completing a task that is no longer there.
+     */
+    private static final Set<Object> ackedConfigConnections = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     @SuppressWarnings("unchecked")
     public static final MenuType<PandoricalMenu> MENU_TYPE = (MenuType<PandoricalMenu>) Registry.register(
@@ -167,7 +192,20 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(
             justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE,
             justfatlard.pandorical.protocol.InventoryButtonsS2C.STREAM_CODEC);
-        PayloadTypeRegistry.clientboundPlay().register(OpenScreenS2C.TYPE, OpenScreenS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.BlockTintPositionsS2C.TYPE,
+            justfatlard.pandorical.protocol.BlockTintPositionsS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.BlockMarksS2C.TYPE,
+            justfatlard.pandorical.protocol.BlockMarksS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.BannerDecalsS2C.TYPE,
+            justfatlard.pandorical.protocol.BannerDecalsS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.ClientSettingS2C.TYPE,
+            justfatlard.pandorical.protocol.ClientSettingS2C.STREAM_CODEC);
+        // Large, because a screen can carry a mod's readme, and a readme is more than a form.
+        PayloadTypeRegistry.clientboundPlay().registerLarge(OpenScreenS2C.TYPE, OpenScreenS2C.STREAM_CODEC, 1048576);
         PayloadTypeRegistry.clientboundPlay().register(UpdateScreenS2C.TYPE, UpdateScreenS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(CloseScreenS2C.TYPE, CloseScreenS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(ShowHudS2C.TYPE, ShowHudS2C.STREAM_CODEC);
@@ -177,6 +215,24 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(SyncContentS2C.TYPE, SyncContentS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SyncAssetsS2C.TYPE, SyncAssetsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(CameraHintS2C.TYPE, CameraHintS2C.STREAM_CODEC);
+        // An entity that has gone is not playing anything. Without this the table of what is
+        // playing only ever grows: every fish, every companion, every mob that ever animated stays
+        // in it for the life of the server, and each one is re-sent to every player who joins.
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents.ENTITY_UNLOAD.register(
+            (entity, level) -> PandoricalApi.AnimationApiImpl.forget(entity.getId()));
+
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.MountPolicyS2C.TYPE,
+            justfatlard.pandorical.protocol.MountPolicyS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.PlayAnimationS2C.TYPE,
+            justfatlard.pandorical.protocol.PlayAnimationS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.RenderPolicyS2C.TYPE,
+            justfatlard.pandorical.protocol.RenderPolicyS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().registerLarge(
+            justfatlard.pandorical.protocol.SkinOverrideS2C.TYPE,
+            justfatlard.pandorical.protocol.SkinOverrideS2C.STREAM_CODEC, 1048576);
         PayloadTypeRegistry.clientboundPlay().register(EntityRenderersS2C.TYPE, EntityRenderersS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SpawnStructureS2C.TYPE, SpawnStructureS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(UpdateStructurePoseS2C.TYPE, UpdateStructurePoseS2C.STREAM_CODEC);
@@ -195,8 +251,19 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.serverboundPlay().register(ContentReadyC2S.TYPE, ContentReadyC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(KeyPressC2S.TYPE, KeyPressC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(
+            justfatlard.pandorical.protocol.KeyReleaseC2S.TYPE, justfatlard.pandorical.protocol.KeyReleaseC2S.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(
             justfatlard.pandorical.protocol.InventoryButtonC2S.TYPE,
             justfatlard.pandorical.protocol.InventoryButtonC2S.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(
+            justfatlard.pandorical.protocol.OpenSettingsC2S.TYPE,
+            justfatlard.pandorical.protocol.OpenSettingsC2S.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(
+            justfatlard.pandorical.protocol.ClientSettingsC2S.TYPE,
+            justfatlard.pandorical.protocol.ClientSettingsC2S.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(
+            justfatlard.pandorical.protocol.ViewportC2S.TYPE,
+            justfatlard.pandorical.protocol.ViewportC2S.STREAM_CODEC);
     }
 
     /**
@@ -214,16 +281,25 @@ public class Pandorical implements ModInitializer {
             context.server().execute(() -> {
                 var profile = handler.getOwner();
 
-                // Only the first ack may complete the task. A second one finds the task
-                // already gone and throws, and on this thread nothing catches it: running
-                // here means a client that acks twice takes the server down rather than
-                // just itself. The set's own add() is the dedupe.
-                if (profile != null && !configPhaseSyncedPlayers.add(profile.id())) {
-                    LOGGER.debug("Ignoring repeat config-phase ack from {}", profile.name());
+                // Only the first ack on THIS connection may complete the task. A second one
+                // finds the task already gone and throws, and on this thread nothing catches
+                // it: running here means a client that acks twice takes the server down rather
+                // than just itself. Keyed on the connection and not the player, because the
+                // same player reconnecting is a new connection with a task of its own waiting
+                // to be completed - keyed on the player, their second visit hangs forever.
+                if (!ackedConfigConnections.add(handler)) {
+                    LOGGER.debug("Ignoring repeat config-phase ack from {}",
+                        profile != null ? profile.name() : "(unknown profile)");
                     return;
                 }
+                if (profile != null) configPhaseSyncedPlayers.add(profile.id());
                 LOGGER.info("Client {} completed config-phase content sync",
                     profile != null ? profile.name() : "(unknown profile)");
+
+                // The client has registered every synced block now, so a tint can find its
+                // block. Sent any earlier it named blocks that did not exist yet and was
+                // dropped on arrival, and no synced block was ever coloured on a first join.
+                sendConfigPhaseBlockTints(handler);
 
                 try {
                     handler.completeTask(PandoricalSyncTask.TYPE);
@@ -235,6 +311,14 @@ public class Pandorical implements ModInitializer {
             });
         });
 
+        // A finished connection is not a connection anybody can ack on again. Only the
+        // per-connection entry is dropped here: whether this event also fires on the ordinary
+        // hand-off into the play phase is not something the API says plainly, and clearing the
+        // player's id on that path would take the flag away before JOIN reads it. It does not
+        // need clearing anyway - see configPhaseSyncedPlayers.
+        ServerConfigurationConnectionEvents.DISCONNECT.register((handler, server) ->
+            ackedConfigConnections.remove(handler));
+
         // Server: add our sync task BEFORE Fabric's registry sync
         ServerConfigurationConnectionEvents.BEFORE_CONFIGURE.register((handler, server) -> {
             if (!agreeOnVersion(handler)) return;
@@ -243,7 +327,8 @@ public class Pandorical implements ModInitializer {
                 // Send inventory slot registrations during config phase so the client
                 // has them BEFORE InventoryMenu is constructed on play-phase entry.
                 sendConfigPhaseInventoryRegistrations(handler);
-                sendConfigPhaseBlockTints(handler);
+                // Not the block tints: those name blocks the client has yet to register, and
+                // a tint for a block it cannot find is dropped. They go once it says it has them.
 
                 var contentRegistry = PandoricalApi.contentRegistry();
                 if (contentRegistry.hasContent()) {
@@ -264,7 +349,7 @@ public class Pandorical implements ModInitializer {
                         // assigns its IDs.
                         var task = new PandoricalSyncTask(blocks, items, assetChunks,
                             entityTypes, blockEntityTypes, villagerProfessions,
-                            poiTypes, menuTypes, recipeBookCategories);
+                            poiTypes, menuTypes, recipeBookCategories, contentRegistry.railsSolid());
                         try {
                             var field = net.minecraft.server.network.ServerConfigurationPacketListenerImpl.class
                                 .getDeclaredField("configurationTasks");
@@ -324,6 +409,16 @@ public class Pandorical implements ModInitializer {
                 // completes, so replay overlays for already-tracked entities
                 PandoricalApi.entityOverlaysImpl().handlePlayerReady(player);
                 PandoricalApi.keybindsImpl().handlePlayerReady(player);
+                // And the same moment for every consuming mod's own replays
+                // Everyone already wearing an override, before anything else is drawn: a skin is a
+                // state and not an event, so a client that missed the announcement would see that
+                // person as Steve for as long as both stayed logged in.
+                PandoricalApi.SkinApiImpl.sendAllTo(player);
+                PandoricalApi.RenderApiImpl.sendTo(player);
+                PandoricalApi.AnimationApiImpl.sendAllTo(player);
+                PandoricalApi.MountApiImpl.sendTo(player);
+
+                PandoricalApi.firePlayerReady(player);
             });
         });
 
@@ -333,12 +428,44 @@ public class Pandorical implements ModInitializer {
             context.server().execute(() ->
                 PandoricalApi.keybindsImpl().handleKeyPress(context.player(), payload.slot()));
         });
+        ServerPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.KeyReleaseC2S.TYPE, (payload, context) -> {
+                context.server().execute(() ->
+                    PandoricalApi.keybindsImpl().handleKeyRelease(context.player(), payload.slot()));
+            });
 
         ServerPlayNetworking.registerGlobalReceiver(
             justfatlard.pandorical.protocol.InventoryButtonC2S.TYPE, (payload, context) -> {
                 context.server().execute(() -> PandoricalApi.playerInventoryImpl()
                     .handleButton(context.player(), payload.namespace(), payload.id()));
             });
+
+        ServerPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.OpenSettingsC2S.TYPE, (payload, context) -> {
+                context.server().execute(() -> PandoricalApi.settings().open(context.player()));
+            });
+        ServerPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.ClientSettingsC2S.TYPE, (payload, context) -> {
+                context.server().execute(() ->
+                    justfatlard.pandorical.settings.ClientMods.declare(context.player(), payload));
+            });
+        ServerPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.ViewportC2S.TYPE, (payload, context) -> {
+                context.server().execute(() ->
+                    justfatlard.pandorical.screen.Viewport.declare(context.player(), payload));
+            });
+        net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            justfatlard.pandorical.settings.ClientMods.forget(handler.player);
+            justfatlard.pandorical.screen.Viewport.forget(handler.player);
+        });
+
+        PandoricalApi.settingsImpl().init();
+        PandoricalApi.onPlayerReady(player -> PandoricalApi.blockMarksImpl().sendAll(player));
+        net.fabricmc.fabric.api.entity.event.v1.ServerEntityLevelChangeEvents.AFTER_PLAYER_CHANGE_LEVEL.register(
+            (player, origin, destination) -> PandoricalApi.blockMarksImpl().sendAll(player));
+        net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.register(
+            (dispatcher, registry, environment) ->
+                justfatlard.pandorical.settings.SettingsCommand.register(dispatcher, PandoricalApi.settingsImpl()));
 
         ServerPlayNetworking.registerGlobalReceiver(ScreenActionC2S.TYPE, (payload, context) -> {
             context.server().execute(() -> {
@@ -372,10 +499,22 @@ public class Pandorical implements ModInitializer {
                 PandoricalApi.markContentReady(player.getUUID());
                 LOGGER.debug("Player {} completed config-phase sync — awaiting HelloC2S for full inventory", player.getName().getString());
             }
+
+            // The menu's copy of the extra slots predates the player-data load; refresh it.
+            PandoricalApi.playerInventoryImpl().syncMenuFromAttachment(player);
         });
+
+        // Respawn has the same stale-copy shape as join: the new ServerPlayer's menu is
+        // built in its constructor, before restoreFrom copies the attachment over.
+        net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents.AFTER_RESPAWN.register(
+            (oldPlayer, newPlayer, alive) ->
+                PandoricalApi.playerInventoryImpl().syncMenuFromAttachment(newPlayer));
 
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             PandoricalApi.removePlayer(handler.getPlayer().getUUID());
+            // Otherwise the worn-skin table keeps a row per player who ever wore one, for the life
+            // of the server, and hands every new arrival a wardrobe of people who are not here.
+            PandoricalApi.SkinApiImpl.forget(handler.getPlayer().getUUID());
         });
     }
 

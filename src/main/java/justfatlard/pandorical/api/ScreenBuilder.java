@@ -143,10 +143,24 @@ public class ScreenBuilder {
         return this;
     }
 
-    /** Add an inventory grid. Additional props: locked_above, slot_style */
+    /** Add an inventory grid. */
     public ScreenBuilder inventoryGrid(String id, int x, int y, int rows, int cols, int startSlot) {
+        return inventoryGrid(id, x, y, rows, cols, startSlot, Map.of());
+    }
+
+    /**
+     * Add an inventory grid, with extra props: {@code locked_above},
+     * {@link ComponentType#PROP_SLOT_STYLE}.
+     *
+     * <p>Those two were documented on this builder before there was any way to pass them, so a
+     * grid could only ever be the default. The grid's own shape (rows, columns, first slot) is
+     * applied after {@code props} and cannot be overridden from it.
+     */
+    public ScreenBuilder inventoryGrid(String id, int x, int y, int rows, int cols, int startSlot,
+            Map<String, String> props) {
         this.components.add(new ComponentBuilder(id, ComponentType.INVENTORY_GRID)
             .bounds(x, y, cols * 18, rows * 18)
+            .props(props)
             .prop("rows", String.valueOf(rows))
             .prop("cols", String.valueOf(cols))
             .prop("start_slot", String.valueOf(startSlot))
