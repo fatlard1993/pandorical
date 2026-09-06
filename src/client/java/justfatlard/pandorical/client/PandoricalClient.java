@@ -48,6 +48,7 @@ public class PandoricalClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        justfatlard.pandorical.client.settings.ContainerHabits.register();
         ComponentRegistry.registerDefaults();
 
         // The menu is built by vanilla's MenuType factory, which is handed nothing but a sync
