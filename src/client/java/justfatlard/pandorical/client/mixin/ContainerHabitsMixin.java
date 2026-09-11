@@ -77,6 +77,8 @@ public abstract class ContainerHabitsMixin {
 	private void pandorical$wheelMoves(double mouseX, double mouseY, double scrollX, double scrollY,
 			CallbackInfoReturnable<Boolean> cir) {
 		if (!ContainerHabits.enabled()) return;
+		// A controller's shoulder scroll is steering a list, not nudging the slot its cursor happens to rest on.
+		if (justfatlard.pandorical.client.screen.NavigationScroll.isActive()) return;
 		if (scrollY == 0 || this.hoveredSlot == null || !this.hoveredSlot.hasItem()) return;
 		// Not while something is on the cursor: the hand is mid-gesture, and taking a slot out from
 		// under it would be a surprise.
