@@ -190,6 +190,7 @@ public final class KeybindManager {
 
 	/** Forward pool presses for claimed slots; drain unclaimed clicks so they cannot pile up. */
 	public static void tick(Minecraft client) {
+		if (pool[0] == null) return;
 		for (int i = 0; i < MAX_SLOTS; i++) {
 			while (pool[i].consumeClick()) {
 				if (claimedSlots.contains(i) && ClientPlayNetworking.canSend(KeyPressC2S.TYPE)) {
