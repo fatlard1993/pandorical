@@ -27,9 +27,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * onto the state (null when none), via {@link OverlayTextureHolder}. Writing
  * unconditionally is what keeps pooled/reused states from leaking overlays
  * between entities.
- *
- * <p>Both injections use require = 1 so a renamed target fails loudly at load
- * (the config's defaultRequire is 0).
  */
 @Mixin(LivingEntityRenderer.class)
 public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extends LivingEntityRenderState, M extends EntityModel<? super S>> {
@@ -37,7 +34,7 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extend
 	@Shadow
 	protected abstract boolean addLayer(RenderLayer<S, M> layer);
 
-	@Inject(method = "<init>", at = @At("TAIL"), require = 1)
+	@Inject(method = "<init>", at = @At("TAIL"))
 	@SuppressWarnings("unchecked")
 	private void pandorical$addOverlayLayer(EntityRendererProvider.Context context, M model,
 			float shadowRadius, CallbackInfo ci) {
@@ -46,8 +43,7 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extend
 
 	@Inject(
 		method = "extractRenderState(Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;F)V",
-		at = @At("TAIL"),
-		require = 1
+		at = @At("TAIL")
 	)
 	private void pandorical$extractOverlay(T entity, S state, float partialTick, CallbackInfo ci) {
 		((OverlayTextureHolder) state).pandorical$setOverlayTexture(

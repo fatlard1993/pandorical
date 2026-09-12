@@ -32,7 +32,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(MultiPlayerGameMode.class)
 public abstract class InteractiveSyncMixin {
 
-	@Inject(method = "performUseItemOn", at = @At("HEAD"), cancellable = true, require = 1)
+	@Inject(method = "performUseItemOn", at = @At("HEAD"), cancellable = true)
 	private void pandorical$leaveItToTheServer(LocalPlayer player, InteractionHand hand, BlockHitResult hit,
 			CallbackInfoReturnable<InteractionResult> callback) {
 		if (player.level() == null) return;

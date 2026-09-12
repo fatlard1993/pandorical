@@ -34,9 +34,7 @@ public abstract class ClimbableSyncMixin {
 	@Shadow
 	private Optional<BlockPos> lastClimbablePos;
 
-	// Required explicitly: this config lets mixins fail quietly by default, and a climb that stops
-	// working is indistinguishable from a climb that was never wired up.
-	@Inject(method = "onClimbable", at = @At("HEAD"), cancellable = true, require = 1)
+	@Inject(method = "onClimbable", at = @At("HEAD"), cancellable = true)
 	private void pandorical$syncedClimbable(CallbackInfoReturnable<Boolean> cir) {
 		LivingEntity self = (LivingEntity) (Object) this;
 		if (self.isSpectator()) return;

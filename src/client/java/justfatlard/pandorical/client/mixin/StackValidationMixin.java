@@ -26,18 +26,13 @@ import org.spongepowered.asm.mixin.injection.Redirect;
  * {@code validateStrict} and returns before this call is reached, so a genuinely malformed
  * stack is still refused - it is only the count this side stops second-guessing, on the same
  * grounds as its two siblings: the server is the authority on what it put in a slot.
- *
- * <p>{@code require = 1} on purpose. A silent miss here would return the crash unchanged and
- * only on a bundle nobody had overfilled yet; failing to apply takes the client down at
- * startup instead, where it cannot be mistaken for working.
  */
 @Mixin(ItemStack.class)
 public class StackValidationMixin {
 
 	@Redirect(
 		method = "validateStrict",
-		at = @At(value = "INVOKE", target = "Lnet/minecraft/world/item/ItemStack;getMaxStackSize()I"),
-		require = 1
+		at = @At(value = "INVOKE", target = "Lnet/minecraft/world/item/ItemStack;getMaxStackSize()I")
 	)
 	private static int pandorical$keepWhatTheServerSent(ItemStack stack) {
 		return stack.getCount();

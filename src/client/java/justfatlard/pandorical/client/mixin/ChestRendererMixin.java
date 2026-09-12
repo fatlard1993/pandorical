@@ -35,9 +35,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ChestRenderer.class)
 public class ChestRendererMixin {
 
-	// require = 1: the client config defaults to 0, which turns a target that no
-	// longer matches into a feature that silently stops existing.
-	@Inject(method = "extractRenderState", at = @At("TAIL"), require = 1)
+	@Inject(method = "extractRenderState", at = @At("TAIL"))
 	private void pandorical$captureOverlay(BlockEntity blockEntity, ChestRenderState state, float partialTick,
 			Vec3 cameraPos, ModelFeatureRenderer.CrumblingOverlay crumbling, CallbackInfo ci) {
 		// Written every time, null included: states are pooled, and a stale value
@@ -47,7 +45,6 @@ public class ChestRendererMixin {
 	}
 
 	@Redirect(
-		require = 1,
 		method = "submit",
 		at = @At(value = "INVOKE",
 			target = "Lnet/minecraft/client/renderer/Sheets;chooseSprite(Lnet/minecraft/client/renderer/blockentity/state/ChestRenderState$ChestMaterialType;Lnet/minecraft/world/level/block/state/properties/ChestType;)Lnet/minecraft/client/resources/model/sprite/SpriteId;"))

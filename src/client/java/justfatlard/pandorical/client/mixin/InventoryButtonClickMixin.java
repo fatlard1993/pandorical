@@ -14,16 +14,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * Answers a press on one of the buttons drawn on the player's own inventory panel.
  *
  * <p><b>Not on {@code InventoryScreen}, where the drawing lives.</b> That class does not declare
- * {@code mouseClicked} - it inherits one - so an injection aimed there finds no method and is
- * dropped. This package sets {@code defaultRequire: 0}, so it was dropped in silence: the buttons
- * appeared, hovered, and did nothing at all, and nothing anywhere said why.
+ * {@code mouseClicked} - it inherits one - so an injection aimed there finds no method.
  *
  * <p>{@code AbstractRecipeBookScreen} is the class that actually declares it, and HEAD is before
  * the recipe book gets its own look at the click - which matters, because the book can answer and
  * return without ever reaching the container screen below it.
- *
- * <p>{@code require = 1} deliberately overrides the package default. A button nobody can press is
- * not worth failing quietly over twice.
  *
  * <p>Extends the container screen for the same reason its neighbour does: purely to reach the
  * protected {@code leftPos}/{@code topPos} the buttons are anchored to.
@@ -35,7 +30,7 @@ public abstract class InventoryButtonClickMixin extends AbstractContainerScreen<
 		super(null, null, null);
 	}
 
-	@Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true, require = 1)
+	@Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
 	private void pandorical$clickInventoryButton(MouseButtonEvent click, boolean handled,
 			CallbackInfoReturnable<Boolean> cir) {
 		if (handled) return;

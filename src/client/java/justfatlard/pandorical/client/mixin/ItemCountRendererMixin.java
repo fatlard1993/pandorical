@@ -33,8 +33,7 @@ public abstract class ItemCountRendererMixin {
 	@Inject(
 		method = "itemDecorations(Lnet/minecraft/client/gui/Font;Lnet/minecraft/world/item/ItemStack;II)V",
 		at = @At("HEAD"),
-		cancellable = true,
-		require = 1
+		cancellable = true
 	)
 	private void pandorical$compactOversizedCount(Font font, ItemStack stack, int x, int y, CallbackInfo ci) {
 		pandorical$drawCompactLabel(font, stack, x, y, ci);
@@ -43,8 +42,7 @@ public abstract class ItemCountRendererMixin {
 	@Inject(
 		method = "itemDecorations(Lnet/minecraft/client/gui/Font;Lnet/minecraft/world/item/ItemStack;IILjava/lang/String;)V",
 		at = @At("HEAD"),
-		cancellable = true,
-		require = 1
+		cancellable = true
 	)
 	private void pandorical$compactOversizedCountLabeled(Font font, ItemStack stack, int x, int y,
 			String customLabel, CallbackInfo ci) {

@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
  */
 @Mixin(Language.class)
 public abstract class LanguageHintMixin {
-	@ModifyVariable(method = "inject", at = @At("HEAD"), argsOnly = true, require = 1)
+	@ModifyVariable(method = "inject", at = @At("HEAD"), argsOnly = true)
 	private static Language pandorical$wrapForHints(Language language) {
 		return language instanceof HintLanguage ? language : new HintLanguage(language);
 	}

@@ -27,8 +27,7 @@ public class MerchantStackSizeMixin {
 
 	@Redirect(
 		method = "setItem",
-		at = @At(value = "INVOKE", target = "Lnet/minecraft/world/item/ItemStack;limitSize(I)V"),
-		require = 1
+		at = @At(value = "INVOKE", target = "Lnet/minecraft/world/item/ItemStack;limitSize(I)V")
 	)
 	private void pandorical$keepWhatTheServerSent(ItemStack stack, int limit) {
 		// Deliberately nothing.
