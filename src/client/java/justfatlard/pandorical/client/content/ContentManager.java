@@ -29,9 +29,31 @@ import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 /**
- * Client-side content registration: receives SyncContentS2C and SyncAssetsS2C,
- * registers the synced blocks/items into the (temporarily unfrozen) registries,
- * injects the VirtualResourcePack, triggers a resource reload, and acks with ContentReadyC2S.
+ * Client-side content sync: registers the server's blocks, items and registry stubs, fills the
+ * {@link VirtualResourcePack} with its assets, reloads resources and acknowledges the server.
+ * Two paths do this.
+ *
+ * <p><b>Configuration phase</b>, driven by the server's PandoricalSyncTask, on the network thread:
+ * {@link #handleConfigSyncContent} and {@link #handleConfigSyncAssets} collect the chunks, then
+ * {@link #forceFinalizeConfig} unpacks the assets, registers the content with
+ * {@link StateIds#AT_JOIN}, reloads on the render thread if the virtual pack holds anything, and
+ * sends ContentReadyConfigC2S once that is done ({@link #ackConfigReady}). At JOIN,
+ * PandoricalClient calls {@link #remapBlockStateIds} to give the block states the server's ids.
+ *
+ * <p><b>Play phase</b>, the fallback for a client the configuration phase did not make
+ * content-ready, on the client thread: {@link #handleSyncContent} and {@link #handleSyncAssets}
+ * collect the payloads, then {@link #forceFinalize} registers the content with
+ * {@link StateIds#AT_REGISTRATION} unless the configuration phase already did, injects the pack,
+ * and sends ContentReadyC2S without waiting for the reload. This path's asset chunks are unpacked
+ * only when {@link #tick} finalizes after {@link #SYNC_TIMEOUT_MS}.
+ *
+ * <p><b>Shared</b>: {@link #registerContent} (blocks through {@link #registerBlock}, items
+ * through {@link #registerItem}, the register*Stubs methods), run between unfreezing and
+ * re-freezing {@link #SYNCED_REGISTRIES}; {@link #unpackAssets}; {@link #injectResourcePack},
+ * whose block colours and creative-tab entries come from configuration-phase content only; the
+ * state-id fallbacks {@link #coverStateIdsWithFallback} and {@link #sweepUnmappedStateIds}; and
+ * {@link #reset}, which clears both paths. Block state properties are read with
+ * {@link StatePropertySpec}.
  */
 public class ContentManager {
     private static final VirtualResourcePack virtualPack = new VirtualResourcePack();
