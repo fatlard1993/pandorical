@@ -11,23 +11,16 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Leaves out the mixins named in {@code -Dpandorical.skipMixins}, for finding which one a machine
- * will not run.
- *
- * <p>For a crash that happens on one player's computer and nowhere else, where the only way to
- * learn anything is for them to try again: a list of simple class names, or {@code all}. Accessors
- * and invokers are never left out by {@code all}, since code calls them directly and taking one
- * away is an ordinary Java error rather than a clue; name one to leave it out anyway.
- *
- * <p>Nothing happens without the property, which nobody sets by accident.
+ * will not run: simple class names, or {@code all}. {@code all} spares accessors and invokers,
+ * which code calls directly; name one to leave it out anyway.
  */
 public final class DiagnosticMixinPlugin implements IMixinConfigPlugin {
 	private static final Set<String> SKIP = Arrays.stream(System.getProperty("pandorical.skipMixins", "").split(","))
 		.map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toSet());
 
-	/** The names in {@link #SKIP} that matched a mixin, so a misspelt one can be told apart from one that did nothing. */
 	private static final Set<String> MATCHED = ConcurrentHashMap.newKeySet();
 
-	/** Say which skip names matched no mixin. Mixin configs are prepared before any mod initialises, so call it from one. */
+	/** Call from a mod initializer: mixin configs are prepared before any runs. */
 	public static void reportUnmatched() {
 		for (String name : SKIP) {
 			if (!name.equals("all") && !MATCHED.contains(name)) {

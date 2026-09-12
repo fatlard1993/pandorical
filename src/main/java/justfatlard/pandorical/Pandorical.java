@@ -67,38 +67,15 @@ import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 public class Pandorical implements ModInitializer {
     public static final String MOD_ID = "pandorical";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-    /**
-     * The wire format, bumped whenever what goes over it changes shape.
-     *
-     * <p>v5 because an item entry now carries whether the item is food, and what kind. A v4 client
-     * decoding a v5 entry stops one field short and reads the next item's id as this one's, so the
-     * whole content sync comes apart - the change is a new field in the middle of a stream, which
-     * is never something an older reader can skip.
-     *
-     * <p>v4 because v3 covered two incompatible content formats: an equippable item's slot gained
-     * the id of its armour asset partway through and this number did not move, so a server and a
-     * client could agree they were both speaking v3 and disagree about every piece of armour. The
-     * number is only worth having if it is bumped, and the check below is only worth having if
-     * the number is honest.
-     */
+    /** Bumped by any change to the shape of a payload; an older reader cannot skip a new field. */
     public static final int PROTOCOL_VERSION = 15;
 
     /**
-     * The oldest client this server can still be understood by.
-     *
-     * <p>Eleven, because v11 added two fields to every block entry and v10 put two varints in the
-     * middle of the config content payload. Either one shifts everything after it, so an older
-     * client does not read a slightly wrong packet - it reads garbage and fails somewhere
-     * unrelated. There is no reading past these.
-     *
-     * <p>It was five for a long while, and the reasoning is worth keeping: v6 only added a payload
-     * type nobody older asks for, which is the additive case this floor is meant to allow. A
-     * version bump is not automatically a compatibility break; a change to the shape of an existing
-     * payload is.
+     * The oldest client protocol this server accepts. Raise it when an existing payload changes
+     * shape; a new payload type an older client never asks for does not need it.
      */
     public static final int MINIMUM_PROTOCOL = 11;
 
-    /** What the jar calls itself, so a refusal can name the version to go and install. */
     public static String modVersion() {
         return FabricLoader.getInstance()
             .getModContainer(MOD_ID)
@@ -109,24 +86,12 @@ public class Pandorical implements ModInitializer {
     public static final List<String> SERVER_CAPABILITIES = Capabilities.SERVER;
 
     /**
-     * Tracks player UUIDs (from GameProfile) that completed config-phase content sync.
-     * Entries are consumed (removed) when the player transitions to play phase.
-     *
-     * <p>An id left here by a connection that never reached the play phase is harmless: the next
-     * attempt acks on a new connection, re-adds it, and joins, and the join is what clears it.
-     * That was NOT true while this set also served as the guard against a second acknowledgement,
-     * which made one successful sync a permanent fact about the player - a connection that died
-     * between the ack and the join left the id behind, every later attempt was read as a repeat
-     * and ignored, the task was never completed, and that player hung on "Joining world" forever,
-     * on any client, until the server restarted. The repeat guard is per-connection now, which is
-     * the thing it was always describing.
+     * Players whose config-phase sync completed; JOIN consumes the entry. A stale id from a
+     * connection that never joined is harmless. Must not double as the repeat-ack guard, which
+     * is per connection: keyed on the player, one dead connection blocks every later join.
      */
     private static final Set<UUID> configPhaseSyncedPlayers = ConcurrentHashMap.newKeySet();
 
-    /**
-     * Connections that have already acknowledged, so a second ack on the SAME connection is
-     * ignored rather than completing a task that is no longer there.
-     */
     private static final Set<Object> ackedConfigConnections = ConcurrentHashMap.newKeySet();
 
     @SuppressWarnings("unchecked")
@@ -140,16 +105,14 @@ public class Pandorical implements ModInitializer {
     @Override
     public void onInitialize() {
         DiagnosticMixinPlugin.reportUnmatched();
-        // Pandorical's own server setting, beside every mod's. Declared first thing so it is on
-        // the page however far the rest of init gets.
+        // First, so the setting exists however far the rest of init gets.
         PandoricalApi.settings().serverGroup(MOD_ID, "Pandorical")
             .toggle("pairNetherPortals", "Nether portals go back the way they came", false)
             .describe("Each portal remembers the one its first traveller came out of, both ways round")
             .backedBy(player -> PortalPairing.enabled(player.level().getServer()),
                 (player, on) -> PortalPairing.choose(player.level().getServer(), on));
 
-        // Auto-detect and register all non-system mod namespaces as server-only.
-        // Only on dedicated server; on the client this would incorrectly filter everything.
+        // Dedicated server only: on a client this would filter every namespace.
         if (FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER) {
             autoRegisterServerOnlyNamespaces();
             PandoricalApi.contentRegistry().autoScanAllModAssets();
@@ -166,19 +129,11 @@ public class Pandorical implements ModInitializer {
     }
 
 
-    /**
-     * Mod ID prefixes that are part of Fabric's infrastructure and should NOT
-     * be marked as server-only (they're handled by Fabric itself).
-     */
     private static final Set<String> SYSTEM_MOD_PREFIXES = Set.of(
         "java", "minecraft", "fabricloader", "fabric-api", "fabric-",
         "mixinextras"
     );
 
-    /**
-     * Scans all loaded mods and registers their mod IDs as server-only namespaces
-     * for registry sync bypass. Skips system mods (Fabric infrastructure, Java, Minecraft).
-     */
     private void autoRegisterServerOnlyNamespaces() {
         var contentApi = PandoricalApi.content();
         var loader = FabricLoader.getInstance();
@@ -199,9 +154,6 @@ public class Pandorical implements ModInitializer {
         return false;
     }
 
-    /**
-     * Factory method called by PandoricalMenuProvider to create a server-side menu.
-     */
     public static AbstractContainerMenu createMenu(int syncId, Inventory playerInventory,
                                                     Container serverContainer, Set<Integer> readOnlySlots,
                                                     OpenScreenS2C screenDef,
@@ -214,8 +166,6 @@ public class Pandorical implements ModInitializer {
     }
 
     private void registerPayloads() {
-        // --- Configuration phase ---
-        // S2C config
         PayloadTypeRegistry.clientboundConfiguration().register(SyncContentConfigS2C.TYPE, SyncContentConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(SyncAssetsConfigS2C.TYPE, SyncAssetsConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(PlayerInventoryRegistrationsS2C.TYPE, PlayerInventoryRegistrationsS2C.STREAM_CODEC);
@@ -229,20 +179,17 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundConfiguration().register(
             KeepsakesAskConfigS2C.TYPE,
             KeepsakesAskConfigS2C.STREAM_CODEC);
-        // C2S config
         PayloadTypeRegistry.serverboundConfiguration().register(ContentReadyConfigC2S.TYPE, ContentReadyConfigC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundConfiguration().register(
             KeepsakesConfigC2S.TYPE,
             KeepsakesConfigC2S.STREAM_CODEC);
 
-        // --- Play phase ---
-        // S2C play
         PayloadTypeRegistry.clientboundPlay().register(HelloS2C.TYPE, HelloS2C.STREAM_CODEC);
         PictureRegistry.register();
         PayloadTypeRegistry.clientboundPlay().register(
             KeepsakeStoreS2C.TYPE,
             KeepsakeStoreS2C.STREAM_CODEC);
-        // Also in play, so a button that is a switch can change its face while somebody watches.
+        // Also in play, so a switch button can change face while the inventory is open.
         PayloadTypeRegistry.clientboundPlay().register(
             InventoryButtonsS2C.TYPE,
             InventoryButtonsS2C.STREAM_CODEC);
@@ -258,7 +205,7 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(
             ClientSettingS2C.TYPE,
             ClientSettingS2C.STREAM_CODEC);
-        // Large, because a screen can carry a mod's readme, and a readme is more than a form.
+        // Large: a screen can carry a mod's readme.
         PayloadTypeRegistry.clientboundPlay().registerLarge(OpenScreenS2C.TYPE, OpenScreenS2C.STREAM_CODEC, 1048576);
         PayloadTypeRegistry.clientboundPlay().register(UpdateScreenS2C.TYPE, UpdateScreenS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(CloseScreenS2C.TYPE, CloseScreenS2C.STREAM_CODEC);
@@ -269,9 +216,7 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(SyncContentS2C.TYPE, SyncContentS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SyncAssetsS2C.TYPE, SyncAssetsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(CameraHintS2C.TYPE, CameraHintS2C.STREAM_CODEC);
-        // An entity that has gone is not playing anything. Without this the table of what is
-        // playing only ever grows: every fish, every companion, every mob that ever animated stays
-        // in it for the life of the server, and each one is re-sent to every player who joins.
+        // Otherwise the playing table only grows, and all of it is re-sent to every joiner.
         ServerEntityEvents.ENTITY_UNLOAD.register(
             (entity, level) -> PlayingAnimations.forget(entity.getId()));
 
@@ -304,7 +249,6 @@ public class Pandorical implements ModInitializer {
             KeybindRebindS2C.TYPE,
             KeybindRebindS2C.STREAM_CODEC);
 
-        // C2S play
         PayloadTypeRegistry.serverboundPlay().register(HelloC2S.TYPE, HelloC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(ScreenActionC2S.TYPE, ScreenActionC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(ContentReadyC2S.TYPE, ContentReadyC2S.STREAM_CODEC);
@@ -328,12 +272,7 @@ public class Pandorical implements ModInitializer {
             ViewportC2S.STREAM_CODEC);
     }
 
-    /**
-     * Register configuration-phase task and handlers.
-     * Content sync happens here BEFORE Fabric's SynchronizeRegistriesTask.
-     */
     private void registerConfigPhase() {
-        // Keepsakes: asked for at login, and the login waits for the answer.
         ServerConfigurationNetworking.registerGlobalReceiver(
             KeepsakesConfigC2S.TYPE, (payload, context) -> {
                 var handler = context.packetListener();
@@ -347,22 +286,17 @@ public class Pandorical implements ModInitializer {
             }
         });
 
-        // Server: handle client acknowledgment during config phase
         ServerConfigurationNetworking.registerGlobalReceiver(ContentReadyConfigC2S.TYPE, (payload, context) -> {
             var handler = context.packetListener();
 
-            // completeTask starts the next configuration task, which is vanilla's
-            // SynchronizeRegistriesTask reading server registries. That belongs on the
-            // server thread, like every other handler here.
+            // completeTask starts vanilla's SynchronizeRegistriesTask, which reads server
+            // registries, so this runs on the server thread.
             context.server().execute(() -> {
                 var profile = handler.getOwner();
 
-                // Only the first ack on THIS connection may complete the task. A second one
-                // finds the task already gone and throws, and on this thread nothing catches
-                // it: running here means a client that acks twice takes the server down rather
-                // than just itself. Keyed on the connection and not the player, because the
-                // same player reconnecting is a new connection with a task of its own waiting
-                // to be completed - keyed on the player, their second visit hangs forever.
+                // Only the first ack on this connection may complete the task; a second throws,
+                // uncaught, on the server thread. Keyed on the connection, not the player: a
+                // reconnect is a new connection with its own task to complete.
                 if (!ackedConfigConnections.add(handler)) {
                     LOGGER.debug("Ignoring repeat config-phase ack from {}",
                         profile != null ? profile.name() : "(unknown profile)");
@@ -373,42 +307,33 @@ public class Pandorical implements ModInitializer {
                 LOGGER.info("Client {} completed config-phase content sync",
                     profile != null ? profile.name() : "(unknown profile)");
 
-                // The client has registered every synced block now, so a tint can find its
-                // block. Sent any earlier it named blocks that did not exist yet and was
-                // dropped on arrival, and no synced block was ever coloured on a first join.
+                // Not before the ack: a tint naming a block the client has not registered yet
+                // is dropped.
                 sendConfigPhaseBlockTints(handler);
 
                 try {
                     handler.completeTask(PandoricalSyncTask.TYPE);
                 } catch (IllegalStateException e) {
-                    // Belt and braces: nothing a peer sends should be able to reach the
-                    // server thread with an uncaught throw.
                     LOGGER.warn("Could not complete config-phase task: {}", e.getMessage());
                 }
             });
         });
 
-        // A finished connection is not a connection anybody can ack on again. Only the
-        // per-connection entry is dropped here: whether this event also fires on the ordinary
-        // hand-off into the play phase is not something the API says plainly, and clearing the
-        // player's id on that path would take the flag away before JOIN reads it. It does not
-        // need clearing anyway - see configPhaseSyncedPlayers.
+        // Leave configPhaseSyncedPlayers alone: this may also fire on the hand-off into play,
+        // before JOIN reads it.
         ServerConfigurationConnectionEvents.DISCONNECT.register((handler, server) -> {
             ackedConfigConnections.remove(handler);
             ConfigPatience.forget(handler);
         });
         ServerTickEvents.END_SERVER_TICK.register(server -> ConfigPatience.expire());
 
-        // Server: add our sync task BEFORE Fabric's registry sync
         ServerConfigurationConnectionEvents.BEFORE_CONFIGURE.register((handler, server) -> {
             if (!agreeOnVersion(handler)) return;
 
             if (ServerConfigurationNetworking.canSend(handler, SyncContentConfigS2C.TYPE)) {
-                // Send inventory slot registrations during config phase so the client
-                // has them BEFORE InventoryMenu is constructed on play-phase entry.
+                // Before play: the client builds InventoryMenu on entry, and the slot counts
+                // must already agree.
                 sendConfigPhaseInventoryRegistrations(handler);
-                // Not the block tints: those name blocks the client has yet to register, and
-                // a tint for a block it cannot find is dropped. They go once it says it has them.
 
                 var contentRegistry = PandoricalApi.contentRegistry();
                 if (contentRegistry.hasContent()) {
@@ -422,11 +347,9 @@ public class Pandorical implements ModInitializer {
                         var poiTypes = contentRegistry.buildPoiTypeEntries();
                         var menuTypes = contentRegistry.buildMenuTypeEntries();
                         var recipeBookCategories = contentRegistry.buildRecipeBookCategoryEntries();
-                        // BEFORE_CONFIGURE fires before vanilla populates the task queue, so
-                        // this queue is empty here and an ordinary addTask would already run
-                        // first. The front-insertion is insurance for the day that stops being
-                        // true: content has to reach the client before the registry sync that
-                        // assigns its IDs.
+                        // Content must reach the client before the registry sync that assigns
+                        // its ids. The queue is still empty at BEFORE_CONFIGURE; inserting at
+                        // the front keeps the order if vanilla ever fills it earlier.
                         var task = new PandoricalSyncTask(blocks, items, assetChunks,
                             entityTypes, blockEntityTypes, villagerProfessions,
                             poiTypes, menuTypes, recipeBookCategories, contentRegistry.railsSolid());
@@ -487,14 +410,10 @@ public class Pandorical implements ModInitializer {
                 }
 
                 sendEntityRenderers(player);
-                // On join, entity tracking starts before this handshake
-                // completes, so replay overlays for already-tracked entities
+                // Tracking starts before this handshake completes, so state sent to tracked
+                // entities so far has to be replayed.
                 PandoricalApi.entityOverlaysImpl().handlePlayerReady(player);
                 PandoricalApi.keybindsImpl().handlePlayerReady(player);
-                // And the same moment for every consuming mod's own replays
-                // Everyone already wearing an override, before anything else is drawn: a skin is a
-                // state and not an event, so a client that missed the announcement would see that
-                // person as Steve for as long as both stayed logged in.
                 SkinOverrides.sendAllTo(player);
                 DeclaredRenderPolicy.sendTo(player);
                 PlayingAnimations.sendAllTo(player);
@@ -516,8 +435,6 @@ public class Pandorical implements ModInitializer {
                 context.player().level().getServer().execute(() ->
                     PandoricalApi.keybindsImpl().handleBindings(context.player(), payload.keys()));
             });
-        // Pooled keybind presses: all validation (capability, slot, rate
-        // limit) happens inside handleKeyPress, on the server thread
         ServerPlayNetworking.registerGlobalReceiver(KeyPressC2S.TYPE, (payload, context) -> {
             context.server().execute(() ->
                 PandoricalApi.keybindsImpl().handleKeyPress(context.player(), payload.slot()));
@@ -567,7 +484,6 @@ public class Pandorical implements ModInitializer {
             });
         });
 
-        // Content ready acknowledgment (play-phase fallback for non-registry content)
         ServerPlayNetworking.registerGlobalReceiver(ContentReadyC2S.TYPE, (payload, context) -> {
             context.server().execute(() -> {
                 var player = context.player();
@@ -581,13 +497,11 @@ public class Pandorical implements ModInitializer {
             });
         });
 
-        // On join: send hello. If client completed config-phase sync, mark content ready immediately.
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             sender.sendPacket(new HelloS2C(PROTOCOL_VERSION, SERVER_CAPABILITIES));
 
-            // Track config-phase players for later; don't pre-register capabilities yet
-            // because the client can't deserialize full component data (armor materials, etc.)
-            // until after the handshake. Capabilities are registered on HelloC2S arrival.
+            // Capabilities wait for HelloC2S: until the handshake the client cannot decode full
+            // component data.
             var player = handler.getPlayer();
             if (configPhaseSyncedPlayers.remove(player.getGameProfile().id())) {
                 PandoricalApi.markContentReady(player.getUUID());
@@ -598,16 +512,14 @@ public class Pandorical implements ModInitializer {
             PandoricalApi.playerInventoryImpl().syncMenuFromAttachment(player);
         });
 
-        // Respawn has the same stale-copy shape as join: the new ServerPlayer's menu is
-        // built in its constructor, before restoreFrom copies the attachment over.
+        // Likewise on respawn: the new player's menu is built before restoreFrom copies the
+        // attachment over.
         ServerPlayerEvents.AFTER_RESPAWN.register(
             (oldPlayer, newPlayer, alive) ->
                 PandoricalApi.playerInventoryImpl().syncMenuFromAttachment(newPlayer));
 
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             PandoricalApi.removePlayer(handler.getPlayer().getUUID());
-            // Otherwise the worn-skin table keeps a row per player who ever wore one, for the life
-            // of the server, and hands every new arrival a wardrobe of people who are not here.
             SkinOverrides.forget(handler.getPlayer().getUUID());
             Keepsakes.INSTANCE.forget(handler.getPlayer().getUUID());
             PandoricalApi.settingsImpl().forget(handler.getPlayer().getUUID());
@@ -615,31 +527,14 @@ public class Pandorical implements ModInitializer {
     }
 
     /**
-     * Settle whether this client can be talked to before anything is said to it.
-     *
-     * <p>Three kinds of client arrive here. A vanilla one cannot receive the content sync at all,
-     * has never been sent any, and is let through untouched - that is the whole promise of this
-     * mod and nothing here may break it. A current one is told what this server speaks and
-     * carries on. Between them is the one this exists for: Pandorical installed, old enough that
-     * the content about to be sent will throw on the way in.
-     *
-     * <p>That one is told, in the disconnect box, which version it has and which to install.
-     * Before this it read the content, threw inside its own config phase and closed the
-     * connection with no reason given, which looks from the outside like the server rejecting
-     * you over whichever mod happened to be first in the list.
+     * Turns away, with the version to install, a client whose Pandorical is too old to read what
+     * is about to be sent. A client without Pandorical passes untouched.
      *
      * @return false if the client was turned away and nothing more should be sent to it
      */
     private static boolean agreeOnVersion(
             ServerConfigurationPacketListenerImpl handler) {
-        // No Pandorical at all: not our business, and never was.
         if (!ServerConfigurationNetworking.canSend(handler, SyncContentConfigS2C.TYPE)) return true;
-
-        // No exemption for a content-free server any more. That carve-out was written when the
-        // only thing that had changed shape was the content sync; the screen payload has since
-        // grown a field of its own, so an old client would misread the first screen it was sent
-        // whether or not this server has any blocks to give it. Anything speaking this protocol
-        // at all has to be current.
 
         if (ServerConfigurationNetworking.canSend(handler,
                 RequirementS2C.TYPE)) {
@@ -649,8 +544,7 @@ public class Pandorical implements ModInitializer {
             return true;
         }
 
-        // It cannot even be told what is wrong with it, which is itself the answer: this type has
-        // existed for as long as the current content format has.
+        // A client that cannot receive RequirementS2C predates the current content format.
         String needed = modVersion();
         LOGGER.warn("Refused a client running a Pandorical older than {}: it cannot read this"
             + " server's content format", needed);
@@ -661,12 +555,6 @@ public class Pandorical implements ModInitializer {
         return false;
     }
 
-    /**
-     * Send all registered extra inventory slot groups during the configuration phase.
-     * This ensures {@code ClientInventorySlotRegistry} is populated BEFORE the client
-     * constructs {@code InventoryMenu} on play-phase entry, avoiding the
-     * {@code IndexOutOfBoundsException} caused by mismatched slot counts.
-     */
     private static void sendConfigPhaseInventoryRegistrations(
             ServerConfigurationPacketListenerImpl handler) {
         List<PlayerInventoryApi.SlotRegistration> regs = PandoricalApi.playerInventoryImpl().getRegistrations();
@@ -685,8 +573,6 @@ public class Pandorical implements ModInitializer {
 
         ServerConfigurationNetworking.send(handler, new PlayerInventoryRegistrationsS2C(groups));
 
-        // Only to a client that has said it understands them. An older one simply gets no
-        // buttons, rather than a packet it cannot read.
         var buttons = PandoricalApi.playerInventoryImpl().declaredButtons();
         if (!buttons.isEmpty() && ServerConfigurationNetworking.canSend(
                 handler, InventoryButtonsS2C.TYPE)) {
@@ -704,12 +590,6 @@ public class Pandorical implements ModInitializer {
         LOGGER.debug("Sent {} block tint group(s) during config phase", impl.buildPacket().entries().size());
     }
 
-    /**
-     * Ties structure visibility to real entity tracking: a player who starts tracking a
-     * structure's anchor entity gets the structure spawned to them; a player who stops
-     * tracking it (out of range, entity removed, or disconnect) gets it despawned.
-     * See {@link justfatlard.pandorical.api.StructureApi} for the broadcast-scoped design.
-     */
     private void registerStructureTracking() {
         EntityTrackingEvents.START_TRACKING.register(
             (entity, player) -> {
@@ -718,16 +598,11 @@ public class Pandorical implements ModInitializer {
             });
         EntityTrackingEvents.STOP_TRACKING.register(
             (entity, player) -> PandoricalApi.structuresImpl().handleStopTracking(entity, player));
-        // Overlay state does not persist: drop it when the entity unloads and
-        // let the owning mod re-set it on load (see EntityOverlayApi javadoc)
+        // Overlay state does not persist; the owning mod sets it again on load.
         ServerEntityEvents.ENTITY_UNLOAD.register(
             (entity, world) -> PandoricalApi.entityOverlaysImpl().handleEntityUnload(entity));
     }
 
-    /**
-     * Send all registered entity renderer mappings to the player.
-     * Called after the player completes the HelloC2S handshake.
-     */
     private static void sendEntityRenderers(ServerPlayer player) {
         Map<String, String> renderers = EntityRendererRegistry.getAll();
         if (renderers.isEmpty()) return;
