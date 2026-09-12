@@ -11,7 +11,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 
-/** The server's marks on blocks, by dimension, for renderers that decide by them. */
 @Environment(EnvType.CLIENT)
 public final class ClientBlockMarks {
     private ClientBlockMarks() {}
@@ -37,7 +36,6 @@ public final class ClientBlockMarks {
         marks.clear();
     }
 
-    /** Whether the block here, in the level being drawn, carries this mark. */
     public static boolean has(BlockPos pos, String mark) {
         Minecraft client = Minecraft.getInstance();
         if (client.level == null) return false;

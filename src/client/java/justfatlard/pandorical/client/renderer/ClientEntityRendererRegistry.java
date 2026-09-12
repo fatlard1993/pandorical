@@ -19,46 +19,24 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.client.Minecraft;
 
-/**
- * Client-side handler for {@link EntityRenderersS2C} packets.
- *
- * <p>Since {@link EntityRenderers#register} is private, this class inserts entries directly
- * into the {@code PROVIDERS} static map via reflection. This is analogous to how modding
- * frameworks (including Fabric's own internals) handle dynamic renderer registration at
- * points other than class initialisation.
- *
- * <p>Only renderer keys defined in {@link EntityRendererRegistry} are supported.
- */
+/** {@link EntityRenderers#register} is private, so this writes {@code PROVIDERS} by reflection. */
 @Environment(EnvType.CLIENT)
 public final class ClientEntityRendererRegistry {
     private ClientEntityRendererRegistry() {}
 
-    /** Tracks which entity type IDs we have already registered to avoid duplicates. */
     private static final Set<String> registeredTypes = ConcurrentHashMap.newKeySet();
 
-    /**
-     * Renderer key per entity type id, kept for the stub entity factories:
-     * ContentManager's stub EntityTypes decide AT SPAWN TIME what client
-     * entity to instantiate ("thrown_item" needs a projectile-shaped stub so
-     * the item stack sync lands and renders), and spawn happens well after
-     * this packet arrives.
-     */
+    /** Read by the stub EntityTypes at spawn, long after this packet, to pick the client entity. */
     private static final Map<String, String> rendererKeys = new ConcurrentHashMap<>();
 
-    /** The renderer key declared for an entity type id, or null if none. */
     public static String getRendererKey(String typeId) {
         return rendererKeys.get(typeId);
     }
 
-    /** Cached reflection access to {@code EntityRenderers.PROVIDERS}. */
     @SuppressWarnings("rawtypes")
     private static volatile Map providers = null;
 
-    /**
-     * Apply all renderer mappings from the packet. Called on the render thread.
-     *
-     * @param packet the received packet containing entity type id → renderer key pairs
-     */
+    /** Render thread only. */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static void applyRenderers(EntityRenderersS2C packet) {
         Map providersMap = getProvidersMap();
@@ -73,8 +51,6 @@ public final class ClientEntityRendererRegistry {
             String typeId = entry.getKey();
             String rendererKey = entry.getValue();
 
-            // Recorded before the dedupe check: the stub factories need the
-            // key on every connection, including reconnects
             rendererKeys.put(typeId, rendererKey);
 
             if (registeredTypes.contains(typeId)) {
@@ -108,12 +84,8 @@ public final class ClientEntityRendererRegistry {
                 rendererKey, typeId);
         }
 
-        // The dispatcher builds its per-type renderer map from PROVIDERS at
-        // resource reload, and the post-join reload races (and usually
-        // precedes) this packet: without an explicit rebuild the new types
-        // have entities but no renderer, and the first render frame dies
-        // with a null-renderer NPE. Rebuild through vanilla's own reload
-        // path so the map is complete before any synced entity can render.
+        // The dispatcher copies PROVIDERS at resource reload, which usually runs before this
+        // packet after a join; without a rebuild the new types render with a null renderer (NPE).
         if (addedAny) {
             Minecraft mc = Minecraft.getInstance();
             mc.getEntityRenderDispatcher().onResourceManagerReload(mc.getResourceManager());
@@ -121,25 +93,17 @@ public final class ClientEntityRendererRegistry {
         }
     }
 
-    /** Clear state on disconnect so re-joining re-registers correctly. */
     public static void reset() {
         registeredTypes.clear();
         rendererKeys.clear();
-        // Do NOT clear the providers map itself; that would break vanilla renderers.
+        // Not the providers map: it holds vanilla's renderers too.
     }
 
-    // --- Private helpers ---
-
-    /**
-     * Resolve a renderer key to an {@link EntityRendererProvider}.
-     * Returns {@code null} for unknown keys.
-     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static EntityRendererProvider<?> resolveProvider(String key) {
         return switch (key) {
             case EntityRendererRegistry.KEY_THROWN_ITEM ->
-                // Raw cast is intentional; we cannot express T extends Entity & ItemSupplier
-                // in the provider map's wildcard-typed signature. This is safe at runtime.
+                // Raw: T extends Entity & ItemSupplier has no wildcard form.
                 (EntityRendererProvider) ctx -> new ThrownItemRenderer(ctx);
             case EntityRendererRegistry.KEY_INVISIBLE ->
                 (EntityRendererProvider) ctx -> new NoopRenderer<>(ctx);
