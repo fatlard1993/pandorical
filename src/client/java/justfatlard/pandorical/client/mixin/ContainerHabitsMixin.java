@@ -19,12 +19,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * The two container habits worth having, on every container screen, for anyone with Pandorical:
- * a client convenience with no server in it, so the client layer is where it lives. Off by a
- * switch on Pandorical's own page of the settings.
- *
- * <p>Originally chest-utils' one client mixin, which made a server mod need a client jar for a
- * feature that was not about chests. The two container habits worth having: sweep the wheel to move a stack, drag to move a row.
+ * Two container habits, on every container screen, for anyone with Pandorical: the wheel moves one
+ * item across, and a drag with an empty hand moves every stack it crosses. A client convenience
+ * with no server in it, so the client layer is where it lives. Off by a switch on Pandorical's own
+ * page of the settings.
  *
  * <p>Both are ordinary quick-moves - the same thing shift-clicking sends - so nothing here needs
  * the server's cooperation or invents a packet. That is the whole reason it can be done at all: the

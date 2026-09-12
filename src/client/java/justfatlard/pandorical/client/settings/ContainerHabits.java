@@ -30,8 +30,8 @@ public final class ContainerHabits {
     /** On Pandorical's own page of the settings, so a player who hates it can say so once. */
     public static void register() {
         ClientSettings.INSTANCE.group("pandorical", "Pandorical")
-            .toggle(KEY, "Container habits",
-                "Wheel over a stack to move it across, drag across slots to move a row; every container screen",
+            .toggle(KEY, "Wheel and drag move items",
+                "Scroll over a stack to move one item across; drag with an empty hand to move every stack you cross",
                 ContainerHabits::enabled, ContainerHabits::set);
     }
 
