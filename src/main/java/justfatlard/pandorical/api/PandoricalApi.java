@@ -3,6 +3,7 @@ package justfatlard.pandorical.api;
 import justfatlard.pandorical.hud.HudRegistry;
 import justfatlard.pandorical.keybind.KeybindPool;
 import justfatlard.pandorical.screen.ScreenRegistry;
+import justfatlard.pandorical.structure.StructureRegistry;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
@@ -41,7 +42,7 @@ public final class PandoricalApi {
     };
     private static final PlayerInventoryApiImpl PLAYER_INVENTORY = new PlayerInventoryApiImpl();
     private static final BlockTintApiImpl BLOCK_TINTS = new BlockTintApiImpl();
-    private static final StructureApiImpl STRUCTURES = new StructureApiImpl();
+    private static final StructureRegistry STRUCTURES = StructureRegistry.INSTANCE;
     private static final EntityOverlayApiImpl ENTITY_OVERLAYS = new EntityOverlayApiImpl();
     private static final ChestOverlayApiImpl CHEST_OVERLAYS = new ChestOverlayApiImpl();
     private static final KeybindPool KEYBINDS = KeybindPool.INSTANCE;
@@ -333,7 +334,7 @@ public final class PandoricalApi {
     public static BlockTintApiImpl blockTintsImpl() { return BLOCK_TINTS; }
 
     /** @hidden used by Pandorical's EntityTrackingEvents registration */
-    public static StructureApiImpl structuresImpl() { return STRUCTURES; }
+    public static StructureRegistry structuresImpl() { return STRUCTURES; }
 
     /** @hidden used by Pandorical's EntityTrackingEvents/ServerEntityEvents registration */
     public static EntityOverlayApiImpl entityOverlaysImpl() { return ENTITY_OVERLAYS; }
@@ -671,190 +672,7 @@ public final class PandoricalApi {
         public boolean hasEntries() { return !entries.isEmpty(); }
     }
 
-    // --- StructureApi implementation ---
-
-    /**
-     * Server-side state for one structure. Broadcast-scoped (not per-player): mutated in
-     * place and re-broadcast to every current tracker of {@code anchorEntity} on every call.
-     */
-    private static final class StructureState {
-        final Entity anchorEntity;
-        final Map<RelPos, BlockState> blocks;
-        StructurePose pose;
-        boolean visible;
-
-        StructureState(Entity anchorEntity, Map<RelPos, BlockState> blocks, StructurePose pose, boolean visible) {
-            this.anchorEntity = anchorEntity;
-            this.blocks = blocks;
-            this.pose = pose;
-            this.visible = visible;
-        }
-    }
-
-    public static final class StructureApiImpl implements StructureApi {
-        private final Map<String, StructureState> structures = new ConcurrentHashMap<>();
-
-        @Override
-        public void spawn(Entity anchorEntity, String structureId, List<BlockEntry> blocks, StructurePose initialPose) {
-            Map<RelPos, BlockState> blockMap = new LinkedHashMap<>();
-            for (BlockEntry entry : blocks) blockMap.put(entry.pos(), entry.state());
-
-            StructureState state = new StructureState(anchorEntity, blockMap, initialPose, true);
-            structures.put(structureId, state);
-
-            justfatlard.pandorical.protocol.SpawnStructureS2C packet = buildSpawnPacket(structureId, state);
-            broadcastToTrackers(state.anchorEntity, packet);
-        }
-
-        /** @hidden A stopped server's structures belong to its world; the next world starts with none. */
-        public void clear() {
-            structures.clear();
-            pendingPoses.clear();
-        }
-
-        /** Structures whose pose changed since the tracker pass last sent it. */
-        private final java.util.Set<String> pendingPoses = java.util.concurrent.ConcurrentHashMap.newKeySet();
-
-        @Override
-        public void updatePose(String structureId, StructurePose pose) {
-            StructureState state = structures.get(structureId);
-            if (state == null) return;
-            state.pose = pose;
-            // Held until the game's own entity tracker runs, and sent from there: the deck and
-            // everything riding it then reach the client in one pass. Sent from here, mid-tick,
-            // the deck ran a full server tick ahead of the anchor, the cushions and the hull the
-            // tracker sends at the start of the next tick, and the pilot stood that tick off
-            // the helm and shook with it.
-            pendingPoses.add(structureId);
-        }
-
-        /**
-         * Send every pose changed since the last pass, for structures anchored in this level.
-         *
-         * <p>Called at the head of {@code ChunkMap.tick()}, which is the pass that sends every
-         * tracked entity's position. Both go out together, so both land in the same client tick.
-         */
-        public void flushPoses(net.minecraft.server.level.ServerLevel level) {
-            if (pendingPoses.isEmpty()) return;
-            for (java.util.Iterator<String> it = pendingPoses.iterator(); it.hasNext();) {
-                String structureId = it.next();
-                StructureState state = structures.get(structureId);
-                if (state == null) {
-                    it.remove();
-                    continue;
-                }
-                if (state.anchorEntity.level() != level) continue;
-                it.remove();
-                sendPose(structureId, state);
-            }
-        }
-
-        /** A pose still waiting for the tracker pass goes now, ahead of an update that cannot wait with it. */
-        private void sendPendingPose(String structureId, StructureState state) {
-            if (pendingPoses.remove(structureId)) sendPose(structureId, state);
-        }
-
-        private void sendPose(String structureId, StructureState state) {
-            StructurePose pose = state.pose;
-            broadcastToTrackers(state.anchorEntity, new justfatlard.pandorical.protocol.UpdateStructurePoseS2C(
-                structureId, pose.x(), pose.y(), pose.z(), pose.yaw()));
-        }
-
-        @Override
-        public void updateBlocks(String structureId, List<BlockEntry> added, List<RelPos> removed, Map<RelPos, BlockState> changed) {
-            StructureState state = structures.get(structureId);
-            if (state == null) return;
-            sendPendingPose(structureId, state);
-
-            for (BlockEntry entry : added) state.blocks.put(entry.pos(), entry.state());
-            for (RelPos pos : removed) state.blocks.remove(pos);
-            for (Map.Entry<RelPos, BlockState> entry : changed.entrySet()) state.blocks.put(entry.getKey(), entry.getValue());
-
-            List<justfatlard.pandorical.protocol.StructureBlockEntry> addedWire = toWireEntries(added);
-            List<justfatlard.pandorical.protocol.StructureRelPos> removedWire = removed.stream()
-                .map(p -> new justfatlard.pandorical.protocol.StructureRelPos(p.x(), p.y(), p.z()))
-                .toList();
-            List<justfatlard.pandorical.protocol.StructureBlockEntry> changedWire = changed.entrySet().stream()
-                .map(e -> new justfatlard.pandorical.protocol.StructureBlockEntry(e.getKey().x(), e.getKey().y(), e.getKey().z(), e.getValue()))
-                .toList();
-
-            broadcastToTrackers(state.anchorEntity, new justfatlard.pandorical.protocol.UpdateStructureBlocksS2C(
-                structureId, addedWire, removedWire, changedWire));
-        }
-
-        @Override
-        public void setVisible(String structureId, boolean visible) {
-            StructureState state = structures.get(structureId);
-            if (state == null) return;
-            sendPendingPose(structureId, state);
-            state.visible = visible;
-
-            broadcastToTrackers(state.anchorEntity,
-                new justfatlard.pandorical.protocol.SetStructureVisibleS2C(structureId, visible));
-        }
-
-        @Override
-        public void despawn(String structureId) {
-            StructureState state = structures.remove(structureId);
-            if (state == null) return;
-            pendingPoses.remove(structureId);
-
-            broadcastToTrackers(state.anchorEntity, new justfatlard.pandorical.protocol.DespawnStructureS2C(structureId));
-        }
-
-        /** @hidden called from Pandorical's EntityTrackingEvents.START_TRACKING handler. */
-        public void handleStartTracking(Entity entity, ServerPlayer player) {
-            if (!hasCapability(player, Capabilities.STRUCTURES)) return;
-            for (Map.Entry<String, StructureState> entry : structures.entrySet()) {
-                if (entry.getValue().anchorEntity == entity) {
-                    net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                        buildSpawnPacket(entry.getKey(), entry.getValue()));
-                }
-            }
-        }
-
-        /** @hidden called from Pandorical's EntityTrackingEvents.STOP_TRACKING handler. */
-        public void handleStopTracking(Entity entity, ServerPlayer player) {
-            if (!isAvailable(player)) return;
-            for (Map.Entry<String, StructureState> entry : structures.entrySet()) {
-                if (entry.getValue().anchorEntity == entity) {
-                    net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                        new justfatlard.pandorical.protocol.DespawnStructureS2C(entry.getKey()));
-                }
-            }
-        }
-
-        private justfatlard.pandorical.protocol.SpawnStructureS2C buildSpawnPacket(String structureId, StructureState state) {
-            return new justfatlard.pandorical.protocol.SpawnStructureS2C(
-                structureId,
-                toWireEntries(state.blocks),
-                state.pose.x(), state.pose.y(), state.pose.z(), state.pose.yaw(),
-                state.visible
-            );
-        }
-
-        private List<justfatlard.pandorical.protocol.StructureBlockEntry> toWireEntries(List<BlockEntry> entries) {
-            return entries.stream()
-                .map(e -> new justfatlard.pandorical.protocol.StructureBlockEntry(e.pos().x(), e.pos().y(), e.pos().z(), e.state()))
-                .toList();
-        }
-
-        private List<justfatlard.pandorical.protocol.StructureBlockEntry> toWireEntries(Map<RelPos, BlockState> blocks) {
-            return blocks.entrySet().stream()
-                .map(e -> new justfatlard.pandorical.protocol.StructureBlockEntry(e.getKey().x(), e.getKey().y(), e.getKey().z(), e.getValue()))
-                .toList();
-        }
-
-        private void broadcastToTrackers(Entity anchorEntity, net.minecraft.network.protocol.common.custom.CustomPacketPayload packet) {
-            for (ServerPlayer player : net.fabricmc.fabric.api.networking.v1.PlayerLookup.tracking(anchorEntity)) {
-                if (hasCapability(player, Capabilities.STRUCTURES)) {
-                    net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, packet);
-                }
-            }
-        }
-    }
-
-    /** @hidden implementation of {@link EntityOverlayApi}; broadcast design mirrors StructureApiImpl. */
+    /** @hidden implementation of {@link EntityOverlayApi}; broadcast design mirrors StructureRegistry. */
     public static final class EntityOverlayApiImpl implements EntityOverlayApi {
         private record OverlayEntry(Entity entity, net.minecraft.resources.Identifier texture) {}
 
