@@ -12,6 +12,25 @@ package justfatlard.pandorical.api;
  * @param thickness of the panel, in blocks
  */
 public record Picture(int columns, int rows, int[] palette, byte[] cells, Pose pose, int backColor, float thickness) {
+    /** Most cells to a side: every client in sight of a picture holds a texture this size for it. */
+    public static final int LARGEST_SIDE = 512;
+
+    /**
+     * @throws IllegalArgumentException if a side is under 1 or over {@link #LARGEST_SIDE}, or
+     *                                  {@code cells} does not hold exactly {@code columns * rows}
+     */
+    public Picture {
+        java.util.Objects.requireNonNull(palette, "palette");
+        java.util.Objects.requireNonNull(cells, "cells");
+        java.util.Objects.requireNonNull(pose, "pose");
+        if (columns < 1 || rows < 1 || columns > LARGEST_SIDE || rows > LARGEST_SIDE) {
+            throw new IllegalArgumentException("picture size " + columns + "x" + rows + " is outside 1.." + LARGEST_SIDE);
+        }
+        if (cells.length != columns * rows) {
+            throw new IllegalArgumentException(cells.length + " cells for a " + columns + "x" + rows + " picture");
+        }
+    }
+
     /**
      * Where the picture stands, relative to the entity it is anchored to.
      *
