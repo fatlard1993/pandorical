@@ -25,7 +25,7 @@ import net.minecraft.util.Util;
  * seconds, the keep-alive clock is held rather than run down, and a ping goes out every ten
  * seconds so the client's own read timeout, which is also thirty seconds, does not end it from
  * the other side. The ack puts everything back. Five minutes is a ceiling, not a target: a
- * client that has not answered by then is not coming back.
+ * client that has not answered by then is not coming back, and {@link #expire} closes it.
  */
 public final class ConfigPatience {
 	private ConfigPatience() {}
@@ -50,6 +50,23 @@ public final class ConfigPatience {
 
 	public static void forget(ServerConfigurationPacketListenerImpl handler) {
 		waiting.remove(handler);
+	}
+
+	/** Close every connection whose sync has gone unanswered past the ceiling. Server thread, once a tick. */
+	public static void expire() {
+		if (waiting.isEmpty()) return;
+		long now = Util.getMillis();
+		java.util.List<ServerConfigurationPacketListenerImpl> expired = new java.util.ArrayList<>();
+		synchronized (waiting) {
+			waiting.forEach((handler, since) -> {
+				if (now - since >= LONGEST_MILLIS) expired.add(handler);
+			});
+			expired.forEach(waiting::remove);
+		}
+		for (ServerConfigurationPacketListenerImpl handler : expired) {
+			handler.disconnect(net.minecraft.network.chat.Component.literal(
+				"Pandorical: the content sync went unanswered for " + PATIENT_SECONDS / 60 + " minutes"));
+		}
 	}
 
 	public static boolean isWaiting(ServerConfigurationPacketListenerImpl handler) {

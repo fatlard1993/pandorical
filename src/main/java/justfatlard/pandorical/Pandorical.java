@@ -362,6 +362,7 @@ public class Pandorical implements ModInitializer {
             ackedConfigConnections.remove(handler);
             ConfigPatience.forget(handler);
         });
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(server -> ConfigPatience.expire());
 
         // Server: add our sync task BEFORE Fabric's registry sync
         ServerConfigurationConnectionEvents.BEFORE_CONFIGURE.register((handler, server) -> {
