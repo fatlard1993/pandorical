@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiPredicate;
+import justfatlard.pandorical.api.PortalApi;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
@@ -25,14 +26,16 @@ import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
 /**
- * Nether portals that remember each other. See {@link justfatlard.pandorical.api.PortalApi}.
+ * Nether portals that remember each other. See {@link PortalApi}.
  *
  * <p>A portal is known by its anchor: the lowest, most north-westerly block of its sheet of purple,
  * found by walking the sheet, so every block of one portal answers to the same name however the
  * traveller entered it. Pairs are kept on the overworld with the world, both directions, and a pair
  * whose other end is no longer a portal is forgotten the first time a trip finds it so.
  */
-public final class PortalPairing {
+public final class PortalPairing implements PortalApi {
+	public static final PortalPairing INSTANCE = new PortalPairing();
+
 	private PortalPairing() {}
 
 	/** A sheet is at most 23 by 23; past that it is not a portal and not worth walking. */
@@ -47,6 +50,16 @@ public final class PortalPairing {
 
 	public static void keepOut(BiPredicate<ServerLevel, BlockPos> ours) {
 		if (ours != null) kept.add(ours);
+	}
+
+	@Override
+	public void pairNetherPortals(boolean byDefault) {
+		setDefault(byDefault);
+	}
+
+	@Override
+	public void keepOutOfPairing(BiPredicate<ServerLevel, BlockPos> ours) {
+		keepOut(ours);
 	}
 
 	public static boolean enabled(MinecraftServer server) {

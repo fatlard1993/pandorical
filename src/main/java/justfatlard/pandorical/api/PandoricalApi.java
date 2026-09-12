@@ -2,6 +2,7 @@ package justfatlard.pandorical.api;
 
 import justfatlard.pandorical.hud.HudRegistry;
 import justfatlard.pandorical.keybind.KeybindPool;
+import justfatlard.pandorical.portal.PortalPairing;
 import justfatlard.pandorical.push.BannerDecals;
 import justfatlard.pandorical.push.BlockMarks;
 import justfatlard.pandorical.push.BlockTints;
@@ -39,17 +40,7 @@ public final class PandoricalApi {
     private static final DeclaredRenderPolicy RENDER = DeclaredRenderPolicy.INSTANCE;
     private static final PlayingAnimations ANIMATIONS = PlayingAnimations.INSTANCE;
     private static final DeclaredMountPolicy MOUNTS = DeclaredMountPolicy.INSTANCE;
-    private static final PortalApi PORTALS = new PortalApi() {
-        @Override
-        public void pairNetherPortals(boolean byDefault) {
-            justfatlard.pandorical.portal.PortalPairing.setDefault(byDefault);
-        }
-
-        @Override
-        public void keepOutOfPairing(java.util.function.BiPredicate<net.minecraft.server.level.ServerLevel, net.minecraft.core.BlockPos> ours) {
-            justfatlard.pandorical.portal.PortalPairing.keepOut(ours);
-        }
-    };
+    private static final PortalPairing PORTALS = PortalPairing.INSTANCE;
     private static final PlayerInventoryApiImpl PLAYER_INVENTORY = new PlayerInventoryApiImpl();
     private static final BlockTints BLOCK_TINTS = BlockTints.INSTANCE;
     private static final StructureRegistry STRUCTURES = StructureRegistry.INSTANCE;
