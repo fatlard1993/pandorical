@@ -346,21 +346,7 @@ public class ContentManager {
             for (Registry<?> registry : SYNCED_REGISTRIES) unfreezeRegistry(registry);
 
             try {
-                justfatlard.pandorical.rail.RailCollision.setSolid(content.solidRails());
-                for (SyncContentS2C.BlockEntry entry : content.blocks()) {
-                    registerBlock(entry, StateIds.AT_JOIN);
-                }
-                for (SyncContentS2C.ItemEntry entry : content.items()) {
-                    registerItem(entry);
-                }
-
-                int stubCount = 0;
-                stubCount += registerEntityTypeStubs(content.entityTypes());
-                stubCount += registerBlockEntityTypeStubs(content.blockEntityTypes());
-                stubCount += registerVillagerProfessionStubs(content.villagerProfessions());
-                stubCount += registerPoiTypeStubs(content.poiTypes());
-                stubCount += registerMenuTypeStubs(content.menuTypes());
-                stubCount += registerRecipeBookCategoryStubs(content.recipeBookCategories());
+                int stubCount = registerContent(content, StateIds.AT_JOIN);
 
                 Pandorical.LOGGER.info("Config phase: registered {} blocks, {} items, and {} additional registry stubs",
                     content.blocks().size(), content.items().size(), stubCount);
@@ -538,21 +524,7 @@ public class ContentManager {
             for (Registry<?> registry : SYNCED_REGISTRIES) unfreezeRegistry(registry);
 
             try {
-                justfatlard.pandorical.rail.RailCollision.setSolid(content.solidRails());
-                for (SyncContentS2C.BlockEntry entry : content.blocks()) {
-                    registerBlock(entry, StateIds.AT_REGISTRATION);
-                }
-                for (SyncContentS2C.ItemEntry entry : content.items()) {
-                    registerItem(entry);
-                }
-
-                int stubCount = 0;
-                stubCount += registerEntityTypeStubs(content.entityTypes());
-                stubCount += registerBlockEntityTypeStubs(content.blockEntityTypes());
-                stubCount += registerVillagerProfessionStubs(content.villagerProfessions());
-                stubCount += registerPoiTypeStubs(content.poiTypes());
-                stubCount += registerMenuTypeStubs(content.menuTypes());
-                stubCount += registerRecipeBookCategoryStubs(content.recipeBookCategories());
+                int stubCount = registerContent(content, StateIds.AT_REGISTRATION);
 
                 sweepUnmappedStateIds(content.blocks());
 
@@ -573,6 +545,29 @@ public class ContentManager {
         injectResourcePack();
 
         ClientPlayNetworking.send(new ContentReadyC2S());
+    }
+
+    /**
+     * Register one sync's rail setting, blocks, items and registry stubs, in that order, into the
+     * {@link #SYNCED_REGISTRIES} the caller has unfrozen. Returns how many stubs were registered.
+     */
+    private static int registerContent(SyncedContent content, StateIds stateIds) {
+        justfatlard.pandorical.rail.RailCollision.setSolid(content.solidRails());
+        for (SyncContentS2C.BlockEntry entry : content.blocks()) {
+            registerBlock(entry, stateIds);
+        }
+        for (SyncContentS2C.ItemEntry entry : content.items()) {
+            registerItem(entry);
+        }
+
+        int stubCount = 0;
+        stubCount += registerEntityTypeStubs(content.entityTypes());
+        stubCount += registerBlockEntityTypeStubs(content.blockEntityTypes());
+        stubCount += registerVillagerProfessionStubs(content.villagerProfessions());
+        stubCount += registerPoiTypeStubs(content.poiTypes());
+        stubCount += registerMenuTypeStubs(content.menuTypes());
+        stubCount += registerRecipeBookCategoryStubs(content.recipeBookCategories());
+        return stubCount;
     }
 
     /** Called from both config-phase finalize (deferred) and play-phase finalize. */

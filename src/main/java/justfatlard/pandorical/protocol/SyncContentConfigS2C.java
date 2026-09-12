@@ -39,7 +39,7 @@ public record SyncContentConfigS2C(
     List<String> menuTypes,
     List<String> recipeBookCategories,
     boolean solidRails
-) implements CustomPacketPayload {
+) implements CustomPacketPayload, SyncedContent {
     public static final Type<SyncContentConfigS2C> TYPE =
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "sync_content_config"));
 
