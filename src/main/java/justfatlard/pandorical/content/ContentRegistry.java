@@ -33,27 +33,17 @@ import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
-/**
- * Server-side content registry. Stores block/item registrations and asset data.
- * Syncs to Pandorical clients on join.
- */
 public class ContentRegistry implements ContentApi {
     private final Map<String, RegisteredBlock> blocks = new LinkedHashMap<>();
     private final Map<String, RegisteredItem> items = new LinkedHashMap<>();
     private final Map<String, byte[]> assets = new ConcurrentHashMap<>();
 
-    /** Who claimed each vanilla-namespace path, so a genuine clash between two mods is audible. */
     private final Map<String, String> vanillaAssetOwners = new ConcurrentHashMap<>();
     private volatile List<SyncAssetsS2C> cachedAssetChunks = null;
 
-    /** Vanilla item overrides: keyed by full item ID, e.g. "minecraft:rabbit_hide" */
     private final Map<String, VanillaItemOverride> vanillaItemOverrides = new LinkedHashMap<>();
 
-    /**
-     * Set of mod namespaces that have registered content through Pandorical.
-     * These namespaces should be excluded from Fabric's registry sync to allow
-     * vanilla/unmodded clients to connect.
-     */
+    /** Kept out of Fabric's registry sync, so a vanilla client can connect. */
     private static final Set<String> serverOnlyNamespaces = ConcurrentHashMap.newKeySet();
 
     public record RegisteredBlock(String id, BlockRegistration registration) {}
@@ -90,10 +80,6 @@ public class ContentRegistry implements ContentApi {
         cachedAssetChunks = null;
     }
 
-    /**
-     * Register an entire mod namespace as server-only for registry sync bypass.
-     * Call this during onInitialize for mods that register custom content via Pandorical.
-     */
     private boolean solidRails;
 
     @Override
@@ -118,12 +104,11 @@ public class ContentRegistry implements ContentApi {
         return serverOnlyNamespaces.contains(namespace);
     }
 
-    /** Hot-path guard: cheaper than materialising the namespace view. */
     public static boolean hasServerOnlyNamespaces() {
         return !serverOnlyNamespaces.isEmpty();
     }
 
-    // Cached unmodifiable view; safe because ConcurrentHashMap.KeySetView is thread-safe
+    // A view of a concurrent set, so caching it is safe.
     private static volatile Set<String> cachedUnmodifiableView = null;
 
     public static Set<String> getServerOnlyNamespaces() {
@@ -142,7 +127,6 @@ public class ContentRegistry implements ContentApi {
             Pandorical.LOGGER.debug("Tracking server-only namespace from mod assets: {}", modId);
         }
 
-        // Scan the mod's jar for assets/{modId}/ files and register them
         try {
             var modContainer = FabricLoader.getInstance()
                 .getModContainer(modId);
@@ -153,14 +137,8 @@ public class ContentRegistry implements ContentApi {
 
             var rootPaths = modContainer.get().getRootPaths();
             for (var root : rootPaths) {
-                // The mod's own namespace, and the vanilla one it may have had to borrow.
-                //
-                // Some assets are not free to live under a mod's name. An armour layer is looked
-                // up from the equipment asset the material names, and a villager profession's
-                // skin from a path the game builds itself - both land under assets/minecraft/,
-                // and scanning only assets/<modId>/ left them on the server. The item icon
-                // arrived and the thing worn on the body did not: a quartz helmet you could hold
-                // and could not see, in three mods at once.
+                // Also assets/minecraft/: armour layers and villager profession skins resolve to
+                // vanilla-namespace paths.
                 for (String namespace : new String[] {modId, "minecraft"}) {
                     if (namespace.equals("minecraft") && modId.equals("minecraft")) continue;
 
@@ -174,11 +152,8 @@ public class ContentRegistry implements ContentApi {
                                     + assetsDir.relativize(file).toString();
                                 byte[] data = Files.readAllBytes(file);
 
-                                // Two mods writing one vanilla path is a real possibility now
-                                // that this namespace is in scope, and the loser would fail
-                                // invisibly. Only worth saying when the other one is somebody
-                                // else: this runs again every time a mod registers a block or an
-                                // item, so a mod meets its own files constantly.
+                                // Warn only on another mod's claim: this reruns on every
+                                // registration, so a mod meets its own files constantly.
                                 if (namespace.equals("minecraft")) {
                                     String previous = vanillaAssetOwners.put(relativePath, modId);
                                     if (previous != null && !previous.equals(modId)) {
@@ -214,19 +189,13 @@ public class ContentRegistry implements ContentApi {
     }
 
     /**
-     * Generate and register assets for a vanilla item override.
-     *
-     * <p>Lang and texture overrides live in the pandorical namespace, which the
-     * VirtualResourcePack definitely serves (lang files from any namespace can carry
-     * keys for any other; writing assets/minecraft/lang/en_us.json risks being shadowed
-     * by the built-in vanilla pack). Only the items/ redirect JSON must live in the
-     * item's own namespace, a single file far less likely to be shadowed.
+     * Lang and textures go in the pandorical namespace: assets/minecraft/lang/en_us.json could be
+     * shadowed by the vanilla pack. Only the items/ redirect must live in the item's namespace.
      */
     private void applyVanillaItemOverrideAssets(String vanillaItemId, VanillaItemOverride override) {
         String[] parts = vanillaItemId.split(":", 2);
         String namespace = parts[0];
         String itemName = parts[1];
-        // Flat key safe for use in file names: "minecraft:rabbit_hide" → "minecraft_rabbit_hide"
         String flatKey = namespace + "_" + itemName.replace('/', '_');
 
         if (override.hasTexture()) {
@@ -238,8 +207,6 @@ public class ContentRegistry implements ContentApi {
             registerAsset("assets/pandorical/models/item/" + flatKey + ".json",
                 autoModel.getBytes(StandardCharsets.UTF_8));
 
-            // Redirect the vanilla item's definition to the generated model, unless an
-            // explicit model override is set (handled below).
             if (!override.hasModel()) {
                 String itemsJson = "{\n  \"model\": {\n    \"type\": \"minecraft:model\",\n    \"model\": \""
                     + escapeJson("pandorical:item/" + flatKey) + "\"\n  }\n}\n";
@@ -260,30 +227,20 @@ public class ContentRegistry implements ContentApi {
         }
     }
 
-    // Extra lang entries contributed outside the vanilla-override path, e.g.
-    // keybind slot names from KeybindPool. Merged into the same synced
-    // pandorical lang file (registerAsset on one path overwrites, so all
-    // contributors must go through the single rebuild below).
+    // registerAsset on one path overwrites, so every lang contributor goes through
+    // rebuildVanillaLangFile.
     private final Map<String, String> extraLangEntries = new LinkedHashMap<>();
 
-    /** Add lang entries to the synced pandorical lang file and rebuild it. */
     public void addLangEntries(Map<String, String> entries) {
         extraLangEntries.putAll(entries);
         rebuildVanillaLangFile();
     }
 
-    /**
-     * Rebuild the merged lang file for all vanilla item name overrides and
-     * extra contributed entries
-     * (namespace rationale in {@link #applyVanillaItemOverrideAssets}).
-     */
     private void rebuildVanillaLangFile() {
         Map<String, String> entries = new LinkedHashMap<>();
         for (var e : vanillaItemOverrides.entrySet()) {
             if (!e.getValue().hasName()) continue;
             String[] parts = e.getKey().split(":", 2);
-            // "minecraft:rabbit_hide" → "item.minecraft.rabbit_hide"
-            // sub-paths like "foo/bar" → "item.minecraft.foo.bar"
             String langKey = "item." + parts[0] + "." + parts[1].replace('/', '.');
             entries.put(langKey, e.getValue().getDisplayName());
         }
@@ -315,18 +272,13 @@ public class ContentRegistry implements ContentApi {
         return hasServerOnlyNamespaces();
     }
 
-    /**
-     * The fallback content sync, sent in the play phase to a client the configuration phase did not
-     * make content-ready: the same blocks, items, registry stubs and assets PandoricalSyncTask sends
-     * there, in the play-phase payloads. Sends nothing when there are no blocks or items.
-     */
+    /** The play-phase fallback of PandoricalSyncTask; sends nothing without blocks or items. */
     public void syncContentTo(ServerPlayer player) {
         List<SyncContentS2C.BlockEntry> blockEntries = buildBlockEntries();
         List<SyncContentS2C.ItemEntry> itemEntries = buildItemEntries();
 
         if (blockEntries.isEmpty() && itemEntries.isEmpty()) return;
 
-        // The content packet carries the chunk count so the client knows what to expect
         int assetChunkCount = 0;
         if (!assets.isEmpty()) {
             try {
@@ -352,7 +304,6 @@ public class ContentRegistry implements ContentApi {
 
     private static final int CHUNK_SIZE = 900_000;
 
-    /** Compressed chunks are cached so they aren't rebuilt per player. */
     private void sendAssets(ServerPlayer player) {
         try {
             List<SyncAssetsS2C> chunks = cachedAssetChunks;
@@ -406,21 +357,9 @@ public class ContentRegistry implements ContentApi {
         return chunks;
     }
 
-    /** Reported once, not per joining player. */
     private volatile boolean reportedInferredBlocks = false;
     private volatile boolean reportedUnsyncedNamespaces = false;
 
-    /**
-     * Name any mod that owns block/item registry entries but is not registered with
-     * Pandorical at all, on every kind of host.
-     *
-     * <p>Severity depends on the host, which is exactly why this cannot be left to
-     * the dedicated-server path: {@code autoRegisterServerOnlyNamespaces()} only runs
-     * on a dedicated server, where an undeclared mod at least gets swept up with a
-     * guessed base block. On an integrated or LAN host that sweep never happens, so
-     * an undeclared mod syncs nothing whatsoever and its blocks simply do not exist
-     * for Pandorical clients. Silent either way without this.
-     */
     private void reportUnsyncedNamespaces() {
         if (reportedUnsyncedNamespaces) return;
         reportedUnsyncedNamespaces = true;
@@ -452,19 +391,7 @@ public class ContentRegistry implements ContentApi {
         }
     }
 
-    /**
-     * One-time note of how much of the content packet the block table is using.
-     *
-     * <p>Block and item content goes out as a single custom payload, and a custom payload stops at
-     * a megabyte. Every state of every registered block puts an id in it, so the packet grows with
-     * the suite rather than with any one mod - and a mod registering a block with a large state
-     * space (a pair of materials in one block is ten thousand states on its own) spends a chunk of
-     * a budget nobody is watching.
-     *
-     * <p>Silence is the failure mode worth fearing here: over the limit the payload does not
-     * truncate, it fails to send, and every Pandorical feature goes missing at once with nothing to
-     * connect it back to the mod that tipped it over.
-     */
+    /** Over the payload limit the play-phase content sync fails to send, so its size is logged. */
     private static boolean loggedContentScale = false;
 
     private static void logContentScale(List<SyncContentS2C.BlockEntry> entries) {
@@ -477,8 +404,7 @@ public class ContentRegistry implements ContentApi {
 
         for (SyncContentS2C.BlockEntry entry : entries) {
             states += entry.stateIds().size();
-            // A state id is a var-int into the global block state registry - three bytes once a
-            // suite this size is registered - and the rest is the id and the property spellings.
+            // A state id is a var-int of about three bytes at this suite's size.
             approximateBytes += entry.stateIds().size() * 3 + entry.id().length() + 64;
             for (String property : entry.stateProperties()) approximateBytes += property.length();
 
@@ -501,11 +427,8 @@ public class ContentRegistry implements ContentApi {
             String namespace = entry.getKey().identifier().getNamespace();
             String id = entry.getKey().identifier().toString();
 
-            // Namespace decides it for the blocks this server invented, but a mod can also claim
-            // a vanilla block by naming it outright - which is the only way to say that a
-            // right-click on, say, a player head is the server's to answer. The client already
-            // handles an id it owns: it finds the block present, keeps its own, and takes only
-            // the flags. Nothing is registered twice and no protocol changed to allow it.
+            // A mod can also claim a vanilla block by id, to make it interactive; the client keeps
+            // its own block and takes only the flags.
             if (!isServerOnlyNamespace(namespace) && !blocks.containsKey(id)) continue;
 
             var block = entry.getValue();
@@ -531,15 +454,11 @@ public class ContentRegistry implements ContentApi {
                 requiresCorrectTool = registered.registration().getRequiresCorrectTool();
             }
 
-            // What the registration leaves unsaid is read off the real block rather than left to
-            // the stand-in's base. The server times the dig from the real block's hardness and tool
-            // requirement, and the client predicts it from whatever it was sent: a cloud standing in
-            // as snow dug in half the server's time, so with a shovel the client broke it instantly,
-            // the server put it back, and the client broke it again, over and over.
+            // Unset mining values come from the real block, which the server times the dig by;
+            // the client predicts from what it is sent.
             var real = block.defaultBlockState();
             if (destroyTime == BlockRegistration.INHERIT) {
-                // An unbreakable block's -1 reads as "inherit" on the wire, which leaves such a
-                // block exactly as it was before this: no worse, and nothing to predict.
+                // An unbreakable block's -1 reads as "inherit" on the wire.
                 destroyTime = real.getDestroySpeed(EmptyBlockGetter.INSTANCE,
                     BlockPos.ZERO);
             }
@@ -547,22 +466,17 @@ public class ContentRegistry implements ContentApi {
                 requiresCorrectTool = real.requiresCorrectToolForDrops() ? 1 : 0;
             }
 
-            // Auto-detected blocks (not registered via PandoricalApi) get an inferred base
-            // so the client can still pick the right block class and Properties.
+            // An unregistered block's base is inferred from its sound and may not share its state
+            // properties, so these are named in a warning.
             if (baseBlockId.isEmpty()) {
                 baseBlockId = inferBaseBlockId(block);
-                // A sound-inferred base can hand the client a block class carrying
-                // different state properties than this block has, which the client can
-                // only paper over with a fallback state (see ContentManager). Name them
-                // here so the mismatch is diagnosable at boot instead of in someone's world.
                 inferred.add(id);
             }
 
             byte[] shapeData = serializeBlockShapes(block);
             byte[] lightData = serializeBlockLight(block);
 
-            // Read off the block's own default state: climbability is a property of the block, and
-            // no vanilla climbable varies it by state.
+            // No vanilla climbable varies climbability by state.
             boolean climbable = block.defaultBlockState().is(BlockTags.CLIMBABLE);
 
             blockEntries.add(new SyncContentS2C.BlockEntry(
@@ -586,7 +500,6 @@ public class ContentRegistry implements ContentApi {
         return blockEntries;
     }
 
-    /** One byte of light per state, in the order the block's own definition lists its states. */
     private static byte[] serializeBlockLight(Block block) {
         var states = block.getStateDefinition().getPossibleStates();
         byte[] light = new byte[states.size()];
@@ -597,9 +510,8 @@ public class ContentRegistry implements ContentApi {
     }
 
     /**
-     * Serialize outline and collision VoxelShapes for all states of a block.
-     * Format per state: [numOutlineBoxes:byte][boxes...][numCollisionBoxes:byte][boxes...]
-     * Each box: [minX:float][minY:float][minZ:float][maxX:float][maxY:float][maxZ:float]
+     * Per state: [outlineBoxCount:byte][boxes][collisionBoxCount:byte][boxes], each box six floats,
+     * min x, y, z then max x, y, z.
      */
     private static byte[] serializeBlockShapes(Block block) {
         try {
@@ -637,7 +549,6 @@ public class ContentRegistry implements ContentApi {
         }
     }
 
-    /** Used by both play-phase and config-phase sync. */
     public List<SyncContentS2C.ItemEntry> buildItemEntries() {
         List<SyncContentS2C.ItemEntry> itemEntries = new ArrayList<>();
         for (var entry : BuiltInRegistries.ITEM.entrySet()) {
@@ -658,18 +569,13 @@ public class ContentRegistry implements ContentApi {
             var equippable = item.components().get(DataComponents.EQUIPPABLE);
             if (equippable != null) {
                 equipSlot = equippable.slot().getName();
-                // The asset id as well, because the slot alone only says where a thing is worn.
-                // Without it the client has nothing to hang an armour model on and falls back to
-                // pasting the item's own sprite flat on the wearer: a quartz helmet came out as a
-                // white square standing up on the player's head.
+                // Without the asset id the client has no armour model and draws the item's sprite.
                 var asset = equippable.assetId();
                 if (asset.isPresent()) {
                     equipSlot = equipSlot + "|" + asset.get().identifier();
                 }
             }
 
-            // A declared tool carries the material's numbers; the bare "tool" from
-            // inferToolType only ever said yes-or-no, which the client could do nothing with.
             String declaredTool = registered != null ? registered.registration().getToolSpec() : "";
             String toolType = declaredTool.isEmpty() ? inferToolType(item) : declaredTool;
 
@@ -679,18 +585,7 @@ public class ContentRegistry implements ContentApi {
         return itemEntries;
     }
 
-    /**
-     * What the client needs to eat this the way the server does, or "" for anything inedible.
-     *
-     * <p>Read off the item's own components rather than declared by the mod, for the same reason
-     * the equipment slot is: the server item already carries the answer, and a second place to say
-     * it is a second place to say it differently.
-     *
-     * <p>Without this the client's stand-in is a bare item with no food component, so a synced
-     * edible has no eating animation, no eating sound and no hunger restored on the client's own
-     * reckoning - you hold right-click and nothing whatsoever happens on screen while the server
-     * quietly feeds you.
-     */
+    /** "" for anything inedible. Without it the client's stand-in has no food component. */
     private static String foodSpec(Item item) {
         var food = item.components().get(DataComponents.FOOD);
         if (food == null) return "";
@@ -703,17 +598,12 @@ public class ContentRegistry implements ContentApi {
             String.valueOf(seconds));
     }
 
-    /** Returns "tool" or "": tools are data-driven via the Tool component in MC 26.1+. */
     private static String inferToolType(Item item) {
         var tool = item.components().get(DataComponents.TOOL);
         if (tool != null) return "tool";
         return "";
     }
 
-    /**
-     * Auto-scan and register assets for all server-only mods that haven't
-     * explicitly registered their assets via PandoricalApi.content().registerModAssets().
-     */
     public void autoScanAllModAssets() {
         for (String namespace : serverOnlyNamespaces) {
             boolean hasAssets = assets.keySet().stream().anyMatch(k -> k.startsWith("assets/" + namespace + "/"));
@@ -730,7 +620,6 @@ public class ContentRegistry implements ContentApi {
         autoScanAllModAssets();
         if (assets.isEmpty()) return List.of();
 
-        // Wire format: [pathUTF][dataLen][data] repeated, then gzipped and chunked
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(baos);
 
@@ -798,8 +687,7 @@ public class ContentRegistry implements ContentApi {
     }
 
     private static String inferBaseBlockId(Block block) {
-        // Match by SoundType to get the right break/place/step sounds and material feel;
-        // the client detects block type (slab, stair, etc.) from state properties independently.
+        // The client works out the block's type from its state properties; the base gives sounds.
         var sound = block.defaultBlockState().getSoundType();
         return inferBaseBlockFromSound(sound);
     }
@@ -814,7 +702,6 @@ public class ContentRegistry implements ContentApi {
         if (sound == SoundType.SAND)    return "minecraft:sand";
         if (sound == SoundType.WOOL)    return "minecraft:white_wool";
         if (sound == SoundType.SNOW)    return "minecraft:snow_block";
-        // CLAY removed in MC 26.1
         if (sound == SoundType.COPPER)  return "minecraft:copper_block";
         if (sound == SoundType.CORAL_BLOCK)     return "minecraft:brain_coral_block";
         if (sound == SoundType.NETHER_BRICKS)   return "minecraft:nether_bricks";
