@@ -130,7 +130,7 @@ public final class SettingsRegistry implements SettingsApi {
         paneScroll.remove(player);
     }
 
-    /** Wire the screen's actions; once, after the screens API exists. */
+    /** Wire the screen's actions and the keybind reports; once, after both APIs exist. */
     public void init() {
         PandoricalApi.screens().onActionFallback(SCREEN_TYPE, (player, data) -> press(player, data.get("_componentId"), data));
         PandoricalApi.screens().onAction(SCREEN_TYPE, "close", (player, data) -> {
@@ -145,6 +145,11 @@ public final class SettingsRegistry implements SettingsApi {
             shown.remove(player.getUUID());
             listScroll.remove(player.getUUID());
             paneScroll.remove(player.getUUID());
+        });
+        // Each report lays the keys tab out again, so only one that changed, or that a rebind is
+        // waiting on, is worth the rebuild.
+        PandoricalApi.keybindsImpl().onBindingsReported((player, changed) -> {
+            if (changed || isRebinding(player)) refreshKeybinds(player);
         });
     }
 
@@ -356,16 +361,16 @@ public final class SettingsRegistry implements SettingsApi {
         PandoricalApi.screens().open(player, screen.build());
     }
 
+    /** Whether this player's keys tab is waiting on a key for one of its slots. */
+    private boolean isRebinding(ServerPlayer player) {
+        return rebinding.containsKey(player.getUUID());
+    }
+
     /**
      * The client has just said what its keys are bound to. Anyone sitting on the keys tab is
      * shown the answer, and whatever they were waiting for has arrived.
      */
-    /** Whether this player's keys tab is waiting on a key for one of its slots. */
-    public boolean isRebinding(ServerPlayer player) {
-        return rebinding.containsKey(player.getUUID());
-    }
-
-    public void refreshKeybinds(ServerPlayer player) {
+    private void refreshKeybinds(ServerPlayer player) {
         Shown was = shown.get(player.getUUID());
         if (was == null || !"keybinds".equals(was.tab())) {
             rebinding.remove(player.getUUID());

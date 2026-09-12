@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.KeybindApi;
@@ -161,16 +162,25 @@ public final class KeybindPool implements KeybindApi {
 		return key == null ? "" : key;
 	}
 
-	/**
-	 * @hidden the client reporting what its pool keys are bound to. The keys tab is laid out
-	 * again only when that changed or a rebind is waiting on it, since each report is a rebuild.
-	 */
+	/** Hears each report of a player's pool key bindings, and whether it differs from their last. */
+	@FunctionalInterface
+	public interface BindingsListener {
+		void bindingsReported(ServerPlayer player, boolean changed);
+	}
+
+	private final List<BindingsListener> bindingsListeners = new CopyOnWriteArrayList<>();
+
+	/** Run this listener on every bindings report from here on. */
+	public void onBindingsReported(BindingsListener listener) {
+		bindingsListeners.add(listener);
+	}
+
+	/** @hidden the client reporting what its pool keys are bound to. */
 	public void handleBindings(ServerPlayer player, List<String> keys) {
 		List<String> now = List.copyOf(keys);
 		List<String> before = bindings.put(player.getUUID(), now);
-		var settings = PandoricalApi.settingsImpl();
-		if (now.equals(before) && !settings.isRebinding(player)) return;
-		settings.refreshKeybinds(player);
+		boolean changed = !now.equals(before);
+		for (BindingsListener listener : bindingsListeners) listener.bindingsReported(player, changed);
 	}
 
 	/** Ask this player's client to bind the next key it sees to this slot. */
