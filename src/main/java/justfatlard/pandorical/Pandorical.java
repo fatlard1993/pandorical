@@ -105,6 +105,7 @@ public class Pandorical implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        DiagnosticMixinPlugin.reportUnmatched();
         // Pandorical's own server setting, beside every mod's. Declared first thing so it is on
         // the page however far the rest of init gets.
         PandoricalApi.settings().serverGroup(MOD_ID, "Pandorical")

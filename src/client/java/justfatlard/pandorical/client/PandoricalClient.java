@@ -47,13 +47,14 @@ public class PandoricalClient implements ClientModInitializer {
     private static final Map<String, OpenScreenS2C> pendingContainerDefs = new LinkedHashMap<>();
 
     /**
-     * Startup pieces left out by {@code -Dpandorical.skip=a,b,...}: keybinds, contextmodels,
-     * suppressor, hud, structures, decals, or all. For finding which one a crash lives in on a
-     * machine nobody here can reach; nothing is left out without the property.
+     * Startup pieces left out by {@code -Dpandorical.skip=a,b,...}, or all of them. For finding which
+     * one a crash lives in on a machine nobody here can reach; nothing is left out without the property.
      */
     private static final java.util.Set<String> SKIP = java.util.Arrays.stream(
             System.getProperty("pandorical.skip", "").split(","))
         .map(String::trim).filter(s -> !s.isEmpty()).collect(java.util.stream.Collectors.toSet());
+    private static final java.util.Set<String> SKIPPABLE = java.util.Set.of(
+        "keybinds", "contextmodels", "suppressor", "hud", "structures", "decals", "pictures", "all");
 
     private static boolean skipped(String piece) {
         justfatlard.pandorical.Diagnostics.mark("startup: " + piece);
@@ -64,6 +65,9 @@ public class PandoricalClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        for (String piece : SKIP) {
+            if (!SKIPPABLE.contains(piece)) Pandorical.LOGGER.warn("[pandorical] diagnostic: pandorical.skip names {}, which is not one of {}", piece, SKIPPABLE);
+        }
         justfatlard.pandorical.client.diag.StackSampler.start();
         justfatlard.pandorical.Diagnostics.mark("client init begins");
         // The load guard (see Diagnostics): up from launch already, and raised again for every join,

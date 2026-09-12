@@ -23,10 +23,23 @@ public final class DiagnosticMixinPlugin implements IMixinConfigPlugin {
 	private static final Set<String> SKIP = Arrays.stream(System.getProperty("pandorical.skipMixins", "").split(","))
 		.map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toSet());
 
+	/** The names in {@link #SKIP} that matched a mixin, so a misspelt one can be told apart from one that did nothing. */
+	private static final Set<String> MATCHED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+	/** Say which skip names matched no mixin. Mixin configs are prepared before any mod initialises, so call it from one. */
+	public static void reportUnmatched() {
+		for (String name : SKIP) {
+			if (!name.equals("all") && !MATCHED.contains(name)) {
+				System.out.println("[pandorical] diagnostic: pandorical.skipMixins names " + name + ", which is no mixin of Pandorical's");
+			}
+		}
+	}
+
 	@Override
 	public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
 		if (SKIP.isEmpty()) return true;
 		String simple = mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1);
+		if (SKIP.contains(simple)) MATCHED.add(simple);
 		boolean skip = SKIP.contains(simple)
 			|| (SKIP.contains("all") && !simple.endsWith("Accessor") && !simple.endsWith("Invoker"));
 		if (skip) System.out.println("[pandorical] diagnostic: leaving out mixin " + simple);
