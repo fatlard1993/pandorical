@@ -1,5 +1,6 @@
 package justfatlard.pandorical.api;
 
+import justfatlard.pandorical.hud.HudRegistry;
 import justfatlard.pandorical.screen.ScreenRegistry;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
@@ -19,7 +20,7 @@ public final class PandoricalApi {
     private PandoricalApi() {}
 
     private static final ScreenRegistry SCREENS = ScreenRegistry.INSTANCE;
-    private static final HudApiImpl HUD = new HudApiImpl();
+    private static final HudRegistry HUD = HudRegistry.INSTANCE;
     private static final justfatlard.pandorical.content.ContentRegistry CONTENT = new justfatlard.pandorical.content.ContentRegistry();
     private static final CameraApiImpl CAMERA = new CameraApiImpl();
     private static final SkinApiImpl SKINS = new SkinApiImpl();
@@ -372,71 +373,6 @@ public final class PandoricalApi {
 
     /** @hidden */
     public static ScreenRegistry screensImpl() { return SCREENS; }
-
-    // --- HudApi implementation ---
-
-    public static final class HudApiImpl implements HudApi {
-        @Override
-        public void show(ServerPlayer player, justfatlard.pandorical.protocol.ShowHudS2C overlay) {
-            if (!hasCapability(player, Capabilities.HUD)) {
-                justfatlard.pandorical.Pandorical.LOGGER.warn(
-                    "Cannot show HUD for {} — client does not support HUD rendering (not yet implemented on client)",
-                    player.getName().getString());
-                return;
-            }
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, overlay);
-        }
-
-        @Override
-        public void update(ServerPlayer player, String overlayId, List<justfatlard.pandorical.protocol.ComponentUpdate> updates) {
-            if (!isAvailable(player)) return;
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.UpdateHudS2C(overlayId, updates));
-        }
-
-        @Override
-        public void hide(ServerPlayer player, String overlayId) {
-            if (!isAvailable(player)) return;
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.HideHudS2C(overlayId));
-        }
-
-        /** player UUID to owner id to that owner's requested element ids. */
-        private final Map<java.util.UUID, Map<String, java.util.Set<String>>> hiddenVanillaElements =
-            new java.util.concurrent.ConcurrentHashMap<>();
-
-        @Override
-        public void hideVanillaElements(ServerPlayer player, String ownerId, java.util.Collection<String> elementIds) {
-            if (!hasCapability(player, Capabilities.HUD_ELEMENTS)) return;
-            Map<String, java.util.Set<String>> byOwner = hiddenVanillaElements
-                .computeIfAbsent(player.getUUID(), k -> new java.util.concurrent.ConcurrentHashMap<>());
-            if (elementIds.isEmpty()) {
-                byOwner.remove(ownerId);
-            } else {
-                byOwner.put(ownerId, java.util.Set.copyOf(elementIds));
-            }
-            sendVanillaElementSet(player, byOwner);
-        }
-
-        @Override
-        public void restoreVanillaElements(ServerPlayer player, String ownerId) {
-            Map<String, java.util.Set<String>> byOwner = hiddenVanillaElements.get(player.getUUID());
-            if (byOwner == null || byOwner.remove(ownerId) == null) return;
-            if (!hasCapability(player, Capabilities.HUD_ELEMENTS)) return;
-            sendVanillaElementSet(player, byOwner);
-        }
-
-        private static void sendVanillaElementSet(ServerPlayer player, Map<String, java.util.Set<String>> byOwner) {
-            java.util.Set<String> union = new java.util.LinkedHashSet<>();
-            for (java.util.Set<String> ids : byOwner.values()) union.addAll(ids);
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.SetVanillaHudElementsS2C(java.util.List.copyOf(union)));
-        }
-
-        void forgetPlayer(java.util.UUID uuid) {
-            hiddenVanillaElements.remove(uuid);
-        }
-    }
 
     // --- CameraApi implementation ---
 
