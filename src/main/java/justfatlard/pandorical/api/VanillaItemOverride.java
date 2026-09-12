@@ -4,48 +4,27 @@ import java.io.IOException;
 import java.nio.file.Files;
 import net.fabricmc.loader.api.FabricLoader;
 
-/**
- * Builder for overriding a vanilla item's appearance for Pandorical clients.
- *
- * The overrides are injected into the VirtualResourcePack at TOP priority,
- * so they take effect over vanilla resources. Vanilla clients are unaffected.
- *
- * Usage:
- * <pre>
- *   PandoricalApi.content().overrideVanillaItem("minecraft:rabbit_hide",
- *       new VanillaItemOverride()
- *           .name("Leather Scraps")
- *           .textureFrom("my-mod", "textures/item/leather_scraps.png"));
- * </pre>
- */
 public class VanillaItemOverride {
     private String displayName = null;
     private byte[] textureData = null;
     private String modelPath = null;
 
-    /**
-     * Override the item's display name for Pandorical clients.
-     * Writes into assets/{namespace}/lang/en_us.json on the client.
-     */
+    /** Written into the client's {@code assets/<namespace>/lang/en_us.json}. */
     public VanillaItemOverride name(String displayName) {
         this.displayName = displayName;
         return this;
     }
 
     /**
-     * Override the item's texture with raw PNG bytes.
-     * Replaces assets/{namespace}/textures/item/{name}.png on the client.
-     * Works for flat 2D items without needing a model override.
+     * PNG bytes replacing {@code assets/<namespace>/textures/item/<name>.png}; enough for a flat
+     * item without a model override.
      */
     public VanillaItemOverride texture(byte[] data) {
         this.textureData = data;
         return this;
     }
 
-    /**
-     * Load the texture from a mod's classpath assets.
-     * Path is relative to assets/{modId}/, e.g. "textures/item/leather_scraps.png".
-     */
+    /** @param assetPath relative to {@code assets/<modId>/}, e.g. {@code "textures/item/leather_scraps.png"} */
     public VanillaItemOverride textureFrom(String modId, String assetPath) {
         try {
             var modContainer = FabricLoader.getInstance().getModContainer(modId);
@@ -66,12 +45,8 @@ public class VanillaItemOverride {
     }
 
     /**
-     * Override the item model by pointing assets/{namespace}/items/{name}.json at a
-     * different model resource location. Use this when you want a model from your mod
-     * namespace, or when the vanilla model chain isn't sufficient for the retexture.
-     *
-     * If only a texture is provided (no model override), the vanilla items/ JSON and
-     * model chain are preserved; only the texture PNG is replaced.
+     * Point {@code assets/<namespace>/items/<name>.json} at another model. Without it the vanilla
+     * model chain is kept and only the texture PNG is replaced.
      */
     public VanillaItemOverride model(String modelPath) {
         this.modelPath = modelPath;
