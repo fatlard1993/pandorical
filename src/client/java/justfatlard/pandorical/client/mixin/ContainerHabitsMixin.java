@@ -1,5 +1,6 @@
 package justfatlard.pandorical.client.mixin;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import justfatlard.pandorical.client.settings.ContainerHabits;
 
 import java.util.HashSet;
@@ -108,8 +109,8 @@ public abstract class ContainerHabitsMixin {
 		if (!pandorical$menu().getCarried().isEmpty()) return;
 		if (this.hoveredSlot == null || !this.hoveredSlot.hasItem()) return;
 
-		boolean rightButton = event.button() == 1;
-		if (!rightButton && event.button() != 0) return;
+		boolean rightButton = event.button() == InputConstants.MOUSE_BUTTON_RIGHT;
+		if (!rightButton && event.button() != InputConstants.MOUSE_BUTTON_LEFT) return;
 		if (!pandorical$swept.add(this.hoveredSlot.index)) return;
 
 		if (rightButton) {
