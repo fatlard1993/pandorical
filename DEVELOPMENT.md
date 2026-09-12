@@ -401,6 +401,28 @@ Broadcast to every current and future tracker of the entity, so there is no play
 argument. State is in-memory only and dropped when the entity unloads: re-call `set`
 when your entity loads, from a tick hook reading your own persisted flag.
 
+## Pictures
+
+A grid of palette-coloured cells standing in the world as a thin panel, at any yaw, tilt and
+size, anchored to an entity: a canvas on an easel, a board anything can be painted onto and seen
+changing. Like entity overlays, a picture is broadcast off the anchor's tracking, so there is no
+player argument and nobody out of range is sent anything.
+
+```java
+PandoricalApi.pictures().show(anchor, new Picture(columns, rows, paletteArgb, cells,
+    new Picture.Pose(dx, dy, dz, yaw, tilt, widthBlocks, heightBlocks),
+    backArgb, thicknessBlocks));
+PandoricalApi.pictures().paint(anchor, changedIndices, newValues); // just what changed
+PandoricalApi.pictures().clear(anchor);
+```
+
+The pose places the middle of the picture's bottom edge, offset from the anchor; yaw turns it the
+way an entity's yaw does. The front is drawn unshaded, as vanilla draws a map in a frame, so a
+colour looks the same whichever way the picture faces; the back and edges take `backArgb`, or are
+left out when its alpha is nought. An invisible item display makes a good anchor: persistent,
+tracked, and nothing to hit. State is in memory and dropped when the anchor unloads, so show it
+again when your anchor loads. mc-paint's easel is the working example.
+
 ## Chest overlays
 
 Draw particular chests with a different texture, so a player can tell (say) the ones a

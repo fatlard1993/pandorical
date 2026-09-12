@@ -203,6 +203,7 @@ public class Pandorical implements ModInitializer {
         // --- Play phase ---
         // S2C play
         PayloadTypeRegistry.clientboundPlay().register(HelloS2C.TYPE, HelloS2C.STREAM_CODEC);
+        justfatlard.pandorical.picture.PictureRegistry.register();
         PayloadTypeRegistry.clientboundPlay().register(
             justfatlard.pandorical.protocol.KeepsakeStoreS2C.TYPE,
             justfatlard.pandorical.protocol.KeepsakeStoreS2C.STREAM_CODEC);

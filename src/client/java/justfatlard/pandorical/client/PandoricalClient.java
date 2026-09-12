@@ -130,6 +130,7 @@ public class PandoricalClient implements ClientModInitializer {
         if (!skipped("hud")) HudRenderer.register();
         if (!skipped("structures")) StructureRenderer.register();
         if (!skipped("decals")) justfatlard.pandorical.client.decal.BannerDecalRenderer.register();
+        if (!skipped("pictures")) justfatlard.pandorical.client.picture.ClientPictures.register();
 
         // Tick content manager for sync timeout detection + show sync overlay
         ClientTickEvents.END_CLIENT_TICK.register(client -> {

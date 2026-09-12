@@ -179,6 +179,8 @@ public final class PandoricalApi {
 
     public static BannerDecalApi bannerDecals() { return BANNER_DECALS; }
 
+    public static PictureApi pictures() { return justfatlard.pandorical.picture.PictureRegistry.INSTANCE; }
+
     /**
      * Returns the entity overlay API for rendering an extra texture layer over a
      * living entity's model on Pandorical clients (e.g. per-entity cosmetics).
