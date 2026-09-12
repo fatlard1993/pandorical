@@ -120,6 +120,15 @@ public final class SettingsRegistry implements SettingsApi {
     /** The same for the pane, which a change to a setting may rebuild mid-read. */
     private final Map<UUID, Integer> paneScroll = new ConcurrentHashMap<>();
 
+    /** A player gone from the server: whatever their menu was showing goes with them. */
+    public void forget(UUID player) {
+        openScreens.remove(player);
+        rebinding.remove(player);
+        shown.remove(player);
+        listScroll.remove(player);
+        paneScroll.remove(player);
+    }
+
     /** Wire the screen's actions; once, after the screens API exists. */
     public void init() {
         PandoricalApi.screens().onActionFallback(SCREEN_TYPE, (player, data) -> press(player, data.get("_componentId"), data));

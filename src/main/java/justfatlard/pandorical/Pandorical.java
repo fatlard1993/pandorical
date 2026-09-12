@@ -577,6 +577,7 @@ public class Pandorical implements ModInitializer {
             // of the server, and hands every new arrival a wardrobe of people who are not here.
             PandoricalApi.SkinApiImpl.forget(handler.getPlayer().getUUID());
             justfatlard.pandorical.config.Keepsakes.INSTANCE.forget(handler.getPlayer().getUUID());
+            PandoricalApi.settingsImpl().forget(handler.getPlayer().getUUID());
         });
     }
 
