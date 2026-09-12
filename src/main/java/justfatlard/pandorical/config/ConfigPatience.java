@@ -2,6 +2,8 @@ package justfatlard.pandorical.config;
 
 import io.netty.channel.Channel;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.Map;
 import java.util.WeakHashMap;
@@ -35,12 +37,29 @@ public final class ConfigPatience {
 	private static final long LONGEST_MILLIS = PATIENT_SECONDS * 1000L;
 	private static final String TIMEOUT_HANDLER = "timeout";
 
+	/**
+	 * Patient connections one address may hold at once. Patience is given before anything is known
+	 * about a connection, so without a limit a handful of silent ones would each keep the whole
+	 * sync queued for five minutes. A household behind one address still fits.
+	 */
+	private static final int MOST_PER_ADDRESS = 8;
+
+	private record Wait(long since, InetAddress from) {}
+
 	/** Connections whose sync is out, and when it went. Weak, so a dropped one is not kept alive here. */
-	private static final Map<ServerConfigurationPacketListenerImpl, Long> waiting =
+	private static final Map<ServerConfigurationPacketListenerImpl, Wait> waiting =
 		Collections.synchronizedMap(new WeakHashMap<>());
 
 	public static void begin(ServerConfigurationPacketListenerImpl handler, Connection connection) {
-		waiting.put(handler, Util.getMillis());
+		InetAddress from = connection.getRemoteAddress() instanceof InetSocketAddress socket ? socket.getAddress() : null;
+		synchronized (waiting) {
+			if (from != null && waiting.values().stream().filter(wait -> from.equals(wait.from())).count() >= MOST_PER_ADDRESS) {
+				Pandorical.LOGGER.warn("[pandorical] {} already has {} connections waiting on the content sync; this one gets vanilla's timeout",
+					from, MOST_PER_ADDRESS);
+				return;
+			}
+			waiting.put(handler, new Wait(Util.getMillis(), from));
+		}
 		readTimeout(connection, PATIENT_SECONDS);
 	}
 
@@ -58,8 +77,8 @@ public final class ConfigPatience {
 		long now = Util.getMillis();
 		java.util.List<ServerConfigurationPacketListenerImpl> expired = new java.util.ArrayList<>();
 		synchronized (waiting) {
-			waiting.forEach((handler, since) -> {
-				if (now - since >= LONGEST_MILLIS) expired.add(handler);
+			waiting.forEach((handler, wait) -> {
+				if (now - wait.since() >= LONGEST_MILLIS) expired.add(handler);
 			});
 			expired.forEach(waiting::remove);
 		}
@@ -70,8 +89,8 @@ public final class ConfigPatience {
 	}
 
 	public static boolean isWaiting(ServerConfigurationPacketListenerImpl handler) {
-		Long since = waiting.get(handler);
-		return since != null && Util.getMillis() - since < LONGEST_MILLIS;
+		Wait wait = waiting.get(handler);
+		return wait != null && Util.getMillis() - wait.since() < LONGEST_MILLIS;
 	}
 
 	private static void readTimeout(Connection connection, int seconds) {
