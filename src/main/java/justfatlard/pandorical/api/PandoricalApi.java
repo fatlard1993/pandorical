@@ -25,6 +25,17 @@ public final class PandoricalApi {
     private static final RenderApiImpl RENDER = new RenderApiImpl();
     private static final AnimationApiImpl ANIMATIONS = new AnimationApiImpl();
     private static final MountApiImpl MOUNTS = new MountApiImpl();
+    private static final PortalApi PORTALS = new PortalApi() {
+        @Override
+        public void pairNetherPortals(boolean byDefault) {
+            justfatlard.pandorical.portal.PortalPairing.setDefault(byDefault);
+        }
+
+        @Override
+        public void keepOutOfPairing(java.util.function.BiPredicate<net.minecraft.server.level.ServerLevel, net.minecraft.core.BlockPos> ours) {
+            justfatlard.pandorical.portal.PortalPairing.keepOut(ours);
+        }
+    };
     private static final PlayerInventoryApiImpl PLAYER_INVENTORY = new PlayerInventoryApiImpl();
     private static final BlockTintApiImpl BLOCK_TINTS = new BlockTintApiImpl();
     private static final StructureApiImpl STRUCTURES = new StructureApiImpl();
@@ -122,6 +133,9 @@ public final class PandoricalApi {
     public static AnimationApi animations() { return ANIMATIONS; }
 
     public static MountApi mounts() { return MOUNTS; }
+
+    /** Nether portals that go back the way they came. See {@link PortalApi}. */
+    public static PortalApi portals() { return PORTALS; }
 
     /**
      * Returns the player inventory API for registering extra inventory slots that appear

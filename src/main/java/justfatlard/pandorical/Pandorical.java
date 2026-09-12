@@ -105,6 +105,14 @@ public class Pandorical implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        // Pandorical's own server setting, beside every mod's. Declared first thing so it is on
+        // the page however far the rest of init gets.
+        PandoricalApi.settings().serverGroup(MOD_ID, "Pandorical")
+            .toggle("pairNetherPortals", "Nether portals go back the way they came", false)
+            .describe("Each portal remembers the one its last traveller came out of, both ways round")
+            .backedBy(player -> justfatlard.pandorical.portal.PortalPairing.enabled(player.level().getServer()),
+                (player, on) -> justfatlard.pandorical.portal.PortalPairing.choose(player.level().getServer(), on));
+
         // Auto-detect and register all non-system mod namespaces as server-only.
         // Only on dedicated server; on the client this would incorrectly filter everything.
         if (net.fabricmc.loader.api.FabricLoader.getInstance().getEnvironmentType() == net.fabricmc.api.EnvType.SERVER) {

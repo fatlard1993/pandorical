@@ -15,7 +15,8 @@
 		"WallPostMixin",
 		"ConnectionChannelAccessor",
 		"ConfigPatienceMixin",
-		"ServerCommonConnectionAccessor"
+		"ServerCommonConnectionAccessor",
+		"NetherPortalPairingMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

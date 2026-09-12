@@ -1,0 +1,209 @@
+package justfatlard.pandorical.portal;
+
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiPredicate;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.portal.TeleportTransition;
+import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
+
+/**
+ * Nether portals that remember each other. See {@link justfatlard.pandorical.api.PortalApi}.
+ *
+ * <p>A portal is known by its anchor: the lowest, most north-westerly block of its sheet of purple,
+ * found by walking the sheet, so every block of one portal answers to the same name however the
+ * traveller entered it. Pairs are kept on the overworld with the world, both directions, and a pair
+ * whose other end is no longer a portal is forgotten the first time a trip finds it so.
+ */
+public final class PortalPairing {
+	private PortalPairing() {}
+
+	/** A sheet is at most 23 by 23; past that it is not a portal and not worth walking. */
+	private static final int MOST_BLOCKS = 23 * 23;
+
+	private static volatile boolean byDefault = false;
+	private static final List<BiPredicate<ServerLevel, BlockPos>> kept = new CopyOnWriteArrayList<>();
+
+	public static void setDefault(boolean on) {
+		byDefault = on;
+	}
+
+	public static void keepOut(BiPredicate<ServerLevel, BlockPos> ours) {
+		if (ours != null) kept.add(ours);
+	}
+
+	public static boolean enabled(MinecraftServer server) {
+		Boolean chosen = Pairs.get(server).chosen;
+		return chosen != null ? chosen : byDefault;
+	}
+
+	/** An op's choice, which from now on is the answer whatever any mod asked for. */
+	public static void choose(MinecraftServer server, boolean on) {
+		Pairs pairs = Pairs.get(server);
+		pairs.chosen = on;
+		pairs.setDirty();
+	}
+
+	/**
+	 * The portal to come out of, for a trip entering {@code entry} and arriving in {@code to}: the
+	 * entry's partner, if it has one there that is still a portal. Null leaves the trip to vanilla.
+	 */
+	public static BlockPos partnerFor(ServerLevel from, BlockPos entry, ServerLevel to) {
+		MinecraftServer server = from.getServer();
+		if (!enabled(server)) return null;
+		GlobalPos source = anchorOf(from, entry);
+		if (source == null || isKept(from, source.pos())) return null;
+
+		Pairs pairs = Pairs.get(server);
+		GlobalPos partner = pairs.links.get(source);
+		if (partner == null || !partner.dimension().equals(to.dimension())) return null;
+		if (!to.getBlockState(partner.pos()).is(Blocks.NETHER_PORTAL) || isKept(to, partner.pos())) {
+			pairs.unlink(source, partner);
+			return null;
+		}
+		return partner.pos();
+	}
+
+	/** After a trip is decided: the portal it went in by and the one it comes out of are a pair now. */
+	public static void remember(ServerLevel from, BlockPos entry, TeleportTransition trip) {
+		if (trip == null || trip.newLevel() == null || trip.newLevel() == from) return;
+		MinecraftServer server = from.getServer();
+		if (!enabled(server)) return;
+		GlobalPos source = anchorOf(from, entry);
+		if (source == null || isKept(from, source.pos())) return;
+
+		ServerLevel to = trip.newLevel();
+		BlockPos arrival = portalNear(to, BlockPos.containing(trip.position()));
+		if (arrival == null) return;
+		GlobalPos target = anchorOf(to, arrival);
+		if (target == null || isKept(to, target.pos())) return;
+
+		Pairs.get(server).link(source, target);
+	}
+
+	private static boolean isKept(ServerLevel level, BlockPos pos) {
+		for (BiPredicate<ServerLevel, BlockPos> ours : kept) {
+			if (ours.test(level, pos)) return true;
+		}
+		return false;
+	}
+
+	/**
+	 * A portal block at or beside where a trip lands. Vanilla puts the traveller inside the
+	 * portal, nudged clear of walls, so the portal is always within a block or two of them.
+	 */
+	private static BlockPos portalNear(ServerLevel level, BlockPos landing) {
+		for (int r = 0; r <= 2; r++) {
+			for (BlockPos pos : BlockPos.betweenClosed(landing.offset(-r, -1, -r), landing.offset(r, 2, r))) {
+				if (level.getBlockState(pos).is(Blocks.NETHER_PORTAL)) return pos.immutable();
+			}
+		}
+		return null;
+	}
+
+	/** The anchor of the portal sheet this block is part of, or null where there is no portal. */
+	static GlobalPos anchorOf(ServerLevel level, BlockPos inside) {
+		if (!level.getBlockState(inside).is(Blocks.NETHER_PORTAL)) return null;
+		Set<BlockPos> seen = new HashSet<>();
+		ArrayDeque<BlockPos> next = new ArrayDeque<>();
+		BlockPos start = inside.immutable();
+		seen.add(start);
+		next.add(start);
+		BlockPos corner = start;
+		while (!next.isEmpty() && seen.size() <= MOST_BLOCKS) {
+			BlockPos pos = next.poll();
+			if (before(pos, corner)) corner = pos;
+			for (Direction direction : Direction.values()) {
+				BlockPos beside = pos.relative(direction);
+				if (seen.contains(beside) || !level.hasChunkAt(beside)) continue;
+				if (!level.getBlockState(beside).is(Blocks.NETHER_PORTAL)) continue;
+				seen.add(beside);
+				next.add(beside);
+			}
+		}
+		return GlobalPos.of(level.dimension(), corner);
+	}
+
+	private static boolean before(BlockPos a, BlockPos b) {
+		if (a.getY() != b.getY()) return a.getY() < b.getY();
+		if (a.getX() != b.getX()) return a.getX() < b.getX();
+		return a.getZ() < b.getZ();
+	}
+
+	/** The pairs, and an op's choice about pairing, kept with the world. */
+	static final class Pairs extends SavedData {
+		private record Link(GlobalPos from, GlobalPos to) {
+			static final Codec<Link> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+				GlobalPos.CODEC.fieldOf("from").forGetter(Link::from),
+				GlobalPos.CODEC.fieldOf("to").forGetter(Link::to)
+			).apply(instance, Link::new));
+		}
+
+		private record Stored(List<Link> links, Optional<Boolean> chosen) {
+			static final Codec<Stored> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+				Link.CODEC.listOf().optionalFieldOf("links", List.of()).forGetter(Stored::links),
+				Codec.BOOL.optionalFieldOf("chosen").forGetter(Stored::chosen)
+			).apply(instance, Stored::new));
+		}
+
+		static final Codec<Pairs> CODEC = Stored.CODEC.xmap(Pairs::fromStored, Pairs::toStored);
+
+		private static final SavedDataType<Pairs> TYPE = new SavedDataType<>(
+			Identifier.fromNamespaceAndPath("pandorical", "portal_pairs"), Pairs::new, CODEC, DataFixTypes.LEVEL);
+
+		final Map<GlobalPos, GlobalPos> links = new HashMap<>();
+		/** Null until an op has chosen, and then their choice. */
+		Boolean chosen;
+
+		static Pairs get(MinecraftServer server) {
+			return server.overworld().getDataStorage().computeIfAbsent(TYPE);
+		}
+
+		/**
+		 * Both ways round, and the newest trip wins: two portals that both led to one on the far
+		 * side each keep going there, and that one leads back to whichever was used last.
+		 */
+		void link(GlobalPos a, GlobalPos b) {
+			if (b.equals(links.get(a)) && a.equals(links.get(b))) return;
+			links.put(a, b);
+			links.put(b, a);
+			setDirty();
+		}
+
+		void unlink(GlobalPos a, GlobalPos b) {
+			links.remove(a, b);
+			links.remove(b, a);
+			setDirty();
+		}
+
+		private static Pairs fromStored(Stored stored) {
+			Pairs pairs = new Pairs();
+			for (Link link : stored.links()) pairs.links.put(link.from(), link.to());
+			pairs.chosen = stored.chosen().orElse(null);
+			return pairs;
+		}
+
+		private Stored toStored() {
+			List<Link> out = new ArrayList<>();
+			for (Map.Entry<GlobalPos, GlobalPos> entry : links.entrySet()) out.add(new Link(entry.getKey(), entry.getValue()));
+			return new Stored(out, Optional.ofNullable(chosen));
+		}
+	}
+}
