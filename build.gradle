@@ -89,6 +89,9 @@ java {
 }
 
 jar {
+    // Always written, so its time says when it was last built: dependent.gradle refuses a jar
+    // older than the source, and Gradle judges up-to-date by content, not by time.
+    outputs.upToDateWhen { false }
     from("LICENSE") {
         rename { "${it}_${project.base.archivesName.get()}" }
     }

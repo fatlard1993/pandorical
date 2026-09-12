@@ -1,20 +1,17 @@
-// Applied by every mod in the suite that compiles against Pandorical's API.
+// Applied by the mods that compile against Pandorical's API but only suggest it at runtime.
+// A mod that depends on Pandorical outright includes it as a subproject instead; DEVELOPMENT.md
+// has both.
 //
-// Pandorical is a BUILD-TIME REQUIREMENT and a RUNTIME OPTION, and the two are easy to confuse.
-// A dependent names Pandorical types directly in method signatures and bodies, so javac needs the
-// jar. At runtime the classes that touch it sit behind FabricLoader.isModLoaded and are never
-// loaded without it, which is why the manifests only "suggest" pandorical and the mods genuinely
-// run standalone.
+// Pandorical is a BUILD-TIME REQUIREMENT and a RUNTIME OPTION for these mods. They name
+// Pandorical types directly, so javac needs the jar; at runtime the classes that touch it sit
+// behind FabricLoader.isModLoaded and are never loaded without it.
 //
-// Guarding the compileOnly on "is pandorical checked out" gets that backwards. It reads as though
-// the dependency were optional, and then the one person it was written for - somebody who cloned
-// a single repo on its own - gets a wall of "package justfatlard.pandorical does not exist"
-// instead of a sentence telling them what to do. The requirement is unconditional; say so here,
-// once, rather than in a block copied into every dependent.
+// The requirement is unconditional, so a missing jar stops the build with the command that makes
+// it, rather than a wall of "package justfatlard.pandorical does not exist".
 //
-// The version is read from what Pandorical declares rather than pinned per repo, because Gradle
-// never clears build/libs: after a version bump the old and new jars sit side by side, and a
-// hand-written name keeps compiling green against a jar an old build left behind.
+// The jar is named by the version Pandorical declares, and refused when Pandorical's source is
+// newer than it: either way a stale jar would otherwise compile green against an API that has
+// since moved.
 
 def pandoricalRoot = project.file("../pandorical")
 def pandoricalProperties = new File(pandoricalRoot, "gradle.properties")
@@ -23,13 +20,20 @@ def pandoricalVersion = new Properties().with {
 	getProperty("mod_version")?.trim()
 }
 def pandoricalJar = new File(pandoricalRoot, "build/libs/pandorical-${pandoricalVersion}.jar")
+def rebuild = "  ./gradlew build -p ${pandoricalRoot.path}\n" +
+	"  (or, with the suite's tools: mc-build pandorical)\n" +
+	"Pandorical stays optional at runtime; this is a build-time dependency only."
 
 if (!pandoricalJar.exists()) {
 	throw new GradleException(
-		"${project.name} compiles against Pandorical's API, and pandorical ${pandoricalVersion} is not built.\n" +
-		"  mc-build pandorical\n" +
-		"  (or: ./gradlew build -p ${pandoricalRoot.path})\n" +
-		"Pandorical stays optional at runtime; this is a build-time dependency only.")
+		"${project.name} compiles against Pandorical's API, and pandorical ${pandoricalVersion} is not built:\n" + rebuild)
+}
+
+def newerSource = fileTree(new File(pandoricalRoot, "src")).files.find { it.lastModified() > pandoricalJar.lastModified() }
+if (newerSource != null) {
+	throw new GradleException(
+		"${project.name} compiles against Pandorical's API, and ${newerSource.path} is newer than\n" +
+		"${pandoricalJar.name}, so the API it would compile against is out of date:\n" + rebuild)
 }
 
 dependencies {

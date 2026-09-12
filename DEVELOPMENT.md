@@ -17,8 +17,11 @@ description of one.
 
 ## Adding it as a dependency
 
-Pandorical is not published to a Maven repository. Depend on it as a Gradle subproject
-pointed at a checkout beside yours:
+Pandorical is not published to a Maven repository. Either way, a mod compiles against a
+checkout of Pandorical beside its own, and which way depends on whether the mod runs without it.
+
+**A mod that needs Pandorical** includes it as a Gradle subproject and compiles against its
+working tree, so an API change surfaces as a compile error at once:
 
 ```groovy
 // settings.gradle
@@ -36,13 +39,31 @@ dependencies {
 ```json
 // fabric.mod.json
 "depends": {
-    "pandorical": ">=1.0.0"
+    "pandorical": ">=1.3.9"
 }
 ```
 
-This compiles against Pandorical's working tree rather than a pinned release, so an API
-change surfaces as a compile error immediately. That is deliberate, and it is why there
-is no published artifact to pin against.
+Set the floor to the first version with every API the mod calls. `"*"` loads against any
+Pandorical and fails at the first call to something it does not have.
+
+**A mod that only uses Pandorical when it is there** compiles against the built jar and applies
+`gradle/dependent.gradle`, which finds the jar by the version Pandorical declares and refuses one
+older than Pandorical's source:
+
+```groovy
+// build.gradle
+apply from: file("../pandorical/gradle/dependent.gradle")
+```
+
+```json
+// fabric.mod.json
+"suggests": {
+    "pandorical": "*"
+}
+```
+
+Build Pandorical first (`./gradlew build -p ../pandorical`), and keep everything that touches its
+types behind `FabricLoader.isModLoaded("pandorical")`.
 
 Version targets live in `gradle.properties` (Minecraft, loader, Fabric API) and
 `fabric.mod.json` (Java). Match them.
