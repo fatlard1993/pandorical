@@ -17,21 +17,11 @@ import java.util.List;
 import net.minecraft.network.chat.Component;
 
 /**
- * Time for a slow machine to take the content in.
- *
- * <p>Taking in the content sync means a resource reload, and a client does not answer the server
- * while it reloads. Vanilla gives a silent connection thirty seconds before the read timeout ends
- * it, and fifteen before a missed keep-alive does. A fast machine is done in seven. A laptop with
- * little memory to spare took longer than thirty every time, was timed out in the middle of the
- * reload, and crashed natively a moment later as it tore down a reload still running: twice for
- * one player in one evening, and the same crash, at the same point, for another before him.
- *
- * <p>So while a connection's sync is out and unanswered it gets five minutes rather than thirty
- * seconds, the keep-alive clock is held rather than run down, and a ping goes out every ten
- * seconds so the client's own read timeout, which is also thirty seconds, does not end it from
- * the other side. The ack puts everything back. The keep-alive hold and the ping are
- * ConfigPatienceMixin's; this class owns the clock and the read timeout. Five minutes is a ceiling, not a target: a
- * client that has not answered by then is not coming back, and {@link #expire} closes it.
+ * Time for a slow client to take in the content sync. Taking it in means a resource reload, during
+ * which the client does not answer, and vanilla's read timeout or keep-alive would end the
+ * connection. While a sync is unanswered this class raises the read timeout and
+ * {@code ConfigPatienceMixin} holds the keep-alive; the ack restores both, and {@link #expire}
+ * closes a connection that outlasts the ceiling.
  */
 public final class ConfigPatience {
 	private ConfigPatience() {}
@@ -41,16 +31,11 @@ public final class ConfigPatience {
 	private static final long LONGEST_MILLIS = PATIENT_SECONDS * 1000L;
 	private static final String TIMEOUT_HANDLER = "timeout";
 
-	/**
-	 * Patient connections one address may hold at once. Patience is given before anything is known
-	 * about a connection, so without a limit a handful of silent ones would each keep the whole
-	 * sync queued for five minutes. A household behind one address still fits.
-	 */
+	/** Patience is granted before a connection proves anything, so one address gets only this many. */
 	private static final int MOST_PER_ADDRESS = 8;
 
 	private record Wait(long since, InetAddress from) {}
 
-	/** Connections whose sync is out, and when it went. Weak, so a dropped one is not kept alive here. */
 	private static final Map<ServerConfigurationPacketListenerImpl, Wait> waiting =
 		Collections.synchronizedMap(new WeakHashMap<>());
 
@@ -75,7 +60,7 @@ public final class ConfigPatience {
 		waiting.remove(handler);
 	}
 
-	/** Close every connection whose sync has gone unanswered past the ceiling. Server thread, once a tick. */
+	/** Server thread, once a tick. */
 	public static void expire() {
 		if (waiting.isEmpty()) return;
 		long now = Util.getMillis();

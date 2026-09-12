@@ -15,19 +15,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-/**
- * Configuration-phase task that syncs Pandorical content (block/item definitions + assets)
- * to the client BEFORE Fabric's SynchronizeRegistriesTask runs.
- *
- * Flow:
- * 1. Server sends SyncContentConfigS2C with block/item definitions + other registry IDs
- * 2. Server sends SyncAssetsConfigS2C chunks with compressed assets
- * 3. Client registers blocks/items/stubs, loads assets, sends ContentReadyConfigC2S
- * 4. Server completes this task, allowing Fabric's registry sync to proceed
- *
- * Since blocks are registered on the client before Fabric's sync,
- * Fabric will see them and assign correct IDs. No more manual addMapping().
- */
 public class PandoricalSyncTask implements ConfigurationTask {
     public static final Type TYPE = new Type("pandorical:sync_content");
 
@@ -65,26 +52,14 @@ public class PandoricalSyncTask implements ConfigurationTask {
     }
 
     /**
-     * How much encoded content one packet may carry.
-     *
-     * <p>Vanilla refuses a packet over 8 MiB. This sits well under it because the budget is
-     * measured on the entries alone: the registry-stub lists, the framing and the varints all ride
-     * on top, and a chunk that fitted exactly would be over the moment anything was added around
-     * it. Headroom here is cheaper than a join that fails at the encoder.
+     * Well under vanilla's 8 MiB packet cap: this counts entries only, and the stub lists and
+     * framing ride on top.
      */
     private static final int CHUNK_BUDGET_BYTES = 4 * 1024 * 1024;
 
     /**
-     * Split a list so no chunk's encoded size exceeds the budget.
-     *
-     * <p>Measured, not counted. Entries are wildly uneven - one block in this suite carries forty
-     * thousand block states and encodes larger than several hundred ordinary ones together - so a
-     * fixed number of entries per chunk would still produce packets over the limit, and would do it
-     * unpredictably as mods come and go. Each entry is encoded once to see how big it actually is.
-     *
-     * <p>An entry too large for a whole chunk on its own still gets its own chunk. There is nothing
-     * else to be done with it here, and one packet over the limit reports itself far better than a
-     * silent truncation would.
+     * Chunks by encoded size, since one entry can outweigh hundreds of others. An entry over the
+     * budget alone still gets a chunk of its own.
      */
     private static <T> List<List<T>> intoChunks(List<T> entries, StreamCodec<ByteBuf, T> codec) {
         List<List<T>> chunks = new ArrayList<>();
@@ -142,7 +117,6 @@ public class PandoricalSyncTask implements ConfigurationTask {
             villagerProfessions.size(), poiTypes.size(), menuTypes.size(),
             recipeBookCategories.size(), expectedChunks);
 
-        // Send asset chunks
         for (SyncAssetsConfigS2C chunk : assetChunks) {
             sender.accept(ServerConfigurationNetworking.createClientboundPacket(chunk));
         }

@@ -22,21 +22,15 @@ import net.minecraft.server.network.ConfigurationTask;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import net.minecraft.util.Util;
 
-/** The server's half of {@link KeepsakeApi}: its own id, the login ask, and what came back. */
 public final class Keepsakes implements KeepsakeApi {
 	public static final Keepsakes INSTANCE = new Keepsakes();
 
 	private Keepsakes() {}
 
-	/** What each player's game handed back at login, by profile id. */
 	private final Map<UUID, Map<String, String>> received = new ConcurrentHashMap<>();
 
 	private String serverId;
 
-	/**
-	 * This server's own name for itself, made once and kept: the address players type can change,
-	 * and two servers on one address are still two servers.
-	 */
 	public synchronized String serverId() {
 		if (serverId != null) return serverId;
 		Path file = FabricLoader.getInstance().getConfigDir().resolve("pandorical").resolve("server-id");
@@ -55,18 +49,15 @@ public final class Keepsakes implements KeepsakeApi {
 		return serverId;
 	}
 
-	/** A login starting under this name: nothing an earlier login's game handed back carries into this one. */
 	public void begin(ServerConfigurationPacketListenerImpl handler) {
 		var profile = handler.getOwner();
 		if (profile != null) received.remove(profile.id());
 	}
 
-	/** Whether this connection's game will answer the ask. */
 	public boolean askable(ServerConfigurationPacketListenerImpl handler) {
 		return ServerConfigurationNetworking.canSend(handler, KeepsakesAskConfigS2C.TYPE);
 	}
 
-	/** The answer arrived: kept for the join, and the login let on. */
 	public void answered(ServerConfigurationPacketListenerImpl handler, KeepsakesConfigC2S payload) {
 		var profile = handler.getOwner();
 		if (profile == null) return;
@@ -80,7 +71,7 @@ public final class Keepsakes implements KeepsakeApi {
 		try {
 			handler.completeTask(Task.TYPE);
 		} catch (IllegalStateException e) {
-			// Answered after the wait ran out: kept all the same, and the login already went on.
+			// Answered after the wait ran out; the login already went on.
 		}
 	}
 
@@ -123,11 +114,7 @@ public final class Keepsakes implements KeepsakeApi {
 		}
 	}
 
-	/**
-	 * The ask, held open until the game answers so the answer is in hand before the player joins.
-	 * Not for ever: a game that says nothing for ten seconds is let on without, since what is
-	 * kept is a convenience and a login that hangs on it is not.
-	 */
+	/** Holds the login for the answer, but not past the wait: keepsakes must never hang a login. */
 	public static final class Task implements ConfigurationTask {
 		public static final Type TYPE = new Type("pandorical:keepsakes");
 		private static final long WAIT_MILLIS = 10_000L;

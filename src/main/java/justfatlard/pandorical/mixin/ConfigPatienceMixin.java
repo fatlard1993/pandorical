@@ -15,12 +15,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * The keep-alive held still while a client takes in the content sync. See {@link ConfigPatience}.
- *
- * <p>Held rather than kept going: a client frozen in a reload answers every keep-alive it was sent
- * once it wakes, and vanilla ends a connection that answers any but the latest. So no new
- * challenge goes out while it is busy, and the clock that would time out the one already out is
- * not allowed to run. Pings go instead, which it answers late and harmlessly.
+ * Holds the keep-alive while a client takes in the content sync ({@link ConfigPatience}). A client
+ * frozen in a reload answers every keep-alive once it wakes, and vanilla ends a connection that
+ * answers any but the latest, so no challenge goes out and the clock is held. Pings go instead,
+ * keeping the client's own read timeout from firing; it answers them late and harmlessly.
  */
 @Mixin(ServerCommonPacketListenerImpl.class)
 public abstract class ConfigPatienceMixin {
