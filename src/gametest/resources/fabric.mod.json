@@ -1,0 +1,21 @@
+{
+	"schemaVersion": 1,
+	"id": "pandorical-gametest",
+	"version": "1.0.0",
+	"name": "Pandorical launch gate",
+	"description": "Launches a client, applies every Pandorical mixin, joins a world and opens a screen.",
+	"license": "MIT",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"justfatlard.pandorical.gametest.GateContent"
+		],
+		"fabric-client-gametest": [
+			"justfatlard.pandorical.gametest.LaunchGate"
+		]
+	},
+	"depends": {
+		"pandorical": "*",
+		"fabric-client-gametest-api-v1": "*"
+	}
+}

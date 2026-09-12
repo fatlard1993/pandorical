@@ -31,6 +31,20 @@ dependencies {
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 }
 
+// src/gametest: runClientGameTest launches a client that applies every mixin, joins a world
+// and opens a screen. It opens a window: run it under xvfb-run, which Loom adds itself when CI is set.
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "pandorical-gametest"
+        enableGameTests = false
+        enableClientGameTests = true
+        eula = true
+    }
+}
+// So an API change that breaks the gate fails the build, not the next launch.
+tasks.named('check') { dependsOn 'gametestClasses' }
+
 // Fabric tests these predicates against the loader's *normalized* game version,
 // not Mojang's id: 26.3-snapshot-10 is compared as 26.3-alpha.10. So a floor of
 // ">=26.3" is false on every 26.3 snapshot, and writing the obvious thing makes
