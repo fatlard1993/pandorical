@@ -2,13 +2,7 @@ package justfatlard.pandorical.api;
 
 import java.util.List;
 
-/**
- * The capability strings of the Pandorical handshake, and the only ones there are.
- *
- * <p>A Pandorical client declares {@link #CLIENT}, and {@link PandoricalApi#hasCapability} answers
- * from that declaration: any other string answers false for every player, a misspelt one included.
- * The server announces {@link #SERVER} back, which adds what only a server offers.
- */
+/** The capability strings of the Pandorical handshake: clients declare {@link #CLIENT}. */
 public final class Capabilities {
     private Capabilities() {}
 
@@ -26,9 +20,9 @@ public final class Capabilities {
     public static final String ANIMATIONS = "animations";
     public static final String MOUNT_POLICY = "mount_policy";
 
-    /** Server only: the server has a mods menu to open. */
+    /** The server has a mods menu to open. */
     public static final String SETTINGS = "settings";
-    /** Server only: the server marks blocks. */
+    /** The server marks blocks. */
     public static final String BLOCK_MARKS = "block_marks";
 
     /** What a Pandorical client of this version declares. */
