@@ -47,6 +47,31 @@ public class ComponentBuilder {
         return this;
     }
 
+    /** A number prop, written as the client reads it. */
+    public ComponentBuilder prop(String key, int value) {
+        return prop(key, String.valueOf(value));
+    }
+
+    /** A number prop, written as the client reads it. */
+    public ComponentBuilder prop(String key, long value) {
+        return prop(key, String.valueOf(value));
+    }
+
+    /** A number prop, written as the client reads it. */
+    public ComponentBuilder prop(String key, float value) {
+        return prop(key, String.valueOf(value));
+    }
+
+    /** A number prop, written as the client reads it. */
+    public ComponentBuilder prop(String key, double value) {
+        return prop(key, String.valueOf(value));
+    }
+
+    /** A true or false prop, written as the client reads it. */
+    public ComponentBuilder prop(String key, boolean value) {
+        return prop(key, String.valueOf(value));
+    }
+
     /** Uniform scale multiplier applied around the component's center. Supported on: sprite, text. */
     public ComponentBuilder scale(float scale) {
         this.props.put(ComponentType.PROP_SCALE, String.valueOf(scale));

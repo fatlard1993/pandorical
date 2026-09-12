@@ -60,6 +60,31 @@ public class ComponentUpdateBuilder {
         return this;
     }
 
+    /** A number prop, written as the client reads it. */
+    public ComponentUpdateBuilder prop(String key, int value) {
+        return prop(key, String.valueOf(value));
+    }
+
+    /** A number prop, written as the client reads it. */
+    public ComponentUpdateBuilder prop(String key, long value) {
+        return prop(key, String.valueOf(value));
+    }
+
+    /** A number prop, written as the client reads it. */
+    public ComponentUpdateBuilder prop(String key, float value) {
+        return prop(key, String.valueOf(value));
+    }
+
+    /** A number prop, written as the client reads it. */
+    public ComponentUpdateBuilder prop(String key, double value) {
+        return prop(key, String.valueOf(value));
+    }
+
+    /** A true or false prop, written as the client reads it. */
+    public ComponentUpdateBuilder prop(String key, boolean value) {
+        return prop(key, String.valueOf(value));
+    }
+
     public ComponentUpdateBuilder props(Map<String, String> props) {
         this.props.putAll(props);
         return this;
