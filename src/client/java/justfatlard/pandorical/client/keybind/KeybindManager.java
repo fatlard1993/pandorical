@@ -70,7 +70,8 @@ public final class KeybindManager {
 		sendBindings();
 	}
 
-	/** The keybinds whose default key this client has already put on, one id to a line. */
+	/** The keybinds whose default key this client has already put on, one {@code id@slot} to a line. */
+	private static final int MOST_REMEMBERED = 512;
 	private static final java.nio.file.Path DEFAULTS_APPLIED = net.fabricmc.loader.api.FabricLoader.getInstance()
 		.getConfigDir().resolve("pandorical").resolve("keybind-defaults.txt");
 
@@ -108,6 +109,13 @@ public final class KeybindManager {
 		}
 
 		if (remembered) {
+			// Every server's ids land here, so the oldest go once there are more than any one
+			// player's servers could want remembered.
+			java.util.Iterator<String> oldest = applied.iterator();
+			while (applied.size() > MOST_REMEMBERED && oldest.hasNext()) {
+				oldest.next();
+				oldest.remove();
+			}
 			try {
 				java.nio.file.Files.createDirectories(DEFAULTS_APPLIED.getParent());
 				java.nio.file.Files.write(DEFAULTS_APPLIED, applied);
