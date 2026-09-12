@@ -233,6 +233,11 @@ public final class PandoricalApi {
             return at != null && at.contains(mark);
         }
 
+        /** @hidden A stopped server's marks belong to its world; the next world starts with none. */
+        public void clear() {
+            marks.clear();
+        }
+
         /** Everything marked in the player's level, for someone who has just arrived in it. */
         public void sendAll(ServerPlayer player) {
             java.util.Map<Long, java.util.Set<String>> inLevel = marks.get(player.level().dimension());

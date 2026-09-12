@@ -471,8 +471,10 @@ public class Pandorical implements ModInitializer {
 
         // Pooled keybind presses: all validation (capability, slot, rate
         // limit) happens inside handleKeyPress, on the server thread
-        net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STOPPED.register(
-            server -> justfatlard.pandorical.settings.ModCommands.forget());
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+            justfatlard.pandorical.settings.ModCommands.forget();
+            PandoricalApi.blockMarksImpl().clear();
+        });
         ServerPlayNetworking.registerGlobalReceiver(
             justfatlard.pandorical.protocol.KeybindBindingsC2S.TYPE, (payload, context) -> {
                 context.player().level().getServer().execute(() ->
