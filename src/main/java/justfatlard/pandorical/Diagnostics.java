@@ -22,7 +22,8 @@ import net.fabricmc.loader.api.FabricLoader;
  * crashed natively inside the JVM while loading, at a different point each time, and a player on
  * the diagnostic jar stopped crashing at all. Nobody knows which part of it is doing that: the
  * JVM's own log is written a line at a time and so queues up threads loading classes and compiling
- * at once, and the thread dumps stop the whole JVM once a second. So the guard is all of it, in the
+ * at once, and the sampler stops the whole JVM to read every thread's stack ten times a second and
+ * for a full thread dump once a second. So the guard is all of it, in the
  * windows where the crashes were and nowhere else, and should a crash get through anyway, the logs
  * it leaves are the ones that say where.
  */
