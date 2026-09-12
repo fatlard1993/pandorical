@@ -2,6 +2,16 @@ package justfatlard.pandorical.api;
 
 import justfatlard.pandorical.hud.HudRegistry;
 import justfatlard.pandorical.keybind.KeybindPool;
+import justfatlard.pandorical.push.BannerDecals;
+import justfatlard.pandorical.push.BlockMarks;
+import justfatlard.pandorical.push.BlockTints;
+import justfatlard.pandorical.push.CameraHints;
+import justfatlard.pandorical.push.ChestOverlays;
+import justfatlard.pandorical.push.DeclaredMountPolicy;
+import justfatlard.pandorical.push.DeclaredRenderPolicy;
+import justfatlard.pandorical.push.EntityOverlays;
+import justfatlard.pandorical.push.PlayingAnimations;
+import justfatlard.pandorical.push.SkinOverrides;
 import justfatlard.pandorical.screen.ScreenRegistry;
 import justfatlard.pandorical.structure.StructureRegistry;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,11 +34,11 @@ public final class PandoricalApi {
     private static final ScreenRegistry SCREENS = ScreenRegistry.INSTANCE;
     private static final HudRegistry HUD = HudRegistry.INSTANCE;
     private static final justfatlard.pandorical.content.ContentRegistry CONTENT = new justfatlard.pandorical.content.ContentRegistry();
-    private static final CameraApiImpl CAMERA = new CameraApiImpl();
-    private static final SkinApiImpl SKINS = new SkinApiImpl();
-    private static final RenderApiImpl RENDER = new RenderApiImpl();
-    private static final AnimationApiImpl ANIMATIONS = new AnimationApiImpl();
-    private static final MountApiImpl MOUNTS = new MountApiImpl();
+    private static final CameraHints CAMERA = CameraHints.INSTANCE;
+    private static final SkinOverrides SKINS = SkinOverrides.INSTANCE;
+    private static final DeclaredRenderPolicy RENDER = DeclaredRenderPolicy.INSTANCE;
+    private static final PlayingAnimations ANIMATIONS = PlayingAnimations.INSTANCE;
+    private static final DeclaredMountPolicy MOUNTS = DeclaredMountPolicy.INSTANCE;
     private static final PortalApi PORTALS = new PortalApi() {
         @Override
         public void pairNetherPortals(boolean byDefault) {
@@ -41,10 +51,10 @@ public final class PandoricalApi {
         }
     };
     private static final PlayerInventoryApiImpl PLAYER_INVENTORY = new PlayerInventoryApiImpl();
-    private static final BlockTintApiImpl BLOCK_TINTS = new BlockTintApiImpl();
+    private static final BlockTints BLOCK_TINTS = BlockTints.INSTANCE;
     private static final StructureRegistry STRUCTURES = StructureRegistry.INSTANCE;
-    private static final EntityOverlayApiImpl ENTITY_OVERLAYS = new EntityOverlayApiImpl();
-    private static final ChestOverlayApiImpl CHEST_OVERLAYS = new ChestOverlayApiImpl();
+    private static final EntityOverlays ENTITY_OVERLAYS = EntityOverlays.INSTANCE;
+    private static final ChestOverlays CHEST_OVERLAYS = ChestOverlays.INSTANCE;
     private static final KeybindPool KEYBINDS = KeybindPool.INSTANCE;
 
     // --- Per-player state ---
@@ -148,30 +158,7 @@ public final class PandoricalApi {
      */
     public static StructureApi structures() { return STRUCTURES; }
 
-    private static final BannerDecalApi BANNER_DECALS = new BannerDecalApi() {
-        @Override
-        public void send(ServerPlayer player, java.util.Collection<Decal> decals) {
-            if (decals.isEmpty()) return;
-            post(player, decals.stream().map(decal -> new justfatlard.pandorical.protocol.BannerDecalsS2C.Entry(
-                decal.pos().asLong(), (byte) decal.toHead().get3DDataValue(), decal.lift(), decal.fromHead(),
-                decal.length(), decal.width(), decal.layers())).toList());
-        }
-
-        @Override
-        public void clear(ServerPlayer player, java.util.Collection<net.minecraft.core.BlockPos> positions) {
-            if (positions.isEmpty()) return;
-            post(player, positions.stream().map(pos -> new justfatlard.pandorical.protocol.BannerDecalsS2C.Entry(
-                pos.asLong(), (byte) 0, 0F, 0F, 0F, 0F,
-                net.minecraft.world.level.block.entity.BannerPatternLayers.EMPTY)).toList());
-        }
-
-        private void post(ServerPlayer player, java.util.List<justfatlard.pandorical.protocol.BannerDecalsS2C.Entry> entries) {
-            if (!net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(
-                    player, justfatlard.pandorical.protocol.BannerDecalsS2C.TYPE)) return;
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.BannerDecalsS2C(entries));
-        }
-    };
+    private static final BannerDecals BANNER_DECALS = BannerDecals.INSTANCE;
 
     public static BannerDecalApi bannerDecals() { return BANNER_DECALS; }
 
@@ -195,67 +182,9 @@ public final class PandoricalApi {
      */
     public static KeybindApi keybinds() { return KEYBINDS; }
 
-    private static final BlockMarkApiImpl BLOCK_MARKS = new BlockMarkApiImpl();
+    private static final BlockMarks BLOCK_MARKS = BlockMarks.INSTANCE;
     public static BlockMarkApi blockMarks() { return BLOCK_MARKS; }
-    public static BlockMarkApiImpl blockMarksImpl() { return BLOCK_MARKS; }
-
-    /** Marks by level, pushed as they change and whole to whoever arrives. */
-    public static final class BlockMarkApiImpl implements BlockMarkApi {
-        private final java.util.Map<net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>,
-            java.util.Map<Long, java.util.Set<String>>> marks = new java.util.concurrent.ConcurrentHashMap<>();
-
-        @Override
-        public void mark(net.minecraft.server.level.ServerLevel level, net.minecraft.core.BlockPos pos, String mark) {
-            java.util.Set<String> at = marks.computeIfAbsent(level.dimension(), k -> new java.util.concurrent.ConcurrentHashMap<>())
-                .computeIfAbsent(pos.asLong(), k -> java.util.concurrent.ConcurrentHashMap.newKeySet());
-            if (!at.add(mark)) return;
-            tell(level, java.util.List.of(new justfatlard.pandorical.protocol.BlockMarksS2C.Entry(pos.asLong(), mark, true)));
-        }
-
-        @Override
-        public void unmark(net.minecraft.server.level.ServerLevel level, net.minecraft.core.BlockPos pos, String mark) {
-            java.util.Map<Long, java.util.Set<String>> inLevel = marks.get(level.dimension());
-            if (inLevel == null) return;
-            java.util.Set<String> at = inLevel.get(pos.asLong());
-            if (at == null || !at.remove(mark)) return;
-            if (at.isEmpty()) inLevel.remove(pos.asLong());
-            tell(level, java.util.List.of(new justfatlard.pandorical.protocol.BlockMarksS2C.Entry(pos.asLong(), mark, false)));
-        }
-
-        @Override
-        public boolean isMarked(net.minecraft.server.level.ServerLevel level, net.minecraft.core.BlockPos pos, String mark) {
-            java.util.Map<Long, java.util.Set<String>> inLevel = marks.get(level.dimension());
-            java.util.Set<String> at = inLevel == null ? null : inLevel.get(pos.asLong());
-            return at != null && at.contains(mark);
-        }
-
-        /** @hidden A stopped server's marks belong to its world; the next world starts with none. */
-        public void clear() {
-            marks.clear();
-        }
-
-        /** Everything marked in the player's level, for someone who has just arrived in it. */
-        public void sendAll(ServerPlayer player) {
-            java.util.Map<Long, java.util.Set<String>> inLevel = marks.get(player.level().dimension());
-            if (inLevel == null || inLevel.isEmpty()) return;
-            java.util.List<justfatlard.pandorical.protocol.BlockMarksS2C.Entry> entries = new java.util.ArrayList<>();
-            for (var e : inLevel.entrySet()) {
-                for (String mark : e.getValue()) entries.add(new justfatlard.pandorical.protocol.BlockMarksS2C.Entry(e.getKey(), mark, true));
-            }
-            send(player, player.level(), entries);
-        }
-
-        private void tell(net.minecraft.server.level.ServerLevel level, java.util.List<justfatlard.pandorical.protocol.BlockMarksS2C.Entry> entries) {
-            for (ServerPlayer player : level.players()) send(player, level, entries);
-        }
-
-        private void send(ServerPlayer player, net.minecraft.server.level.ServerLevel level, java.util.List<justfatlard.pandorical.protocol.BlockMarksS2C.Entry> entries) {
-            if (!net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(
-                    player, justfatlard.pandorical.protocol.BlockMarksS2C.TYPE)) return;
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.BlockMarksS2C(level.dimension().identifier(), entries));
-        }
-    }
+    public static BlockMarks blockMarksImpl() { return BLOCK_MARKS; }
 
     private static final justfatlard.pandorical.settings.SettingsRegistry SETTINGS =
         new justfatlard.pandorical.settings.SettingsRegistry();
@@ -286,42 +215,6 @@ public final class PandoricalApi {
     }
 
 
-    /** @hidden */
-    public static final class ChestOverlayApiImpl implements ChestOverlayApi {
-        @Override
-        public void replace(ServerPlayer player, net.minecraft.resources.Identifier texture,
-                java.util.Collection<net.minecraft.core.BlockPos> positions) {
-            send(player, justfatlard.pandorical.protocol.ChestOverlayS2C.OP_REPLACE, texture, positions);
-        }
-
-        @Override
-        public void add(ServerPlayer player, net.minecraft.resources.Identifier texture,
-                java.util.Collection<net.minecraft.core.BlockPos> positions) {
-            if (positions.isEmpty()) return;
-            send(player, justfatlard.pandorical.protocol.ChestOverlayS2C.OP_ADD, texture, positions);
-        }
-
-        @Override
-        public void remove(ServerPlayer player, java.util.Collection<net.minecraft.core.BlockPos> positions) {
-            if (positions.isEmpty()) return;
-            // The texture is irrelevant to a removal, and the client ignores it.
-            send(player, justfatlard.pandorical.protocol.ChestOverlayS2C.OP_REMOVE,
-                net.minecraft.resources.Identifier.fromNamespaceAndPath("pandorical", "none"), positions);
-        }
-
-        private static void send(ServerPlayer player, byte op, net.minecraft.resources.Identifier texture,
-                java.util.Collection<net.minecraft.core.BlockPos> positions) {
-            if (!hasCapability(player, Capabilities.CHEST_OVERLAYS)) return;
-
-            long[] packed = new long[positions.size()];
-            int i = 0;
-            for (net.minecraft.core.BlockPos pos : positions) packed[i++] = pos.asLong();
-
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.ChestOverlayS2C(op, texture.toString(), packed));
-        }
-    }
-
     // --- Internal methods (used by Pandorical core, not for consuming mods) ---
 
     /** @hidden */
@@ -331,13 +224,13 @@ public final class PandoricalApi {
     public static PlayerInventoryApiImpl playerInventoryImpl() { return PLAYER_INVENTORY; }
 
     /** @hidden */
-    public static BlockTintApiImpl blockTintsImpl() { return BLOCK_TINTS; }
+    public static BlockTints blockTintsImpl() { return BLOCK_TINTS; }
 
     /** @hidden used by Pandorical's EntityTrackingEvents registration */
     public static StructureRegistry structuresImpl() { return STRUCTURES; }
 
     /** @hidden used by Pandorical's EntityTrackingEvents/ServerEntityEvents registration */
-    public static EntityOverlayApiImpl entityOverlaysImpl() { return ENTITY_OVERLAYS; }
+    public static EntityOverlays entityOverlaysImpl() { return ENTITY_OVERLAYS; }
 
     /** @hidden used by Pandorical's KeyPressC2S receiver and handshake push */
     public static KeybindPool keybindsImpl() { return KEYBINDS; }
@@ -375,369 +268,4 @@ public final class PandoricalApi {
 
     /** @hidden */
     public static ScreenRegistry screensImpl() { return SCREENS; }
-
-    // --- CameraApi implementation ---
-
-    public static final class CameraApiImpl implements CameraApi {
-        @Override
-        public void setDistance(ServerPlayer player, float distance) {
-            if (!hasCapability(player, Capabilities.CAMERA)) return;
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.CameraHintS2C("distance",
-                    Map.of("distance", String.valueOf(distance))));
-        }
-
-        @Override
-        public void setPerspective(ServerPlayer player, String perspective) {
-            if (!hasCapability(player, Capabilities.CAMERA)) return;
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.CameraHintS2C("perspective",
-                    Map.of("mode", perspective)));
-        }
-
-        @Override
-        public void zoom(ServerPlayer player, float factor) {
-            if (!hasCapability(player, Capabilities.CAMERA)) return;
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.CameraHintS2C("zoom",
-                    Map.of("factor", String.valueOf(factor))));
-        }
-
-        @Override
-        public void reset(ServerPlayer player) {
-            if (!isAvailable(player)) return;
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.CameraHintS2C("reset", Map.of()));
-        }
-    }
-
-    // --- MountApi implementation ---
-
-    public static final class MountApiImpl implements MountApi {
-        private static boolean doubleRiders = false;
-        private static boolean freeLook = false;
-
-        @Override
-        public void doubleRiders(boolean allow) {
-            doubleRiders = allow;
-            apply();
-        }
-
-        @Override
-        public void freeLook(boolean enable) {
-            freeLook = enable;
-            apply();
-        }
-
-        /**
-         * The server's own mixins read the same holder the client's do, so it is set here rather
-         * than only sent. Declared at mod initialise, before any player exists; {@link #sendTo}
-         * tells each client as it arrives.
-         */
-        private static void apply() {
-            justfatlard.pandorical.MountPolicy.set(doubleRiders, freeLook);
-        }
-
-        public static void sendTo(ServerPlayer player) {
-            if (!doubleRiders && !freeLook) return;
-            if (!hasCapability(player, Capabilities.MOUNT_POLICY)) return;
-
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.MountPolicyS2C(doubleRiders, freeLook));
-        }
-    }
-
-    // --- AnimationApi implementation ---
-
-    public static final class AnimationApiImpl implements AnimationApi {
-        /**
-         * What each entity is playing, so somebody who walks into view is told about an animation
-         * that started before they arrived. Keyed by network id and cleared when the entity goes.
-         */
-        private static final java.util.Map<Integer, justfatlard.pandorical.protocol.PlayAnimationS2C>
-            PLAYING = new java.util.concurrent.ConcurrentHashMap<>();
-
-        @Override
-        public void play(net.minecraft.world.entity.Entity entity, String animationId, boolean looping) {
-            var payload = new justfatlard.pandorical.protocol.PlayAnimationS2C(
-                entity.getId(), animationId, looping);
-            PLAYING.put(entity.getId(), payload);
-            broadcast(entity, payload);
-        }
-
-        @Override
-        public void stop(net.minecraft.world.entity.Entity entity) {
-            PLAYING.remove(entity.getId());
-            broadcast(entity, new justfatlard.pandorical.protocol.PlayAnimationS2C(
-                entity.getId(), "", false));
-        }
-
-        private static void broadcast(net.minecraft.world.entity.Entity entity,
-                justfatlard.pandorical.protocol.PlayAnimationS2C payload) {
-            if (!(entity.level() instanceof net.minecraft.server.level.ServerLevel level)) return;
-
-            for (ServerPlayer player : level.players()) {
-                if (!hasCapability(player, Capabilities.ANIMATIONS)) continue;
-                net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, payload);
-            }
-        }
-
-        /** Catch a joining client up on everything already playing. */
-        public static void sendAllTo(ServerPlayer player) {
-            if (!hasCapability(player, Capabilities.ANIMATIONS)) return;
-
-            for (var payload : PLAYING.values()) {
-                net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, payload);
-            }
-        }
-
-        /** An entity that has gone is not playing anything. */
-        public static void forget(int entityId) {
-            PLAYING.remove(entityId);
-        }
-    }
-
-    // --- RenderApi implementation ---
-
-    public static final class RenderApiImpl implements RenderApi {
-        /**
-         * The policy in force, kept so a player joining later is told the same thing as everyone
-         * already here. A mod declares this once at startup and never again.
-         */
-        private static volatile boolean cullLeaves = false;
-
-        /**
-         * Declared once, at mod initialize, before any server or player exists - so this only
-         * records the answer and {@link #sendTo} does the telling as each client arrives. There is
-         * deliberately no broadcast: a rendering policy is a property of the server's content, not
-         * something that flips while people are looking at it.
-         */
-        @Override
-        public void cullLeaves(boolean enforce) {
-            cullLeaves = enforce;
-        }
-
-        /** Tell one arriving client what this server asks for. */
-        public static void sendTo(ServerPlayer player) {
-            if (!cullLeaves) return;
-            if (!hasCapability(player, Capabilities.RENDER_POLICY)) return;
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.RenderPolicyS2C(cullLeaves));
-        }
-    }
-
-    // --- SkinApi implementation ---
-
-    public static final class SkinApiImpl implements SkinApi {
-        /**
-         * Every override currently in force, so a player who joins later still sees them.
-         *
-         * <p>A skin is not an event, it is a state, and a client that missed the announcement would
-         * otherwise see that person as Steve for as long as both stayed logged in. Held by subject
-         * so a second call about the same player replaces the first rather than piling up.
-         */
-        private static final Map<java.util.UUID, justfatlard.pandorical.protocol.SkinOverrideS2C> WORN =
-            new java.util.concurrent.ConcurrentHashMap<>();
-
-        /**
-         * Subjects dressed for the life of the server: a leaver's row goes unless it is one of these.
-         * The two lifetimes are told apart here rather than by two maps, so the one send loop and
-         * the one replay on join serve both.
-         */
-        private static final Set<java.util.UUID> KEPT = ConcurrentHashMap.newKeySet();
-
-        @Override
-        public void set(ServerPlayer subject, byte[] png, boolean slim) {
-            if (png == null || png.length == 0) {
-                clear(subject);
-                return;
-            }
-            broadcast(subject, new justfatlard.pandorical.protocol.SkinOverrideS2C(
-                subject.getUUID(), png, slim));
-        }
-
-        @Override
-        public void clear(ServerPlayer subject) {
-            clear(subject.level().getServer(), subject.getUUID());
-        }
-
-        @Override
-        public void set(net.minecraft.server.MinecraftServer server, java.util.UUID subject,
-                byte[] png, boolean slim) {
-            if (png == null || png.length == 0) {
-                clear(server, subject);
-                return;
-            }
-            KEPT.add(subject);
-            justfatlard.pandorical.protocol.SkinOverrideS2C worn =
-                new justfatlard.pandorical.protocol.SkinOverrideS2C(subject, png, slim);
-            WORN.put(subject, worn);
-            send(server, worn);
-        }
-
-        @Override
-        public void clear(net.minecraft.server.MinecraftServer server, java.util.UUID subject) {
-            KEPT.remove(subject);
-            WORN.remove(subject);
-            // An empty image is how "wear your own skin again" is said; the alternative would be a
-            // second packet type that means nothing else.
-            send(server, new justfatlard.pandorical.protocol.SkinOverrideS2C(
-                subject, new byte[0], false));
-        }
-
-        private void broadcast(ServerPlayer subject,
-                justfatlard.pandorical.protocol.SkinOverrideS2C worn) {
-            WORN.put(subject.getUUID(), worn);
-            send(subject.level().getServer(), worn);
-        }
-
-        private static void send(net.minecraft.server.MinecraftServer server,
-                justfatlard.pandorical.protocol.SkinOverrideS2C worn) {
-            if (server == null) return;
-            for (ServerPlayer viewer : server.getPlayerList().getPlayers()) {
-                if (!hasCapability(viewer, Capabilities.SKINS)) continue;
-                net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(viewer, worn);
-            }
-        }
-
-        /** Catch a newly arrived client up on everyone already wearing something. */
-        public static void sendAllTo(ServerPlayer viewer) {
-            if (WORN.isEmpty() || !hasCapability(viewer, Capabilities.SKINS)) return;
-            for (justfatlard.pandorical.protocol.SkinOverrideS2C worn : WORN.values()) {
-                net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(viewer, worn);
-            }
-        }
-
-        /** Drop a leaver's entry, so the map does not grow for the life of the server. */
-        public static void forget(java.util.UUID subject) {
-            if (!KEPT.contains(subject)) WORN.remove(subject);
-        }
-    }
-
-    // --- BlockTintApi implementation ---
-
-    public static final class BlockTintApiImpl implements BlockTintApi {
-        private final java.util.List<justfatlard.pandorical.protocol.BlockTintsConfigS2C.Entry> entries =
-            new java.util.ArrayList<>();
-
-        @Override public void grass(String... blockIds)     { add("grass",     0, blockIds); }
-        @Override public void stem(String... blockIds)      { add("stem",      0, blockIds); }
-        @Override public void sugarCane(String... blockIds) { add("sugar_cane",0, blockIds); }
-        @Override public void foliage(String... blockIds)   { add("foliage",   0, blockIds); }
-        @Override public void constant(int argb, String... blockIds) { add("constant", argb, blockIds); }
-        @Override public void positional(String... blockIds)          { add("positional", 0, blockIds); }
-        @Override public void positional(int fallbackArgb, String... blockIds) { add("positional", fallbackArgb, blockIds); }
-
-        @Override
-        public void paint(ServerPlayer player, java.util.Map<net.minecraft.core.BlockPos, Integer> argbByPosition) {
-            if (argbByPosition.isEmpty()) return;
-
-            send(player, argbByPosition.entrySet().stream()
-                .map(entry -> new justfatlard.pandorical.protocol.BlockTintPositionsS2C.Entry(
-                    entry.getKey().asLong(), entry.getValue()))
-                .toList());
-        }
-
-        @Override
-        public void unpaint(ServerPlayer player, java.util.Collection<net.minecraft.core.BlockPos> positions) {
-            if (positions.isEmpty()) return;
-
-            // Zero is the clear: a colour with no alpha is not a colour anybody meant to paint,
-            // so it can carry the other meaning without a second packet to say which.
-            send(player, positions.stream()
-                .map(pos -> new justfatlard.pandorical.protocol.BlockTintPositionsS2C.Entry(pos.asLong(), 0))
-                .toList());
-        }
-
-        private void send(ServerPlayer player,
-                java.util.List<justfatlard.pandorical.protocol.BlockTintPositionsS2C.Entry> entries) {
-            // Asked rather than assumed: an older Pandorical has no receiver for this type, and
-            // sending it anyway disconnects them over a colour.
-            if (!net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(
-                    player, justfatlard.pandorical.protocol.BlockTintPositionsS2C.TYPE)) return;
-
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.BlockTintPositionsS2C(entries));
-        }
-
-        private void add(String tintType, int constantColor, String[] blockIds) {
-            entries.add(new justfatlard.pandorical.protocol.BlockTintsConfigS2C.Entry(
-                tintType, constantColor, java.util.List.of(blockIds)));
-        }
-
-        public justfatlard.pandorical.protocol.BlockTintsConfigS2C buildPacket() {
-            return new justfatlard.pandorical.protocol.BlockTintsConfigS2C(java.util.List.copyOf(entries));
-        }
-
-        public boolean hasEntries() { return !entries.isEmpty(); }
-    }
-
-    /** @hidden implementation of {@link EntityOverlayApi}; broadcast design mirrors StructureRegistry. */
-    public static final class EntityOverlayApiImpl implements EntityOverlayApi {
-        private record OverlayEntry(Entity entity, net.minecraft.resources.Identifier texture) {}
-
-        // Keyed by entity UUID; entries dropped on entity unload (see
-        // handleEntityUnload). The wire protocol uses the network id, which is
-        // unique per server run, so a cleared client never confuses entities.
-        private final Map<UUID, OverlayEntry> overlays = new ConcurrentHashMap<>();
-
-        @Override
-        public void set(Entity entity, net.minecraft.resources.Identifier texture) {
-            if (entity == null || texture == null) return;
-            overlays.put(entity.getUUID(), new OverlayEntry(entity, texture));
-            justfatlard.pandorical.Pandorical.LOGGER.info("Entity overlay set: {} ({}) -> {}",
-                entity.getId(),
-                net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType()),
-                texture);
-            broadcastToTrackers(entity,
-                new justfatlard.pandorical.protocol.EntityOverlayS2C(entity.getId(), texture.toString()));
-        }
-
-        @Override
-        public void clear(Entity entity) {
-            if (entity == null) return;
-            if (overlays.remove(entity.getUUID()) == null) return;
-            broadcastToTrackers(entity,
-                new justfatlard.pandorical.protocol.EntityOverlayS2C(entity.getId(), ""));
-        }
-
-        /** @hidden called from Pandorical's EntityTrackingEvents.START_TRACKING handler. */
-        public void handleStartTracking(Entity entity, ServerPlayer player) {
-            if (!hasCapability(player, Capabilities.ENTITY_OVERLAYS)) return;
-            OverlayEntry entry = overlays.get(entity.getUUID());
-            if (entry != null) {
-                net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                    new justfatlard.pandorical.protocol.EntityOverlayS2C(entity.getId(), entry.texture().toString()));
-            }
-        }
-
-        /**
-         * @hidden called after HelloC2S registers capabilities: on join, entity
-         * tracking starts before the handshake completes, so overlays for
-         * already-tracked entities must be replayed here.
-         */
-        public void handlePlayerReady(ServerPlayer player) {
-            if (!hasCapability(player, Capabilities.ENTITY_OVERLAYS)) return;
-            for (OverlayEntry entry : overlays.values()) {
-                if (net.fabricmc.fabric.api.networking.v1.PlayerLookup.tracking(entry.entity()).contains(player)) {
-                    net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                        new justfatlard.pandorical.protocol.EntityOverlayS2C(
-                            entry.entity().getId(), entry.texture().toString()));
-                }
-            }
-        }
-
-        /** @hidden called from Pandorical's ServerEntityEvents.ENTITY_UNLOAD handler. */
-        public void handleEntityUnload(Entity entity) {
-            overlays.remove(entity.getUUID());
-        }
-
-        private void broadcastToTrackers(Entity entity, net.minecraft.network.protocol.common.custom.CustomPacketPayload packet) {
-            for (ServerPlayer player : net.fabricmc.fabric.api.networking.v1.PlayerLookup.tracking(entity)) {
-                if (hasCapability(player, Capabilities.ENTITY_OVERLAYS)) {
-                    net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, packet);
-                }
-            }
-        }
-    }
 }

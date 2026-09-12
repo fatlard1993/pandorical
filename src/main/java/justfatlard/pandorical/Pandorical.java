@@ -8,6 +8,10 @@ import justfatlard.pandorical.api.PlayerInventoryApiImpl;
 import justfatlard.pandorical.config.ConfigPatience;
 import justfatlard.pandorical.config.PandoricalSyncTask;
 import justfatlard.pandorical.protocol.*;
+import justfatlard.pandorical.push.DeclaredMountPolicy;
+import justfatlard.pandorical.push.DeclaredRenderPolicy;
+import justfatlard.pandorical.push.PlayingAnimations;
+import justfatlard.pandorical.push.SkinOverrides;
 import justfatlard.pandorical.screen.PandoricalMenu;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -240,7 +244,7 @@ public class Pandorical implements ModInitializer {
         // playing only ever grows: every fish, every companion, every mob that ever animated stays
         // in it for the life of the server, and each one is re-sent to every player who joins.
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents.ENTITY_UNLOAD.register(
-            (entity, level) -> PandoricalApi.AnimationApiImpl.forget(entity.getId()));
+            (entity, level) -> PlayingAnimations.forget(entity.getId()));
 
         PayloadTypeRegistry.clientboundPlay().register(
             justfatlard.pandorical.protocol.MountPolicyS2C.TYPE,
@@ -462,10 +466,10 @@ public class Pandorical implements ModInitializer {
                 // Everyone already wearing an override, before anything else is drawn: a skin is a
                 // state and not an event, so a client that missed the announcement would see that
                 // person as Steve for as long as both stayed logged in.
-                PandoricalApi.SkinApiImpl.sendAllTo(player);
-                PandoricalApi.RenderApiImpl.sendTo(player);
-                PandoricalApi.AnimationApiImpl.sendAllTo(player);
-                PandoricalApi.MountApiImpl.sendTo(player);
+                SkinOverrides.sendAllTo(player);
+                DeclaredRenderPolicy.sendTo(player);
+                PlayingAnimations.sendAllTo(player);
+                DeclaredMountPolicy.sendTo(player);
 
                 PandoricalApi.firePlayerReady(player);
             });
@@ -575,7 +579,7 @@ public class Pandorical implements ModInitializer {
             PandoricalApi.removePlayer(handler.getPlayer().getUUID());
             // Otherwise the worn-skin table keeps a row per player who ever wore one, for the life
             // of the server, and hands every new arrival a wardrobe of people who are not here.
-            PandoricalApi.SkinApiImpl.forget(handler.getPlayer().getUUID());
+            SkinOverrides.forget(handler.getPlayer().getUUID());
             justfatlard.pandorical.config.Keepsakes.INSTANCE.forget(handler.getPlayer().getUUID());
             PandoricalApi.settingsImpl().forget(handler.getPlayer().getUUID());
         });
