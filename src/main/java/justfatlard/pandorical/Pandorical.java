@@ -124,6 +124,11 @@ public class Pandorical implements ModInitializer {
             .shownWhen(player -> !DropsPolicy.getItTogetherInstalled())
             .backedBy(player -> DropsPolicy.mergeRadius(player.level().getServer()),
                 (player, tenths) -> DropsPolicy.chooseMergeRadius(player.level().getServer(), tenths));
+        settings.number("itemTrackingRange", "Players see dropped items and XP orbs this far off, in blocks",
+                0, DropsPolicy.MOST_TRACKING_BLOCKS, 8, 0)
+            .describe("0 is vanilla's 96. A change reaches the items and orbs tracked after it")
+            .backedBy(player -> DropsPolicy.trackingRange(player.level().getServer()),
+                (player, blocks) -> DropsPolicy.chooseTrackingRange(player.level().getServer(), blocks));
 
         // Dedicated server only: on a client this would filter every namespace.
         if (FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER) {

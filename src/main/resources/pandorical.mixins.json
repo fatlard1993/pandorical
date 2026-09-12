@@ -18,7 +18,8 @@
 		"ServerCommonConnectionAccessor",
 		"NetherPortalPairingMixin",
 		"ExperienceOrbClumpMixin",
-		"ItemMergeRadiusMixin"
+		"ItemMergeRadiusMixin",
+		"TrackingRangeMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

@@ -59,7 +59,26 @@ public final class DropsFixes implements FabricClientGameTest {
 			check(stacksAfterAWhile(context, server, floor, false) == 1, "with a 2-block reach, stacks 1.5 apart stayed apart");
 			check(stacksAfterAWhile(context, server, floor, true) == 2, "with a 2-block reach, stacks merged through glass");
 			server.runOnServer(s -> DropsPolicy.chooseMergeRadius(s, DropsPolicy.VANILLA_MERGE_TENTHS));
+
+			BlockPos far = spawn.east(24).above();
+			server.runOnServer(s -> DropsPolicy.chooseTrackingRange(s, 16));
+			int unseen = dropAt(server, far);
+			context.waitTicks(20);
+			server.runOnServer(s -> DropsPolicy.chooseTrackingRange(s, 0));
+			int seen = dropAt(server, far);
+			context.waitFor(client -> client.level.getEntity(seen) != null);
+			check(context.computeOnClient(client -> client.level.getEntity(unseen) == null),
+				"an item 24 blocks off reached the client with the range at 16");
 		}
+	}
+
+	private static int dropAt(TestServerContext server, BlockPos pos) {
+		return server.computeOnServer(s -> {
+			ItemEntity stack = new ItemEntity(s.overworld(), pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, new ItemStack(Items.STICK));
+			stack.setDeltaMovement(Vec3.ZERO);
+			s.overworld().addFreshEntity(stack);
+			return stack.getId();
+		});
 	}
 
 	/**
