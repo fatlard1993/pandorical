@@ -21,55 +21,32 @@ import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.block.state.properties.RailShape;
 
 /**
- * A run of alternating curved rails drawn as the straight diagonal it is.
+ * Draws a run of alternating curves as a straight diagonal. A curve with a joined curve on either
+ * side draws the chord between its connected faces; a lone curve between straights keeps its
+ * bend. Where a run meets a straight they share one bend: the straight draws its half, and the
+ * run's last chord draws the rest.
  *
- * <p>A minecart cannot travel at forty-five degrees, so a diagonal line of track is a
- * staircase of curves, and vanilla draws every step of it as a bend: the classic S-wriggle.
- * The cart still wriggles; this only changes what is drawn. A curve with a curve joined to it
- * on either side is a step of a diagonal, and it is drawn with the chord between its two
- * connected faces instead of the bend. Chords meet end to end, so a run reads as one straight
- * line from the straight rail it leaves to the straight rail it reaches, and where one diagonal
- * turns into another the two lines meet at a sharp corner. The ends of the run are chords too:
- * a diagonal of three curves is three chords, not a chord between two bends, because the line
- * is what the player laid and the bends were only ever vanilla's way of not having one. A
- * curve on its own between two straights is a corner, and keeps its bend.
- *
- * <p>Where a diagonal meets a straight the two share one bend: an arc tangent to the straight
- * short of the shared face and to the chord the same distance past it, so both rails swing
- * round together the way rails do. The straight draws the part on its side, and the run's last
- * chord, the one with a straight beyond its other face, is drawn with the rest in place of its
- * plain end. The straight used to take the whole bend, and its outer rail swung out past the
- * block and back to reach the chord's.
- *
- * <p>The models come from whoever ships the rail: a model named
- * {@code <block>_diagonal_<se|sw|nw|ne>} beside the block's own models (with {@code _on}
- * before {@code _diagonal} for a powered state) is picked up at model load, and a rail without
- * one keeps its bend; {@code <block>_diagonal_<se|sw|nw|ne>_<n|e|s|w>} is the run's last chord
- * eased toward the straight beyond that face; {@code <block>_diagonal_end_<ne|nw>} is the
- * straight's half of the bend, drawn for a diagonal received through its south face and turned
- * for the other three. Any block with a
- * {@code shape} property of {@link RailShape} counts as a rail, which covers vanilla's and any
- * server-defined stand-in.
- *
- * <p>The swap happens where the chunk compiler looks a block's model up, because that is the
- * one place with the neighbours in hand: a model on its own no longer sees the world.
+ * <p>Models, beside the block's own, with {@code _on} before {@code _diagonal} when powered:
+ * {@code <block>_diagonal_<se|sw|nw|ne>} is the chord; a trailing {@code _<n|e|s|w>} is the last
+ * chord eased toward a straight beyond that face; {@code <block>_diagonal_end_<ne|nw>} is the
+ * straight's half, modelled for a diagonal arriving through its south face and turned for the
+ * others. A rail without them keeps its bends. Any block whose {@code shape} property is a
+ * {@link RailShape} counts.
  */
 @Environment(EnvType.CLIENT)
 public final class RailDiagonals implements ContextModels.Provider {
 
 	private record Key(Block block, boolean powered, RailShape curve) {}
 
-	/** An easing: which hand the diagonal comes in on, and which face it comes through. */
 	private record EaseKey(Block block, boolean powered, String hand, Direction through) {}
 
-	/** A run's last chord: the curve, and the face with the straight beyond it. */
 	private record EndKey(Block block, boolean powered, RailShape curve, Direction open) {}
 
 	private static final Map<Key, ExtraModelKey<BlockStateModel>> KEYS = new HashMap<>();
 	private static final Map<EaseKey, ExtraModelKey<BlockStateModel>> EASINGS = new HashMap<>();
 	private static final Map<EndKey, ExtraModelKey<BlockStateModel>> ENDS = new HashMap<>();
 
-	/** The face a diagonal comes through, and the quarter turn that carries the south-face model there. */
+	/** The quarter turn that carries the south-face end model to each face. */
 	private static final Map<Direction, Quadrant> TURNS = Map.of(
 		Direction.SOUTH, Quadrant.R0, Direction.WEST, Quadrant.R90, Direction.NORTH, Quadrant.R180, Direction.EAST, Quadrant.R270);
 	private static final Map<Block, Property<RailShape>> SHAPE_PROPERTIES = new HashMap<>();
@@ -77,7 +54,6 @@ public final class RailDiagonals implements ContextModels.Provider {
 	private static final Map<RailShape, String> SUFFIX = Map.of(
 		RailShape.SOUTH_EAST, "se", RailShape.SOUTH_WEST, "sw", RailShape.NORTH_WEST, "nw", RailShape.NORTH_EAST, "ne");
 
-	/** Every rail block in the registry, every chord model that actually exists for it. */
 	@Override
 	public void scan(ResourceManager resources, ContextModels.Registrar add) {
 		KEYS.clear();
@@ -118,7 +94,6 @@ public final class RailDiagonals implements ContextModels.Provider {
 		}
 	}
 
-	/** The block's rail shape property, by name and value type, or null for anything that is not a rail. */
 	@SuppressWarnings("unchecked")
 	private static Property<RailShape> shapeProperty(Block block) {
 		return SHAPE_PROPERTIES.computeIfAbsent(block, b -> {
@@ -131,10 +106,6 @@ public final class RailDiagonals implements ContextModels.Provider {
 		});
 	}
 
-	/**
-	 * The chord for a curve with a joining curve on either side, the easing for a straight with
-	 * such a curve at one end, else nothing.
-	 */
 	@Override
 	public BlockStateModel pick(BlockState state, BlockAndTintGetter level, BlockPos pos, ContextModels.Lookup models) {
 		if (KEYS.isEmpty()) return null;
@@ -149,7 +120,6 @@ public final class RailDiagonals implements ContextModels.Provider {
 			boolean second = joinedCurve(level, pos, sides[1]);
 			if (!first && !second) return null;
 			if (first != second) {
-				// The run's end: with a straight beyond the open face the two are eased together.
 				Direction open = first ? sides[1] : sides[0];
 				if (straightAlong(level.getBlockState(pos.relative(open)), open)) {
 					ExtraModelKey<BlockStateModel> end = ENDS.get(new EndKey(state.getBlock(), powered, shape, open));
@@ -172,8 +142,8 @@ public final class RailDiagonals implements ContextModels.Provider {
 			RailShape curve = neighbour.getValue(theirs);
 			if (!SUFFIX.containsKey(curve) || !joins(curve, through.getOpposite())) continue;
 			if (!stepped(level, beyond, curve)) continue;
-			// The curve's other side says which way the line runs: clockwise of the face it
-			// comes through is the north-east hand on the south face, and turns with it.
+			// The curve's other side gives the hand: clockwise of the entry face is "ne" on the
+			// south-face model, and turns with it.
 			Direction other = connected(curve)[0] == through.getOpposite() ? connected(curve)[1] : connected(curve)[0];
 			String hand = other == through.getClockWise() ? "ne" : "nw";
 			ExtraModelKey<BlockStateModel> key = EASINGS.get(new EaseKey(state.getBlock(), powered, hand, through));
@@ -182,7 +152,6 @@ public final class RailDiagonals implements ContextModels.Provider {
 		return null;
 	}
 
-	/** Whether a curve here has a curve joined to it on either side: a step of a diagonal. */
 	private static boolean stepped(BlockAndTintGetter level, BlockPos pos, RailShape shape) {
 		for (Direction side : connected(shape)) {
 			if (joinedCurve(level, pos, side)) return true;
@@ -190,7 +159,6 @@ public final class RailDiagonals implements ContextModels.Provider {
 		return false;
 	}
 
-	/** Whether the block on that side is a curve joined back to this one. */
 	private static boolean joinedCurve(BlockAndTintGetter level, BlockPos pos, Direction side) {
 		BlockState neighbour = level.getBlockState(pos.relative(side));
 		Property<RailShape> theirs = shapeProperty(neighbour.getBlock());
@@ -199,7 +167,6 @@ public final class RailDiagonals implements ContextModels.Provider {
 		return SUFFIX.containsKey(near) && joins(near, side.getOpposite());
 	}
 
-	/** Whether this is a flat straight running the way that face looks: one a chord can ease into. */
 	private static boolean straightAlong(BlockState neighbour, Direction through) {
 		Property<RailShape> theirs = shapeProperty(neighbour.getBlock());
 		if (theirs == null) return false;
@@ -207,7 +174,6 @@ public final class RailDiagonals implements ContextModels.Provider {
 		return neighbour.getValue(theirs) == straight;
 	}
 
-	/** The two sides a curve joins. */
 	private static Direction[] connected(RailShape curve) {
 		return switch (curve) {
 			case SOUTH_EAST -> new Direction[] {Direction.SOUTH, Direction.EAST};
@@ -218,7 +184,6 @@ public final class RailDiagonals implements ContextModels.Provider {
 		};
 	}
 
-	/** Whether this curve has a connection on that side: a neighbour that turns its back is no step. */
 	private static boolean joins(RailShape curve, Direction side) {
 		for (Direction joined : connected(curve)) {
 			if (joined == side) return true;

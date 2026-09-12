@@ -19,24 +19,19 @@ import net.minecraft.world.level.block.state.BlockState;
 import justfatlard.pandorical.BlockMarkLookup;
 
 /**
- * Fence gates side by side drawn as one wide gate.
- *
- * <p>A gate with the same gate on its left, its right, or both, on the same line, takes a
- * joined model: the post on the shared side gone, the bars running through. The models come
- * from whoever ships them, named {@code <gate>[_wall][_open]_join_<left|right|both>_<facing>}
- * beside the block's own models; the facing is in the name because a model picked here has
- * no blockstate rotation to lean on. Left and right are the gate's own, looking the way it
- * faces. A gate without joined models keeps its posts.
+ * Gates side by side drawn as one wide gate, from
+ * {@code <gate>[_wall][_open]_join_<left|right|both|none>[_stacked]_<facing>}. The facing is in
+ * the name because a model picked here gets no blockstate rotation. Left and right are the gate's
+ * own, looking the way it faces.
  */
 @Environment(EnvType.CLIENT)
 public final class FenceGateJoins implements ContextModels.Provider {
 	private record Key(Block block, boolean open, boolean wall, String join, String swing, boolean stacked, Direction facing) {}
 
 	/**
-	 * The single leaves a gate marked {@link BlockMarkApi#GATE_HINGE_LEFT} or
-	 * {@link BlockMarkApi#GATE_HINGE_RIGHT} opens as, drawn by
-	 * {@code <gate>[_wall]_open_swing_<left|right>[_stacked]_<facing>}. A pair never swings as one
-	 * leaf: a leaf two blocks long has no model to fit in.
+	 * A lone gate marked {@link BlockMarkApi#GATE_HINGE_LEFT} or
+	 * {@link BlockMarkApi#GATE_HINGE_RIGHT} opens as
+	 * {@code <gate>[_wall]_open_swing_<left|right>[_stacked]_<facing>}.
 	 */
 	private static final String[] SWINGS = {"left", "right"};
 
@@ -94,8 +89,6 @@ public final class FenceGateJoins implements ContextModels.Provider {
 		Direction facing = state.getValue(FenceGateBlock.FACING);
 		boolean left = joined(state, level.getBlockState(pos.relative(facing.getCounterClockWise())));
 		boolean right = joined(state, level.getBlockState(pos.relative(facing.getClockWise())));
-		// A gate on a gate: the posts run down to meet the one below, so a tall gate has posts
-		// the whole way rather than a gap at every storey.
 		boolean stacked = joined(state, level.getBlockState(pos.below()));
 		boolean open = state.getValue(FenceGateBlock.OPEN);
 		String swing = "";
@@ -108,13 +101,11 @@ public final class FenceGateJoins implements ContextModels.Provider {
 		boolean wall = state.getValue(FenceGateBlock.IN_WALL);
 		ExtraModelKey<BlockStateModel> key = KEYS.get(new Key(state.getBlock(), open, wall, join, swing, stacked, facing));
 		if (key == null && !swing.isEmpty()) {
-			// A gate without single-leaf models opens the way it always did.
 			key = KEYS.get(new Key(state.getBlock(), open, wall, join, "", stacked, facing));
 		}
 		return key == null ? null : models.get(key);
 	}
 
-	/** The same gate on the same line, facing along it either way. */
 	private static boolean joined(BlockState mine, BlockState other) {
 		return other.getBlock() == mine.getBlock()
 			&& other.getValue(FenceGateBlock.FACING).getAxis() == mine.getValue(FenceGateBlock.FACING).getAxis();

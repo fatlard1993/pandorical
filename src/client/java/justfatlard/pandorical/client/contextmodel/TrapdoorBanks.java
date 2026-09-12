@@ -25,13 +25,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Half;
 
 /**
- * A rectangle of trapdoors drawn as one trapdoor.
- *
- * <p>Trapdoors of one kind lying in one plane - flat at the same height, or standing open
- * against the same wall - and filling a rectangle are one hatch or one shutter: the frame goes
- * round the outside and the sheet's interior stretches across the inside. Each tile takes a
- * model named for the sides of the frame it keeps, {@code <trapdoor>_mega_<state>_<flags>},
- * which More Doors ships for every trapdoor in the game and every one of its own.
+ * A full rectangle of like trapdoors in one plane drawn as one. Each tile takes
+ * {@code <trapdoor>_mega_<bottom|top|open>_<flags>}, the flags naming the frame sides it keeps.
  */
 @Environment(EnvType.CLIENT)
 public final class TrapdoorBanks implements ContextModels.Provider {
@@ -54,7 +49,7 @@ public final class TrapdoorBanks implements ContextModels.Provider {
 					if (resources.getResource(file).isEmpty()) continue;
 					Identifier model = Identifier.fromNamespaceAndPath(id.getNamespace(), "block/" + path);
 					if (state.equals("open")) {
-						// Vanilla's own turns for an open trapdoor: north as drawn, then a quarter turn per facing.
+						// Vanilla's open-trapdoor turns: north as drawn, a quarter turn per facing.
 						for (Direction facing : Direction.Plane.HORIZONTAL) {
 							KEYS.put(new Key(block, state, flags, facing),
 								add.add(model, new Variant.SimpleModelState(Quadrant.R0, turn(facing), Quadrant.R0, false).asModelState()));
@@ -82,8 +77,7 @@ public final class TrapdoorBanks implements ContextModels.Provider {
 		boolean open = state.getValue(TrapDoorBlock.OPEN);
 		Direction facing = state.getValue(TrapDoorBlock.FACING);
 
-		// The sheet's axes in the world: u along, v across. Flat, that is east and south;
-		// standing, it is along the wall and down from the top.
+		// The sheet's axes in the world: flat, east and south; standing, along the wall and down.
 		Direction uDir = open ? modelWest(facing).getOpposite() : Direction.EAST;
 		Direction vDir = open ? Direction.DOWN : Direction.SOUTH;
 
@@ -138,7 +132,6 @@ public final class TrapdoorBanks implements ContextModels.Provider {
 			+ (tile.getZ() - origin.getZ()) * dir.getStepZ();
 	}
 
-	/** Same trapdoor, same state: lying at the same height, or standing open on the same wall. */
 	private static boolean joins(BlockState other, BlockState like) {
 		if (!other.is(like.getBlock()) || other.getValue(TrapDoorBlock.OPEN) != like.getValue(TrapDoorBlock.OPEN)) return false;
 		if (like.getValue(TrapDoorBlock.OPEN)) return other.getValue(TrapDoorBlock.FACING) == like.getValue(TrapDoorBlock.FACING);

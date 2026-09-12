@@ -22,36 +22,26 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Models chosen by what stands next to a block.
- *
- * <p>A model on its own no longer sees the world, so a block that wants to look different beside
- * a particular neighbour - a curve in a diagonal run, a gate joined to another - has to be
- * answered where the chunk compiler looks its model up, with the neighbours in hand. This is
- * that one place. Each {@link Provider} says which extra models it wants loaded, found by
- * scanning the resources so nothing is asked for that nobody shipped, and then picks one at
- * render time or declines.
+ * Models chosen by a block's neighbours. A model cannot see the world, so the choice is made
+ * where the chunk compiler looks the model up. Providers register only models that exist.
  */
 @Environment(EnvType.CLIENT)
 public final class ContextModels {
 	private ContextModels() {}
 
-	/** What the compiler is looking at, stashed from the block-state read just before the model lookup. */
 	public static final ThreadLocal<BlockAndTintGetter> LEVEL = new ThreadLocal<>();
 	public static final ThreadLocal<BlockPos> POS = new ThreadLocal<>();
 
 	public interface Provider {
-		/** The extra models this provider can use that actually exist, registered through {@code add}. */
 		void scan(ResourceManager resources, Registrar add);
 
-		/** The model to draw for this state here, or null to leave the block's own. */
+		/** Null leaves the block's own model. */
 		BlockStateModel pick(BlockState state, BlockAndTintGetter level, BlockPos pos, Lookup models);
 	}
 
 	public interface Registrar {
-		/** The model as it is, unturned. */
 		ExtraModelKey<BlockStateModel> add(Identifier model);
 
-		/** The model turned, the way a blockstate variant turns one, so a facing need not be baked in. */
 		ExtraModelKey<BlockStateModel> add(Identifier model, ModelState state);
 	}
 
@@ -64,7 +54,6 @@ public final class ContextModels {
 	private static final List<Provider> PROVIDERS = new ArrayList<>();
 	private static boolean any;
 
-	/** Whether any provider found models to pick from. */
 	public static boolean active() {
 		return any;
 	}
@@ -102,7 +91,6 @@ public final class ContextModels {
 			});
 	}
 
-	/** The compiler's question. */
 	public static BlockStateModel pick(BlockStateModelSet models, BlockState state) {
 		BlockStateModel own = models.get(state);
 		if (!any) return own;

@@ -20,12 +20,8 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.SlabType;
 
 /**
- * A ceiling-mounted block hung from the underside of a top slab.
- *
- * <p>The slab's underside is half a block above where a ceiling model puts its ceiling, so a
- * block hung there floats. A block that ships lifted models takes one here whenever the block
- * above it is a top slab. Named {@code <block>_hung_<facing>[_on]}, facing baked in, in the
- * block's own namespace. Lever Torch ships them for its torch and for vanilla's lever.
+ * A top slab's underside is half a block above where a ceiling model puts its ceiling, so a
+ * ceiling block under one takes {@code <block>_hung_<facing>[_on]}, facing baked in.
  */
 @Environment(EnvType.CLIENT)
 public final class SlabHung implements ContextModels.Provider {

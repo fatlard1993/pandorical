@@ -26,30 +26,22 @@ import net.minecraft.world.level.block.state.properties.DoorHingeSide;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 
 /**
- * A bank of doors drawn as one door.
- *
- * <p>Doors of one kind, hung on the same side, standing in a full rectangle, are one door: a frame
- * round the outside, the sheet stretched across the inside, one handle. Each leaf takes a model
- * that keeps only the pieces of the frame on the rectangle's edge, named
- * {@code <door>_mega_<lower|upper>_<hinge>[_open]_<flags>} with the flags saying which pieces,
- * and turned by vanilla's own rotation for its facing and swing. More Doors ships them for every
- * door in the game and every one of its own.
- *
- * <p>The rectangle is read from the world at render time, so a leaf added or taken away rejoins
- * or splits the door with the next chunk rebuild.
+ * A full rectangle of like doors drawn as one door. Each leaf takes
+ * {@code <door>_mega_<bottom|top>_<hinge>[_open]_<flags>}, the flags naming the frame pieces it
+ * keeps, turned by vanilla's door rotation for its facing and swing.
  */
 @Environment(EnvType.CLIENT)
 public final class DoorBanks implements ContextModels.Provider {
 	private record Key(Block block, DoubleBlockHalf half, DoorHingeSide hinge, boolean open, String flags, Direction facing) {}
 
 	private static final Map<Key, ExtraModelKey<BlockStateModel>> KEYS = new HashMap<>();
-	/** The mark More Doors puts on a leaf its owner cut loose from the leaves beside it. */
+	/** More Doors' mark on a leaf cut loose from its neighbours. */
 	private static final String DETACHED = "more-doors:detached";
-	/** The mark More Doors puts on a leaf that slides: nothing to turn, so no knob. */
+	/** More Doors' mark on a sliding leaf, drawn without a knob. */
 	private static final String SLIDING = "more-doors:sliding";
 	private static final int MAX_LEAVES = 64;
 
-	/** Every flag string the generator writes, per half. */
+	/** Every flag string the model generator writes, per half. */
 	private static final String[] LOWER_FLAGS = {"x", "h", "b", "bh", "r", "rh", "rb", "rbh",
 		"l", "lh", "lb", "lbh", "lr", "lrh", "lrb", "lrbh"};
 	private static final String[] UPPER_FLAGS = {"x", "t", "r", "rt", "l", "lt", "lr", "lrt"};
@@ -82,7 +74,7 @@ public final class DoorBanks implements ContextModels.Provider {
 		}
 	}
 
-	/** Vanilla's rotation for a door: a quarter turn per facing, and one more either way when open. */
+	/** Must match vanilla's door blockstate rotations. */
 	private static Quadrant turn(Direction facing, DoorHingeSide hinge, boolean open) {
 		int y = switch (facing) {
 			case EAST -> 0;
@@ -118,13 +110,11 @@ public final class DoorBanks implements ContextModels.Provider {
 
 		// Leaves run along the wall while the door is closed, and out from it once it has swung.
 		Direction along = open ? facing : facing.getClockWise();
-		// A leaf cut loose from its neighbours is its own door, however they agree. A door of one
-		// leaf is vanilla's to draw, unless it slides: then it is drawn here, without a knob.
+		// A single leaf is vanilla's to draw, unless it slides.
 		boolean sliding = ClientBlockMarks.has(foot, SLIDING);
 		Set<BlockPos> leaves = ClientBlockMarks.has(foot, DETACHED) ? Set.of(foot) : bank(level, foot, footState, along, sliding);
 		if (leaves.size() < 2 && !sliding) return null;
 
-		// A full rectangle, measured along the leaves and up in door heights.
 		int sMin = Integer.MAX_VALUE, sMax = Integer.MIN_VALUE, rMin = Integer.MAX_VALUE, rMax = Integer.MIN_VALUE;
 		for (BlockPos leaf : leaves) {
 			int s = (leaf.getX() - foot.getX()) * along.getStepX() + (leaf.getZ() - foot.getZ()) * along.getStepZ();
@@ -160,7 +150,6 @@ public final class DoorBanks implements ContextModels.Provider {
 		return key == null ? null : models.get(key);
 	}
 
-	/** Every leaf joined to this one: same door, same facing, same hinge, same state, hung or sliding alike, in a row or stacked. */
 	private static Set<BlockPos> bank(BlockAndTintGetter level, BlockPos foot, BlockState like, Direction along, boolean sliding) {
 		Set<BlockPos> found = new HashSet<>();
 		Deque<BlockPos> pending = new ArrayDeque<>();
@@ -188,11 +177,7 @@ public final class DoorBanks implements ContextModels.Provider {
 			&& state.getValue(DoorBlock.OPEN) == like.getValue(DoorBlock.OPEN);
 	}
 
-	/**
-	 * A door by what it carries, not by its class: the client's copy of a synced door is built
-	 * from its base block's properties and is not a DoorBlock, but it has a door's half, hinge,
-	 * facing and open state, which is all that is asked of it here.
-	 */
+	/** By properties, not class: a synced door's stand-in need not be a DoorBlock. */
 	static boolean isDoor(BlockState state) {
 		return state.hasProperty(DoorBlock.HALF) && state.hasProperty(DoorBlock.HINGE)
 			&& state.hasProperty(DoorBlock.FACING) && state.hasProperty(DoorBlock.OPEN);
