@@ -16,6 +16,7 @@
   "pandorical.settings.no_client": "The settings screen needs the Pandorical client. Here they are as a list; change one with /pandorical settings <mod> <key> <value>.",
   "pandorical.settings.unknown": "No setting called %s.",
   "pandorical.settings.bad_value": "%s is not a value that setting takes.",
+  "pandorical.settings.bad_value_takes": "%s is not a value %s takes; it takes %s.",
   "pandorical.settings.set": "%s: %s",
   "pandorical.mods.button": "Mods",
   "pandorical.mods.title": "Server Mods",

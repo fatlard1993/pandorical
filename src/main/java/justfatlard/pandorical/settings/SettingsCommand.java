@@ -39,7 +39,7 @@ public final class SettingsCommand {
     private static int open(CommandSourceStack source, SettingsRegistry settings) throws CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
         if (!PandoricalApi.hasCapability(player, Capabilities.SCREENS)) {
-            source.sendSuccess(() -> Component.translatable("pandorical.settings.no_client"), false);
+            source.sendSuccess(() -> text("pandorical.settings.no_client"), false);
             return list(source, settings);
         }
         PandoricalApi.settings().open(player);
@@ -63,7 +63,7 @@ public final class SettingsCommand {
     private static int list(CommandSourceStack source, SettingsRegistry settings) throws CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
         if (settings.isEmpty()) {
-            source.sendSuccess(() -> Component.translatable("pandorical.settings.none"), false);
+            source.sendSuccess(() -> text("pandorical.settings.none"), false);
             return 0;
         }
         int count = 0;
@@ -91,24 +91,48 @@ public final class SettingsCommand {
         @SuppressWarnings("unchecked")
         SettingsRegistry.SettingImpl<T> setting = (SettingsRegistry.SettingImpl<T>) settings.find(mod, key);
         if (setting == null) {
-            source.sendFailure(Component.translatable("pandorical.settings.unknown", mod + " " + key));
+            source.sendFailure(text("pandorical.settings.unknown", mod + " " + key));
             return 0;
         }
         if (settings.groupIsServer(setting) && !SettingsRegistry.isOp(player)) {
-            source.sendFailure(Component.translatable("pandorical.settings.ops_only"));
+            source.sendFailure(text("pandorical.settings.ops_only"));
             return 0;
         }
         if (!setting.visible(player)) {
-            source.sendFailure(Component.translatable("pandorical.settings.hidden"));
+            source.sendFailure(text("pandorical.settings.hidden"));
             return 0;
         }
         T parsed = setting.parse(value.trim());
         if (parsed == null) {
-            source.sendFailure(Component.translatable("pandorical.settings.bad_value", value));
+            String accepts = setting.accepts();
+            source.sendFailure(accepts.isEmpty()
+                ? text("pandorical.settings.bad_value", value)
+                : text("pandorical.settings.bad_value_takes", value, setting.label(), accepts));
             return 0;
         }
         setting.set(player, parsed);
-        source.sendSuccess(() -> Component.translatable("pandorical.settings.set", setting.label(), setting.shown(player)), false);
+        source.sendSuccess(() -> text("pandorical.settings.set", setting.label(), setting.shown(player)), false);
         return 1;
+    }
+
+    /** Pandorical's own English, read out of this jar, for the games that do not have it. */
+    private static final java.util.Map<String, String> ENGLISH = readEnglish();
+
+    /**
+     * Text a player on any game can read: the key for one with Pandorical's language, and the
+     * English for a vanilla game, which is who this command is for as often as not.
+     */
+    private static Component text(String key, Object... args) {
+        return Component.translatableWithFallback(key, ENGLISH.getOrDefault(key, key), args);
+    }
+
+    private static java.util.Map<String, String> readEnglish() {
+        try (var in = SettingsCommand.class.getResourceAsStream("/assets/pandorical/lang/en_us.json")) {
+            if (in == null) return java.util.Map.of();
+            return new com.google.gson.Gson().fromJson(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8),
+                new com.google.gson.reflect.TypeToken<java.util.Map<String, String>>() {}.getType());
+        } catch (java.io.IOException | RuntimeException e) {
+            return java.util.Map.of();
+        }
     }
 }
