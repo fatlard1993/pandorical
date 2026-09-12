@@ -23,5 +23,6 @@
   "pandorical.settings.hidden": "That setting is not in play right now.",
   "pandorical.settings.remove": "Remove",
   "pandorical.mods.readme": "Readme",
-  "pandorical.mods.settings": "Settings"
+  "pandorical.mods.settings": "Settings",
+  "pandorical.mods.commands": "Commands"
 }

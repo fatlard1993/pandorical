@@ -228,10 +228,18 @@ public final class SettingsRegistry implements SettingsApi {
             }
             if (selected == null && !mods.isEmpty()) selected = mods.get(0);
         }
+        // Every tab this mod has anything on, in reading order. A mod with no commands has no
+        // commands tab: four buttons across a narrow pane leave no room for their own names, and
+        // an empty tab is a press that tells the player nothing.
+        List<String> tabs = new ArrayList<>();
+        if (selected != null) {
+            tabs.add("readme");
+            if (!groupsFor(selected.id(), player).isEmpty()) tabs.add("settings");
+            if (!ModCommands.of(selected.id(), player).isEmpty()) tabs.add("commands");
+        }
         // Settings first when there are some to change; the readme otherwise.
-        boolean settingsTab = tab == null
-            ? selected != null && !groupsFor(selected.id(), player).isEmpty()
-            : tab.equals("settings");
+        String at_tab = tab != null && tabs.contains(tab) ? tab
+            : tabs.contains("settings") ? "settings" : "readme";
 
         ScreenBuilder screen = new ScreenBuilder(SCREEN_TYPE).size(at.width, at.height).title("Mods");
         screen.panel("frame", 0, 0, at.width, at.height, Map.of());
@@ -294,15 +302,21 @@ public final class SettingsRegistry implements SettingsApi {
                 .bounds(at.paneX, 32, at.paneW, 12)
                 .prop(ComponentType.PROP_TEXT, Glyphs.clip(selected.authors().isEmpty() ? selected.id() : selected.authors(), at.paneW))
                 .prop(ComponentType.PROP_COLOR, HINT_COLOR));
-            screen.button("tab:readme", at.paneX, TABS_Y, 70, 20, Map.of(
-                ComponentType.PROP_LABEL_KEY, "pandorical.mods.readme",
-                ComponentType.PROP_STYLE, settingsTab ? "default" : "pressed"));
-            screen.button("tab:settings", at.paneX + 74, TABS_Y, 70, 20, Map.of(
-                ComponentType.PROP_LABEL_KEY, "pandorical.mods.settings",
-                ComponentType.PROP_STYLE, settingsTab ? "pressed" : "default"));
+            int gap = 4;
+            int tabW = Math.min(70, (at.paneW - gap * (tabs.size() - 1)) / Math.max(1, tabs.size()));
+            for (int i = 0; i < tabs.size(); i++) {
+                String name = tabs.get(i);
+                screen.button("tab:" + name, at.paneX + i * (tabW + gap), TABS_Y, tabW, 20, Map.of(
+                    ComponentType.PROP_LABEL_KEY, "pandorical.mods." + name,
+                    ComponentType.PROP_STYLE, name.equals(at_tab) ? "pressed" : "default"));
+            }
 
             List<ComponentDef> about = new ArrayList<>();
-            int height = settingsTab ? settingsPane(player, selected, about, at) : readmePane(selected, about, at);
+            int height = switch (at_tab) {
+                case "settings" -> settingsPane(player, selected, about, at);
+                case "commands" -> commandsPane(player, selected, about, at);
+                default -> readmePane(selected, about, at);
+            };
             // Laid out in lines, scrolled two at a time; the scrollbar's arithmetic is in lines too.
             int lines = (height + LINE - 1) / LINE;
             int paneOffset = Math.max(0, Math.min(paneScroll.getOrDefault(player.getUUID(), 0), lines - at.paneH / LINE));
@@ -319,7 +333,7 @@ public final class SettingsRegistry implements SettingsApi {
             Map.of(ComponentType.PROP_LABEL_KEY, "pandorical.settings.close"));
 
         openScreens.put(player.getUUID(), screen.screenId());
-        shown.put(player.getUUID(), new Shown(selected == null ? null : selected.id(), settingsTab ? "settings" : "readme"));
+        shown.put(player.getUUID(), new Shown(selected == null ? null : selected.id(), at_tab));
         PandoricalApi.screens().open(player, screen.build());
     }
 
@@ -338,6 +352,55 @@ public final class SettingsRegistry implements SettingsApi {
             case CLIENT -> "Yours alone, kept by your game wherever you play.";
             case SERVER -> "One value for everyone. Ops only.";
         };
+    }
+
+    /**
+     * The commands tab: every form of every command the mod registered, one to a line, with the
+     * ones an operator alone may run marked and gathered under their own heading.
+     *
+     * <p>A command is worth nothing unheard of, and until now the only way to learn a server
+     * mod's commands was to type a slash and read the suggestions, which says the names and not
+     * what they take.
+     */
+    private int commandsPane(ServerPlayer player, ModCatalog.ModInfo mod, List<ComponentDef> out, Layout at) {
+        List<ModCommands.Entry> entries = ModCommands.of(mod.id(), player);
+        if (entries.isEmpty()) {
+            out.add(prose("none", 2, "This mod has no commands.", HINT_COLOR, at));
+            return LINE + 2;
+        }
+        boolean op = isOp(player);
+        int y = 2;
+        int n = 0;
+        for (boolean ops : new boolean[] {false, true}) {
+            List<ModCommands.Entry> section = new ArrayList<>();
+            for (ModCommands.Entry entry : entries) {
+                if (entry.ops() == ops) section.add(entry);
+            }
+            if (section.isEmpty()) continue;
+            out.add(prose("cmdhead:" + ops, y, ops ? "Operators only" : "Anyone", ops ? OPS_COLOR : HEADING_COLOR, at));
+            y += LINE + 2;
+            if (ops && !op) {
+                for (String line : Glyphs.wrap("Listed so you know they exist; the server will refuse them.", at.proseW())) {
+                    out.add(prose("cmdhint:" + n++, y, line, HINT_COLOR, at));
+                    y += LINE;
+                }
+            }
+            y += 2;
+            for (ModCommands.Entry entry : section) {
+                // Wrapped rather than clipped: a command with three arguments is longer than the
+                // pane and the arguments are the half worth reading.
+                List<String> lines = Glyphs.wrap(entry.usage(), at.proseW() - INDENT);
+                for (int i = 0; i < lines.size(); i++) {
+                    out.add(new ComponentBuilder("cmd:" + n++, ComponentType.TEXT)
+                        .bounds(i == 0 ? 0 : INDENT, y, at.proseW(), LINE)
+                        .prop(ComponentType.PROP_TEXT, lines.get(i))
+                        .prop(ComponentType.PROP_COLOR, CODE_COLOR).build());
+                    y += LINE;
+                }
+            }
+            y += 6;
+        }
+        return y;
     }
 
     /**
