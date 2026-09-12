@@ -9,12 +9,8 @@ import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 
 /**
- * A cushion blends between positions the way a structure does.
- *
- * <p>Vanilla never moves a cushion, so it never blends: a position update snaps it. Big-boats
- * carries cushions on a sailing deck and pushes their position every tick, and a cushion that
- * snaps while the deck blends has its rider a tick ahead of the boards under them. A cushion
- * that never moves is unaffected; it has nothing to blend towards.
+ * Vanilla never moves a cushion, so its position updates snap. A cushion carried on a moving
+ * structure must blend like the structure or its rider leads the deck by a tick.
  */
 @Mixin(Cushion.class)
 public abstract class CushionInterpolationMixin extends Entity {

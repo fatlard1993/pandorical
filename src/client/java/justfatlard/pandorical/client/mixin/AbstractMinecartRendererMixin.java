@@ -20,12 +20,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.objectweb.asm.Opcodes;
 
 /**
- * A minecart wears the texture the server set for it, the way a living entity already does.
- *
- * <p>Vanilla draws every cart from one texture, a private constant read once inside
- * {@code submit}. The entity is known while the state is extracted, so the overlay is looked
- * up then and stashed on the state; the constant read is then answered with the stash when
- * there is one. A copper minecart is the case: its weathering is a texture and nothing else.
+ * Vanilla draws every cart from the constant {@code MINECART_LOCATION}, read inside
+ * {@code submit}. The overlay is looked up at extraction, where the entity is known, and answers
+ * that read.
  */
 @Mixin(AbstractMinecartRenderer.class)
 public abstract class AbstractMinecartRendererMixin {
@@ -37,10 +34,7 @@ public abstract class AbstractMinecartRendererMixin {
 		((OverlayTextureHolder) state).pandorical$setOverlayTexture(EntityOverlayStore.get(entity.getId()));
 	}
 
-	/**
-	 * The state being drawn, noted as {@code submit} begins: a field read has no arguments to
-	 * carry it, and one renderer draws every cart in turn on the one render thread.
-	 */
+	/** A field-read redirect gets no arguments; submit draws carts one at a time. */
 	@Unique
 	private MinecartRenderState pandorical$drawing;
 

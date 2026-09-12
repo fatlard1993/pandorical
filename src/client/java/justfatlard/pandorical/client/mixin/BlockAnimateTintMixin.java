@@ -11,7 +11,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-/** While a painted block animates, the particles it throws are painted too. */
 @Mixin(ClientLevel.class)
 public abstract class BlockAnimateTintMixin {
 	@Redirect(method = "doAnimateTick", at = @At(value = "INVOKE",

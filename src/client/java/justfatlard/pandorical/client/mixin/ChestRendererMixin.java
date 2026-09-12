@@ -21,16 +21,9 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Lets a server say that particular chests are drawn with a different texture.
- *
- * <p>Two halves, because the two facts arrive in different places. Extraction is
- * the only point that knows which block this is, and submit is the only point
- * that picks a sprite, so extraction writes the texture onto the render state
- * and submit reads it back off.
- *
- * <p>The sprite is swapped rather than the material, because the material is a
- * closed enum. Vanilla resolves it through a single static call, which is the
- * one thing this needs to intervene in.
+ * Only extraction knows the block position and only submit picks the sprite, so the texture
+ * travels between them on the render state. The sprite is swapped because the material is a
+ * closed enum.
  */
 @Mixin(ChestRenderer.class)
 public class ChestRendererMixin {
@@ -38,8 +31,7 @@ public class ChestRendererMixin {
 	@Inject(method = "extractRenderState", at = @At("TAIL"))
 	private void pandorical$captureOverlay(BlockEntity blockEntity, ChestRenderState state, float partialTick,
 			Vec3 cameraPos, ModelFeatureRenderer.CrumblingOverlay crumbling, CallbackInfo ci) {
-		// Written every time, null included: states are pooled, and a stale value
-		// would dress the next ordinary chest that reused this one.
+		// Written every time, null included: render states are pooled and reused.
 		((ChestOverlayHolder) state).pandorical$setChestOverlay(
 			ChestOverlayStore.get(blockEntity.getBlockPos()));
 	}
@@ -53,8 +45,6 @@ public class ChestRendererMixin {
 		Identifier base = ((ChestOverlayHolder) state).pandorical$getChestOverlay();
 		if (base == null) return Sheets.chooseSprite(material, chestType);
 
-		// Vanilla splits a double chest across two textures and names them by the
-		// half they are, so the same suffixes apply to a replacement.
 		String suffix = switch (chestType) {
 			case LEFT -> "_left";
 			case RIGHT -> "_right";

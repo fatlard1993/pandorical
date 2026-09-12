@@ -13,13 +13,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * An item display whose item is marked hidden is not drawn.
- *
- * <p>For a mod that draws something better through Pandorical and keeps the item display as
- * what vanilla clients see: the display is the record and the fallback, and on a Pandorical
- * client it would be drawn twice.
- */
+/** The marked item display is the vanilla-client fallback for something Pandorical draws. */
 @Mixin(EntityRenderDispatcher.class)
 public abstract class HiddenDisplayMixin {
 	@Inject(method = "shouldRender", at = @At("HEAD"), cancellable = true)
@@ -28,7 +22,7 @@ public abstract class HiddenDisplayMixin {
 		if (!(entity instanceof Display.ItemDisplay display)) return;
 		ItemStack item = display.getSlot(0).get();
 		CustomData data = item.get(DataComponents.CUSTOM_DATA);
-		// Read in place: this runs for every item display every frame, and copyTag copies the lot
+		// Not copyTag: this runs for every item display every frame.
 		if (data != null && ((CustomDataAccessor) (Object) data).pandorical$tag().contains(BannerDecalApi.HIDDEN_ITEM_KEY)) {
 			cir.setReturnValue(false);
 		}

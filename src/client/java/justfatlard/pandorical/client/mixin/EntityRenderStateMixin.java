@@ -8,13 +8,6 @@ import org.spongepowered.asm.mixin.Unique;
 import justfatlard.pandorical.client.animation.EntityAnimations;
 import justfatlard.pandorical.client.renderer.AnimationHolder;
 
-/**
- * Merges {@link OverlayTextureHolder} onto every render state so the overlay
- * texture can travel from extraction (entity in hand) to layer submit (state
- * only). The field is rewritten on every extraction by
- * {@link LivingEntityRendererMixin}, so reuse of pooled states across entities
- * cannot leak an overlay.
- */
 @Mixin(EntityRenderState.class)
 public class EntityRenderStateMixin implements OverlayTextureHolder,
 		AnimationHolder {

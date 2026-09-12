@@ -11,19 +11,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Compact, scaled count labels for OVERSIZED stacks (100+), absorbed from
- * stackz's client so stack-size mods need no client jar at all. Vanilla-range
- * stacks keep the untouched vanilla decoration pass (count text, durability
- * bar, cooldown overlay).
- *
- * <p>For 100+ stacks the whole decoration pass is replaced with a 0.75-scale
- * label right-anchored at (x+17, y+11): the text's right edge stays fixed so
- * abbreviations never overflow into the next slot. The durability bar and
- * cooldown overlay are suppressed for those stacks only, stackz's original
- * trade-off scoped narrowly: stacks above vanilla sizes come from stack-size
- * mods, which unlock non-durability items.
- *
- * <p>Abbreviation matches stackz exactly: 1k, 15k, 1.2m, 15m, 1b.
+ * Replaces the whole decoration pass for oversized stacks, so they draw no durability bar or
+ * cooldown overlay. The label is right-anchored so it never spills into the next slot.
  */
 @Mixin(GuiGraphicsExtractor.class)
 public abstract class ItemCountRendererMixin {
@@ -46,7 +35,6 @@ public abstract class ItemCountRendererMixin {
 	)
 	private void pandorical$compactOversizedCountLabeled(Font font, ItemStack stack, int x, int y,
 			String customLabel, CallbackInfo ci) {
-		// A caller-supplied label overrides the count; leave that to vanilla
 		if (customLabel != null) return;
 		pandorical$drawCompactLabel(font, stack, x, y, ci);
 	}

@@ -9,16 +9,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Draw the skin the server asked for, where one was asked for.
- *
- * <p>Taken at the point the game asks a player what they look like, rather than anywhere in the
- * profile: a profile's skin is resolved through authlib, which only trusts texture URLs from
- * domains Mojang publishes, so a server has no way to put its own image into that answer. This is
- * downstream of all of it - by the time anything asks, the override is simply what the player is
- * wearing.
- *
- * <p>Costs one map lookup per call and returns immediately when the map is empty, which is every
- * server that never sets one.
+ * Hooked downstream of the profile because authlib resolves profile skins only from texture URLs
+ * on Mojang's domains, so a server cannot put its own image there.
  */
 @Mixin(AbstractClientPlayer.class)
 public abstract class PlayerSkinOverrideMixin {

@@ -12,14 +12,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Plays a server-declared animation on top of whatever the model just did to itself.
- *
- * <p>At the tail of the model's own posing on purpose: the animation is meant to be an addition
- * rather than a replacement, so a walking animal keeps walking and an animation that only turns the
- * head leaves the legs where the game put them.
- *
- * <p>{@code Model} is generic in an unbounded parameter, so the method erases to take an Object;
- * the state is checked rather than cast blindly.
+ * TAIL, so a server animation adds to the model's own pose rather than replacing it. The state
+ * parameter is Object because {@code Model}'s type parameter is unbounded.
  */
 @Mixin(Model.class)
 public abstract class ModelAnimationMixin {

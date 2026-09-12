@@ -6,12 +6,6 @@ import net.minecraft.resources.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
-/**
- * Merges {@link ChestOverlayHolder} onto the chest render state. Render states
- * are pooled and reused between chests, so the field is written on every
- * extraction, null included, or one marked chest would leak its texture onto
- * whichever ordinary chest reused the state next.
- */
 @Mixin(ChestRenderState.class)
 public class ChestRenderStateMixin implements ChestOverlayHolder {
 	@Unique

@@ -15,17 +15,9 @@ import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.sounds.SoundEvents;
 
 /**
- * Answers a press on one of the buttons drawn on the player's own inventory panel.
- *
- * <p><b>Not on {@code InventoryScreen}, where the drawing lives.</b> That class does not declare
- * {@code mouseClicked} - it inherits one - so an injection aimed there finds no method.
- *
- * <p>{@code AbstractRecipeBookScreen} is the class that actually declares it, and HEAD is before
- * the recipe book gets its own look at the click - which matters, because the book can answer and
- * return without ever reaching the container screen below it.
- *
- * <p>Extends the container screen for the same reason its neighbour does: purely to reach the
- * protected {@code leftPos}/{@code topPos} the buttons are anchored to.
+ * Clicks for the buttons {@link InventoryScreenMixin} draws. {@code InventoryScreen} inherits
+ * {@code mouseClicked} from this class, so the hook lives here; HEAD runs before the recipe book,
+ * which can consume the click. Extends the container screen only to reach {@code leftPos}.
  */
 @Mixin(AbstractRecipeBookScreen.class)
 public abstract class InventoryButtonClickMixin extends AbstractContainerScreen<RecipeBookMenu> {
@@ -38,7 +30,6 @@ public abstract class InventoryButtonClickMixin extends AbstractContainerScreen<
 	private void pandorical$clickInventoryButton(MouseButtonEvent click, boolean handled,
 			CallbackInfoReturnable<Boolean> cir) {
 		if (handled) return;
-		// Only the player's own inventory draws these, so only it should answer for them.
 		if (!((Object) this instanceof InventoryScreen)) return;
 
 		for (var button : ClientInventoryButtons.all()) {

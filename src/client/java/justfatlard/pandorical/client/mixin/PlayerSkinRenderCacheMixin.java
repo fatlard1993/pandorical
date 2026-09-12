@@ -13,15 +13,8 @@ import net.minecraft.client.renderer.PlayerSkinRenderCache;
 import net.minecraft.world.item.component.ResolvableProfile;
 
 /**
- * Draw the skin the server asked for on heads too.
- *
- * <p>A player entity asks {@code AbstractClientPlayer.getSkin} what it looks like; a player head
- * does not. A skull block and a head item both resolve their face here, from the profile the head
- * carries, so an override that stopped at the player would leave their head wearing Steve - which
- * on an offline server is every head there is.
- *
- * <p>Both entry points are covered: {@code getOrDefault} is what the skull renderer and the head
- * item ask, and {@code lookup} is behind the deferred form used by GUI faces.
+ * Player heads resolve their skin here, not through {@code AbstractClientPlayer.getSkin}. The
+ * skull renderer and head item call {@code getOrDefault}; GUI faces go through {@code lookup}.
  */
 @Mixin(PlayerSkinRenderCache.class)
 public abstract class PlayerSkinRenderCacheMixin {

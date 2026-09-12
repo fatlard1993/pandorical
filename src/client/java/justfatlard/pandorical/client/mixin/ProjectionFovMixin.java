@@ -7,16 +7,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 
 /**
- * Narrows the field of view when the server has asked for a closer look.
- *
- * <p>Applied to the projection rather than to the player's own options, so nothing the player set
- * is touched and nothing has to be put back: releasing the zoom is the server sending 1.0, and a
- * disconnect mid-zoom leaves no trace in anybody's settings.
- *
- * <p>The field of view is the third parameter of {@code setupPerspective(zNear, zFar, fov, width,
- * height)}, which is local slot three with {@code this} in slot zero. Worth naming, because the
- * signature is five floats and a wrong slot would silently scale the far plane instead - a world
- * that fades out a few blocks away rather than one that does not zoom.
+ * Index 3 is {@code fov} in {@code setupPerspective(zNear, zFar, fov, width, height)}, with
+ * {@code this} in slot 0. All five are floats, so a wrong index silently scales another one.
  */
 @Mixin(Projection.class)
 public class ProjectionFovMixin {

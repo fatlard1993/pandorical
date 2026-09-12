@@ -18,18 +18,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import justfatlard.pandorical.client.animation.EntityAnimations;
 import justfatlard.pandorical.client.renderer.AnimationHolder;
 
-/**
- * Two hooks that make server-pushed entity overlays render:
- *
- * <p>1. Every LivingEntityRenderer gets one {@link EntityOverlayLayer} at
- * construction; the layer is a no-op unless the render state carries an
- * overlay texture.
- *
- * <p>2. extractRenderState stashes the overlay for the entity being extracted
- * onto the state (null when none), via {@link OverlayTextureHolder}. Writing
- * unconditionally is what keeps pooled/reused states from leaking overlays
- * between entities.
- */
 @Mixin(LivingEntityRenderer.class)
 public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extends LivingEntityRenderState, M extends EntityModel<? super S>> {
 
@@ -48,11 +36,10 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extend
 		at = @At("TAIL")
 	)
 	private void pandorical$extractOverlay(T entity, S state, float partialTick, CallbackInfo ci) {
+		// Both written every time, null included: render states are pooled and reused.
 		((OverlayTextureHolder) state).pandorical$setOverlayTexture(
 			EntityOverlayStore.get(entity.getId()));
 
-		// The model is posed from the state alone, long after the entity is out of reach, so what
-		// it is playing has to travel with it.
 		((AnimationHolder) state).pandorical$setAnimation(
 			EntityAnimations.playing(entity.getId()));
 	}

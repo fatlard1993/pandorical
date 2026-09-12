@@ -19,24 +19,12 @@ import justfatlard.pandorical.client.inventory.ClientInventoryButtons;
 import net.minecraft.client.Minecraft;
 
 /**
- * Draws slot backgrounds for Pandorical's extra inventory slots.
+ * Draws backgrounds for the slots in {@link ClientInventorySlotRegistry}, which vanilla's
+ * background texture does not have.
  *
- * Vanilla only draws slot backgrounds from its background texture, so dynamically
- * added slots (map/compass at custom positions) are functional but invisible.
- * This mixin draws beveled backgrounds for every slot registered in
- * {@link ClientInventorySlotRegistry}, matching the colors used by
- * {@link justfatlard.pandorical.client.component.ItemSlotComponent}.
- *
- * Injection is at HEAD so backgrounds are drawn before items, ensuring items
- * render on top of (not underneath) the backgrounds.
- *
- * <p>Extends {@link AbstractContainerScreen} (a real superclass of the target)
- * purely to reach the protected {@code leftPos}/{@code topPos} fields: the
- * backgrounds MUST anchor to the screen's live origin, exactly like the Slot
- * objects themselves (menu-space x/y drawn and hit-tested against the live
- * origin by vanilla). Deriving the origin from centered screen math instead
- * broke when the recipe book pane shifted the panel right: the real slots and
- * their click targets moved with it, while the drawn boxes stayed centered.
+ * <p>Extends {@link AbstractContainerScreen} only to reach {@code leftPos}/{@code topPos}. Vanilla
+ * draws and hit-tests slots against that live origin, which the recipe book pane shifts, so
+ * anything positioned from screen centre drifts off its slot when the book opens.
  */
 @Environment(EnvType.CLIENT)
 @Mixin(InventoryScreen.class)
@@ -46,7 +34,6 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
         super(null, null, null);
     }
 
-    /** Button faces, matching the slot colours so the two read as one panel. */
     private static final int BUTTON_FACE  = 0xFF8B8B8B;
     private static final int BUTTON_HOVER = 0xFFA8A8A8;
     private static final int BUTTON_TEXT  = 0xFF373737;
@@ -56,14 +43,7 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
     private static final int SLOT_BORDER_LIGHT = 0xFFFFFFFF;
     private static final int SLOT_INNER        = 0xFF8B8B8B;
 
-    /**
-     * Before vanilla renders the inventory screen, draw backgrounds for every extra slot
-     * Pandorical has registered. Injecting at HEAD ensures items render on top of backgrounds.
-     *
-     * Slot positions in {@link ClientInventorySlotRegistry} are relative to the screen
-     * background origin ({@code leftPos}, {@code topPos}), so we add those offsets before
-     * calling {@code graphics.fill()} or {@code graphics.blitSprite()}.
-     */
+    /** HEAD, so vanilla draws the slot items on top of these backgrounds. */
     @Inject(method = "extractRenderState", at = @At("HEAD"))
     private void pandorical$drawExtraSlotBackgrounds(GuiGraphicsExtractor graphics,
             int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
@@ -88,13 +68,6 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
         }
     }
 
-    /**
-     * Draw the buttons this server asked for, and answer clicks on them.
-     *
-     * <p>Anchored to {@code leftPos}/{@code topPos} for the same reason the slot backgrounds
-     * are: the recipe book pane shifts the panel sideways, and anything positioned from screen
-     * centre parts company with the panel the moment it opens.
-     */
     @Inject(method = "extractRenderState", at = @At("TAIL"))
     private void pandorical$drawInventoryButtons(GuiGraphicsExtractor graphics,
             int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
@@ -112,9 +85,7 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
             graphics.fill(bx + 1, by + 1, bx + size - 1, by + size - 1,
                 over ? BUTTON_HOVER : BUTTON_FACE);
 
-            // A face is either a sprite id or a character to draw. Only the former can carry a
-            // colon, so that is the whole test - and sprite art is what these should be wearing:
-            // a font arrow is a one-pixel hairline against vanilla's chunky widgets.
+            // A face is a sprite id or a character to draw; only a sprite id contains a colon.
             String face = button.glyph();
             if (face.indexOf(':') >= 0) {
                 graphics.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.parse(face),

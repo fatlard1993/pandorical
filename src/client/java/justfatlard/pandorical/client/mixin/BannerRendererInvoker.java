@@ -11,7 +11,6 @@ import net.minecraft.world.item.DyeColor;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
-/** One pattern layer of a banner on any model, which vanilla keeps private. */
 @Mixin(BannerRenderer.class)
 public interface BannerRendererInvoker {
 	@Invoker("submitPatternLayer")
