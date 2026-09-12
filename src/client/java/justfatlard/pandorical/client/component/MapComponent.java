@@ -267,11 +267,16 @@ public class MapComponent extends AbstractComponent {
             // never have been asking the map.
             float bearing = (float) Math.toDegrees(Math.atan2(
                 compassTargetX - mc.player.getX(), -(compassTargetZ - mc.player.getZ())));
+            // Relative to the way the player faces, as a compass in the hand is and as the
+            // needle without a map already was: straight up means straight ahead. Measured from
+            // north it agreed with the map underneath and disagreed with the player, who turned
+            // and watched the needle stand still.
+            float facingFromNorth = mc.player.getYRot() + 180.0f;
 
             Matrix3x2fStack npose = graphics.pose();
             npose.pushMatrix();
             npose.translate(nx + size / 2.0f, ny + size / 2.0f);
-            npose.rotate((float) Math.toRadians(bearing));
+            npose.rotate((float) Math.toRadians(bearing - facingFromNorth));
             npose.translate(-size / 2.0f, -size / 2.0f);
             graphics.blit(RenderPipelines.GUI_TEXTURED, needleTexture, 0, 0, 0.0F, 0.0F,
                 size, size, size, size);
