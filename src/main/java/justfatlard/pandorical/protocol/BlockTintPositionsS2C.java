@@ -8,13 +8,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/**
- * Play-phase packet painting particular block positions particular colours.
- *
- * <p>Deltas, not a picture: only the positions in this packet change, and a colour of zero
- * means the position goes back to being untinted. A world can hold a lot of painted blocks and
- * nearly all of them are somewhere the player is not.
- */
+/** Deltas: only the positions in this packet change. */
 public record BlockTintPositionsS2C(List<Entry> entries) implements CustomPacketPayload {
     public static final Type<BlockTintPositionsS2C> TYPE =
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "block_tint_positions"));

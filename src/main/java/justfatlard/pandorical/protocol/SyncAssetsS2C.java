@@ -6,9 +6,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/**
- * Sends gzipped asset data (models, textures) to the client in chunks.
- */
+/** {@code data} is one chunk of the gzipped assets. */
 public record SyncAssetsS2C(
     int chunkIndex,
     int totalChunks,

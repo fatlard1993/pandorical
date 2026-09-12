@@ -6,18 +6,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/**
- * Sets or clears a per-entity texture overlay on the client. The referenced
- * entity is identified by its network id ({@code Entity.getId()}), which is
- * unique for the lifetime of a server run.
- *
- * <p>{@code texture} is the full texture identifier including extension, e.g.
- * {@code "poopsmith:textures/entity/poopsmith_gloves.png"}. An empty string
- * clears the overlay for that entity.
- *
- * <p>Only sent to clients that asserted the {@code "entity_overlays"}
- * capability in their HelloC2S, so older clients never see this payload.
- */
+/** {@code texture} is a full identifier with extension; empty clears the overlay. */
 public record EntityOverlayS2C(
     int entityId,
     String texture

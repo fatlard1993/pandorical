@@ -5,14 +5,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/**
- * Configuration-phase acknowledgment from client.
- * Sent after the client has registered all blocks/items from SyncContentConfigS2C
- * and loaded all assets from SyncAssetsConfigS2C.
- *
- * The server completes the PandoricalSyncTask upon receiving this,
- * allowing Fabric's SynchronizeRegistriesTask to run next.
- */
+/** Sent once the client has registered the synced content and loaded its assets. */
 public record ContentReadyConfigC2S() implements CustomPacketPayload {
     public static final Type<ContentReadyConfigC2S> TYPE =
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "content_ready_config"));

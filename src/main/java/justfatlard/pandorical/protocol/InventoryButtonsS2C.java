@@ -10,13 +10,8 @@ import net.minecraft.resources.Identifier;
 import io.netty.handler.codec.DecoderException;
 
 /**
- * Buttons a server mod wants on the player's own inventory screen.
- *
- * <p>Its own payload rather than another field on {@link PlayerInventoryRegistrationsS2C},
- * deliberately. Adding to that record would change bytes a client already knows how to read, and
- * a client one version behind would fail to decode the packet that gives it its extra slots -
- * losing the map and compass slots to gain a button. A separate payload is simply never sent to a
- * client that has not declared it: no buttons there, and everything else exactly as before.
+ * Separate from {@link PlayerInventoryRegistrationsS2C}, whose shape older clients decode: a client
+ * that has not declared this type is just not sent buttons.
  */
 public record InventoryButtonsS2C(List<Button> buttons) implements CustomPacketPayload {
 
@@ -24,18 +19,13 @@ public record InventoryButtonsS2C(List<Button> buttons) implements CustomPacketP
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "inventory_buttons"));
 
     /**
-     * One button.
-     *
-     * @param namespace who registered it, so a press can be routed back to them
-     * @param id        their own name for it
-     * @param screenX   offset from the inventory panel's top-left, in gui pixels
-     * @param size      width and height; these are square
-     * @param glyph     what to draw on it - a character, not a texture, so a mod needs no art
+     * @param screenX offset from the inventory panel's top-left, in GUI pixels
+     * @param size    width and height; buttons are square
+     * @param glyph   a character, drawn in place of a texture
      */
     public record Button(String namespace, String id, int screenX, int screenY, int size,
                          String glyph) {}
 
-    /** A sane ceiling: the inventory screen has room for a handful, not a toolbar. */
     private static final int MAX_BUTTONS = 32;
 
     public static final StreamCodec<ByteBuf, InventoryButtonsS2C> STREAM_CODEC =

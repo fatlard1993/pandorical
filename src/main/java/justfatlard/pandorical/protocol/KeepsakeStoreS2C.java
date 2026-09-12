@@ -7,7 +7,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/** Keep this value for this server; an empty value takes the key away. */
+/** An empty value removes the key. */
 public record KeepsakeStoreS2C(String serverId, String key, String value) implements CustomPacketPayload {
 	public static final Type<KeepsakeStoreS2C> TYPE =
 		new Type<>(Identifier.fromNamespaceAndPath("pandorical", "keepsake_store"));

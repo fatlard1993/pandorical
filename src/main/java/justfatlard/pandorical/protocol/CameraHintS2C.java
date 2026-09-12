@@ -9,10 +9,6 @@ import net.minecraft.resources.Identifier;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Server tells client to adjust camera behavior.
- * Types: "distance" (params: distance), "perspective" (params: mode), "reset"
- */
 public record CameraHintS2C(
     String hintType,
     Map<String, String> params

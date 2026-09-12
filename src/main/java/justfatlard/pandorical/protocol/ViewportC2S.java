@@ -6,12 +6,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/**
- * How big the client's window is, in the scaled pixels a screen is laid out in.
- *
- * <p>Sent after the hello and again when the window settles at a new size, so a screen the
- * server builds can fill the room it will show in rather than the least any window has.
- */
+/** In scaled pixels; sent after the hello and again when the window settles at a new size. */
 public record ViewportC2S(int width, int height) implements CustomPacketPayload {
 
     public static final Type<ViewportC2S> TYPE =

@@ -8,10 +8,6 @@ import net.minecraft.resources.Identifier;
 
 import java.util.List;
 
-/**
- * Configuration-phase packet delivering block tint registrations to the client.
- * Each entry maps a tint type to the block IDs that should use it.
- */
 public record BlockTintsConfigS2C(List<Entry> entries) implements CustomPacketPayload {
     public static final Type<BlockTintsConfigS2C> TYPE =
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "block_tints_config"));

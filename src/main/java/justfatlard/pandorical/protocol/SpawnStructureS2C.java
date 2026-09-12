@@ -8,11 +8,6 @@ import net.minecraft.resources.Identifier;
 
 import java.util.List;
 
-/**
- * Sent when a structure is spawned for a player, either via {@code StructureApi.spawn()}
- * while they already track the anchor entity, or when they start tracking an anchor entity
- * that already has a live structure attached.
- */
 public record SpawnStructureS2C(
     String structureId,
     List<StructureBlockEntry> blocks,

@@ -8,11 +8,6 @@ import net.minecraft.resources.Identifier;
 
 import java.util.List;
 
-/**
- * Incremental block delta for an existing structure: blocks added, removed, and changed
- * in place (changed entries carry their new {@link net.minecraft.world.level.block.state.BlockState}
- * the same way added entries do; the client just overwrites its stored block at that position).
- */
 public record UpdateStructureBlocksS2C(
     String structureId,
     List<StructureBlockEntry> added,

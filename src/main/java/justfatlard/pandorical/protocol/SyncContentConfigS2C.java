@@ -9,22 +9,9 @@ import net.minecraft.resources.Identifier;
 import java.util.List;
 
 /**
- * Configuration-phase content sync payload, one chunk of it.
- *
- * <p>Sends block/item definitions BEFORE Fabric's registry sync, so the client can register them
- * and Fabric assigns IDs correctly. Also carries identifier lists for the other registry types
- * (entity types, block entity types, villager professions, POI types, menu types, recipe book
- * categories) so the client can register stubs.
- *
- * <p><b>This arrives in pieces.</b> A suite large enough is a payload larger than the 8 MiB a
- * single packet may carry, and the encoder does not truncate when that happens - it throws, and
- * the join fails with no clue that size was the problem. So the blocks and items are split across
- * however many packets it takes, exactly as the assets beside them already are, and the client
- * puts them back together before registering anything.
- *
- * <p>The registry-stub lists ride along on every chunk rather than only the first. They are a few
- * hundred bytes between them, and paying that twice over is worth not having a packet whose
- * meaning depends on its position in a sequence.
+ * One chunk of the content sync: blocks and items are split to stay under vanilla's 8 MiB packet
+ * cap, and the client reassembles them before registering anything. The registry-stub lists ride
+ * on every chunk, so no chunk's meaning depends on its position.
  */
 public record SyncContentConfigS2C(
     List<SyncContentS2C.BlockEntry> blocks,

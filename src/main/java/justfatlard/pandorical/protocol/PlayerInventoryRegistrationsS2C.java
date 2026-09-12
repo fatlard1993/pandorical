@@ -11,13 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import io.netty.handler.codec.DecoderException;
 
-/**
- * Sent during the Pandorical handshake (after HelloC2S) to inform the client of all registered
- * extra inventory slot groups. The client uses this to add matching dummy slots to InventoryMenu
- * so vanilla's slot-sync protocol can populate them correctly.
- *
- * Item validators are server-only and are not included in this packet.
- */
+/** The client adds matching slots to its InventoryMenu so vanilla's slot sync can fill them. */
 public record PlayerInventoryRegistrationsS2C(
     List<SlotGroup> groups
 ) implements CustomPacketPayload {
@@ -25,22 +19,15 @@ public record PlayerInventoryRegistrationsS2C(
     public static final Type<PlayerInventoryRegistrationsS2C> TYPE =
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "player_inv_registrations"));
 
-    /** One group of extra slots registered by a single server-side namespace. */
     public record SlotGroup(
         String namespace,
         List<SlotPosition> slots
     ) {}
 
-    /**
-     * Screen position for a single slot index.
-     *
-     * @param backgroundSprite optional sprite identifier string (e.g. {@code "map-plus-plus:empty_map_slot"}),
-     *                         or {@code null} / empty string if none
-     */
+    /** @param backgroundSprite a sprite id, or null for none (empty on the wire) */
     public record SlotPosition(int slotIndex, int screenX, int screenY, @Nullable String backgroundSprite) {}
 
-    // Both counts arrive as raw VarInts in the configuration phase, before a player
-    // exists to disconnect. Size the lists by what is decoded, not by what is claimed.
+    // Counts off the wire are capped, and lists sized by what decodes, not by what is claimed.
     private static final int MAX_GROUPS = 64;
     private static final int MAX_SLOTS_PER_GROUP = 256;
 

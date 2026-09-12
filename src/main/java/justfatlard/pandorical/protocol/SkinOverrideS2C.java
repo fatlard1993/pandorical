@@ -8,17 +8,10 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
 /**
- * A skin the server wants worn, sent as the image itself.
+ * The image itself, not a URL: authlib fetches skins only from Mojang's domains. An empty image
+ * clears the override.
  *
- * <p>The bytes travel rather than a link to them because a link does not work: a client resolves a
- * profile's skin through authlib, which checks the texture URL against a list of domains it fetches
- * from Mojang, so a server offering its own skin file is refused and the player falls back to Steve.
- * Nothing a server says about that URL can change the answer. Handing over the picture is the way
- * round it - the client registers the image directly and never asks authlib anything.
- *
- * <p>An empty image means "stop overriding this player", which is how a skin is taken back off.
- *
- * @param slim the three-pixel-arm model, as opposed to the four-pixel default
+ * @param slim the three-pixel-arm model
  */
 public record SkinOverrideS2C(UUID subject, byte[] png, boolean slim) implements CustomPacketPayload {
 

@@ -7,24 +7,10 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
 /**
- * Tells one client that certain chests should be drawn with a different texture.
- *
- * <p>{@code texture} is a sprite base in the chests atlas, without the
- * {@code _left} / {@code _right} suffix and without an extension, e.g.
- * {@code "yourmod:entity/chest/hoard"}. The client appends the suffix for
- * whichever half of a double chest it is drawing. Any namespace works: the
- * vanilla chests atlas is built from a directory source, so a texture at
- * {@code assets/<namespace>/textures/entity/chest/<name>.png} is picked up
- * without touching the atlas definition.
- *
- * <p>{@code positions} are packed with {@link net.minecraft.core.BlockPos#asLong}.
- *
- * <p>Unlike entity overlays, which are broadcast to everyone tracking the
- * entity, these are per player: whether a chest is worth marking can depend on
- * who is looking at it.
- *
- * <p>Only sent to clients that asserted the {@code "chest_overlays"} capability
- * in their HelloC2S, so older clients never see this payload.
+ * {@code texture} is a sprite base in the chests atlas, with no {@code _left}/{@code _right}
+ * suffix and no extension; the client appends the suffix. The vanilla chests atlas reads a
+ * directory, so any namespace's {@code textures/entity/chest/} works. {@code positions} are
+ * {@code BlockPos.asLong}.
  */
 public record ChestOverlayS2C(
     byte op,

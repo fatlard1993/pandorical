@@ -7,7 +7,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/** Marks on blocks in one dimension: set or cleared, a few at a time or the whole set on arrival. */
 public record BlockMarksS2C(Identifier dimension, List<Entry> entries) implements CustomPacketPayload {
     public static final Type<BlockMarksS2C> TYPE =
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "block_marks"));

@@ -10,10 +10,6 @@ import io.netty.handler.codec.DecoderException;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-/**
- * Universal component descriptor. The server describes UI as a tree of these;
- * the client instantiates the matching PandoricalComponent for each one.
- */
 public record ComponentDef(
     String id,
     String type,

@@ -5,7 +5,6 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import io.netty.buffer.ByteBuf;
 
-/** A client asking for the settings screen: the options menu's button, pressed. */
 public record OpenSettingsC2S() implements CustomPacketPayload {
 
     public static final Type<OpenSettingsC2S> TYPE =

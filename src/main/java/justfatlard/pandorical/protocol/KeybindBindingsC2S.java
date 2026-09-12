@@ -8,12 +8,8 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
 /**
- * What each pooled keybind slot is bound to on this client, in the order of the pool, as the
- * client's own controls screen would name it. The server has no other way to know: the binding
- * lives in the player's options file and never leaves the client otherwise.
- *
- * <p>Sent when the server declares its slots and again after any rebind, so the mods menu shows
- * the key that is actually bound rather than the one a mod asked for.
+ * Each slot's key in pool order, named as the client's controls screen names it. The binding lives
+ * only in the client's options file.
  */
 public record KeybindBindingsC2S(
     List<String> keys

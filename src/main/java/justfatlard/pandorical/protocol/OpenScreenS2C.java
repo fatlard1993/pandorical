@@ -24,16 +24,8 @@ public record OpenScreenS2C(
 ) implements CustomPacketPayload {
 
     /**
-     * A screen that is a crafting station, and the recipe book category it works from.
-     *
-     * <p>A Pandorical screen has no vanilla recipe book and cannot have one: the book is bolted
-     * to {@code RecipeBookMenu}, and this is not one. So a station says what it is and leaves the
-     * showing to whoever is listening - the client's own book, or a mod that replaces it. Without
-     * this a fletching table could only ever browse its recipes by growing a browser of its own,
-     * which is how the last one ended up as a grid of two-letter buttons.
-     *
-     * <p>An id, not a category object: the client resolves it against its own registry, and a
-     * client that has never heard of the category simply shows nothing rather than failing.
+     * No recipe station. {@code recipeStation} is a recipe book category id, resolved on the
+     * client; a client that does not know it shows nothing.
      */
     public OpenScreenS2C(String screenId, String screenType, int width, int height,
             boolean pauseGame, String title, List<ComponentDef> components,
@@ -57,8 +49,6 @@ public record OpenScreenS2C(
             boolean pauseGame = ByteBufCodecs.BOOL.decode(buf);
             String title = ByteBufCodecs.STRING_UTF8.decode(buf);
             int compCount = ByteBufCodecs.VAR_INT.decode(buf);
-            // Never size the list from the wire: ComponentDef caps its own children and
-            // depth, but this root count was allocating before a single component decoded.
             if (compCount < 0 || compCount > MAX_ROOT_COMPONENTS) {
                 throw new DecoderException(
                     "OpenScreenS2C component count " + compCount + " exceeds " + MAX_ROOT_COMPONENTS);
@@ -75,11 +65,6 @@ public record OpenScreenS2C(
             Optional<String> recipeStation = ByteBufCodecs.BOOL.decode(buf)
                 ? Optional.of(ByteBufCodecs.STRING_UTF8.decode(buf))
                 : Optional.empty();
-            // Pass it. This read the station off the wire correctly and then dropped it on the
-            // floor, calling the eight-argument convenience constructor that defaults it to
-            // empty - so every screen arrived saying it was no kind of crafting station, and the
-            // one feature that asks (a recipe book offering to open on the bench you are stood
-            // at) was never offered on any screen, with nothing to see anywhere but its absence.
             return new OpenScreenS2C(screenId, screenType, width, height, pauseGame, title,
                 components, container, recipeStation);
         }

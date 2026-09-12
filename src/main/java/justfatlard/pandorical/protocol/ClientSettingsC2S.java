@@ -11,18 +11,12 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import java.util.LinkedHashMap;
 
-/**
- * A client's own mods and their settings, for the mod menu.
- *
- * <p>A client-side mod has no server half to declare anything, so the client declares for it:
- * who the mod is and what it can be asked, with the current answers. Sent whole after the hello,
- * and again whenever a value changes on the client's side.
- */
+/** A client's own mods and settings, sent whole after the hello and again on any change. */
 public record ClientSettingsC2S(List<Mod> mods) implements CustomPacketPayload {
     public static final Type<ClientSettingsC2S> TYPE =
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "client_settings"));
 
-    /** One setting: kind is toggle, choice or number; options carry a choice's ids and labels. */
+    /** {@code kind} is toggle, choice or number; {@code options} carry a choice's ids and labels. */
     public record Setting(String key, String label, String description, String kind,
             Map<String, String> options, int min, int max, int step, String value) {
         static final StreamCodec<ByteBuf, Setting> STREAM_CODEC = new StreamCodec<>() {
@@ -63,7 +57,7 @@ public record ClientSettingsC2S(List<Mod> mods) implements CustomPacketPayload {
         };
     }
 
-    /** A block of readme, as {@link ModCatalog.Line}: what it is, how deep, and its text. */
+    /** {@link ModCatalog.Kind} travels as its ordinal, so its order is part of the wire format. */
     static final StreamCodec<ByteBuf, ModCatalog.Line> LINE_CODEC = new StreamCodec<>() {
         @Override
         public ModCatalog.Line decode(ByteBuf buf) {
@@ -82,7 +76,6 @@ public record ClientSettingsC2S(List<Mod> mods) implements CustomPacketPayload {
         }
     };
 
-    /** One client mod: what the menu says about it, and its settings. */
     public record Mod(String id, String name, String version, String authors, String description,
             List<ModCatalog.Line> readme, List<Setting> settings) {
         static final StreamCodec<ByteBuf, Mod> STREAM_CODEC = new StreamCodec<>() {

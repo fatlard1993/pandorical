@@ -8,13 +8,8 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
 /**
- * The keys this server's keybinds would like to be on, for the ones that asked to be bound by
- * default. The client binds each slot once, if it is still unbound, and remembers having done so
- * by the keybind's id, so a player who clears it afterwards keeps it clear.
- *
- * <p>Its own payload rather than a field on {@link KeybindDeclarationsS2C}: a client from before
- * it simply never registers the type, the server sees it cannot send it, and nothing about the
- * declarations every client already reads has changed shape.
+ * The client binds each slot once, if still unbound, and remembers that by keybind id, so a
+ * player who clears it keeps it clear. A separate payload, so an older client is not sent it.
  */
 public record KeybindDefaultsS2C(List<Entry> entries) implements CustomPacketPayload {
 

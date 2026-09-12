@@ -10,12 +10,9 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.entity.BannerPatternLayers;
 
 /**
- * Play-phase packet laying banner patterns flat on blocks, or taking them off.
- *
- * <p>Deltas: only the positions in this packet change. An entry with no layers clears its
- * position. The rectangle is described from the block it is anchored to: {@code lift} up from
- * the block's bottom, {@code fromHead} in from the face the pattern's top points at, then
- * {@code length} along and {@code width} across, in blocks.
+ * Deltas: only the positions here change, and an entry with no layers clears its position. In
+ * blocks from the anchor block: {@code lift} up from its bottom, {@code fromHead} in from the face
+ * {@code toHead} names, then {@code length} along and {@code width} across.
  */
 public record BannerDecalsS2C(List<Entry> entries) implements CustomPacketPayload {
     public static final Type<BannerDecalsS2C> TYPE =

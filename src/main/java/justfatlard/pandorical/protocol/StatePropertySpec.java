@@ -9,31 +9,21 @@ import java.util.Locale;
 import java.util.StringJoiner;
 
 /**
- * One block state property as {@link SyncContentS2C.BlockEntry#stateProperties()} carries it: the
- * server writes it with {@link #encode}, the client reads it back with {@link #parse}.
+ * Wire format "name:type:rest": {@code b} boolean, {@code i} with "min:max", {@code e} with
+ * comma-separated value names. The legacy form is "name:valueCount".
  *
- * <p>Wire format: "name:type:valuesOrCount" where type is b=boolean, i=integer, e=enum
- * (comma-separated names); integers use "name:i:min:max"; legacy form is "name:valueCount".
- *
- * @param name        the property's name
- * @param type        "b", "i" or "e"; "i" when the spec names none
- * @param valueCount  how many values the property has, or -1 when the spec does not say
- * @param intMin      an integer property's lowest value, 0 unless the spec gives a range
- * @param enumValues  an enum property's comma-separated value names, otherwise null
+ * @param type        "i" when the spec names none
+ * @param valueCount  -1 when the spec does not say
+ * @param enumValues  null unless type is "e"
  */
 public record StatePropertySpec(String name, String type, int valueCount, int intMin, String enumValues) {
 
     public static String encode(Property<?> prop) {
-        // Anything that is not a boolean or an integer range is described by its value
-        // names, not by a count. An EnumProperty is the usual case, but a mod can define a
-        // Property of its own whose values read as words - and sending "i:101" for one of
-        // those would hand the client a property numbered 0..100 with the names thrown
-        // away, which is exactly the shape the client's NamedIntegerProperty exists to be
-        // rebuilt into. The names are the only part the blockstate JSON can match on.
+        // Anything but a boolean or an integer range goes by value names, which are all the
+        // blockstate JSON can match on; a mod's own word-valued Property included.
         String type = "e";
         if (prop instanceof BooleanProperty) type = "b";
         else if (prop instanceof IntegerProperty) type = "i";
-        // For enums, send the value names so the client can create matching properties
         if ("e".equals(type)) {
             var names = new StringJoiner(",");
             try {
@@ -49,8 +39,7 @@ public record StatePropertySpec(String name, String type, int valueCount, int in
             }
             return prop.getName() + ":" + type + ":" + names.toString();
         } else if ("i".equals(type) && prop instanceof IntegerProperty intProp) {
-            // Send min:max, not just a count: flower_amount [1,4] as "flower_amount:i:4"
-            // would create [0,3] on the client and fail to decode the value 4.
+            // min:max, not a count: a range not starting at 0 would shift on the client.
             int min = intProp.getPossibleValues().stream().mapToInt(Integer::intValue).min().getAsInt();
             int max = intProp.getPossibleValues().stream().mapToInt(Integer::intValue).max().getAsInt();
             return prop.getName() + ":" + type + ":" + min + ":" + max;

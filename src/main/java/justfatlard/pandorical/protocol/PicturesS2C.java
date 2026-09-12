@@ -7,10 +7,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/**
- * Play-phase packet about one entity's picture: the whole of it, some of its cells, or its
- * removal. The entity is named by its network id.
- */
 public record PicturesS2C(int entityId, Picture picture, int[] indices, byte[] values) implements CustomPacketPayload {
     public static final Type<PicturesS2C> TYPE =
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "pictures"));

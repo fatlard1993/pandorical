@@ -16,11 +16,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Encodes a {@link BlockState} as a block id string plus a property-name/property-value string
- * map, rather than as a registry-sync-dependent int id. This works for any block already known
- * to {@link BuiltInRegistries#BLOCK} on both ends, including Pandorical-registered custom
- * blocks, since those are registered into the same real registry once content sync completes;
- * without depending on both sides having assigned the same numeric id in the same order.
+ * By block id and property names, not the registry-sync-dependent numeric id, so both ends need
+ * only know the block.
  */
 public final class BlockStateCodec {
     private BlockStateCodec() {}

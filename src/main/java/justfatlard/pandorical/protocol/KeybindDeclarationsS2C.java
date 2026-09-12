@@ -9,15 +9,8 @@ import net.minecraft.resources.Identifier;
 import java.util.List;
 
 /**
- * Tells the client which pooled keybind slots this server has claimed. The
- * client only forwards presses for claimed slots, so unclaimed pool keys are
- * inert and never generate network traffic. Display names are not carried
- * here: they arrive as lang entries in the synced pandorical asset pack, so
- * the controls screen shows the server's names through the ordinary
- * translation path.
- *
- * <p>Sent after the capability handshake completes (not on raw join), only to
- * clients that asserted {@code "keybinds"}.
+ * The client forwards presses only for these slots. Their names arrive as lang entries in the
+ * synced asset pack, not here.
  */
 public record KeybindDeclarationsS2C(
     List<Integer> claimedSlots

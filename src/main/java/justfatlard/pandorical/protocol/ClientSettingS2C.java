@@ -6,7 +6,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/** A client-side setting the player changed from the mod menu, handed back to the client to apply. */
 public record ClientSettingS2C(String modId, String key, String value) implements CustomPacketPayload {
     public static final Type<ClientSettingS2C> TYPE =
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "client_setting"));

@@ -7,9 +7,6 @@ import net.minecraft.network.codec.StreamCodec;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Partial property update for a live component. Only changed props are sent.
- */
 public record ComponentUpdate(
     String componentId,
     Map<String, String> changedProps

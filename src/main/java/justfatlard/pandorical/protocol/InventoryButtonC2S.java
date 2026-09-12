@@ -6,12 +6,6 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/**
- * A press on one of the buttons from {@link InventoryButtonsS2C}.
- *
- * <p>Not a screen action: those are checked against the pandorical screen the player has open,
- * and the whole point of these is that they live on the vanilla inventory, which is nobody's.
- */
 public record InventoryButtonC2S(String namespace, String id) implements CustomPacketPayload {
 
     public static final Type<InventoryButtonC2S> TYPE =

@@ -8,12 +8,7 @@ import net.minecraft.resources.Identifier;
 
 import java.util.List;
 
-/**
- * Syncs custom block and item definitions to the client on join.
- * Also includes identifier lists for other registry types (entity types,
- * block entity types, villager professions, POI types, menu types,
- * recipe book categories) so the client can register stubs.
- */
+/** The play-phase fallback of {@link SyncContentConfigS2C}. */
 public record SyncContentS2C(
     List<BlockEntry> blocks,
     List<ItemEntry> items,
@@ -37,49 +32,23 @@ public record SyncContentS2C(
         List<Integer> stateIds,
         byte[] shapeData,
         /*
-         * Light given off, one byte per state in the block's own state order.
-         *
-         * <p>Light is the client's to compute, from its own copy of the block, and a stand-in
-         * copied from a base block gives off what the base does: nothing, for nearly all of
-         * them. A torch sharing a slab's block was dark on every client while the server
-         * believed it lit. Sent per state because that is how the game caches it - each state
-         * fixes its emission as it is built - and the stand-in's states are built from this.
+         * Light emitted, one byte per state in the block's own state order. The client computes
+         * light from its stand-in, which otherwise emits what its base block does.
          */
         byte[] lightData,
         /*
-         * Whether this block carries players up it.
-         *
-         * <p>Climbing is decided by the client, off {@code #minecraft:climbable}, and a tag is a
-         * poor thing to depend on for a block the client only learns about here: tag membership
-         * travels as numeric registry ids against a registry these stand-ins are appended to at
-         * connection time. Sending the fact outright costs a bit and needs no such agreement.
+         * The client decides climbing off {@code #minecraft:climbable}, whose membership travels as
+         * numeric ids in a registry these stand-ins are appended to at connection time.
          */
         boolean climbable,
         /*
-         * Whether a right-click on this block is the server's business.
-         *
-         * <p>Without it the client predicts a block placement against anything it has no
-         * behaviour for, which is every synced block. See {@code BlockRegistration#interactive}.
+         * Without it the client predicts a placement against a right-click on any synced block.
+         * See {@code BlockRegistration#interactive}.
          */
         boolean interactive,
-        /*
-         * How long this block takes to break, or a negative number to keep the base block's.
-         *
-         * <p>Sent because breaking is predicted on the client, off the stand-in's properties, while
-         * everything the server decides is measured against the real block. A stand-in whose
-         * hardness differs breaks at a different speed than the server thinks it does - the two
-         * disagree for the whole dig, and any progress bar drawn from the server's side disagrees
-         * with the player's own screen.
-         */
+        /* Negative keeps the base block's. The client predicts breaking off the stand-in. */
         float destroyTime,
-        /*
-         * Whether the client should apply the wrong-tool penalty, or -1 to keep the base block's.
-         *
-         * <p>Its own field rather than part of the base block, because it is the larger of the two
-         * mining mismatches: a stand-in that wants a pickaxe predicts roughly five times the dig
-         * a server that does not care will actually perform. Sent as a tri-state so a block that
-         * has no opinion still inherits, which is nearly all of them.
-         */
+        /* 1 applies the wrong-tool penalty, 0 does not, -1 keeps the base block's. */
         int requiresCorrectTool
     ) {
         public static final StreamCodec<ByteBuf, BlockEntry> STREAM_CODEC = new StreamCodec<>() {
@@ -112,8 +81,7 @@ public record SyncContentS2C(
                 ByteBufCodecs.BOOL.encode(buf, value.climbable());
                 ByteBufCodecs.BOOL.encode(buf, value.interactive());
                 ByteBufCodecs.FLOAT.encode(buf, value.destroyTime());
-                // Shifted by one so the "no opinion" case is zero rather than a negative, which
-                // VAR_INT spends five bytes on.
+                // Shifted by one: VAR_INT spends five bytes on a negative.
                 ByteBufCodecs.VAR_INT.encode(buf, value.requiresCorrectTool() + 1);
             }
         };

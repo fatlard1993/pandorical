@@ -6,11 +6,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/**
- * Pushes a new world position/yaw for a structure. The client interpolates towards this pose
- * from the previously known one rather than snapping, so the sender should call this roughly
- * once per server tick while the structure is moving for smooth client-side motion.
- */
+/** The client interpolates toward this pose, so a moving structure sends one about every tick. */
 public record UpdateStructurePoseS2C(
     String structureId,
     double x,

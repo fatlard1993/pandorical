@@ -6,11 +6,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/**
- * Shows or hides a structure without discarding its client-side block/pose state;
- * e.g. hide a ship's virtual structure while it's docked and its real placed-world blocks
- * are visible instead.
- */
+/** Hiding keeps the client's block and pose state. */
 public record SetStructureVisibleS2C(
     String structureId,
     boolean visible

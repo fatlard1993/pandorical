@@ -6,13 +6,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
-/**
- * Configuration-phase asset sync payload.
- * Sends gzipped asset data (models, textures) during the configuration phase
- * so blocks/items are fully set up before Fabric's registry sync.
- *
- * Same data format as SyncAssetsS2C but registered on the configuration channel.
- */
+/** Same format as {@link SyncAssetsS2C}, on the configuration channel. */
 public record SyncAssetsConfigS2C(
     int chunkIndex,
     int totalChunks,

@@ -9,10 +9,6 @@ import net.minecraft.resources.Identifier;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Universal client-to-server UI interaction. Replaces per-mod payload types.
- * The server routes by screenType + componentId.
- */
 public record ScreenActionC2S(
     String screenId,
     String componentId,
