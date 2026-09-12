@@ -1,17 +1,9 @@
-// Applied by the mods that compile against Pandorical's API but only suggest it at runtime.
-// A mod that depends on Pandorical outright includes it as a subproject instead; DEVELOPMENT.md
-// has both.
+// For mods that compile against Pandorical's API but only suggest it at runtime, where the classes
+// that touch it sit behind FabricLoader.isModLoaded. A mod that depends on it outright includes it
+// as a subproject instead (see DEVELOPMENT.md).
 //
-// Pandorical is a BUILD-TIME REQUIREMENT and a RUNTIME OPTION for these mods. They name
-// Pandorical types directly, so javac needs the jar; at runtime the classes that touch it sit
-// behind FabricLoader.isModLoaded and are never loaded without it.
-//
-// The requirement is unconditional, so a missing jar stops the build with the command that makes
-// it, rather than a wall of "package justfatlard.pandorical does not exist".
-//
-// The jar is named by the version Pandorical declares, and refused when Pandorical's source is
-// newer than it: either way a stale jar would otherwise compile green against an API that has
-// since moved.
+// A missing jar, or one older than Pandorical's source, stops the build with the command that
+// rebuilds it: a stale jar would compile green against an API that has since moved.
 
 def pandoricalRoot = project.file("../pandorical")
 def pandoricalProperties = new File(pandoricalRoot, "gradle.properties")
