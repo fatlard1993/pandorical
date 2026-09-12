@@ -1,9 +1,9 @@
 package justfatlard.pandorical.client.component;
 
+import justfatlard.pandorical.protocol.ComponentDef;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.util.Map;
-import justfatlard.pandorical.protocol.ComponentDef;
 
 public class PanelComponent extends AbstractComponent {
     private int background;

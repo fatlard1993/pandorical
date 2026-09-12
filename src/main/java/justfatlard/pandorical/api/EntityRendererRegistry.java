@@ -1,11 +1,11 @@
 package justfatlard.pandorical.api;
 
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.EntityType;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import net.minecraft.core.registries.BuiltInRegistries;
 
 public final class EntityRendererRegistry {
     private EntityRendererRegistry() {}

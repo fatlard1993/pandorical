@@ -1,9 +1,10 @@
 package justfatlard.pandorical.api;
 
-import java.util.Collection;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.Collection;
 
 /**
  * Particular chests drawn with a different texture, per player.

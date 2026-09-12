@@ -3,9 +3,9 @@ package justfatlard.pandorical.client.component;
 import justfatlard.pandorical.protocol.ComponentDef;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.HashSet;
 
 /** Draws a grid of slot frames and moves the menu's vanilla Slots into them. */
 public class InventoryGridComponent extends AbstractComponent {

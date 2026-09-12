@@ -1,6 +1,5 @@
 package justfatlard.pandorical.push;
 
-import java.util.Collection;
 import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.ChestOverlayApi;
 import justfatlard.pandorical.api.PandoricalApi;
@@ -9,6 +8,8 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.Collection;
 
 public final class ChestOverlays implements ChestOverlayApi {
 	public static final ChestOverlays INSTANCE = new ChestOverlays();

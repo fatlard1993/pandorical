@@ -1,15 +1,16 @@
 package justfatlard.pandorical.client.component;
 
-import java.util.Map;
-import java.util.UUID;
 import justfatlard.pandorical.api.ComponentType;
+import justfatlard.pandorical.client.skin.SkinOverrides;
+import justfatlard.pandorical.protocol.ComponentDef;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.PlayerFaceExtractor;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.world.entity.player.PlayerSkin;
-import justfatlard.pandorical.client.skin.SkinOverrides;
-import justfatlard.pandorical.protocol.ComponentDef;
+
+import java.util.Map;
+import java.util.UUID;
 
 /** See {@link ComponentType#PLAYER_FACE}. The skin is looked up every frame: it downloads late. */
 public class PlayerFaceComponent extends AbstractComponent {

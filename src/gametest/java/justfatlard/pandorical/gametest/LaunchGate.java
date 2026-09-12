@@ -2,15 +2,6 @@ package justfatlard.pandorical.gametest;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 import justfatlard.pandorical.api.HudBuilder;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.ScreenBuilder;
@@ -29,6 +20,16 @@ import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.Mixins;
 import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.Annotations;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 /** Pandorical launches, applies every mixin, joins a world, and shows a screen and a HUD. */
 public final class LaunchGate implements FabricClientGameTest {

@@ -1,7 +1,5 @@
 package justfatlard.pandorical.client.contextmodel;
 
-import java.util.HashMap;
-import java.util.Map;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.model.loading.v1.ExtraModelKey;
@@ -19,6 +17,9 @@ import net.minecraft.world.level.block.PipeBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.DoorHingeSide;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * A fence arm ends aimed at the middle of the door's block, but the panel hugs its far edge, so a

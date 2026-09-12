@@ -1,5 +1,6 @@
 package justfatlard.pandorical.client.screen;
 
+import justfatlard.pandorical.api.NavigableScreen;
 import justfatlard.pandorical.client.component.*;
 import justfatlard.pandorical.protocol.ComponentDef;
 import justfatlard.pandorical.protocol.ComponentUpdate;
@@ -11,7 +12,6 @@ import org.joml.Matrix3x2fStack;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import justfatlard.pandorical.api.NavigableScreen;
 
 /** Component tree logic shared by PandoricalScreen and PandoricalContainerScreen. */
 public final class ScreenHelper {

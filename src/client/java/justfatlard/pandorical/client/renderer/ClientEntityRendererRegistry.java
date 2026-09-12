@@ -5,6 +5,7 @@ import justfatlard.pandorical.api.EntityRendererRegistry;
 import justfatlard.pandorical.protocol.EntityRenderersS2C;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.EntityRenderers;
 import net.minecraft.client.renderer.entity.NoopRenderer;
@@ -17,7 +18,6 @@ import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import net.minecraft.client.Minecraft;
 
 /** {@link EntityRenderers#register} is private, so this writes {@code PROVIDERS} by reflection. */
 @Environment(EnvType.CLIENT)

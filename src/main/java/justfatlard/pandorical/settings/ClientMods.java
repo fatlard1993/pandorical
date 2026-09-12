@@ -1,17 +1,17 @@
 package justfatlard.pandorical.settings;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.SettingsApi;
 import justfatlard.pandorical.protocol.ClientSettingS2C;
 import justfatlard.pandorical.protocol.ClientSettingsC2S;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 

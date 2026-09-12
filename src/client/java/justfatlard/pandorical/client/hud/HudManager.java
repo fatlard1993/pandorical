@@ -6,9 +6,9 @@ import justfatlard.pandorical.client.component.PandoricalComponent;
 import justfatlard.pandorical.client.screen.ScreenHelper;
 import justfatlard.pandorical.protocol.ComponentDef;
 import justfatlard.pandorical.protocol.ComponentUpdate;
+import justfatlard.pandorical.protocol.HideHudS2C;
 import justfatlard.pandorical.protocol.ShowHudS2C;
 import justfatlard.pandorical.protocol.UpdateHudS2C;
-import justfatlard.pandorical.protocol.HideHudS2C;
 import net.minecraft.client.Minecraft;
 
 import java.util.ArrayList;

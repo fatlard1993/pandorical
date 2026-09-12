@@ -1,5 +1,6 @@
 package justfatlard.pandorical.client.component;
 
+import justfatlard.pandorical.protocol.ComponentDef;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -9,7 +10,6 @@ import net.minecraft.world.item.Items;
 
 import java.util.Map;
 import java.util.Optional;
-import justfatlard.pandorical.protocol.ComponentDef;
 
 public class ItemIconComponent extends AbstractComponent {
     private ItemStack stack = ItemStack.EMPTY;

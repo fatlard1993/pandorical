@@ -1,8 +1,5 @@
 package justfatlard.pandorical.rail;
 
-import java.util.EnumMap;
-import java.util.Map;
-
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -12,7 +9,10 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.EntityCollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+
+import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.function.IntFunction;
 
 /**

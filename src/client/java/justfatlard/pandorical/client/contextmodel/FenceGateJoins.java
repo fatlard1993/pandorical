@@ -1,8 +1,7 @@
 package justfatlard.pandorical.client.contextmodel;
 
+import justfatlard.pandorical.BlockMarkLookup;
 import justfatlard.pandorical.api.BlockMarkApi;
-import java.util.HashMap;
-import java.util.Map;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.model.loading.v1.ExtraModelKey;
@@ -16,7 +15,9 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import justfatlard.pandorical.BlockMarkLookup;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Gates side by side drawn as one wide gate, from

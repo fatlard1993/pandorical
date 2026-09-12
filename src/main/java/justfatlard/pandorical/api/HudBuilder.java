@@ -4,9 +4,9 @@ import justfatlard.pandorical.protocol.ComponentDef;
 import justfatlard.pandorical.protocol.ShowHudS2C;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 
 public class HudBuilder {
 	private final String overlayId;

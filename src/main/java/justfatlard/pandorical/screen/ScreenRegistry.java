@@ -1,13 +1,5 @@
 package justfatlard.pandorical.screen;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.PandoricalApi;
@@ -22,6 +14,15 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.crafting.display.RecipeDisplayId;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 public final class ScreenRegistry implements ScreenApi {
 	public static final ScreenRegistry INSTANCE = new ScreenRegistry();

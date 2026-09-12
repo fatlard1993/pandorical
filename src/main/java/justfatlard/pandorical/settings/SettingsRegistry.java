@@ -1,17 +1,6 @@
 package justfatlard.pandorical.settings;
 
 import justfatlard.pandorical.api.Capabilities;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.Objects;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
 import justfatlard.pandorical.api.ComponentBuilder;
 import justfatlard.pandorical.api.ComponentType;
 import justfatlard.pandorical.api.PandoricalApi;
@@ -23,9 +12,21 @@ import justfatlard.pandorical.protocol.ComponentUpdate;
 import justfatlard.pandorical.screen.Viewport;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.level.ServerPlayer;
-import java.util.Comparator;
-import java.util.Locale;
 import net.minecraft.server.permissions.Permissions;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 public final class SettingsRegistry implements SettingsApi {
     public static final String SCREEN_TYPE = "pandorical:settings";

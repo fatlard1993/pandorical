@@ -1,10 +1,11 @@
 package justfatlard.pandorical.screen;
 
+import justfatlard.pandorical.protocol.ViewportC2S;
+import net.minecraft.server.level.ServerPlayer;
+
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import justfatlard.pandorical.protocol.ViewportC2S;
-import net.minecraft.server.level.ServerPlayer;
 
 /** {@link #LEAST}, the smallest window vanilla allows at any GUI scale, stands until the client says. */
 public record Viewport(int width, int height) {

@@ -1,6 +1,7 @@
 package justfatlard.pandorical.protocol;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.DecoderException;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -9,7 +10,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
-import io.netty.handler.codec.DecoderException;
 
 /** The client adds matching slots to its InventoryMenu so vanilla's slot sync can fill them. */
 public record PlayerInventoryRegistrationsS2C(

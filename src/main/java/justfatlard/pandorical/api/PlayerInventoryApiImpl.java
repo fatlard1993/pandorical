@@ -2,20 +2,20 @@ package justfatlard.pandorical.api;
 
 import com.mojang.serialization.Codec;
 import justfatlard.pandorical.Pandorical;
+import justfatlard.pandorical.protocol.InventoryButtonsS2C;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentRegistry;
 import net.fabricmc.fabric.api.attachment.v1.AttachmentType;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.NonNullList;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
-import justfatlard.pandorical.protocol.InventoryButtonsS2C;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
 public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
 

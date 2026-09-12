@@ -1,6 +1,5 @@
 package justfatlard.pandorical.mixin;
 
-import java.util.List;
 import justfatlard.pandorical.drops.DropsPolicy;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -15,6 +14,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.util.List;
 
 /**
  * XP orbs of any value clump into one, and a touch takes a whole orb. See DropsPolicy.

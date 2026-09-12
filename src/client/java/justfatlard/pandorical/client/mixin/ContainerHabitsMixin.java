@@ -1,15 +1,13 @@
 package justfatlard.pandorical.client.mixin;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import justfatlard.pandorical.client.screen.NavigationScroll;
 import justfatlard.pandorical.client.settings.ContainerHabits;
-
-import java.util.HashSet;
-import java.util.Set;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerInput;
-import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
@@ -17,7 +15,9 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-import justfatlard.pandorical.client.screen.NavigationScroll;
+
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * The wheel moves one item across; an empty-hand drag moves every stack it crosses. Both are

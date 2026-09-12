@@ -1,16 +1,15 @@
 package justfatlard.pandorical.client.mixin;
 
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-
+import justfatlard.pandorical.client.skin.SkinOverrides;
+import net.minecraft.client.renderer.PlayerSkinRenderCache;
+import net.minecraft.world.item.component.ResolvableProfile;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import justfatlard.pandorical.client.skin.SkinOverrides;
-import net.minecraft.client.renderer.PlayerSkinRenderCache;
-import net.minecraft.world.item.component.ResolvableProfile;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Player heads resolve their skin here, not through {@code AbstractClientPlayer.getSkin}. The

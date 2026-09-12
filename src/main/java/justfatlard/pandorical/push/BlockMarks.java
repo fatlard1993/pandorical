@@ -1,10 +1,5 @@
 package justfatlard.pandorical.push;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import justfatlard.pandorical.api.BlockMarkApi;
 import justfatlard.pandorical.protocol.BlockMarksS2C;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -13,6 +8,12 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class BlockMarks implements BlockMarkApi {
 	public static final BlockMarks INSTANCE = new BlockMarks();

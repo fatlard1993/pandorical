@@ -1,5 +1,7 @@
 package justfatlard.pandorical.client.mixin;
 
+import justfatlard.pandorical.client.animation.EntityAnimations;
+import justfatlard.pandorical.client.renderer.AnimationHolder;
 import justfatlard.pandorical.client.renderer.EntityOverlayLayer;
 import justfatlard.pandorical.client.renderer.EntityOverlayStore;
 import justfatlard.pandorical.client.renderer.OverlayTextureHolder;
@@ -15,8 +17,6 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import justfatlard.pandorical.client.animation.EntityAnimations;
-import justfatlard.pandorical.client.renderer.AnimationHolder;
 
 @Mixin(LivingEntityRenderer.class)
 public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extends LivingEntityRenderState, M extends EntityModel<? super S>> {

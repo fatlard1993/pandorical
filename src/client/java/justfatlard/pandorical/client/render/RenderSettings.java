@@ -2,10 +2,11 @@ package justfatlard.pandorical.client.render;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import justfatlard.pandorical.Pandorical;
 import net.fabricmc.loader.api.FabricLoader;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public final class RenderSettings {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();

@@ -1,9 +1,9 @@
 package justfatlard.pandorical.protocol;
 
+import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
-import io.netty.buffer.ByteBuf;
 
 public record OpenSettingsC2S() implements CustomPacketPayload {
 

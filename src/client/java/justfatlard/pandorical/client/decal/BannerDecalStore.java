@@ -1,10 +1,10 @@
 package justfatlard.pandorical.client.decal;
 
+import justfatlard.pandorical.protocol.BannerDecalsS2C;
+
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
-import justfatlard.pandorical.protocol.BannerDecalsS2C;
 
 public final class BannerDecalStore {
 	private BannerDecalStore() {}

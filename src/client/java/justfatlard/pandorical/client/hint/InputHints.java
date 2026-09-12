@@ -1,11 +1,12 @@
 package justfatlard.pandorical.client.hint;
 
-import java.util.function.Function;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.locale.Language;
+
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * While a pad is in use, a translation {@code key} with a {@code key.controller} line reads that

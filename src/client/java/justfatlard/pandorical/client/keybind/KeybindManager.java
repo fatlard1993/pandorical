@@ -8,16 +8,17 @@ import justfatlard.pandorical.protocol.KeyPressC2S;
 import justfatlard.pandorical.protocol.KeyReleaseC2S;
 import justfatlard.pandorical.protocol.KeybindBindingsC2S;
 import justfatlard.pandorical.protocol.KeybindDeclarationsS2C;
+import justfatlard.pandorical.protocol.KeybindDefaultsS2C;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.resources.Identifier;
 
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,9 +26,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
-import justfatlard.pandorical.protocol.KeybindDefaultsS2C;
-import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.input.KeyEvent;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A fixed pool of rebindable KeyMappings, registered at client startup (the only time the options

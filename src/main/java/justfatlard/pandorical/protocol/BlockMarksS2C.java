@@ -1,11 +1,12 @@
 package justfatlard.pandorical.protocol;
 
 import io.netty.buffer.ByteBuf;
-import java.util.List;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+
+import java.util.List;
 
 public record BlockMarksS2C(Identifier dimension, List<Entry> entries) implements CustomPacketPayload {
     public static final Type<BlockMarksS2C> TYPE =

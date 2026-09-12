@@ -1,13 +1,5 @@
 package justfatlard.pandorical.login;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.KeepsakeApi;
 import justfatlard.pandorical.protocol.KeepsakeStoreS2C;
@@ -21,6 +13,15 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ConfigurationTask;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import net.minecraft.util.Util;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 public final class Keepsakes implements KeepsakeApi {
 	public static final Keepsakes INSTANCE = new Keepsakes();

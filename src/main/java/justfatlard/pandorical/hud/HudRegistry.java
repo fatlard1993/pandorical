@@ -1,12 +1,5 @@
 package justfatlard.pandorical.hud;
 
-import java.util.Collection;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.HudApi;
@@ -18,6 +11,14 @@ import justfatlard.pandorical.protocol.ShowHudS2C;
 import justfatlard.pandorical.protocol.UpdateHudS2C;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class HudRegistry implements HudApi {
 	public static final HudRegistry INSTANCE = new HudRegistry();

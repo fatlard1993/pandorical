@@ -1,7 +1,5 @@
 package justfatlard.pandorical.gametest;
 
-import java.lang.reflect.Field;
-import java.util.List;
 import justfatlard.pandorical.drops.DropsPolicy;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -24,6 +22,9 @@ import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+
+import java.lang.reflect.Field;
+import java.util.List;
 
 /** The drops fixes do what DropsApi says with each on, and nothing with each off. */
 public final class DropsFixes implements FabricClientGameTest {

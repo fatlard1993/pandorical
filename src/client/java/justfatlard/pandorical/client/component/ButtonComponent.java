@@ -1,14 +1,14 @@
 package justfatlard.pandorical.client.component;
 
+import justfatlard.pandorical.api.ComponentType;
 import justfatlard.pandorical.protocol.ComponentDef;
-import net.minecraft.world.scores.TeamColor;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.scores.TeamColor;
 
 import java.util.Map;
-import justfatlard.pandorical.api.ComponentType;
 
 /** Clickable button that sends a ScreenActionC2S on click. */
 public class ButtonComponent extends AbstractComponent {

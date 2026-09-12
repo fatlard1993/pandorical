@@ -1,15 +1,15 @@
 package justfatlard.pandorical.protocol;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.DecoderException;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import io.netty.handler.codec.DecoderException;
-import java.util.ArrayList;
 
 public record OpenScreenS2C(
     String screenId,

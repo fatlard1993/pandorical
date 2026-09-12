@@ -6,10 +6,10 @@ import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.protocol.SyncAssetsConfigS2C;
 import justfatlard.pandorical.protocol.SyncContentConfigS2C;
 import justfatlard.pandorical.protocol.SyncContentS2C;
+import net.fabricmc.fabric.api.networking.v1.ServerConfigurationNetworking;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.network.ConfigurationTask;
-import net.fabricmc.fabric.api.networking.v1.ServerConfigurationNetworking;
 
 import java.util.ArrayList;
 import java.util.List;

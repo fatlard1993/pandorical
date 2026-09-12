@@ -1,7 +1,5 @@
 package justfatlard.pandorical.push;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import justfatlard.pandorical.api.AnimationApi;
 import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.PandoricalApi;
@@ -10,6 +8,9 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class PlayingAnimations implements AnimationApi {
 	public static final PlayingAnimations INSTANCE = new PlayingAnimations();

@@ -2,7 +2,6 @@ package justfatlard.pandorical.client.decal;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
-
 import justfatlard.pandorical.client.mixin.BannerRendererInvoker;
 import justfatlard.pandorical.protocol.BannerDecalsS2C;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;

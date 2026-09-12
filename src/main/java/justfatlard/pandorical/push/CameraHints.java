@@ -1,12 +1,13 @@
 package justfatlard.pandorical.push;
 
-import java.util.Map;
 import justfatlard.pandorical.api.CameraApi;
 import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.protocol.CameraHintS2C;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.Map;
 
 public final class CameraHints implements CameraApi {
 	public static final CameraHints INSTANCE = new CameraHints();

@@ -1,13 +1,14 @@
 package justfatlard.pandorical.push;
 
-import java.util.Collection;
-import java.util.List;
 import justfatlard.pandorical.api.BannerDecalApi;
 import justfatlard.pandorical.protocol.BannerDecalsS2C;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BannerPatternLayers;
+
+import java.util.Collection;
+import java.util.List;
 
 public final class BannerDecals implements BannerDecalApi {
 	public static final BannerDecals INSTANCE = new BannerDecals();

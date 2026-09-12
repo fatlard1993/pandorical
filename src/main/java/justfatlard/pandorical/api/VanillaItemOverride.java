@@ -1,8 +1,9 @@
 package justfatlard.pandorical.api;
 
+import net.fabricmc.loader.api.FabricLoader;
+
 import java.io.IOException;
 import java.nio.file.Files;
-import net.fabricmc.loader.api.FabricLoader;
 
 public class VanillaItemOverride {
     private String displayName = null;

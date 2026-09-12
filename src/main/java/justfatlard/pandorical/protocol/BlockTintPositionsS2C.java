@@ -1,12 +1,12 @@
 package justfatlard.pandorical.protocol;
 
-import java.util.List;
-
 import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+
+import java.util.List;
 
 /** Deltas: only the positions in this packet change. */
 public record BlockTintPositionsS2C(List<Entry> entries) implements CustomPacketPayload {

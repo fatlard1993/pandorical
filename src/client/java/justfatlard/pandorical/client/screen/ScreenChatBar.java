@@ -1,5 +1,6 @@
 package justfatlard.pandorical.client.screen;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
@@ -7,7 +8,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
-import com.mojang.blaze3d.platform.InputConstants;
 
 /**
  * Chat input inside a Pandorical screen, since vanilla's chat screen would close it, and closing a

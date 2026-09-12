@@ -1,8 +1,9 @@
 package justfatlard.pandorical.client.diag;
 
-import java.util.Map;
 import justfatlard.pandorical.Diagnostics;
+
 import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**

@@ -1,5 +1,6 @@
 package justfatlard.pandorical.client.screen;
 
+import justfatlard.pandorical.api.NavigableScreen;
 import justfatlard.pandorical.client.component.*;
 import justfatlard.pandorical.protocol.ComponentUpdate;
 import justfatlard.pandorical.protocol.OpenScreenS2C;
@@ -12,7 +13,6 @@ import net.minecraft.network.chat.Component;
 
 import java.util.List;
 import java.util.Map;
-import justfatlard.pandorical.api.NavigableScreen;
 
 public class PandoricalScreen extends Screen implements NavigableScreen {
     private final OpenScreenS2C screenDef;

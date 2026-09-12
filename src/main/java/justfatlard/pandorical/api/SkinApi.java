@@ -1,9 +1,9 @@
 package justfatlard.pandorical.api;
 
-import java.util.UUID;
-
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.UUID;
 
 /**
  * The skin a player is seen wearing, e.g. on an offline-mode server where profiles carry none.

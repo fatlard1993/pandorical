@@ -2,19 +2,20 @@ package justfatlard.pandorical.login;
 
 import io.netty.channel.Channel;
 import io.netty.handler.timeout.ReadTimeoutHandler;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.util.Collections;
-import java.util.Map;
-import java.util.WeakHashMap;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.mixin.ConnectionChannelAccessor;
 import net.minecraft.network.Connection;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import net.minecraft.util.Util;
+
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import net.minecraft.network.chat.Component;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 /**
  * Time for a slow client to take in the content sync. Taking it in means a resource reload, during

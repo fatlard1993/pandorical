@@ -1,11 +1,12 @@
 package justfatlard.pandorical.mixin;
 
+import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.PlayerInventoryApi;
 import justfatlard.pandorical.api.PlayerInventoryApiImpl;
-import justfatlard.pandorical.api.PandoricalApi;
 import net.minecraft.core.NonNullList;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
+import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -22,7 +23,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import net.minecraft.world.ContainerHelper;
 
 @Mixin(InventoryMenu.class)
 public abstract class InventoryMenuMixin extends AbstractContainerMenu {

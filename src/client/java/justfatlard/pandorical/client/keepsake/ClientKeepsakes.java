@@ -2,16 +2,6 @@ package justfatlard.pandorical.client.keepsake;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HashMap;
-import java.util.HexFormat;
-import java.util.Locale;
-import java.util.Map;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.KeepsakeApi;
 import justfatlard.pandorical.client.mixin.ClientCommonListenerAccessor;
@@ -24,6 +14,17 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.network.Connection;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
+import java.util.HexFormat;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * One keepsake file per server id and address the player connected to. Not the id alone: any

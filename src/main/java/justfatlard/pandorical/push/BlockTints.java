@@ -1,15 +1,16 @@
 package justfatlard.pandorical.push;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
 import justfatlard.pandorical.api.BlockTintApi;
 import justfatlard.pandorical.protocol.BlockTintPositionsS2C;
 import justfatlard.pandorical.protocol.BlockTintsConfigS2C;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 
 public final class BlockTints implements BlockTintApi {
 	public static final BlockTints INSTANCE = new BlockTints();

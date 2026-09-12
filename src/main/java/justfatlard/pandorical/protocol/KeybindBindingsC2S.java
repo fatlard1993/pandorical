@@ -1,11 +1,12 @@
 package justfatlard.pandorical.protocol;
 
 import io.netty.buffer.ByteBuf;
-import java.util.List;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+
+import java.util.List;
 
 /**
  * Each slot's key in pool order, named as the client's controls screen names it. The binding lives

@@ -1,13 +1,14 @@
 package justfatlard.pandorical.protocol;
 
 import io.netty.buffer.ByteBuf;
-import java.util.HashMap;
-import java.util.Map;
 import justfatlard.pandorical.api.KeepsakeApi;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public record KeepsakesConfigC2S(Map<String, String> values) implements CustomPacketPayload {
 	public static final Type<KeepsakesConfigC2S> TYPE =

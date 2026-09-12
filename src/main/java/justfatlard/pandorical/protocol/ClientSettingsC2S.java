@@ -1,15 +1,15 @@
 package justfatlard.pandorical.protocol;
 
-import java.util.List;
-import java.util.Map;
-
 import io.netty.buffer.ByteBuf;
 import justfatlard.pandorical.settings.ModCatalog;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /** A client's own mods and settings, sent whole after the hello and again on any change. */
 public record ClientSettingsC2S(List<Mod> mods) implements CustomPacketPayload {

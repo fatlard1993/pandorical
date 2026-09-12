@@ -4,8 +4,8 @@ import justfatlard.pandorical.protocol.ComponentUpdate;
 import justfatlard.pandorical.protocol.ShowHudS2C;
 import net.minecraft.server.level.ServerPlayer;
 
-import java.util.List;
 import java.util.Collection;
+import java.util.List;
 
 public interface HudApi {
     /** No-op without the {@code "hud"} capability. Build the overlay with {@link HudBuilder}. */

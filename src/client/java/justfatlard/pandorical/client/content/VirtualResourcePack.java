@@ -1,21 +1,21 @@
 package justfatlard.pandorical.client.content;
 
+import justfatlard.pandorical.Pandorical;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackLocationInfo;
 import net.minecraft.server.packs.PackResources;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.metadata.MetadataSectionType;
+import net.minecraft.server.packs.metadata.pack.PackMetadataSection;
+import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.server.packs.resources.IoSupplier;
+import net.minecraft.util.InclusiveRange;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import justfatlard.pandorical.Pandorical;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.packs.metadata.pack.PackMetadataSection;
-import net.minecraft.server.packs.repository.PackSource;
-import net.minecraft.util.InclusiveRange;
 
 public class VirtualResourcePack implements PackResources {
     private static final String PACK_ID = "pandorical_virtual";

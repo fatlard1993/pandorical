@@ -1,13 +1,5 @@
 package justfatlard.pandorical.keybind;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.KeybindApi;
@@ -17,6 +9,15 @@ import justfatlard.pandorical.protocol.KeybindDefaultsS2C;
 import justfatlard.pandorical.protocol.KeybindRebindS2C;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public final class KeybindPool implements KeybindApi {
 	public static final KeybindPool INSTANCE = new KeybindPool();

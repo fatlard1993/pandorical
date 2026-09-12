@@ -1,12 +1,13 @@
 package justfatlard.pandorical.client.component;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import java.util.Locale;
-import java.util.Map;
 import justfatlard.pandorical.api.ComponentType;
 import justfatlard.pandorical.protocol.ComponentDef;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.lwjgl.sdl.SDLMouse;
+
+import java.util.Locale;
+import java.util.Map;
 
 /** See {@link ComponentType#DIAL}. A push freezes the angle until release. */
 public class DialComponent extends SpriteComponent {

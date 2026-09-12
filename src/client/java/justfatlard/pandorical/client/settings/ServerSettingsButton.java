@@ -1,5 +1,6 @@
 package justfatlard.pandorical.client.settings;
 
+import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.protocol.OpenSettingsC2S;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -10,7 +11,6 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.options.OptionsScreen;
 import net.minecraft.network.chat.Component;
-import justfatlard.pandorical.api.Capabilities;
 
 /** The mod menu button on the pause and options screens, while the server offers the menu. */
 @Environment(EnvType.CLIENT)

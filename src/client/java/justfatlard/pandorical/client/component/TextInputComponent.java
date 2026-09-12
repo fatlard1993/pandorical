@@ -1,14 +1,14 @@
 package justfatlard.pandorical.client.component;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import justfatlard.pandorical.protocol.ComponentDef;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 
 import java.util.Map;
-import com.mojang.blaze3d.platform.InputConstants;
-import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.client.input.KeyEvent;
 
 /** A vanilla EditBox that sends {@code {"text": ...}} on every change. */
 public class TextInputComponent extends AbstractComponent {

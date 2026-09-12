@@ -1,19 +1,20 @@
 package justfatlard.pandorical;
 
+import net.fabricmc.api.EnvType;
+import net.fabricmc.loader.api.FabricLoader;
+
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import net.fabricmc.loader.api.FabricLoader;
 import java.lang.management.ManagementFactory;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.management.ObjectName;
-import net.fabricmc.api.EnvType;
 
 /**
  * A trace of what Pandorical is doing, for crashes on machines nobody here can reach. On when this

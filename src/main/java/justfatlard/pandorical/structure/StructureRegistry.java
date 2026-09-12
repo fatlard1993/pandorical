@@ -1,11 +1,5 @@
 package justfatlard.pandorical.structure;
 
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import justfatlard.pandorical.api.BlockEntry;
 import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.PandoricalApi;
@@ -26,6 +20,13 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.state.BlockState;
+
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class StructureRegistry implements StructureApi {
 	public static final StructureRegistry INSTANCE = new StructureRegistry();

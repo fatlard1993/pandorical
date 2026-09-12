@@ -1,21 +1,22 @@
 package justfatlard.pandorical.client.skin;
 
+import com.mojang.authlib.GameProfile;
 import com.mojang.blaze3d.platform.NativeImage;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.protocol.SkinOverrideS2C;
-import com.mojang.authlib.GameProfile;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.PlayerSkinRenderCache;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.Identifier;
 import net.minecraft.core.ClientAsset;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.PlayerModelType;
 import net.minecraft.world.entity.player.PlayerSkin;
 import net.minecraft.world.item.component.ResolvableProfile;
+
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Server-sent skins, registered straight into the texture manager: authlib accepts skin URLs only

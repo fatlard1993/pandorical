@@ -1,11 +1,12 @@
 package justfatlard.pandorical.protocol;
 
 import io.netty.buffer.ByteBuf;
-import java.util.UUID;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+
+import java.util.UUID;
 
 /**
  * The image itself, not a URL: authlib fetches skins only from Mojang's domains. An empty image

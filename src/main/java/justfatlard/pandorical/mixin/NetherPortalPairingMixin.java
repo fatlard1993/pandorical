@@ -2,7 +2,6 @@ package justfatlard.pandorical.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import java.util.Optional;
 import justfatlard.pandorical.portal.PortalPairing;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -15,6 +14,8 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.util.Optional;
 
 /** Replaces only vanilla's exit search; the rest of the trip runs vanilla's code on the partner. */
 @Mixin(NetherPortalBlock.class)

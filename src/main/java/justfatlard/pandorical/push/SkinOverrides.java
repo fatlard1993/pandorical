@@ -1,9 +1,5 @@
 package justfatlard.pandorical.push;
 
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.SkinApi;
@@ -11,6 +7,11 @@ import justfatlard.pandorical.protocol.SkinOverrideS2C;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class SkinOverrides implements SkinApi {
 	public static final SkinOverrides INSTANCE = new SkinOverrides();

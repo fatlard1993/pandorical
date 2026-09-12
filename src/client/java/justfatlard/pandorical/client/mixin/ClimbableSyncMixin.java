@@ -1,6 +1,5 @@
 package justfatlard.pandorical.client.mixin;
 
-import java.util.Optional;
 import justfatlard.pandorical.client.content.ContentManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.LivingEntity;
@@ -9,6 +8,8 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.util.Optional;
 
 /**
  * Climbing is decided on the client from {@code #minecraft:climbable}, whose numeric ids resolve

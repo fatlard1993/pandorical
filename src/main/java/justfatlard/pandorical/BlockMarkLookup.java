@@ -1,12 +1,13 @@
 package justfatlard.pandorical;
 
-import java.util.function.BiPredicate;
 import justfatlard.pandorical.api.BlockMarkApi;
 import justfatlard.pandorical.api.PandoricalApi;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
+
+import java.util.function.BiPredicate;
 
 /**
  * Block marks for code that runs on either side. The client sets {@link #client} at startup,

@@ -1,22 +1,22 @@
 package justfatlard.pandorical.client.renderer;
 
-import java.util.HashMap;
-import java.util.Map;
-
+import justfatlard.pandorical.client.mixin.SingleQuadParticleAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockTintSource;
+import net.minecraft.client.particle.Particle;
+import net.minecraft.client.particle.SingleQuadParticle;
 import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
-import justfatlard.pandorical.client.mixin.SingleQuadParticleAccessor;
-import net.minecraft.client.particle.Particle;
-import net.minecraft.client.particle.SingleQuadParticle;
-import net.minecraft.world.level.block.Block;
 
 public final class PositionalTintStore {
 	private PositionalTintStore() {}

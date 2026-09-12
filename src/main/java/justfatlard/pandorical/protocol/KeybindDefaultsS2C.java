@@ -1,11 +1,12 @@
 package justfatlard.pandorical.protocol;
 
 import io.netty.buffer.ByteBuf;
-import java.util.List;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+
+import java.util.List;
 
 /**
  * The client binds each slot once, if still unbound, and remembers that by keybind id, so a

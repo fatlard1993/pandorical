@@ -1,8 +1,9 @@
 package justfatlard.pandorical.api;
 
-import java.util.function.BiPredicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+
+import java.util.function.BiPredicate;
 
 /**
  * Nether portals that go back the way they came.

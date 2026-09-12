@@ -1,18 +1,18 @@
 package justfatlard.pandorical.client.settings;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
-
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.client.api.ClientSettingsApi;
 import justfatlard.pandorical.protocol.ClientSettingS2C;
 import justfatlard.pandorical.protocol.ClientSettingsC2S;
 import justfatlard.pandorical.settings.ModCatalog;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /** The client half: what client mods declared, sent to whichever server the player is on. */
 public final class ClientSettings implements ClientSettingsApi {

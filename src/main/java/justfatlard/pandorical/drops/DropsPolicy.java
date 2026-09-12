@@ -2,7 +2,6 @@ package justfatlard.pandorical.drops;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import java.util.Optional;
 import justfatlard.pandorical.api.DropsApi;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.resources.Identifier;
@@ -11,6 +10,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
+
+import java.util.Optional;
 
 /** Which of the drops fixes are on, for the mixins to read live. See {@link DropsApi}. */
 public final class DropsPolicy implements DropsApi {

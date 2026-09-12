@@ -1,9 +1,9 @@
 package justfatlard.pandorical.client.camera;
 
+import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.protocol.CameraHintS2C;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
-import justfatlard.pandorical.Pandorical;
 
 public class CameraManager {
     private static float overrideDistance = -1;

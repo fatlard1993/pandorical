@@ -1,5 +1,6 @@
 package justfatlard.pandorical.client.screen;
 
+import justfatlard.pandorical.api.NavigableScreen;
 import justfatlard.pandorical.client.component.*;
 import justfatlard.pandorical.protocol.ComponentUpdate;
 import justfatlard.pandorical.protocol.OpenScreenS2C;
@@ -15,7 +16,6 @@ import net.minecraft.world.entity.player.Inventory;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import justfatlard.pandorical.api.NavigableScreen;
 
 public class PandoricalContainerScreen extends AbstractContainerScreen<PandoricalMenu> implements NavigableScreen {
     private final OpenScreenS2C screenDef;

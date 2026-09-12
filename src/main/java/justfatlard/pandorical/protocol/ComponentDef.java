@@ -1,14 +1,14 @@
 package justfatlard.pandorical.protocol;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.DecoderException;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
-import java.util.List;
-import java.util.Map;
-import io.netty.handler.codec.DecoderException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public record ComponentDef(
     String id,

@@ -1,9 +1,10 @@
 package justfatlard.pandorical.api;
 
-import java.util.Collection;
-import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
+
+import java.util.Collection;
+import java.util.Map;
 
 /**
  * Block tint mappings, synced to connecting clients during the configuration phase. Register

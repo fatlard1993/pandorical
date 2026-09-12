@@ -1,8 +1,5 @@
 package justfatlard.pandorical.push;
 
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.EntityOverlayApi;
@@ -15,6 +12,10 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class EntityOverlays implements EntityOverlayApi {
 	public static final EntityOverlays INSTANCE = new EntityOverlays();

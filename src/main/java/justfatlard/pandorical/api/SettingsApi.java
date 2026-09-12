@@ -1,10 +1,11 @@
 package justfatlard.pandorical.api;
 
+import net.minecraft.server.level.ServerPlayer;
+
 import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import net.minecraft.server.level.ServerPlayer;
 
 /**
  * Per-player settings, shown on one screen with a section per mod: from the options menu on a

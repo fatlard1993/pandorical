@@ -4,27 +4,20 @@ import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.BlockRegistration;
 import justfatlard.pandorical.api.ContentApi;
 import justfatlard.pandorical.api.ItemRegistration;
+import justfatlard.pandorical.api.VanillaItemOverride;
+import justfatlard.pandorical.protocol.StatePropertySpec;
 import justfatlard.pandorical.protocol.SyncAssetsConfigS2C;
 import justfatlard.pandorical.protocol.SyncAssetsS2C;
-import justfatlard.pandorical.protocol.StatePropertySpec;
 import justfatlard.pandorical.protocol.SyncContentS2C;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.server.level.ServerPlayer;
-
-import java.io.*;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.zip.GZIPOutputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import justfatlard.pandorical.api.VanillaItemOverride;
 import justfatlard.pandorical.rail.RailCollision;
 import net.fabricmc.api.EnvType;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.EmptyBlockGetter;
@@ -32,6 +25,13 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.zip.GZIPOutputStream;
 
 public class ContentRegistry implements ContentApi {
     private final Map<String, RegisteredBlock> blocks = new LinkedHashMap<>();

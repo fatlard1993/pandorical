@@ -1,17 +1,18 @@
 package justfatlard.pandorical.client.animation;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.WeakHashMap;
-import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.client.animation.AnimationChannel;
 import net.minecraft.client.animation.AnimationDefinition;
 import net.minecraft.client.animation.KeyframeAnimation;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.resources.Identifier;
+
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import net.minecraft.client.animation.AnimationChannel;
 
 /**
  * What each entity plays, by network id, and animations baked per model root. The baked cache is

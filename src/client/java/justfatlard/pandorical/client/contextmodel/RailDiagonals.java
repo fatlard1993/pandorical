@@ -1,11 +1,10 @@
 package justfatlard.pandorical.client.contextmodel;
 
-import java.util.HashMap;
-import java.util.Map;
+import com.mojang.math.Quadrant;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.model.loading.v1.ExtraModelKey;
-import com.mojang.math.Quadrant;
+import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.client.renderer.block.dispatch.Variant;
 import net.minecraft.core.BlockPos;
@@ -13,12 +12,14 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.block.state.properties.RailShape;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Draws a run of alternating curves as a straight diagonal. A curve with a joined curve on either

@@ -7,8 +7,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.BiConsumer;
-import java.util.function.Predicate;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Extra slots and buttons in the vanilla inventory screen. The slots are real container slots,

@@ -1,13 +1,13 @@
 package justfatlard.pandorical.protocol;
 
-import java.util.List;
-
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.entity.BannerPatternLayers;
+
+import java.util.List;
 
 /**
  * Deltas: only the positions here change, and an entry with no layers clears its position. In

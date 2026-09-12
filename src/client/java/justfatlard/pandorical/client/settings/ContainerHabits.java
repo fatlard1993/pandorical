@@ -1,10 +1,11 @@
 package justfatlard.pandorical.client.settings;
 
+import net.fabricmc.loader.api.FabricLoader;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
-import net.fabricmc.loader.api.FabricLoader;
 
 /** The container habits switch, in the client's config so it holds across servers. */
 public final class ContainerHabits {

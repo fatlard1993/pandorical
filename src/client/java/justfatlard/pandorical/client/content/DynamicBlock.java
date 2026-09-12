@@ -1,20 +1,20 @@
 package justfatlard.pandorical.client.content;
 
+import justfatlard.pandorical.Pandorical;
+import justfatlard.pandorical.rail.RailCollision;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.*;
+import net.minecraft.world.phys.shapes.BooleanOp;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 import java.io.*;
 import java.util.*;
-import justfatlard.pandorical.Pandorical;
-import justfatlard.pandorical.rail.RailCollision;
-import net.minecraft.world.phys.shapes.BooleanOp;
 
 public class DynamicBlock extends Block {
     private final List<Property<?>> dynamicProperties;

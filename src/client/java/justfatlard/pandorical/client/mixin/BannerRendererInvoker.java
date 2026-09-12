@@ -1,7 +1,6 @@
 package justfatlard.pandorical.client.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-
 import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.OrderedSubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.BannerRenderer;

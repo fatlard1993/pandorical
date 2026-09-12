@@ -1,9 +1,9 @@
 package justfatlard.pandorical.api;
 
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.IntConsumer;
-import java.util.Base64;
 
 /**
  * The rule a {@link ComponentType#PIXEL_CANVAS} paints by, and its wire forms.

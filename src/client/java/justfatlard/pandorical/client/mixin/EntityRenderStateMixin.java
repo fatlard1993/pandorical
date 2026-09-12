@@ -1,12 +1,12 @@
 package justfatlard.pandorical.client.mixin;
 
+import justfatlard.pandorical.client.animation.EntityAnimations;
+import justfatlard.pandorical.client.renderer.AnimationHolder;
 import justfatlard.pandorical.client.renderer.OverlayTextureHolder;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.resources.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
-import justfatlard.pandorical.client.animation.EntityAnimations;
-import justfatlard.pandorical.client.renderer.AnimationHolder;
 
 @Mixin(EntityRenderState.class)
 public class EntityRenderStateMixin implements OverlayTextureHolder,
