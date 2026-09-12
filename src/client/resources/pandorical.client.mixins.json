@@ -16,6 +16,7 @@
     "ContainerHabitsMixin",
     "ContainerStackSizeMixin",
     "CushionInterpolationMixin",
+    "CustomDataAccessor",
     "EntityRenderStateMixin",
     "HiddenDisplayMixin",
     "InteractiveSyncMixin",

@@ -28,7 +28,8 @@ public abstract class HiddenDisplayMixin {
 		if (!(entity instanceof Display.ItemDisplay display)) return;
 		ItemStack item = display.getSlot(0).get();
 		CustomData data = item.get(DataComponents.CUSTOM_DATA);
-		if (data != null && data.copyTag().contains(BannerDecalApi.HIDDEN_ITEM_KEY)) {
+		// Read in place: this runs for every item display every frame, and copyTag copies the lot
+		if (data != null && ((CustomDataAccessor) (Object) data).pandorical$tag().contains(BannerDecalApi.HIDDEN_ITEM_KEY)) {
 			cir.setReturnValue(false);
 		}
 	}

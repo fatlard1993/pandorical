@@ -64,6 +64,11 @@ public final class ContextModels {
 	private static final List<Provider> PROVIDERS = new ArrayList<>();
 	private static boolean any;
 
+	/** Whether any provider found models to pick from. */
+	public static boolean active() {
+		return any;
+	}
+
 	public static void register(Provider provider) {
 		PROVIDERS.add(provider);
 	}
