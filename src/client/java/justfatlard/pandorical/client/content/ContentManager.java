@@ -348,7 +348,7 @@ public class ContentManager {
             try {
                 justfatlard.pandorical.rail.RailCollision.setSolid(content.solidRails());
                 for (SyncContentS2C.BlockEntry entry : content.blocks()) {
-                    registerBlockConfig(entry);
+                    registerBlock(entry, StateIds.AT_JOIN);
                 }
                 for (SyncContentS2C.ItemEntry entry : content.items()) {
                     registerItem(entry);
@@ -434,126 +434,6 @@ public class ContentManager {
     /** Whether this is a synced block the server declared climbable. */
     public static boolean isClimbable(BlockState state) {
         return !climbable.isEmpty() && climbable.contains(state.getBlock());
-    }
-
-    /**
-     * Config-phase variant of registerBlock: leaves block state IDs unassigned so
-     * {@link #remapBlockStateIds()} can map them to the server's IDs at JOIN time.
-     */
-    private static void registerBlockConfig(SyncContentS2C.BlockEntry entry) {
-        try {
-            Identifier id = Identifier.tryParse(entry.id());
-            if (id == null) {
-                Pandorical.LOGGER.warn("Config phase: invalid block ID: '{}'", entry.id());
-                return;
-            }
-
-            // On reconnect the block survives from the previous session: track it and
-            // apply fresh shape data rather than re-registering.
-            if (BuiltInRegistries.BLOCK.containsKey(id)) {
-                Block existing = BuiltInRegistries.BLOCK.getValue(id);
-                registeredBlocks.put(id, existing);
-                DynamicBlock.applyShapeData(existing, entry.shapeData());
-                if (entry.climbable()) climbable.add(existing);
-                if (entry.interactive()) interactive.add(existing);
-                Pandorical.LOGGER.debug("Config phase: block {} already registered — reusing", entry.id());
-                return;
-            }
-
-            Identifier baseId = Identifier.tryParse(entry.baseBlockId());
-            BlockBehaviour.Properties props;
-            if (baseId != null) {
-                Block baseBlock = BuiltInRegistries.BLOCK.getValue(baseId);
-                if (baseBlock != null) {
-                    props = BlockBehaviour.Properties.ofFullCopy(baseBlock);
-                } else {
-                    Pandorical.LOGGER.warn("Config phase: base block '{}' not found for '{}' — using defaults",
-                        entry.baseBlockId(), entry.id());
-                    props = BlockBehaviour.Properties.of();
-                }
-            } else {
-                props = BlockBehaviour.Properties.of();
-            }
-
-            // Before the block exists, because vanilla settles collision from this flag when the
-            // state cache is built, and that happens during registration - long before the shapes
-            // arriving with this entry are ever applied.
-            if (!DynamicBlock.declaresCollision(entry.shapeData())) props.noCollision();
-
-            applyMiningProperties(props, entry);
-
-            ResourceKey<Block> key = ResourceKey.create(Registries.BLOCK, id);
-            props.setId(key);
-
-            Block baseBlock = baseId != null ? BuiltInRegistries.BLOCK.getValue(baseId) : null;
-            List<net.minecraft.world.level.block.state.properties.Property<?>> stateProps = new java.util.ArrayList<>();
-            for (String propSpec : entry.stateProperties()) {
-                // Wire format: "name:type:valuesOrCount" where type is b=boolean, i=integer,
-                // e=enum (comma-separated names); integers use "name:i:min:max" (split(":",3)
-                // leaves parts[2]="min:max"); legacy form is "name:valueCount".
-                String[] parts = propSpec.split(":", 3);
-                String propName = parts[0];
-                String propType = "i";
-                int valueCount = -1;
-                int intMin = 0;
-                String enumValues = null;
-                if (parts.length == 3) {
-                    propType = parts[1];
-                    if ("e".equals(propType)) {
-                        enumValues = parts[2];
-                        valueCount = parts[2].split(",").length;
-                    } else if ("i".equals(propType) && parts[2].contains(":")) {
-                        String[] minMax = parts[2].split(":", 2);
-                        try {
-                            intMin = Integer.parseInt(minMax[0]);
-                            int intMax = Integer.parseInt(minMax[1]);
-                            valueCount = intMax - intMin + 1;
-                        } catch (NumberFormatException ignored) {
-                            Pandorical.LOGGER.warn("[pandorical] Malformed state prop range '{}' for block '{}', defaulting to 0", parts[2], entry.id());
-                        }
-                    } else {
-                        try { valueCount = Integer.parseInt(parts[2]); } catch (NumberFormatException ignored) {
-                            Pandorical.LOGGER.warn("[pandorical] Malformed state prop range '{}' for block '{}', defaulting to 0", parts[2], entry.id());
-                        }
-                    }
-                } else if (parts.length == 2) {
-                    try { valueCount = Integer.parseInt(parts[1]); } catch (NumberFormatException ignored) {
-                        Pandorical.LOGGER.warn("[pandorical] Malformed state prop range '{}' for block '{}', defaulting to 0", parts[1], entry.id());
-                    }
-                }
-                var prop = DynamicBlock.resolveProperty(propName, baseBlock, valueCount, intMin, propType, enumValues);
-                if (prop != null) {
-                    stateProps.add(prop);
-                } else {
-                    Pandorical.LOGGER.warn("Config phase: unknown state property '{}' (type={}, values={}) for block '{}'",
-                        propName, propType, valueCount, entry.id());
-                }
-            }
-
-            // Light is fixed into each state as the block is built, so it has to be on the
-            // properties before createBlock, not applied after like the shapes are
-            byte[] light = entry.lightData();
-            if (light != null && light.length > 0) {
-                props.lightLevel(state -> DynamicBlock.lightFor(state, light));
-            }
-            Block block = createBlock(props, stateProps, baseBlock, entry.stateProperties());
-            Registry.register(BuiltInRegistries.BLOCK, id, block);
-            registeredBlocks.put(id, block);
-            if (entry.climbable()) climbable.add(block);
-            if (entry.interactive()) interactive.add(block);
-
-            DynamicBlock.applyShapeData(block, entry.shapeData());
-
-            // Do NOT add states to BLOCK_STATE_REGISTRY here. They get the server's IDs
-            // in remapBlockStateIds(), which runs synchronously at JOIN time, before any
-            // chunks are decoded.
-
-            Pandorical.LOGGER.debug("Config phase: registered block {} (base: {}, class: {}, states: {})",
-                entry.id(), entry.baseBlockId(), block.getClass().getSimpleName(),
-                block.getStateDefinition().getPossibleStates().size());
-        } catch (Exception e) {
-            Pandorical.LOGGER.error("Config phase: failed to register block {}: {}", entry.id(), e.getMessage(), e);
-        }
     }
 
     private static void unpackConfigAssets() {
@@ -699,7 +579,7 @@ public class ContentManager {
             try {
                 justfatlard.pandorical.rail.RailCollision.setSolid(content.solidRails());
                 for (SyncContentS2C.BlockEntry entry : content.blocks()) {
-                    registerBlock(entry);
+                    registerBlock(entry, StateIds.AT_REGISTRATION);
                 }
                 for (SyncContentS2C.ItemEntry entry : content.items()) {
                     registerItem(entry);
@@ -1013,21 +893,42 @@ public class ContentManager {
         Pandorical.LOGGER.info("Registered block color providers for {} blocks", registered);
     }
 
-    private static void registerBlock(SyncContentS2C.BlockEntry entry) {
+    /**
+     * How {@link #registerBlock} gives a newly registered block's states their ids. Each sync path
+     * uses one, so it also decides which path's wording the block's log lines take.
+     */
+    private enum StateIds {
+        /**
+         * The config phase: left unassigned, for {@link #remapBlockStateIds()} to map to the
+         * server's ids at JOIN, after Fabric's registry sync.
+         */
+        AT_JOIN,
+        /** The play-phase fallback: registered at the server's exact ids as the block is. */
+        AT_REGISTRATION
+    }
+
+    private static void registerBlock(SyncContentS2C.BlockEntry entry, StateIds stateIds) {
+        boolean configPhase = stateIds == StateIds.AT_JOIN;
         try {
             Identifier id = Identifier.tryParse(entry.id());
             if (id == null) {
-                Pandorical.LOGGER.warn("Invalid block ID: '{}'", entry.id());
+                Pandorical.LOGGER.warn(configPhase
+                    ? "Config phase: invalid block ID: '{}'"
+                    : "Invalid block ID: '{}'", entry.id());
                 return;
             }
 
-            // On reconnect, reuse the existing block
+            // On reconnect the block survives from the previous session: track it and
+            // apply fresh shape data rather than re-registering.
             if (BuiltInRegistries.BLOCK.containsKey(id)) {
                 Block existing = BuiltInRegistries.BLOCK.getValue(id);
                 registeredBlocks.put(id, existing);
                 DynamicBlock.applyShapeData(existing, entry.shapeData());
                 if (entry.climbable()) climbable.add(existing);
                 if (entry.interactive()) interactive.add(existing);
+                if (configPhase) {
+                    Pandorical.LOGGER.debug("Config phase: block {} already registered — reusing", entry.id());
+                }
                 return;
             }
 
@@ -1038,7 +939,9 @@ public class ContentManager {
                 if (baseBlock != null) {
                     props = BlockBehaviour.Properties.ofFullCopy(baseBlock);
                 } else {
-                    Pandorical.LOGGER.warn("Base block '{}' not found for '{}' — using defaults",
+                    Pandorical.LOGGER.warn(configPhase
+                        ? "Config phase: base block '{}' not found for '{}' — using defaults"
+                        : "Base block '{}' not found for '{}' — using defaults",
                         entry.baseBlockId(), entry.id());
                     props = BlockBehaviour.Properties.of();
                 }
@@ -1059,7 +962,9 @@ public class ContentManager {
             Block baseBlock = baseId != null ? BuiltInRegistries.BLOCK.getValue(baseId) : null;
             List<net.minecraft.world.level.block.state.properties.Property<?>> stateProps = new java.util.ArrayList<>();
             for (String propSpec : entry.stateProperties()) {
-                // Wire format: same as in registerBlockConfig above.
+                // Wire format: "name:type:valuesOrCount" where type is b=boolean, i=integer,
+                // e=enum (comma-separated names); integers use "name:i:min:max" (split(":",3)
+                // leaves parts[2]="min:max"); legacy form is "name:valueCount".
                 String[] parts = propSpec.split(":", 3);
                 String propName = parts[0];
                 String propType = "i";
@@ -1094,7 +999,10 @@ public class ContentManager {
                 if (prop != null) {
                     stateProps.add(prop);
                 } else {
-                    Pandorical.LOGGER.warn("Unknown state property '{}' (type={}, values={}) for block '{}'", propName, propType, valueCount, entry.id());
+                    Pandorical.LOGGER.warn(configPhase
+                        ? "Config phase: unknown state property '{}' (type={}, values={}) for block '{}'"
+                        : "Unknown state property '{}' (type={}, values={}) for block '{}'",
+                        propName, propType, valueCount, entry.id());
                 }
             }
 
@@ -1112,26 +1020,37 @@ public class ContentManager {
 
             DynamicBlock.applyShapeData(block, entry.shapeData());
 
-            // Register block states at the exact IDs the server uses
-            var possibleStates = block.getStateDefinition().getPossibleStates();
-            if (entry.stateIds().size() == possibleStates.size()) {
-                for (int i = 0; i < possibleStates.size(); i++) {
-                    Block.BLOCK_STATE_REGISTRY.addMapping(possibleStates.get(i), entry.stateIds().get(i));
-                }
+            if (stateIds == StateIds.AT_JOIN) {
+                // Do NOT add states to BLOCK_STATE_REGISTRY here. They get the server's IDs
+                // in remapBlockStateIds(), which runs synchronously at JOIN time, before any
+                // chunks are decoded.
+                Pandorical.LOGGER.debug("Config phase: registered block {} (base: {}, class: {}, states: {})",
+                    entry.id(), entry.baseBlockId(), block.getClass().getSimpleName(),
+                    block.getStateDefinition().getPossibleStates().size());
             } else {
-                // Appending sequentially here (the old behaviour) overwrote other
-                // custom blocks' server-assigned slots, see coverStateIdsWithFallback
-                coverStateIdsWithFallback(entry, block.defaultBlockState(),
-                    "state count mismatch (server=" + entry.stateIds().size()
-                        + ", client=" + possibleStates.size()
-                        + ", client properties=" + propertyNames(block)
-                        + ", server properties=" + entry.stateProperties() + ")");
-            }
+                // Register block states at the exact IDs the server uses
+                var possibleStates = block.getStateDefinition().getPossibleStates();
+                if (entry.stateIds().size() == possibleStates.size()) {
+                    for (int i = 0; i < possibleStates.size(); i++) {
+                        Block.BLOCK_STATE_REGISTRY.addMapping(possibleStates.get(i), entry.stateIds().get(i));
+                    }
+                } else {
+                    // Appending sequentially here (the old behaviour) overwrote other
+                    // custom blocks' server-assigned slots, see coverStateIdsWithFallback
+                    coverStateIdsWithFallback(entry, block.defaultBlockState(),
+                        "state count mismatch (server=" + entry.stateIds().size()
+                            + ", client=" + possibleStates.size()
+                            + ", client properties=" + propertyNames(block)
+                            + ", server properties=" + entry.stateProperties() + ")");
+                }
 
-            Pandorical.LOGGER.debug("Registered client block: {} (base: {}, states: {}, ids: {})",
-                entry.id(), entry.baseBlockId(), possibleStates.size(), entry.stateIds());
+                Pandorical.LOGGER.debug("Registered client block: {} (base: {}, states: {}, ids: {})",
+                    entry.id(), entry.baseBlockId(), possibleStates.size(), entry.stateIds());
+            }
         } catch (Exception e) {
-            Pandorical.LOGGER.error("Failed to register block {}: {}", entry.id(), e.getMessage(), e);
+            Pandorical.LOGGER.error(configPhase
+                ? "Config phase: failed to register block {}: {}"
+                : "Failed to register block {}: {}", entry.id(), e.getMessage(), e);
         }
     }
 
