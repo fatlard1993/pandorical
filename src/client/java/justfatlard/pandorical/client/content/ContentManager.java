@@ -63,6 +63,7 @@ public class ContentManager {
         syncStartTime = 0;
         syncing = false;
         configPhaseSynced = false;
+        configReloadDone = false;
         registeredBlocks.clear();
         climbable.clear();
         interactive.clear();
@@ -395,12 +396,37 @@ public class ContentManager {
             }
         }
 
-        // Resource pack injection happens later, once the Minecraft client instance exists;
-        // config phase doesn't have it yet.
+        // The reload happens here, in the configuration phase, before there is a level - the
+        // moment vanilla reloads for a server resource pack. It used to wait for the play-phase
+        // join, which put a full resource reload on top of the level being created and the first
+        // chunks arriving, and that is the one condition some Windows OpenGL drivers do not
+        // survive (MC-311345: the game died with an access violation seconds after joining).
+        // The ack waits for the reload, so the server holds the login until the client can draw
+        // what it is about to be sent.
+        if (virtualPack.hasResources()) {
+            Minecraft.getInstance().execute(() -> injectResourcePack(ContentManager::ackConfigReady));
+        } else {
+            ackConfigReady();
+        }
+    }
 
-        // The ack lets the server complete PandoricalSyncTask.
-        ClientConfigurationNetworking.send(new ContentReadyConfigC2S());
-        Pandorical.LOGGER.info("Config phase: sent ContentReadyConfigC2S acknowledgment");
+    /** Whether the configuration phase already reloaded resources for this connection. */
+    private static volatile boolean configReloadDone = false;
+
+    public static boolean wasConfigReloadDone() {
+        return configReloadDone;
+    }
+
+    /** The ack lets the server complete PandoricalSyncTask. */
+    private static void ackConfigReady() {
+        configReloadDone = true;
+        try {
+            ClientConfigurationNetworking.send(new ContentReadyConfigC2S());
+            Pandorical.LOGGER.info("Config phase: sent ContentReadyConfigC2S acknowledgment");
+        } catch (Exception e) {
+            // The connection ended while the reload ran; there is nobody left to tell.
+            Pandorical.LOGGER.warn("Config phase: could not acknowledge content sync: {}", e.toString());
+        }
     }
 
     /**
@@ -747,14 +773,25 @@ public class ContentManager {
 
     /** Called from both config-phase finalize (deferred) and play-phase finalize. */
     public static void injectResourcePack() {
+        injectResourcePack(() -> {});
+    }
+
+    /**
+     * Put the synced pack in front of the game and reload. {@code afterReload} runs once the
+     * reload has finished, or at once when there was nothing to reload or it could not start:
+     * a caller waiting to acknowledge the server must hear back on every path.
+     */
+    public static void injectResourcePack(Runnable afterReload) {
         if (!virtualPack.hasResources()) {
             Pandorical.LOGGER.warn("Virtual pack has no resources — skipping injection");
+            afterReload.run();
             return;
         }
 
         Minecraft client = Minecraft.getInstance();
         if (client == null) {
             Pandorical.LOGGER.warn("Minecraft client is null — cannot inject resource pack");
+            afterReload.run();
             return;
         }
 
@@ -807,6 +844,7 @@ public class ContentManager {
                 mutableSources.size());
         } catch (Exception e) {
             Pandorical.LOGGER.error("Failed to add virtual pack source: {}", e.getMessage(), e);
+            afterReload.run();
             return;
         }
 
@@ -816,7 +854,12 @@ public class ContentManager {
         registerBlockColors(client);
         registerCreativeTabItems();
 
-        client.reloadResourcePacks().thenRun(() -> {
+        java.util.concurrent.CompletableFuture<Void> reload = client.reloadResourcePacks();
+        reload.whenComplete((unused, error) -> {
+            if (error != null) Pandorical.LOGGER.error("Resource reload failed: {}", error.toString());
+            afterReload.run();
+        });
+        reload.thenRun(() -> {
             // Force all chunks to re-render so they pick up the newly loaded block models.
             Minecraft mc = Minecraft.getInstance();
             if (mc != null && mc.levelRenderer != null && mc.level != null) {

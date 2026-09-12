@@ -420,8 +420,11 @@ public class PandoricalClient implements ClientModInitializer {
                 // Remap SYNCHRONOUSLY before any chunks are decoded
                 Pandorical.LOGGER.info("Play phase joined — remapping block state IDs synchronously");
                 ContentManager.remapBlockStateIds();
-                // Resource pack injection and re-render can be async
-                client.execute(() -> ContentManager.injectResourcePackAndReRender(client));
+                // The configuration phase reloads before the level exists; only a client that
+                // somehow reached play without that still reloads here, on top of the level.
+                if (!ContentManager.wasConfigReloadDone()) {
+                    client.execute(() -> ContentManager.injectResourcePackAndReRender(client));
+                }
             }
         });
 
