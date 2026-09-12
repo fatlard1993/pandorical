@@ -23,7 +23,7 @@ import java.util.Map;
  * Container screen with declarative UI + vanilla slot sync.
  * Used for screens that manage item slots (trade, backpack, etc.).
  */
-public class PandoricalContainerScreen extends AbstractContainerScreen<PandoricalMenu> {
+public class PandoricalContainerScreen extends AbstractContainerScreen<PandoricalMenu> implements justfatlard.pandorical.api.NavigableScreen {
     private final OpenScreenS2C screenDef;
     private final List<PandoricalComponent> components = new ArrayList<>();
     private final Map<String, PandoricalComponent> componentIndex = new HashMap<>();
@@ -172,6 +172,11 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
             return true;
         }
         return super.mouseReleased(event);
+    }
+
+    @Override
+    public List<NavRegion> navRegions() {
+        return ScreenHelper.navRegions(components);
     }
 
     public void applyUpdates(List<ComponentUpdate> updates) {

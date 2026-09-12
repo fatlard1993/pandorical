@@ -543,7 +543,7 @@ keyboard focus or a gamepad finds nothing to press. `NavigableScreen` (in the co
 `justfatlard.pandorical.api`) is how a screen says where its interactive parts are:
 
 ```java
-// PandoricalScreen already implements this; a component opts in by overriding
+// Both Pandorical screens, plain and container, implement this; a component opts in by overriding
 // isNavigable(), which should be true exactly when it handles mouseClicked.
 List<NavigableScreen.NavRegion> regions = ((NavigableScreen) screen).navRegions();
 ```
