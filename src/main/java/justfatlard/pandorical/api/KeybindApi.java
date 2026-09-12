@@ -44,6 +44,20 @@ public interface KeybindApi {
      */
     void register(String id, int preferredDefaultKey, String displayName, KeybindHandler handler);
 
+    /**
+     * Bind a registered keybind to its {@code preferredDefaultKey} on clients, even though no pool
+     * slot starts on that key: once, on each client whose slot for it is still unbound when it
+     * joins. The client remembers doing it by this id, so clearing or moving the key afterwards
+     * sticks, and a key the player had already put on that slot is left alone.
+     *
+     * <p>For a key a player should not have to find and bind before the feature is any use to
+     * them. Pick one nothing in vanilla uses; the pool's own two defaults are G and B. A client
+     * from before this binds nothing and the key starts unbound, as every key used to.
+     *
+     * @param id a keybind already passed to {@link #register}
+     */
+    default void bindByDefault(String id) {}
+
     @FunctionalInterface
     interface KeybindHandler {
         void onPress(ServerPlayer player);

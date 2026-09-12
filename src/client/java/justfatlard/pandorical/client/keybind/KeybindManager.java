@@ -68,6 +68,58 @@ public final class KeybindManager {
 		sendBindings();
 	}
 
+	/** The keybinds whose default key this client has already put on, one id to a line. */
+	private static final java.nio.file.Path DEFAULTS_APPLIED = net.fabricmc.loader.api.FabricLoader.getInstance()
+		.getConfigDir().resolve("pandorical").resolve("keybind-defaults.txt");
+
+	/**
+	 * Put on the keys the server's keybinds asked to start on, where nobody has chosen one.
+	 *
+	 * <p>Once per keybind, ever: the id goes in a file here the first time it is seen, whether or
+	 * not its slot was free, so a key the player clears or moves afterwards is theirs and is never
+	 * put back. A slot the player had already bound keeps their key.
+	 */
+	public static void applyDefaults(justfatlard.pandorical.protocol.KeybindDefaultsS2C payload) {
+		Set<String> applied = new java.util.LinkedHashSet<>();
+		try {
+			if (java.nio.file.Files.exists(DEFAULTS_APPLIED)) {
+				for (String line : java.nio.file.Files.readAllLines(DEFAULTS_APPLIED)) {
+					if (!line.isBlank()) applied.add(line.trim());
+				}
+			}
+		} catch (java.io.IOException e) {
+			Pandorical.LOGGER.warn("Could not read {}: {}", DEFAULTS_APPLIED, e.toString());
+			return;
+		}
+
+		boolean bound = false;
+		boolean remembered = false;
+		for (var entry : payload.entries()) {
+			if (entry.slot() < 0 || entry.slot() >= MAX_SLOTS || pool[entry.slot()] == null) continue;
+			if (!applied.add(entry.id())) continue;
+			remembered = true;
+			if (!pool[entry.slot()].isUnbound()) continue;
+			pool[entry.slot()].setKey(InputConstants.Type.KEYBOARD.getOrCreate(entry.key()));
+			bound = true;
+			Pandorical.LOGGER.info("Bound {} to its default key", entry.id());
+		}
+
+		if (remembered) {
+			try {
+				java.nio.file.Files.createDirectories(DEFAULTS_APPLIED.getParent());
+				java.nio.file.Files.write(DEFAULTS_APPLIED, applied);
+			} catch (java.io.IOException e) {
+				Pandorical.LOGGER.warn("Could not write {}: {}", DEFAULTS_APPLIED, e.toString());
+			}
+		}
+		if (bound) {
+			KeyMapping.resetMapping();
+			Minecraft client = Minecraft.getInstance();
+			if (client != null && client.options != null) client.options.save();
+			sendBindings();
+		}
+	}
+
 	/** Tell the server what each pool slot is bound to now, as this client's controls screen says. */
 	public static void sendBindings() {
 		if (!ClientPlayNetworking.canSend(KeybindBindingsC2S.TYPE)) return;

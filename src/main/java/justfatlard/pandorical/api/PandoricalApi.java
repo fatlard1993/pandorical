@@ -1249,7 +1249,10 @@ public final class PandoricalApi {
                                                         UNBOUND, UNBOUND, UNBOUND, UNBOUND};
         private static final int MAX_PRESSES_PER_TICK = 8;
 
-        private record Registration(String id, String displayName, KeybindHandler handler) {}
+        private record Registration(String id, String displayName, KeybindHandler handler, int preferredKey) {}
+
+        /** Keybinds that asked for their preferred key to be bound on clients by default. */
+        private final java.util.Set<String> boundByDefault = ConcurrentHashMap.newKeySet();
 
         /** A claimed slot, as the mods menu shows it: which mod, what it is called, where it sits. */
         public record Claim(int slot, String id, String displayName) {}
@@ -1279,7 +1282,7 @@ public final class PandoricalApi {
                     "Keybind pool exhausted ({} slots) — cannot register '{}'", MAX_SLOTS, id);
                 return;
             }
-            bySlot.put(slot, new Registration(id, displayName, handler));
+            bySlot.put(slot, new Registration(id, displayName, handler, preferredDefaultKey));
 
             // The controls screen label for the claimed slot resolves through
             // the synced pandorical lang, overriding the client's shipped
@@ -1326,6 +1329,15 @@ public final class PandoricalApi {
                 }
             }
             return -1;
+        }
+
+        @Override
+        public void bindByDefault(String id) {
+            if (!registeredIds.contains(id)) {
+                justfatlard.pandorical.Pandorical.LOGGER.warn("bindByDefault('{}'): no keybind registered by that id", id);
+                return;
+            }
+            boundByDefault.add(id);
         }
 
         /** Every slot some mod has claimed, in pool order. */
@@ -1378,6 +1390,21 @@ public final class PandoricalApi {
             java.util.Collections.sort(slots);
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
                 new justfatlard.pandorical.protocol.KeybindDeclarationsS2C(slots));
+
+            java.util.List<justfatlard.pandorical.protocol.KeybindDefaultsS2C.Entry> defaults = new java.util.ArrayList<>();
+            for (int slot : slots) {
+                Registration registration = bySlot.get(slot);
+                if (registration != null && registration.preferredKey() != UNBOUND
+                        && boundByDefault.contains(registration.id())) {
+                    defaults.add(new justfatlard.pandorical.protocol.KeybindDefaultsS2C.Entry(
+                        slot, registration.id(), registration.preferredKey()));
+                }
+            }
+            if (!defaults.isEmpty() && net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(
+                    player, justfatlard.pandorical.protocol.KeybindDefaultsS2C.TYPE)) {
+                net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
+                    new justfatlard.pandorical.protocol.KeybindDefaultsS2C(defaults));
+            }
         }
 
         /** @hidden validate and dispatch one press; called on the server thread. */

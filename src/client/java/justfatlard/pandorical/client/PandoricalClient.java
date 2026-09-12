@@ -446,6 +446,10 @@ public class PandoricalClient implements ClientModInitializer {
             context.client().execute(() ->
                 justfatlard.pandorical.client.keybind.KeybindManager.handleDeclarations(payload));
         });
+        ClientPlayNetworking.registerGlobalReceiver(justfatlard.pandorical.protocol.KeybindDefaultsS2C.TYPE, (payload, context) -> {
+            context.client().execute(() ->
+                justfatlard.pandorical.client.keybind.KeybindManager.applyDefaults(payload));
+        });
 
         // When entering play phase, inject resource pack if config-phase synced assets
         justfatlard.pandorical.client.settings.ServerSettingsButton.register();

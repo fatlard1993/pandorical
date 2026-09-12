@@ -255,6 +255,8 @@ public class Pandorical implements ModInitializer {
             justfatlard.pandorical.protocol.ChestOverlayS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(KeybindDeclarationsS2C.TYPE, KeybindDeclarationsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.KeybindDefaultsS2C.TYPE, justfatlard.pandorical.protocol.KeybindDefaultsS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
             justfatlard.pandorical.protocol.KeybindRebindS2C.TYPE,
             justfatlard.pandorical.protocol.KeybindRebindS2C.STREAM_CODEC);
 
