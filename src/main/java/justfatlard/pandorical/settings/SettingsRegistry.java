@@ -786,6 +786,14 @@ public final class SettingsRegistry implements SettingsApi {
                 @Override String display(Boolean v) { return v ? "pandorical.settings.on" : "pandorical.settings.off"; }
                 @Override boolean displayIsKey() { return true; }
                 @Override Boolean next(Boolean v, int direction) { return !v; }
+                @Override public Boolean parse(String s) {
+                    return switch (s.toLowerCase(java.util.Locale.ROOT)) {
+                        case "true", "on" -> true;
+                        case "false", "off" -> false;
+                        default -> null;
+                    };
+                }
+                @Override String accepts() { return "on or off"; }
             });
         }
 
@@ -807,6 +815,7 @@ public final class SettingsRegistry implements SettingsApi {
                     return ids.get(Math.floorMod(at + direction, ids.size()));
                 }
                 @Override public String parse(String s) { return ordered.containsKey(s) ? s : null; }
+                @Override String accepts() { return String.join(", ", ids); }
             });
         }
 
@@ -829,6 +838,7 @@ public final class SettingsRegistry implements SettingsApi {
                 @Override public Integer parse(String s) {
                     try { return Math.clamp(Integer.parseInt(s), min, max); } catch (NumberFormatException e) { return null; }
                 }
+                @Override String accepts() { return "a number from " + min + " to " + max; }
             });
         }
     }
@@ -877,6 +887,11 @@ public final class SettingsRegistry implements SettingsApi {
         /** A value typed at a command, or null if it is not one this setting takes. */
         public T parse(String typed) {
             return decode(typed);
+        }
+
+        /** What {@link #parse} takes, said for a player who typed something else; empty when there is nothing to list. */
+        String accepts() {
+            return "";
         }
 
         /** The value as it would be shown, for a command listing. */
