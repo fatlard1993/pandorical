@@ -27,6 +27,9 @@ public final class PixelCanvas {
     /** A supply entry that never runs out. */
     public static final int UNLIMITED = -1;
 
+    /** The widest brush {@link #apply} lays; a report asking for more gets this. */
+    public static final int MAX_BRUSH = 16;
+
     /** Brush anchors a client puts in one report, which keeps the report inside an action value. */
     public static final int MAX_ANCHORS_PER_REPORT = 100;
 
@@ -90,16 +93,18 @@ public final class PixelCanvas {
      * Lay a stroke over {@code cells}: each anchor in order, each covering a brush-by-brush square
      * from {@link #brushStart}, clipped to the grid. A cell already the stroke's ink costs nothing.
      * Any other cell costs one from {@code supply[ink]}, and is left alone when the supply is spent,
-     * so a stroke that runs dry stops where the paint did.
+     * so a stroke that runs dry stops where the paint did. The brush is held to 1..{@link #MAX_BRUSH}.
      *
-     * @param supply  per palette index, decremented in place; null or {@link #UNLIMITED} for free
+     * @param supply  per palette index, decremented in place; null for free, {@link #UNLIMITED} for an
+     *                ink that never runs out, and an ink past its end has none
      * @param changed told the index of every cell that changed, in the order they did; may be null
      * @return how many cells changed
      */
     public static int apply(byte[] cells, int width, int height, int[] supply, Stroke stroke, IntConsumer changed) {
         int ink = stroke.ink();
         if (ink < 0 || ink >= MAX_PALETTE) return 0;
-        int brush = Math.max(1, stroke.brush());
+        if (supply != null && ink >= supply.length) return 0;
+        int brush = Math.clamp(stroke.brush(), 1, MAX_BRUSH);
         int[] anchors = stroke.anchors();
         int count = 0;
         for (int a = 0; a + 1 < anchors.length; a += 2) {
@@ -109,7 +114,7 @@ public final class PixelCanvas {
                 for (int x = Math.max(0, x0); x < Math.min(width, x0 + brush); x++) {
                     int i = x + y * width;
                     if ((cells[i] & 0xFF) == ink) continue;
-                    if (supply != null && ink < supply.length && supply[ink] != UNLIMITED) {
+                    if (supply != null && supply[ink] != UNLIMITED) {
                         if (supply[ink] <= 0) continue;
                         supply[ink]--;
                     }
