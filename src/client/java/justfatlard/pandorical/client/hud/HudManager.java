@@ -50,7 +50,8 @@ public final class HudManager {
 			roots, componentIndex
 		);
 
-		activeOverlays.put(payload.overlayId(), overlay);
+		HudOverlay replaced = activeOverlays.put(payload.overlayId(), overlay);
+		if (replaced != null) removed(replaced);
 		Pandorical.LOGGER.debug("HUD overlay '{}' shown with {} components", payload.overlayId(), roots.size());
 	}
 
@@ -61,7 +62,13 @@ public final class HudManager {
 	}
 
 	public static void handleHide(HideHudS2C payload) {
-		activeOverlays.remove(payload.overlayId());
+		HudOverlay hidden = activeOverlays.remove(payload.overlayId());
+		if (hidden != null) removed(hidden);
+	}
+
+	/** An overlay's components are told they are gone, as a screen's are when it closes. */
+	private static void removed(HudOverlay overlay) {
+		overlay.roots.forEach(ScreenHelper::removedTree);
 	}
 
 	public static Map<String, HudOverlay> getActiveOverlays() {
@@ -78,6 +85,7 @@ public final class HudManager {
 	}
 
 	public static void clear() {
+		activeOverlays.values().forEach(HudManager::removed);
 		activeOverlays.clear();
 	}
 }
