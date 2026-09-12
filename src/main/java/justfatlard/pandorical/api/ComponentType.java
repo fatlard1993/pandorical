@@ -27,7 +27,8 @@ public final class ComponentType {
      * see it, falling back to the position that came with the blip when it cannot.
      *
      * <p>{@link #RADAR_BLIPS} is a list of {@code entityId,x,y,z,colour,size} separated by
-     * semicolons: colour an ARGB integer, size 1 to 3. {@link #RADAR_RANGE} is the disc's radius
+     * semicolons: colour an ARGB integer, size 1 to 3. A seventh field of {@code p} marks a
+     * player, drawn as a diamond rather than a square. {@link #RADAR_RANGE} is the disc's radius
      * in blocks. {@link #RADAR_TARGET_X} and {@link #RADAR_TARGET_Z} mark one place to head for,
      * drawn where it lies or on the rim when it is further than the range; leave them empty for
      * none.

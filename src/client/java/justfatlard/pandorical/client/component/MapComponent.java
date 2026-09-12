@@ -198,17 +198,23 @@ public class MapComponent extends AbstractComponent {
                     int decX = Integer.parseInt(parts[0]);
                     int decZ = Integer.parseInt(parts[1]);
                     int color = Integer.parseInt(parts[2]);
+                    boolean person = parts.length > 3 && parts[3].equals("minecraft:player");
 
-                    // Category filters, by the colour the server gave the dot
-                    if (!showHostile && color == 0xFFFF3333) continue;
-                    if (!showPassive && (color == 0xFF33FF33 || color == 0xFFFFAA00)) continue;
+                    // Category filters, by the colour the server gave the dot. A person's colour
+                    // is their locator bar colour and can be anything, so it is never filtered.
+                    if (!person && !showHostile && color == 0xFFFF3333) continue;
+                    if (!person && !showPassive && (color == 0xFF33FF33 || color == 0xFFFFAA00)) continue;
 
                     if (Math.abs(decX - clampedSelfDecX) <= 1 && Math.abs(decZ - clampedSelfDecY) <= 1) continue;
                     int sx = Math.round(originX + (decX / 2.0f + 64f) * zoomScale);
                     int sy = Math.round(originY + (decZ / 2.0f + 64f) * zoomScale);
                     if (sx < mapX || sx >= mapX + mapSize || sy < mapY || sy >= mapY + mapSize) continue;
-                    // 2x2 dot; small enough not to obscure map detail
-                    graphics.fill(sx, sy, sx + 2, sy + 2, color);
+                    if (person) {
+                        diamond(graphics, sx, sy, color);
+                    } else {
+                        // 2x2 dot; small enough not to obscure map detail
+                        graphics.fill(sx, sy, sx + 2, sy + 2, color);
+                    }
                 } catch (NumberFormatException ignored) {}
             }
         }
@@ -339,6 +345,23 @@ public class MapComponent extends AbstractComponent {
         graphics.blit(sprite.atlasLocation(), -1, 1, -1, 1,
             sprite.getU0(), sprite.getU1(), sprite.getV1(), sprite.getV0());
         pose.popMatrix();
+    }
+
+    /**
+     * Another player: a diamond in their locator bar colour, outlined dark so it holds up on
+     * terrain of any colour. A different shape from a mob's square, because the colours overlap
+     * - a player whose dot came out red is still a person and not something to run from.
+     */
+    static void diamond(GuiGraphicsExtractor graphics, int cx, int cy, int color) {
+        diamondFill(graphics, cx, cy, 3, 0xE0101010);
+        diamondFill(graphics, cx, cy, 2, color);
+    }
+
+    private static void diamondFill(GuiGraphicsExtractor graphics, int cx, int cy, int r, int color) {
+        for (int dy = -r; dy <= r; dy++) {
+            int half = r - Math.abs(dy);
+            graphics.fill(cx - half, cy + dy, cx + half + 1, cy + dy + 1, color);
+        }
     }
 
     /**

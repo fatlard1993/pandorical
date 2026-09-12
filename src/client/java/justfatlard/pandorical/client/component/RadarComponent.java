@@ -30,7 +30,7 @@ public class RadarComponent extends AbstractComponent {
     /** Past this far above or below, a blip is dimmed: it is near on the map and not in reach. */
     private static final double DIM_HEIGHT = 6.0;
 
-    private record Blip(int entityId, double x, double y, double z, int color, int size) {}
+    private record Blip(int entityId, double x, double y, double z, int color, int size, boolean person) {}
 
     private final List<Blip> blips = new ArrayList<>();
     private float range = 32f;
@@ -63,7 +63,8 @@ public class RadarComponent extends AbstractComponent {
             try {
                 blips.add(new Blip(Integer.parseInt(parts[0]),
                     Double.parseDouble(parts[1]), Double.parseDouble(parts[2]), Double.parseDouble(parts[3]),
-                    Integer.parseInt(parts[4]), Math.clamp(Integer.parseInt(parts[5]), 1, 3)));
+                    Integer.parseInt(parts[4]), Math.clamp(Integer.parseInt(parts[5]), 1, 3),
+                    parts.length > 6 && parts[6].equals("p")));
             } catch (NumberFormatException ignored) {
                 // One bad entry costs that dot, not the radar.
             }
@@ -107,6 +108,11 @@ public class RadarComponent extends AbstractComponent {
             if (side * side + ahead * ahead > (double) range * range) continue;
 
             int color = Math.abs(at.y - self.y) > DIM_HEIGHT ? dim(blip.color()) : blip.color();
+            if (blip.person()) {
+                MapComponent.diamond(graphics, Math.round(cx + (float) side * perBlock),
+                    Math.round(cy - (float) ahead * perBlock), color);
+                continue;
+            }
             // Two, three or four pixels across: a chicken, a cow, a ravager.
             int across = blip.size() + 1;
             int px = Math.round(cx + (float) side * perBlock) - across / 2;
