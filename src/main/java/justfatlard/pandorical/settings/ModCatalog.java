@@ -13,39 +13,25 @@ import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.fabricmc.loader.api.metadata.Person;
 
-/**
- * What is installed on this server, as a player would want to read it.
- *
- * <p>Every mod the loader knows, less the plumbing nobody installed on purpose: the game, the
- * loader, and Fabric API's own modules. Each comes with its name, version and description from
- * its manifest, and its readme if it shipped one in its jar - which every mod in this suite does,
- * as {@code README_<name>.md} beside its licence.
- */
 public final class ModCatalog {
     private ModCatalog() {}
 
-    /** One mod, ready to show. The readme is flattened markdown: a line per block, each knowing what it is. */
     public record ModInfo(String id, String name, String version, String authors, String description, List<Line> readme) {}
 
-    /** What a line of readme is. */
     public enum Kind {
-        /** {@code level} is the heading's depth, one for a title. */
+        /** {@code level} is the depth, 1 for a title. */
         HEADING,
-        /** A paragraph, joined from its source lines. */
         TEXT,
-        /** A list item; {@code level} is how deep it is nested, from zero. */
+        /** {@code level} is the nesting, from 0. */
         BULLET,
-        /** A list item whose text starts with its number and a dot. */
+        /** Text starts with the number and a dot. */
         NUMBERED,
-        /** One line of a fenced block, verbatim; a run of them is one block. */
+        /** One verbatim line; a run of them is one block. */
         CODE,
-        /** A quoted paragraph. */
         QUOTE,
-        /** A horizontal rule; no text. */
         RULE
     }
 
-    /** A block of readme, or a line of code. */
     public record Line(Kind kind, int level, String text) {
         public Line(Kind kind, String text) {
             this(kind, 0, text);
@@ -85,7 +71,6 @@ public final class ModCatalog {
             || id.startsWith("fabric-") || id.equals("fabric") || id.startsWith("fabric_");
     }
 
-    /** The readme shipped in the jar root, flattened, or an empty list. */
     private static List<Line> readme(ModContainer container) {
         for (Path root : container.getRootPaths()) {
             try (Stream<Path> files = Files.list(root)) {
@@ -95,17 +80,12 @@ public final class ModCatalog {
                 }).findFirst().orElse(null);
                 if (found != null) return flatten(Files.readString(found, StandardCharsets.UTF_8));
             } catch (IOException ignored) {
-                // A jar without a listable root has no readme to show.
             }
         }
         return List.of();
     }
 
-    /**
-     * Markdown as blocks: headings with their depth, paragraphs joined, list items with their
-     * nesting, fenced code kept verbatim, quotes and rules marked, tables turned into a list of
-     * their rows. Images and raw HTML are left out; links keep their text.
-     */
+    /** Images and raw HTML are dropped; a table becomes a list of its rows. */
     static List<Line> flatten(String markdown) {
         List<Line> out = new ArrayList<>();
         StringBuilder paragraph = new StringBuilder();
@@ -151,8 +131,7 @@ public final class ModCatalog {
             if (line.startsWith("|")) {
                 flush.run();
                 if (line.matches("^\\|?\\s*:?-+:?\\s*(\\|\\s*:?-+:?\\s*)*\\|?$")) {
-                    // The rule under a header row. Column names are for a grid, and these rows
-                    // are read as a list, so the header goes with its rule.
+                    // Rows are read as a list, so the header row goes with the rule under it.
                     if (tableRow && !out.isEmpty()) out.remove(out.size() - 1);
                     continue;
                 }
@@ -201,11 +180,7 @@ public final class ModCatalog {
         return withoutEmptyHeadings(out);
     }
 
-    /**
-     * A heading with nothing under it before the next heading at its level or above, or the
-     * end: a section that was only images or HTML, which are left out, and reads in-game as a
-     * title over nothing.
-     */
+    /** Drops a heading whose section held only images or HTML. */
     private static List<Line> withoutEmptyHeadings(List<Line> lines) {
         List<Line> out = new ArrayList<>(lines);
         boolean changed = true;

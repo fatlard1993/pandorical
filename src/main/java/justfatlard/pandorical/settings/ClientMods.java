@@ -16,13 +16,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 /**
- * The mods a player's own client brought, kept per player so the menu can list them.
- *
- * <p>A client-side mod is on nobody's server, so what the menu knows of it is what the client
- * said: name, version, description, readme and settings, with the values the client holds. The
- * values live on the client. The menu edits them the way it edits any setting, and every change
- * is handed straight back to the client to apply and keep; the copy here is only what the
- * screen shows, refreshed whenever the client says its values moved.
+ * The mods a player's own client declared. Their values live on the client: every change is sent
+ * back to it, and the copy here only feeds the screen.
  */
 public final class ClientMods {
     private ClientMods() {}
@@ -30,11 +25,7 @@ public final class ClientMods {
     private static final Map<UUID, List<ClientSettingsC2S.Mod>> byPlayer = new ConcurrentHashMap<>();
     private static final Map<UUID, Map<String, String>> values = new ConcurrentHashMap<>();
 
-    /**
-     * What one client may declare, and what all of them together may add to the server's registry.
-     * A registered setting is kept for the life of the server, so a client that invents a new mod
-     * each time it connects would otherwise grow it without end.
-     */
+    /** A registered setting lasts the server's life, so what clients may add to it is capped. */
     private static final int MOST_MODS = 64;
     private static final int MOST_SETTINGS_PER_MOD = 64;
     private static final int MOST_REGISTERED = 1024;
@@ -72,7 +63,6 @@ public final class ClientMods {
         values.remove(player.getUUID());
     }
 
-    /** The player's client mods as catalogue entries, or nothing for a client that declared none. */
     public static List<ModCatalog.ModInfo> of(ServerPlayer player) {
         List<ModCatalog.ModInfo> out = new ArrayList<>();
         for (ClientSettingsC2S.Mod mod : byPlayer.getOrDefault(player.getUUID(), List.of())) {
@@ -82,11 +72,7 @@ public final class ClientMods {
         return out;
     }
 
-    /**
-     * A client setting as a registry setting, backed by the per-player copy and the packet that
-     * carries a change back. Registered once per key, on the first client that declares it; the
-     * schema is the mod's, not the player's.
-     */
+    /** Once per key, from the first client that declares it: the schema is the mod's, not the player's. */
     private static void register(SettingsRegistry registry, ClientSettingsC2S.Mod mod, ClientSettingsC2S.Setting setting) {
         SettingsApi.Group group = registry.clientGroup(mod.id(), mod.name());
         String id = mod.id() + ":" + setting.key();

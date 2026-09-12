@@ -5,19 +5,14 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * How wide text is in the default font, as near as a server can tell.
- *
- * <p>The client measures with the font it has; the server lays the mod menu out without one.
- * Vanilla's glyphs advance six pixels but for a handful of narrow ones, and this table carries
- * those. A resource pack's font can differ, so a caller keeps a few pixels spare: a line a shade
- * short costs nothing, a line under the scrollbar cannot be read.
+ * Default-font text widths, as near as a server can tell. A resource pack's font can differ, so
+ * callers keep a few pixels spare.
  */
 final class Glyphs {
     private Glyphs() {}
 
     private static final String ELLIPSIS = "...";
     private static final int[] ASCII = new int[128];
-    /** Anything outside the table: the bullet and the accented letters run six to seven. */
     private static final int OTHER = 7;
 
     static {
@@ -39,7 +34,7 @@ final class Glyphs {
         return total;
     }
 
-    /** Words folded into lines at most {@code px} wide; a word wider than that is broken. */
+    /** A word wider than {@code px} is broken. */
     static List<String> wrap(String text, int px) {
         List<String> lines = new ArrayList<>();
         StringBuilder line = new StringBuilder();
@@ -64,7 +59,7 @@ final class Glyphs {
         return lines;
     }
 
-    /** The text cut into pieces at most {@code px} wide, spacing kept: for code, where it means something. */
+    /** Spacing kept, for code. */
     static List<String> cut(String text, int px) {
         List<String> pieces = new ArrayList<>();
         StringBuilder piece = new StringBuilder();
@@ -80,7 +75,6 @@ final class Glyphs {
         return pieces;
     }
 
-    /** The text if it fits in {@code px}, else as much as does with a mark on the end. */
     static String clip(String text, int px) {
         if (width(text) <= px) return text;
         int room = px - width(ELLIPSIS);

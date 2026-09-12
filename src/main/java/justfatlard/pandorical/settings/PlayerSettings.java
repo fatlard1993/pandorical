@@ -14,12 +14,6 @@ import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
-/**
- * What each player chose, for the settings whose mods do not keep the value themselves.
- *
- * <p>One store for the whole server, on the overworld, because a setting is the player's and not
- * the dimension's. Values are strings on disk; each setting knows how to read its own.
- */
 public final class PlayerSettings extends SavedData {
     private static final String STORAGE_KEY = "pandorical_player_settings";
 

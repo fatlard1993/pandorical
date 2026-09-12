@@ -20,33 +20,20 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.PermissionSet;
 
 /**
- * Which mod each command came from, and what it looks like typed out.
- *
- * <p>Nothing in the game records who registered a command: the dispatcher is one tree with every
- * mod's branches grafted onto it and no label saying whose is whose. So the owner is read off the
- * code instead. Every node carries the lambdas the mod wrote - what to run, and who may run it -
- * and a class knows which jar it was loaded from. The first node in a command's subtree that
- * resolves to a mod names the command; one that resolves to nothing is the game's own and is
- * left out of every mod's page.
- *
- * <p>Read once per server, because the dispatcher is built once and does not change while it
- * runs, and forgotten when the server stops.
+ * Which mod each command came from. Nothing in the game records who registered a command, so the
+ * owner is read off the classes of each node's command and requirement lambdas.
  */
 public final class ModCommands {
 	private ModCommands() {}
 
-	/** One usable form of a command: what to type, and whether it takes an operator to type it. */
 	public record Entry(String usage, boolean ops) {}
 
-	/** Deep enough for any command worth documenting; a redirect is followed no further than this. */
 	private static final int MAX_DEPTH = 6;
-	/** Enough for the wordiest command in the suite, and a stop against a tree that loops. */
 	private static final int MAX_ENTRIES = 60;
 
 	private static Map<String, List<Entry>> byMod;
 	private static Map<Class<?>, String> owners = new HashMap<>();
 
-	/** Every form of every command this mod registered, ops-only ones marked. Never null. */
 	public static synchronized List<Entry> of(String modId, ServerPlayer player) {
 		MinecraftServer server = player.level().getServer();
 		if (server == null) return List.of();
@@ -54,17 +41,13 @@ public final class ModCommands {
 		return byMod.getOrDefault(modId, List.of());
 	}
 
-	/** The dispatcher is rebuilt on a datapack reload, so what was read off it no longer holds. */
+	/** The dispatcher is rebuilt on a datapack reload. */
 	public static synchronized void forget() {
 		byMod = null;
 		owners = new HashMap<>();
 	}
 
-	/**
-	 * Read as a player would meet it: a player's own source, raised to an operator's permissions for
-	 * what an operator may run and lowered to none for what anyone may. The console is no stand-in,
-	 * since a command that asks for a player refuses it whatever its permissions.
-	 */
+	/** From the player's own source: a command that needs a player refuses the console. */
 	private static Map<String, List<Entry>> read(MinecraftServer server, ServerPlayer player) {
 		CommandDispatcher<CommandSourceStack> dispatcher = server.getCommands().getDispatcher();
 		CommandSourceStack ops = player.createCommandSourceStack()
@@ -74,7 +57,6 @@ public final class ModCommands {
 		Map<String, List<Entry>> found = new LinkedHashMap<>();
 		for (CommandNode<CommandSourceStack> root : dispatcher.getRoot().getChildren()) {
 			String mod = ownerOf(root);
-			// The game's own commands are the game's; this page is for what the mods added.
 			if (mod == null || mod.equals("minecraft")) continue;
 			List<Entry> entries = found.computeIfAbsent(mod, key -> new ArrayList<>());
 			walk(root, "", false, ops, anyone, entries, 0);
@@ -82,20 +64,12 @@ public final class ModCommands {
 		return found;
 	}
 
-	/**
-	 * Every path through this command that can actually be run, written the way it is typed.
-	 *
-	 * @param opsSoFar whether some step already taken needs an operator, since a branch under a
-	 *                 gate is behind that gate however open its own door is
-	 */
 	private static void walk(CommandNode<CommandSourceStack> node, String prefix, boolean opsSoFar,
 			CommandSourceStack ops, CommandSourceStack anyone, List<Entry> out, int depth) {
 		if (depth > MAX_DEPTH || out.size() >= MAX_ENTRIES) return;
 		boolean gated = opsSoFar || !node.canUse(anyone);
 		String here = prefix.isEmpty() ? node.getUsageText() : prefix + " " + node.getUsageText();
 		if (node.getCommand() != null) out.add(new Entry("/" + here, gated));
-		// A redirect is another command's tree wearing this name; saying where it goes is more
-		// use than copying it out, and it is how the game's own help writes one.
 		CommandNode<CommandSourceStack> redirect = node.getRedirect();
 		if (redirect != null) {
 			out.add(new Entry("/" + here + " → /" + redirect.getName(), gated));
@@ -107,13 +81,6 @@ public final class ModCommands {
 		}
 	}
 
-	/**
-	 * The mod this command belongs to, or null for the game's own.
-	 *
-	 * <p>Breadth first, so the answer comes from the shallowest node that can give one: a mod's
-	 * root literal usually carries its own permission check, and the run itself is a lambda in
-	 * the mod either way.
-	 */
 	private static String ownerOf(CommandNode<CommandSourceStack> root) {
 		Deque<CommandNode<CommandSourceStack>> pending = new ArrayDeque<>();
 		Set<CommandNode<CommandSourceStack>> seen = new HashSet<>();
@@ -135,13 +102,8 @@ public final class ModCommands {
 	}
 
 	/**
-	 * Which mod's jar a class came from.
-	 *
-	 * <p>The jar is the honest answer and the one asked for first: a class knows where it was
-	 * loaded from, and the loader knows which mod owns that file. A lambda has no code source of
-	 * its own, so it is asked about the class that declares it. Failing all of that the package
-	 * is compared with the mod ids, which catches a class the loader cannot place - a dev run
-	 * where every mod is a directory on one classpath, most of all.
+	 * A lambda has no code source of its own, so its declaring class is asked. The package match
+	 * places classes the loader cannot, as in a dev run where every mod is a directory.
 	 */
 	private static String ownerOfClass(Class<?> type) {
 		Class<?> owner = type;
@@ -151,7 +113,6 @@ public final class ModCommands {
 			try {
 				owner = Class.forName(name.substring(0, lambda), false, type.getClassLoader());
 			} catch (Throwable ignored) {
-				// The declaring class is gone or unnameable; the package below still says enough.
 			}
 		}
 		String cached = owners.get(owner);
@@ -172,29 +133,17 @@ public final class ModCommands {
 			return null;
 		}
 		for (ModContainer mod : FabricLoader.getInstance().getAllMods()) {
-			// Asked one mod at a time: a mod inside another mod's jar has no path of its own and
-			// says so by throwing, and one such mod used to end the search for every mod after it.
+			// Per mod: a mod nested in another's jar throws here, and must not end the search.
 			try {
 				for (Path path : mod.getOrigin().getPaths()) {
 					if (from.startsWith(path.toAbsolutePath().normalize())) return mod.getMetadata().getId();
 				}
 			} catch (Throwable ignored) {
-				// Nested, or from nowhere on disk. Not this one, then.
 			}
 		}
 		return null;
 	}
 
-	/**
-	 * The mod whose id best matches this class's package, or null. Only ever a fallback: it is
-	 * how a class gets placed in a development run, where every mod is a directory of classes
-	 * rather than a jar the loader can name.
-	 *
-	 * <p>A mod id and a package say the same words in different dialects and not always in the
-	 * same order - {@code spawn-lock-justfatlard} against {@code justfatlard.spawn_lock} - so
-	 * both are cut into words and the id matches when every word of it is a word of the package.
-	 * The id with the most words wins, so {@code village-mail} is not answered by {@code village}.
-	 */
 	private static String byPackage(String className) {
 		Set<String> words = words(className);
 		String best = null;
@@ -210,7 +159,6 @@ public final class ModCommands {
 		return best;
 	}
 
-	/** The words in a name, however it spells its joins: dots, dashes, underscores, or capitals. */
 	private static Set<String> words(String text) {
 		Set<String> out = new HashSet<>();
 		StringBuilder word = new StringBuilder();

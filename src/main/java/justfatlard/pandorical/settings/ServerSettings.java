@@ -14,7 +14,6 @@ import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
-/** Server-wide setting values a mod did not keep itself, one per key, on the overworld. */
 public final class ServerSettings extends SavedData {
     private static final String STORAGE_KEY = "pandorical_server_settings";
 

@@ -16,13 +16,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
-/**
- * The settings for anyone who cannot see the screen.
- *
- * <p>{@code /pandorical settings} opens the screen on a Pandorical client. {@code list} says what
- * every setting is, and {@code <mod> <key> <value>} changes one, which is what a vanilla client
- * has instead of a screen.
- */
+/** Settings by command, for a vanilla client that cannot show the screen. */
 public final class SettingsCommand {
     private SettingsCommand() {}
 
@@ -52,7 +46,6 @@ public final class SettingsCommand {
         return 1;
     }
 
-    /** The mod menu on a Pandorical client; the list of mods, one line each, on any other. */
     private static int mods(CommandSourceStack source) throws CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
         if (PandoricalApi.hasCapability(player, Capabilities.SCREENS)) {
@@ -121,13 +114,9 @@ public final class SettingsCommand {
         return 1;
     }
 
-    /** Pandorical's own English, read out of this jar, for the games that do not have it. */
+    /** The fallback text for a vanilla client, which has no Pandorical lang. */
     private static final Map<String, String> ENGLISH = readEnglish();
 
-    /**
-     * Text a player on any game can read: the key for one with Pandorical's language, and the
-     * English for a vanilla game, which is who this command is for as often as not.
-     */
     private static Component text(String key, Object... args) {
         return Component.translatableWithFallback(key, ENGLISH.getOrDefault(key, key), args);
     }

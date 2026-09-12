@@ -27,23 +27,10 @@ import java.util.Comparator;
 import java.util.Locale;
 import net.minecraft.server.permissions.Permissions;
 
-/**
- * Every mod's settings, and the one screen that shows them.
- *
- * <p>The screen is the mod menu: every mod installed down the left, and the chosen one on the
- * right with its description, its settings, and its readme. A toggle is a button that says On or
- * Off; a choice is a button that says the current option and cycles through them; a number is a
- * value between a minus and a plus. A press changes the value where it lives and re-labels the
- * control in place; only choosing another mod rebuilds the screen.
- *
- * <p>The settings sit in sections by whose they are: the player's own, kept here for them; the
- * player's own, kept by their client; and the server's, one value for everyone, which only an
- * op is shown.
- */
 public final class SettingsRegistry implements SettingsApi {
     public static final String SCREEN_TYPE = "pandorical:settings";
 
-    /** Whose a group's values are, in the order the sections are shown. */
+    /** Declaration order is section order. */
     public enum Kind { PLAYER, CLIENT, SERVER }
 
     private static final int LIST_X = 8;
@@ -55,31 +42,20 @@ public final class SettingsRegistry implements SettingsApi {
     private static final int LINE = 10;
     private static final int ROW = 24;
     private static final int CONTROL_W = 84;
-    /** How far a list's entries sit in from its label. */
     private static final int INDENT = 8;
-    /** Lines the pane will carry; past this the rest is left unsaid. */
     private static final int MOST_LINES = 800;
     private static final String HEADING_COLOR = "#303030";
     private static final String LABEL_COLOR = "#404040";
     private static final String HINT_COLOR = "#707070";
-    /** The ops' colour: the server section's reminder, and the pill of a mod with server settings. */
     private static final String OPS_COLOR = "#B02828";
-    /** The count bubble beside a mod's button: a quiet blue pill, white figure, against vanilla's grey. */
     private static final String BADGE_COLOR = "#FF4A76B8";
     private static final String OPS_BADGE_COLOR = "#FFB02828";
-    /** The readme's furniture: rules under titles, the inset a code block sits in, a quote's bar. */
     private static final String RULE_COLOR = "#FF8C8C8C";
     private static final String CODE_BG_COLOR = "#FFB8B8B8";
     private static final String CODE_COLOR = "#1C2C3C";
     private static final String QUOTE_BAR_COLOR = "#FF9A9A9A";
     private static final String BADGE_TEXT_COLOR = "#FFFFFFFF";
 
-    /**
-     * The screen's measurements, cut to the window it will show in.
-     *
-     * <p>The least is what vanilla's smallest window holds, which every window can show. The most
-     * is where a line of readme gets too long to read back across; a bigger window gets margins.
-     */
     private record Layout(int width, int height, int listW, int paneX, int paneW, int listH, int paneH) {
         private static final int LEAST_W = 320;
         private static final int LEAST_H = 230;
@@ -95,36 +71,25 @@ public final class SettingsRegistry implements SettingsApi {
             return new Layout(width, height, listW, paneX, width - paneX - GUTTER, height - 52, height - PANE_Y - 32);
         }
 
-        /** A line of prose: clear of the pane's scrollbar, with a little spare for another font. */
+        /** Clear of the scrollbar, with spare for a client font wider than {@link Glyphs} measures. */
         int proseW() { return paneW - 12; }
 
-        /** A setting's label and hint: what its control leaves. */
         int labelW(int controlW) { return paneW - controlW - 14; }
 
-        /** The widest a control may grow for a long option; the label keeps enough to wrap in. */
         int mostControlW() { return paneW - 10 - 60; }
     }
 
     private final List<GroupImpl> groups = new ArrayList<>();
     private final Map<String, SettingImpl<?>> byId = new HashMap<>();
-    /** The screen each player has open, so a press can re-label its control. */
     private final Map<UUID, String> openScreens = new ConcurrentHashMap<>();
-    /** Which mod and tab each player is looking at, so a press on one keeps the other. */
     private record Shown(String mod, String tab) {}
 
-    /** Which slot each player is waiting to press a key for, while the keys tab is open. */
     private final Map<UUID, Integer> rebinding = new ConcurrentHashMap<>();
     private final Map<UUID, Shown> shown = new ConcurrentHashMap<>();
-    /**
-     * How far down the mod list each player has scrolled, so the list a press rebuilds comes
-     * back at the same place. The list tells us every time it moves; without this, choosing the
-     * thirtieth mod put the list back at the top with the chosen one out of sight.
-     */
+    /** The client reports every scroll, so a rebuilt list comes back at the same place. */
     private final Map<UUID, Integer> listScroll = new ConcurrentHashMap<>();
-    /** The same for the pane, which a change to a setting may rebuild mid-read. */
     private final Map<UUID, Integer> paneScroll = new ConcurrentHashMap<>();
 
-    /** A player gone from the server: whatever their menu was showing goes with them. */
     public void forget(UUID player) {
         openScreens.remove(player);
         rebinding.remove(player);
@@ -133,7 +98,7 @@ public final class SettingsRegistry implements SettingsApi {
         paneScroll.remove(player);
     }
 
-    /** Wire the screen's actions and the keybind reports; once, after both APIs exist. */
+    /** Once, after the screen and keybind APIs exist. */
     public void init() {
         PandoricalApi.screens().onActionFallback(SCREEN_TYPE, (player, data) -> press(player, data.get("_componentId"), data));
         PandoricalApi.screens().onAction(SCREEN_TYPE, "close", (player, data) -> {
@@ -149,8 +114,6 @@ public final class SettingsRegistry implements SettingsApi {
             listScroll.remove(player.getUUID());
             paneScroll.remove(player.getUUID());
         });
-        // Each report lays the keys tab out again, so only one that changed, or that a rebind is
-        // waiting on, is worth the rebuild.
         PandoricalApi.keybindsImpl().onBindingsReported((player, changed) -> {
             if (changed || isRebinding(player)) refreshKeybinds(player);
         });
@@ -166,7 +129,6 @@ public final class SettingsRegistry implements SettingsApi {
         return group(modId, modName, Kind.SERVER);
     }
 
-    /** A group whose values a player's own client keeps; see {@link ClientMods}. */
     public Group clientGroup(String modId, String modName) {
         return group(modId, modName, Kind.CLIENT);
     }
@@ -180,7 +142,6 @@ public final class SettingsRegistry implements SettingsApi {
         return group;
     }
 
-    /** The one bar for touching the server's own settings: the same one that runs its commands. */
     public static boolean isOp(ServerPlayer player) {
         return player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
     }
@@ -197,12 +158,11 @@ public final class SettingsRegistry implements SettingsApi {
         return groups;
     }
 
-    /** The setting called {@code mod:key}, or null. */
     public SettingImpl<?> find(String modId, String key) {
         return byId.get(modId + ":" + key);
     }
 
-    /** The menu as the player left it if it is open now, since a resize asks for it again; else fresh. */
+    /** As the player left it if it is open, since a window resize asks again; else fresh. */
     @Override
     public void open(ServerPlayer player) {
         Shown was = openScreens.containsKey(player.getUUID()) ? shown.get(player.getUUID()) : null;
@@ -213,10 +173,6 @@ public final class SettingsRegistry implements SettingsApi {
         open(player, selectedId, null);
     }
 
-    /**
-     * A mod's groups this player may see, in section order: those with a setting shown to
-     * them right now, and server groups only for ops.
-     */
     private List<GroupImpl> groupsFor(String modId, ServerPlayer player) {
         List<GroupImpl> out = new ArrayList<>();
         for (GroupImpl group : groups) {
@@ -228,13 +184,8 @@ public final class SettingsRegistry implements SettingsApi {
         return out;
     }
 
-    /**
-     * The mod menu: every mod down the left, and the chosen one on the right with its
-     * description, its settings if it registered any, and its readme.
-     */
     public void open(ServerPlayer player, String selectedId, String tab) {
         Layout at = Layout.fit(Viewport.of(player));
-        // The server's mods and this player's own client mods, one list, the client's marked.
         List<ModCatalog.ModInfo> mods = new ArrayList<>(ModCatalog.all());
         for (ModCatalog.ModInfo mine : ClientMods.of(player)) {
             if (mods.stream().noneMatch(mod -> mod.id().equals(mine.id()))) mods.add(mine);
@@ -247,15 +198,11 @@ public final class SettingsRegistry implements SettingsApi {
             }
         }
         if (selected == null) {
-            // Start on something with a setting to change, else the first name.
             for (ModCatalog.ModInfo mod : mods) {
                 if (!groupsFor(mod.id(), player).isEmpty()) { selected = mod; break; }
             }
             if (selected == null && !mods.isEmpty()) selected = mods.get(0);
         }
-        // Every tab this mod has anything on, in reading order. A mod with no commands has no
-        // commands tab: four buttons across a narrow pane leave no room for their own names, and
-        // an empty tab is a press that tells the player nothing.
         List<String> tabs = new ArrayList<>();
         if (selected != null) {
             tabs.add("readme");
@@ -263,7 +210,6 @@ public final class SettingsRegistry implements SettingsApi {
             if (!ModCommands.of(selected.id(), player).isEmpty()) tabs.add("commands");
             if (!PandoricalApi.keybindsImpl().claimsOf(selected.id()).isEmpty()) tabs.add("keybinds");
         }
-        // Settings first when there are some to change; the readme otherwise.
         String at_tab = tab != null && tabs.contains(tab) ? tab
             : tabs.contains("settings") ? "settings" : "readme";
 
@@ -274,10 +220,6 @@ public final class SettingsRegistry implements SettingsApi {
             .prop(ComponentType.PROP_TEXT_KEY, "pandorical.mods.title")
             .prop(ComponentType.PROP_COLOR, HEADING_COLOR));
 
-        // The list. A mod with settings this player may change wears a count of them beside
-        // its button, so the ones worth opening can be told from the ones that are only a
-        // readme without opening each in turn; the pill is red when any of them are the
-        // server's. The button carries the whole name; the client fits it with the font it has.
         List<ComponentDef> names = new ArrayList<>();
         int buttonW = at.listW - 8;
         int y = 0;
@@ -318,7 +260,6 @@ public final class SettingsRegistry implements SettingsApi {
             "scroll_offset", String.valueOf(offset),
             "show_scrollbar", String.valueOf(mods.size() * LIST_ROW > at.listH)), names);
 
-        // The chosen mod.
         if (selected != null) {
             screen.component(new ComponentBuilder("name", ComponentType.TEXT)
                 .bounds(at.paneX, 20, at.paneW, 12)
@@ -344,7 +285,6 @@ public final class SettingsRegistry implements SettingsApi {
                 case "keybinds" -> keybindsPane(player, selected, about, at);
                 default -> readmePane(selected, about, at);
             };
-            // Laid out in lines, scrolled two at a time; the scrollbar's arithmetic is in lines too.
             int lines = (height + LINE - 1) / LINE;
             int paneOffset = Math.max(0, Math.min(paneScroll.getOrDefault(player.getUUID(), 0), lines - at.paneH / LINE));
             screen.scrollPanel("about", at.paneX, PANE_Y, at.paneW, at.paneH, Map.of(
@@ -364,15 +304,10 @@ public final class SettingsRegistry implements SettingsApi {
         PandoricalApi.screens().open(player, screen.build());
     }
 
-    /** Whether this player's keys tab is waiting on a key for one of its slots. */
     private boolean isRebinding(ServerPlayer player) {
         return rebinding.containsKey(player.getUUID());
     }
 
-    /**
-     * The client has just said what its keys are bound to. Anyone sitting on the keys tab is
-     * shown the answer, and whatever they were waiting for has arrived.
-     */
     private void refreshKeybinds(ServerPlayer player) {
         Shown was = shown.get(player.getUUID());
         if (was == null || !"keybinds".equals(was.tab())) {
@@ -383,7 +318,6 @@ public final class SettingsRegistry implements SettingsApi {
         open(player, was.mod(), was.tab());
     }
 
-    /** What a section is called, and the line under it saying whose the values are. */
     private static String sectionTitle(Kind kind) {
         return switch (kind) {
             case PLAYER -> "Your settings";
@@ -400,14 +334,6 @@ public final class SettingsRegistry implements SettingsApi {
         };
     }
 
-    /**
-     * The commands tab: every form of every command the mod registered, one to a line, with the
-     * ones an operator alone may run marked and gathered under their own heading.
-     *
-     * <p>A command is worth nothing unheard of, and until now the only way to learn a server
-     * mod's commands was to type a slash and read the suggestions, which says the names and not
-     * what they take.
-     */
     private int commandsPane(ServerPlayer player, ModCatalog.ModInfo mod, List<ComponentDef> out, Layout at) {
         List<ModCommands.Entry> entries = ModCommands.of(mod.id(), player);
         if (entries.isEmpty()) {
@@ -433,8 +359,6 @@ public final class SettingsRegistry implements SettingsApi {
             }
             y += 2;
             for (ModCommands.Entry entry : section) {
-                // Wrapped rather than clipped: a command with three arguments is longer than the
-                // pane and the arguments are the half worth reading.
                 List<String> lines = Glyphs.wrap(entry.usage(), at.proseW() - INDENT);
                 for (int i = 0; i < lines.size(); i++) {
                     out.add(new ComponentBuilder("cmd:" + n++, ComponentType.TEXT)
@@ -449,14 +373,6 @@ public final class SettingsRegistry implements SettingsApi {
         return y;
     }
 
-    /**
-     * The keys tab: the keybinds this mod claimed, what each is bound to now, and a button that
-     * binds it to the next key pressed.
-     *
-     * <p>The pool is Pandorical's and the names are the server's, so the controls screen shows
-     * them under one heading with no hint of which mod asked for what. Here they sit with the
-     * mod they belong to, and can be changed without leaving the page.
-     */
     private int keybindsPane(ServerPlayer player, ModCatalog.ModInfo mod, List<ComponentDef> out, Layout at) {
         var keybinds = PandoricalApi.keybindsImpl();
         List<KeybindPool.Claim> claims = keybinds.claimsOf(mod.id());
@@ -500,10 +416,6 @@ public final class SettingsRegistry implements SettingsApi {
         return y;
     }
 
-    /**
-     * The settings tab: a section per group the player may see, each headed with whose it is,
-     * and a row per setting under it; or a line saying there are none.
-     */
     private int settingsPane(ServerPlayer player, ModCatalog.ModInfo mod, List<ComponentDef> out, Layout at) {
         List<GroupImpl> sections = groupsFor(mod.id(), player);
         if (sections.isEmpty()) {
@@ -529,12 +441,11 @@ public final class SettingsRegistry implements SettingsApi {
         return y;
     }
 
-    /** The readme tab: the description, then the readme, block by block. */
     private int readmePane(ModCatalog.ModInfo mod, List<ComponentDef> out, Layout at) {
         Readme readme = new Readme(out, at);
         if (!mod.description().isEmpty()) readme.paragraph(mod.description(), LABEL_COLOR, 0);
         List<ModCatalog.Line> lines = mod.readme();
-        // The title is the mod's name, which the pane already says above, with its version.
+        // A level-1 title repeats the mod name shown above the pane.
         int first = !lines.isEmpty() && lines.get(0).kind() == ModCatalog.Kind.HEADING && lines.get(0).level() == 1 ? 1 : 0;
         for (int i = first; i < lines.size(); i++) {
             if (readme.n >= MOST_LINES) {
@@ -569,12 +480,6 @@ public final class SettingsRegistry implements SettingsApi {
         return Math.max(readme.y, 1);
     }
 
-    /**
-     * Lays readme blocks down the pane. Each kind has its own shape: a title carries a rule
-     * beneath it, a list item hangs its text off its marker, code sits in an inset with its
-     * spacing kept, a quote has a bar down its side. The gaps between blocks are what make a
-     * page of it readable; a wall is what it was without them.
-     */
     private final class Readme {
         private static final int GAP = 5;
         private static final int INDENT = 10;
@@ -601,7 +506,6 @@ public final class SettingsRegistry implements SettingsApi {
                 .prop(ComponentType.PROP_COLOR, color).build());
         }
 
-        /** Wrapped lines at an indent; returns how many. */
         private int lines(String text, String color, int indent) {
             List<String> wrapped = Glyphs.wrap(text, at.proseW() - indent);
             for (String line : wrapped) {
@@ -673,11 +577,6 @@ public final class SettingsRegistry implements SettingsApi {
             .prop(ComponentType.PROP_COLOR, color).build();
     }
 
-    /**
-     * A press on a control: "set:", "dec:" or "inc:" followed by the setting's id, or "rem:"
-     * followed by the setting's id and an entry's; "mod:" or "tab:" to rebuild the screen
-     * around another mod or tab; or a panel saying it scrolled.
-     */
     private void press(ServerPlayer player, String componentId, Map<String, String> data) {
         if (componentId == null) return;
         if (componentId.equals("mods") || componentId.equals("about")) {
@@ -694,11 +593,8 @@ public final class SettingsRegistry implements SettingsApi {
         if (colon < 0) return;
         String verb = componentId.substring(0, colon);
         if (verb.equals("mod") || verb.equals("tab")) {
-            // Opened over the old screen rather than after closing it. A close puts the cursor
-            // back in the middle of the window - vanilla grabs the mouse when the screen goes
-            // and lets it go again, centred, when the next one arrives - so every press on a
-            // mod's name yanked the pointer away from the list. Opening straight over the top
-            // swaps the screen with the cursor where it was.
+            // Opened over the old screen, not after closing it: vanilla recentres the cursor
+            // between screens.
             Shown was = shown.get(player.getUUID());
             String mod = verb.equals("mod") ? componentId.substring(colon + 1) : was == null ? null : was.mod();
             String tab = verb.equals("tab") ? componentId.substring(colon + 1) : was == null ? null : was.tab();
@@ -750,8 +646,7 @@ public final class SettingsRegistry implements SettingsApi {
         String screenId = openScreens.get(player.getUUID());
         if (screenId == null) return;
         if (setting.group.conditional() || setting instanceof ListImpl) {
-            // Another setting may have just appeared or gone: the page is laid out again, at
-            // the same place, rather than the one control re-labelled.
+            // A setting may have appeared or gone, so the page is laid out again.
             Shown was = shown.get(player.getUUID());
             open(player, was == null ? null : was.mod(), was == null ? null : was.tab());
         } else {
@@ -779,7 +674,6 @@ public final class SettingsRegistry implements SettingsApi {
             return setting;
         }
 
-        /** The settings shown to this player right now, in order. */
         List<SettingImpl<?>> shown(ServerPlayer player) {
             List<SettingImpl<?>> out = new ArrayList<>();
             for (SettingImpl<?> setting : settings) {
@@ -788,7 +682,6 @@ public final class SettingsRegistry implements SettingsApi {
             return out;
         }
 
-        /** Whether any setting here can come and go. */
         boolean conditional() {
             for (SettingImpl<?> setting : settings) {
                 if (!setting.conditions.isEmpty()) return true;
@@ -896,10 +789,7 @@ public final class SettingsRegistry implements SettingsApi {
         boolean displayIsKey() { return false; }
         boolean stepped() { return false; }
 
-        /**
-         * How wide the control is drawn: the usual, unless what it may have to say is wider,
-         * up to {@code most}. The client shrinks a label that still does not fit.
-         */
+        /** Up to {@code most}; the client shrinks a label that still does not fit. */
         int controlWidth(int most) { return CONTROL_W; }
 
         /** A value typed at a command, or null if it is not one this setting takes. */
@@ -907,12 +797,11 @@ public final class SettingsRegistry implements SettingsApi {
             return decode(typed);
         }
 
-        /** What {@link #parse} takes, said for a player who typed something else; empty when there is nothing to list. */
+        /** What {@link #parse} takes, for a player who typed something else; empty for nothing to list. */
         String accepts() {
             return "";
         }
 
-        /** The value as it would be shown, for a command listing. */
         public String shown(ServerPlayer player) {
             T value = get(player);
             return displayIsKey() ? encode(value) : display(value);
@@ -939,7 +828,6 @@ public final class SettingsRegistry implements SettingsApi {
             changed(player, value);
         }
 
-        /** Tell the listeners. */
         void changed(ServerPlayer player, T value) {
             for (BiConsumer<ServerPlayer, T> listener : listeners) listener.accept(player, value);
         }
@@ -984,7 +872,6 @@ public final class SettingsRegistry implements SettingsApi {
             return shownWhen(player -> Objects.equals(other.get(player), value));
         }
 
-        /** Whether this player is shown the setting right now. */
         public boolean visible(ServerPlayer player) {
             for (Predicate<ServerPlayer> condition : conditions) {
                 if (!condition.test(player)) return false;
@@ -997,12 +884,7 @@ public final class SettingsRegistry implements SettingsApi {
             return Map.of(displayIsKey() ? ComponentType.PROP_LABEL_KEY : ComponentType.PROP_LABEL, shown);
         }
 
-        /**
-         * The setting's rows on the page, panel-relative from {@code y}; returns their height.
-         *
-         * <p>The label and its hint stack down the left of the control, as many lines as they
-         * take; a lone one-line label sits level with the control instead.
-         */
+        /** Panel-relative from {@code y}; returns their height. */
         int rows(ServerPlayer player, List<ComponentDef> out, Layout at, int y) {
             int controlW = controlWidth(at.mostControlW());
             int labelW = at.labelW(controlW);
@@ -1021,7 +903,7 @@ public final class SettingsRegistry implements SettingsApi {
             return Math.max(ROW, 1 + lines * LINE + 3);
         }
 
-        /** The control(s) for this setting, panel-relative, with the control's right edge at {@code right}. */
+        /** Panel-relative, the control's right edge at {@code right}. */
         List<ComponentDef> controls(ServerPlayer player, int right, int y, int width) {
             List<ComponentDef> out = new ArrayList<>();
             if (stepped()) {
@@ -1041,7 +923,6 @@ public final class SettingsRegistry implements SettingsApi {
             return out;
         }
 
-        /** The update that shows the value it has now. */
         List<ComponentUpdate> relabel(ServerPlayer player) {
             if (stepped()) {
                 return List.of(new ComponentUpdate("val:" + id(), Map.of(ComponentType.PROP_TEXT, display(get(player)))));
@@ -1050,11 +931,7 @@ public final class SettingsRegistry implements SettingsApi {
         }
     }
 
-    /**
-     * A list the player prunes: its label and hint as a heading, then a row per entry with a
-     * button that takes it off. There is no value to cycle; a press rebuilds the page without
-     * the row, and {@code set} with an entry's id is the same removal for the command.
-     */
+    /** A list the player prunes: {@code set} with an entry's id removes that entry. */
     public final class ListImpl extends SettingImpl<String> {
         private static final int REMOVE_W = 56;
         private static final int ENTRY_ROW = 22;
