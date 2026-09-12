@@ -5,9 +5,6 @@ import justfatlard.pandorical.client.component.PandoricalComponent;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Client-side state for a single HUD overlay sent by the server.
- */
 public class HudOverlay {
 	public final String overlayId;
 	public final String anchor;
@@ -26,9 +23,6 @@ public class HudOverlay {
 		this.componentIndex = componentIndex;
 	}
 
-	/**
-	 * Get the bounding box width of all root components.
-	 */
 	public int getWidth() {
 		int minLeft = Integer.MAX_VALUE;
 		int maxRight = 0;
@@ -39,9 +33,6 @@ public class HudOverlay {
 		return roots.isEmpty() ? 0 : maxRight - minLeft;
 	}
 
-	/**
-	 * Get the bounding box height of all root components.
-	 */
 	public int getHeight() {
 		int minTop = Integer.MAX_VALUE;
 		int maxBottom = 0;

@@ -5,20 +5,12 @@ import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import justfatlard.pandorical.Pandorical;
 
-/**
- * Client-side camera hint manager.
- * Applies server-sent camera distance and perspective overrides.
- */
 public class CameraManager {
-    // All fields accessed only on the render thread via client.execute()
-    private static float overrideDistance = -1; // -1 = no override
+    private static float overrideDistance = -1;
     private static CameraType savedPerspective = null;
     private static boolean perspectiveForced = false;
     private static float zoomFactor = 1.0F;
 
-    /**
-     * Handle a camera hint from the server.
-     */
     public static void handleHint(CameraHintS2C hint) {
         switch (hint.hintType()) {
             case "distance" -> {
@@ -63,22 +55,16 @@ public class CameraManager {
         }
     }
 
-    /** How much the field of view is narrowed, 1.0 being not at all. */
+    /** 1.0 is no zoom. */
     public static float getZoomFactor() {
         return zoomFactor;
     }
 
-    /**
-     * Called by CameraMixin to get the overridden camera distance.
-     * Returns -1 if no override is active.
-     */
+    /** -1 when there is no override. */
     public static float getOverrideDistance() {
         return overrideDistance;
     }
 
-    /**
-     * Reset all camera overrides.
-     */
     public static void reset() {
         zoomFactor = 1.0F;
         overrideDistance = -1;
@@ -89,9 +75,6 @@ public class CameraManager {
         savedPerspective = null;
     }
 
-    /**
-     * Called on disconnect to clean up state.
-     */
     public static void onDisconnect() {
         reset();
     }

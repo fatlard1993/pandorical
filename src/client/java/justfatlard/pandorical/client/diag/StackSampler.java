@@ -6,14 +6,8 @@ import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Where the game's working threads are, ten times a second: for the first ten minutes on the
- * diagnostic jar, and for each window the load guard raises (see Diagnostics).
- *
- * <p>A native crash takes the process with it before anything can be caught or reported, so
- * the only record of where it happened is whatever was written down just before. This writes
- * down the render thread and the resource loaders as they go - only when what they are doing has
- * changed, so a thread sitting still costs one line - and the last lines before a crash name
- * the code, and the call into native code, that it died in.
+ * Logs each changed stack of the game's working threads while {@link Diagnostics#active}: a
+ * native crash leaves no record but what was written before it.
  */
 public final class StackSampler {
 	private StackSampler() {}
@@ -22,14 +16,8 @@ public final class StackSampler {
 	private static final long FOR_MILLIS = 600_000;
 	private static final int FRAMES = 14;
 
-	/** One sampler at a time; a window opening while one runs is simply more of the same run. */
 	private static final AtomicBoolean running = new AtomicBoolean();
 
-	/**
-	 * Start sampling, for as long as {@link Diagnostics#active} says: ten minutes on the diagnostic
-	 * jar, the length of a window for the load guard. Called at launch and again as each join
-	 * raises the guard.
-	 */
 	public static void start() {
 		if (!Diagnostics.active()) return;
 		Diagnostics.jvmLog();
@@ -52,15 +40,14 @@ public final class StackSampler {
 			Diagnostics.mark("stack sampler finished");
 			Diagnostics.jvmLogOff();
 			running.set(false);
-			// A join that raised the guard in the moment this one was stopping gets its own.
+			// The guard may have been raised again while this run was stopping.
 			if (Diagnostics.active()) start();
 		}
 	}
 
 	private static void sample(Map<Thread, String> last, String compilers, long until) {
 		for (int round = 0; Diagnostics.ON ? System.currentTimeMillis() < until : Diagnostics.active(); round++) {
-			// A second's heartbeat, so the log bounds when the process went even while nothing moves,
-			// and the compiler threads' ids, since the JVM starts more of them as the load grows.
+			// A heartbeat bounds when the process died; the JVM adds compiler threads under load.
 			if (round % 10 == 0) {
 				String now = Diagnostics.compilerThreads();
 				if (!now.equals(compilers)) {

@@ -6,11 +6,7 @@ import net.minecraft.locale.Language;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.util.FormattedCharSequence;
 
-/**
- * The game's language, reading a key's {@code .controller} line instead while a pad is in use.
- * Wrapped around whatever language the game puts in place (see LanguageHintMixin), so a resource
- * reload or a change of language in the options keeps it.
- */
+/** Wrapped around every language the game injects (LanguageHintMixin). See {@link InputHints}. */
 @Environment(EnvType.CLIENT)
 public final class HintLanguage extends Language {
 	private final Language base;

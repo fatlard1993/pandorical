@@ -17,23 +17,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Manages active HUD overlays on the client.
- * Overlays are sent by the server via ShowHudS2C and rendered each frame.
- */
 public final class HudManager {
 	private HudManager() {}
 
 	private static final Map<String, HudOverlay> activeOverlays = new LinkedHashMap<>();
 
 	public static void handleShow(ShowHudS2C payload) {
-		// Build component trees
 		ComponentContext context = new ComponentContext(
 			payload.overlayId(), "hud",
-			0, 0, // HUD overlays use absolute positioning via anchor/offset
+			0, 0,
 			Minecraft.getInstance().font,
-			(componentId, data) -> {}, // HUD components don't send actions
-			null // no menu for HUD overlays
+			(componentId, data) -> {},
+			null
 		);
 
 		List<PandoricalComponent> roots = new ArrayList<>();
@@ -66,7 +61,6 @@ public final class HudManager {
 		if (hidden != null) removed(hidden);
 	}
 
-	/** An overlay's components are told they are gone, as a screen's are when it closes. */
 	private static void removed(HudOverlay overlay) {
 		overlay.roots.forEach(ScreenHelper::removedTree);
 	}
@@ -75,7 +69,6 @@ public final class HudManager {
 		return activeOverlays;
 	}
 
-	/** Advance client-side interpolation for every active overlay's component tree by one client tick. */
 	public static void tick() {
 		for (HudOverlay overlay : activeOverlays.values()) {
 			for (PandoricalComponent root : overlay.roots) {

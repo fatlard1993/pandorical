@@ -11,14 +11,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Lets a server stand its own Pandorical overlay in for a vanilla HUD element (the
- * hunger bar, say) by suppressing vanilla's.
- *
- * <p>Every suppressible element is wrapped once at client init, because Fabric's
- * registry is a startup-time structure while suppression is per connection: the
- * wrapper stays installed for the process lifetime and consults a mutable set each
- * frame. That set is cleared on disconnect, so a suppression never leaks into the
- * next world or server.
+ * Hides vanilla HUD elements at the server's request. Every suppressible element is wrapped at
+ * client init, the only time Fabric's HUD registry is writable; the hidden set is per connection.
  */
 public final class VanillaHudElementSuppressor {
     private VanillaHudElementSuppressor() {}
@@ -26,11 +20,7 @@ public final class VanillaHudElementSuppressor {
     private static final Set<Identifier> suppressed = ConcurrentHashMap.newKeySet();
     private static boolean installed = false;
 
-    /**
-     * Elements a server may suppress. Deliberately not every vanilla element: chat,
-     * the player list, the sleep overlay and the demo timer stay untouchable so a
-     * server cannot blind a player to the things they need to leave or communicate.
-     */
+    /** Chat, the player list, the sleep overlay and the demo timer are never hidden. */
     private static final List<Identifier> SUPPRESSIBLE = List.of(
         VanillaHudElements.MISC_OVERLAYS,
         VanillaHudElements.CROSSHAIR,
@@ -51,7 +41,7 @@ public final class VanillaHudElementSuppressor {
         VanillaHudElements.SUBTITLES
     );
 
-    /** Install the wrappers. Safe to call once, at client init. */
+    /** Client init only. */
     public static void init() {
         if (installed) return;
         installed = true;
@@ -62,8 +52,6 @@ public final class VanillaHudElementSuppressor {
                     original.extractRenderState(extractor, delta);
                 });
             } catch (Exception e) {
-                // An element this client build doesn't have is not fatal: it just
-                // stays unsuppressible.
                 Pandorical.LOGGER.debug("Could not wrap vanilla HUD element {}: {}", id, e.getMessage());
             }
         }
