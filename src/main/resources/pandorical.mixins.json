@@ -11,7 +11,10 @@
 		"MountCapacityMixin",
 		"TrackerPoseFlushMixin",
 		"FencePostMixin",
-		"WallPostMixin"
+		"WallPostMixin",
+		"ConnectionChannelAccessor",
+		"ConfigPatienceMixin",
+		"ServerCommonConnectionAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1

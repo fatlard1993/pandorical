@@ -4,6 +4,7 @@ import justfatlard.pandorical.api.EntityRendererRegistry;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.PlayerInventoryApi;
 import justfatlard.pandorical.api.PlayerInventoryApiImpl;
+import justfatlard.pandorical.config.ConfigPatience;
 import justfatlard.pandorical.config.PandoricalSyncTask;
 import justfatlard.pandorical.protocol.*;
 import justfatlard.pandorical.screen.PandoricalMenu;
@@ -299,6 +300,7 @@ public class Pandorical implements ModInitializer {
                     return;
                 }
                 if (profile != null) configPhaseSyncedPlayers.add(profile.id());
+                ConfigPatience.end(handler, ((justfatlard.pandorical.mixin.ServerCommonConnectionAccessor) handler).pandorical$connection());
                 LOGGER.info("Client {} completed config-phase content sync",
                     profile != null ? profile.name() : "(unknown profile)");
 
@@ -322,8 +324,10 @@ public class Pandorical implements ModInitializer {
         // hand-off into the play phase is not something the API says plainly, and clearing the
         // player's id on that path would take the flag away before JOIN reads it. It does not
         // need clearing anyway - see configPhaseSyncedPlayers.
-        ServerConfigurationConnectionEvents.DISCONNECT.register((handler, server) ->
-            ackedConfigConnections.remove(handler));
+        ServerConfigurationConnectionEvents.DISCONNECT.register((handler, server) -> {
+            ackedConfigConnections.remove(handler);
+            ConfigPatience.forget(handler);
+        });
 
         // Server: add our sync task BEFORE Fabric's registry sync
         ServerConfigurationConnectionEvents.BEFORE_CONFIGURE.register((handler, server) -> {
@@ -373,6 +377,8 @@ public class Pandorical implements ModInitializer {
                         }
                         LOGGER.info("Added PandoricalSyncTask for config phase ({} blocks, {} items)",
                             blocks.size(), items.size());
+                        ConfigPatience.begin(handler,
+                            ((justfatlard.pandorical.mixin.ServerCommonConnectionAccessor) handler).pandorical$connection());
                     } catch (IOException e) {
                         LOGGER.error("Failed to build config-phase asset chunks", e);
                     }
