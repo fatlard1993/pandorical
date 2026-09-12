@@ -244,12 +244,18 @@ public class Pandorical implements ModInitializer {
             justfatlard.pandorical.protocol.ChestOverlayS2C.TYPE,
             justfatlard.pandorical.protocol.ChestOverlayS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(KeybindDeclarationsS2C.TYPE, KeybindDeclarationsS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.KeybindRebindS2C.TYPE,
+            justfatlard.pandorical.protocol.KeybindRebindS2C.STREAM_CODEC);
 
         // C2S play
         PayloadTypeRegistry.serverboundPlay().register(HelloC2S.TYPE, HelloC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(ScreenActionC2S.TYPE, ScreenActionC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(ContentReadyC2S.TYPE, ContentReadyC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(KeyPressC2S.TYPE, KeyPressC2S.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(
+            justfatlard.pandorical.protocol.KeybindBindingsC2S.TYPE,
+            justfatlard.pandorical.protocol.KeybindBindingsC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(
             justfatlard.pandorical.protocol.KeyReleaseC2S.TYPE, justfatlard.pandorical.protocol.KeyReleaseC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(
@@ -426,6 +432,11 @@ public class Pandorical implements ModInitializer {
         // limit) happens inside handleKeyPress, on the server thread
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STOPPED.register(
             server -> justfatlard.pandorical.settings.ModCommands.forget());
+        ServerPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.KeybindBindingsC2S.TYPE, (payload, context) -> {
+                context.player().level().getServer().execute(() ->
+                    PandoricalApi.keybindsImpl().handleBindings(context.player(), payload.keys()));
+            });
         ServerPlayNetworking.registerGlobalReceiver(KeyPressC2S.TYPE, (payload, context) -> {
             context.server().execute(() ->
                 PandoricalApi.keybindsImpl().handleKeyPress(context.player(), payload.slot()));

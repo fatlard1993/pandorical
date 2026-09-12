@@ -402,6 +402,11 @@ public class PandoricalClient implements ClientModInitializer {
             });
 
         // Keybind slot declarations
+        ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.KeybindRebindS2C.TYPE, (payload, context) -> {
+                context.client().execute(() ->
+                    justfatlard.pandorical.client.keybind.KeybindManager.handleRebindRequest(payload.slot()));
+            });
         ClientPlayNetworking.registerGlobalReceiver(KeybindDeclarationsS2C.TYPE, (payload, context) -> {
             context.client().execute(() ->
                 justfatlard.pandorical.client.keybind.KeybindManager.handleDeclarations(payload));

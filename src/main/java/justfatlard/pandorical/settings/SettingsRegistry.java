@@ -106,6 +106,9 @@ public final class SettingsRegistry implements SettingsApi {
     private final Map<UUID, String> openScreens = new ConcurrentHashMap<>();
     /** Which mod and tab each player is looking at, so a press on one keeps the other. */
     private record Shown(String mod, String tab) {}
+
+    /** Which slot each player is waiting to press a key for, while the keys tab is open. */
+    private final Map<UUID, Integer> rebinding = new ConcurrentHashMap<>();
     private final Map<UUID, Shown> shown = new ConcurrentHashMap<>();
     /**
      * How far down the mod list each player has scrolled, so the list a press rebuilds comes
@@ -124,6 +127,9 @@ public final class SettingsRegistry implements SettingsApi {
             if (id != null) PandoricalApi.screens().close(player, id);
         });
         PandoricalApi.screens().onClose(SCREEN_TYPE, player -> {
+            if (rebinding.remove(player.getUUID()) != null) {
+                PandoricalApi.keybindsImpl().requestRebind(player, -1);
+            }
             openScreens.remove(player.getUUID());
             shown.remove(player.getUUID());
             listScroll.remove(player.getUUID());
@@ -236,6 +242,7 @@ public final class SettingsRegistry implements SettingsApi {
             tabs.add("readme");
             if (!groupsFor(selected.id(), player).isEmpty()) tabs.add("settings");
             if (!ModCommands.of(selected.id(), player).isEmpty()) tabs.add("commands");
+            if (!PandoricalApi.keybindsImpl().claimsOf(selected.id()).isEmpty()) tabs.add("keybinds");
         }
         // Settings first when there are some to change; the readme otherwise.
         String at_tab = tab != null && tabs.contains(tab) ? tab
@@ -315,6 +322,7 @@ public final class SettingsRegistry implements SettingsApi {
             int height = switch (at_tab) {
                 case "settings" -> settingsPane(player, selected, about, at);
                 case "commands" -> commandsPane(player, selected, about, at);
+                case "keybinds" -> keybindsPane(player, selected, about, at);
                 default -> readmePane(selected, about, at);
             };
             // Laid out in lines, scrolled two at a time; the scrollbar's arithmetic is in lines too.
@@ -335,6 +343,20 @@ public final class SettingsRegistry implements SettingsApi {
         openScreens.put(player.getUUID(), screen.screenId());
         shown.put(player.getUUID(), new Shown(selected == null ? null : selected.id(), at_tab));
         PandoricalApi.screens().open(player, screen.build());
+    }
+
+    /**
+     * The client has just said what its keys are bound to. Anyone sitting on the keys tab is
+     * shown the answer, and whatever they were waiting for has arrived.
+     */
+    public void refreshKeybinds(ServerPlayer player) {
+        Shown was = shown.get(player.getUUID());
+        if (was == null || !"keybinds".equals(was.tab())) {
+            rebinding.remove(player.getUUID());
+            return;
+        }
+        rebinding.remove(player.getUUID());
+        open(player, was.mod(), was.tab());
     }
 
     /** What a section is called, and the line under it saying whose the values are. */
@@ -399,6 +421,57 @@ public final class SettingsRegistry implements SettingsApi {
                 }
             }
             y += 6;
+        }
+        return y;
+    }
+
+    /**
+     * The keys tab: the keybinds this mod claimed, what each is bound to now, and a button that
+     * binds it to the next key pressed.
+     *
+     * <p>The pool is Pandorical's and the names are the server's, so the controls screen shows
+     * them under one heading with no hint of which mod asked for what. Here they sit with the
+     * mod they belong to, and can be changed without leaving the page.
+     */
+    private int keybindsPane(ServerPlayer player, ModCatalog.ModInfo mod, List<ComponentDef> out, Layout at) {
+        var keybinds = PandoricalApi.keybindsImpl();
+        List<PandoricalApi.KeybindApiImpl.Claim> claims = keybinds.claimsOf(mod.id());
+        if (claims.isEmpty()) {
+            out.add(prose("none", 2, "This mod claims no keys.", HINT_COLOR, at));
+            return LINE + 2;
+        }
+        int y = 2;
+        int n = 0;
+        boolean listening = PandoricalApi.hasCapability(player, "keybinds");
+        if (!listening) {
+            for (String line : Glyphs.wrap("Your client does not carry keybinds; these do nothing here.", at.proseW())) {
+                out.add(prose("keyhint:" + n++, y, line, HINT_COLOR, at));
+                y += LINE;
+            }
+            y += 4;
+        }
+        Integer waiting = rebinding.get(player.getUUID());
+        for (PandoricalApi.KeybindApiImpl.Claim claim : claims) {
+            boolean asking = waiting != null && waiting == claim.slot();
+            String bound = keybinds.bindingOf(player, claim.slot());
+            out.add(new ComponentBuilder("keyname:" + claim.slot(), ComponentType.TEXT)
+                .bounds(0, y + 5, at.proseW() - CONTROL_W - GUTTER, LINE)
+                .prop(ComponentType.PROP_TEXT, Glyphs.clip(claim.displayName(), at.proseW() - CONTROL_W - GUTTER))
+                .prop(ComponentType.PROP_COLOR, LABEL_COLOR).build());
+            out.add(new ComponentBuilder("key:" + claim.slot(), ComponentType.BUTTON)
+                .bounds(at.proseW() - CONTROL_W, y, CONTROL_W, 20)
+                .prop(ComponentType.PROP_LABEL, asking ? "> Press a key <"
+                    : bound == null ? (listening ? "..." : "Unknown") : bound)
+                .prop(ComponentType.PROP_ENABLED, String.valueOf(listening))
+                .prop(ComponentType.PROP_STYLE, asking ? "pressed" : "default").build());
+            y += ROW;
+        }
+        y += 4;
+        for (String line : Glyphs.wrap(waiting != null
+                ? "Press the key you want, or Escape to leave it as it is."
+                : "Press a key's button, then the key you want it on.", at.proseW())) {
+            out.add(prose("keyfoot:" + n++, y, line, HINT_COLOR, at));
+            y += LINE;
         }
         return y;
     }
@@ -607,6 +680,22 @@ public final class SettingsRegistry implements SettingsApi {
             String tab = verb.equals("tab") ? componentId.substring(colon + 1) : was == null ? null : was.tab();
             paneScroll.remove(player.getUUID());
             open(player, mod, tab);
+            return;
+        }
+        if (verb.equals("key")) {
+            int slot;
+            try {
+                slot = Integer.parseInt(componentId.substring(colon + 1));
+            } catch (NumberFormatException ignored) {
+                return;
+            }
+            Integer waiting = rebinding.get(player.getUUID());
+            boolean cancel = waiting != null && waiting == slot;
+            if (cancel) rebinding.remove(player.getUUID());
+            else rebinding.put(player.getUUID(), slot);
+            PandoricalApi.keybindsImpl().requestRebind(player, cancel ? -1 : slot);
+            Shown was = shown.get(player.getUUID());
+            open(player, was == null ? null : was.mod(), was == null ? null : was.tab());
             return;
         }
         String rest = componentId.substring(colon + 1);

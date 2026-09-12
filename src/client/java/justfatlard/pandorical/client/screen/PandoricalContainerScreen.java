@@ -134,6 +134,11 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
 
     @Override
     public boolean keyPressed(KeyEvent event) {
+        // A key being bound is spent on the binding. It comes first because the key most worth
+        // binding is one that already does something on the screen it is pressed on.
+        if (justfatlard.pandorical.client.keybind.KeybindManager.captureKey(event)) {
+            return true;
+        }
         // An open chat bar owns the keyboard; the chat key only opens it once no
         // component (a focused text field) has claimed the key for itself
         if (chatBar.keyPressed(event)) {

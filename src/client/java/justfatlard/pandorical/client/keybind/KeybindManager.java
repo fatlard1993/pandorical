@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.protocol.KeyPressC2S;
 import justfatlard.pandorical.protocol.KeyReleaseC2S;
+import justfatlard.pandorical.protocol.KeybindBindingsC2S;
 import justfatlard.pandorical.protocol.KeybindDeclarationsS2C;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -43,6 +44,8 @@ public final class KeybindManager {
 
 	private static final KeyMapping[] pool = new KeyMapping[MAX_SLOTS];
 	private static final Set<Integer> claimedSlots = ConcurrentHashMap.newKeySet();
+	/** The slot the server asked us to rebind, or -1: the next key pressed goes here. */
+	private static volatile int rebinding = -1;
 
 	/** Register the pool. Call once from client mod init, never later. */
 	public static void init() {
@@ -60,6 +63,52 @@ public final class KeybindManager {
 			if (slot != null && slot >= 0 && slot < MAX_SLOTS) claimedSlots.add(slot);
 		}
 		Pandorical.LOGGER.debug("Server declared keybind slots: {}", claimedSlots);
+		// The server can name a key but not read one: the binding is a line in this player's
+		// options and nowhere else, so the mods menu learns it here or not at all.
+		sendBindings();
+	}
+
+	/** Tell the server what each pool slot is bound to now, as this client's controls screen says. */
+	public static void sendBindings() {
+		if (!ClientPlayNetworking.canSend(KeybindBindingsC2S.TYPE)) return;
+		java.util.List<String> keys = new java.util.ArrayList<>(MAX_SLOTS);
+		for (int i = 0; i < MAX_SLOTS; i++) {
+			keys.add(pool[i] == null || pool[i].isUnbound()
+				? "Not bound" : pool[i].getTranslatedKeyMessage().getString());
+		}
+		ClientPlayNetworking.send(new KeybindBindingsC2S(keys));
+	}
+
+	/** The server asks for this slot to take the next key pressed; a negative slot calls it off. */
+	public static void handleRebindRequest(int slot) {
+		rebinding = slot >= 0 && slot < MAX_SLOTS ? slot : -1;
+	}
+
+	public static boolean isRebinding() {
+		return rebinding >= 0;
+	}
+
+	/**
+	 * Take this key press as the new binding, if one was asked for. True when the press was
+	 * spent here and must go no further, which is the whole point: the key being bound is
+	 * usually a key that does something else on the screen it was pressed on.
+	 *
+	 * <p>Escape leaves the binding alone, the way the controls screen does; every other key,
+	 * including one already used elsewhere, is taken. Two things on one key is the player's to
+	 * sort out, and refusing it here would be the one place in the game that does.
+	 */
+	public static boolean captureKey(net.minecraft.client.input.KeyEvent event) {
+		int slot = rebinding;
+		if (slot < 0) return false;
+		rebinding = -1;
+		Minecraft client = Minecraft.getInstance();
+		if (event.key() != InputConstants.KEY_ESCAPE && pool[slot] != null) {
+			pool[slot].setKey(InputConstants.getKey(event));
+			KeyMapping.resetMapping();
+			if (client != null && client.options != null) client.options.save();
+		}
+		sendBindings();
+		return true;
 	}
 
 	/** How many slots the pool has. */
@@ -104,5 +153,6 @@ public final class KeybindManager {
 
 	public static void clear() {
 		claimedSlots.clear();
+		rebinding = -1;
 	}
 }

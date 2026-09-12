@@ -24,5 +24,6 @@
   "pandorical.settings.remove": "Remove",
   "pandorical.mods.readme": "Readme",
   "pandorical.mods.settings": "Settings",
-  "pandorical.mods.commands": "Commands"
+  "pandorical.mods.commands": "Commands",
+  "pandorical.mods.keybinds": "Keys"
 }

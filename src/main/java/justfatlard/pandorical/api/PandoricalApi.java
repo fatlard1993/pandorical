@@ -1248,7 +1248,12 @@ public final class PandoricalApi {
 
         private record Registration(String id, String displayName, KeybindHandler handler) {}
 
+        /** A claimed slot, as the mods menu shows it: which mod, what it is called, where it sits. */
+        public record Claim(int slot, String id, String displayName) {}
+
         private final Map<Integer, Registration> bySlot = new ConcurrentHashMap<>();
+        /** What each player's client says its pool keys are bound to, by slot; empty until it says. */
+        private final Map<UUID, java.util.List<String>> bindings = new ConcurrentHashMap<>();
         private final Set<String> registeredIds = ConcurrentHashMap.newKeySet();
         // Per-player rate limit: [tick the count belongs to, dispatches that tick]
         private final Map<UUID, long[]> pressCounters = new ConcurrentHashMap<>();
@@ -1320,8 +1325,51 @@ public final class PandoricalApi {
             return -1;
         }
 
+        /** Every slot some mod has claimed, in pool order. */
+        public java.util.List<Claim> claims() {
+            java.util.List<Claim> out = new java.util.ArrayList<>();
+            for (int slot = 0; slot < MAX_SLOTS; slot++) {
+                Registration registration = bySlot.get(slot);
+                if (registration != null) out.add(new Claim(slot, registration.id(), registration.displayName()));
+            }
+            return out;
+        }
+
+        /** The claims whose id is namespaced to this mod. */
+        public java.util.List<Claim> claimsOf(String modId) {
+            java.util.List<Claim> out = new java.util.ArrayList<>();
+            for (Claim claim : claims()) {
+                int colon = claim.id().indexOf(':');
+                if (colon > 0 && claim.id().substring(0, colon).equals(modId)) out.add(claim);
+            }
+            return out;
+        }
+
+        /** What this player's client has this slot bound to, or null when it has not said. */
+        public String bindingOf(ServerPlayer player, int slot) {
+            java.util.List<String> keys = bindings.get(player.getUUID());
+            if (keys == null || slot < 0 || slot >= keys.size()) return null;
+            String key = keys.get(slot);
+            return key == null || key.isEmpty() ? null : key;
+        }
+
+        /** @hidden the client reporting what its pool keys are bound to. */
+        public void handleBindings(ServerPlayer player, java.util.List<String> keys) {
+            bindings.put(player.getUUID(), java.util.List.copyOf(keys));
+            justfatlard.pandorical.settings.SettingsRegistry registry = SETTINGS;
+            registry.refreshKeybinds(player);
+        }
+
+        /** Ask this player's client to bind the next key it sees to this slot. */
+        public void requestRebind(ServerPlayer player, int slot) {
+            if (!hasCapability(player, "keybinds")) return;
+            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
+                new justfatlard.pandorical.protocol.KeybindRebindS2C(slot));
+        }
+
         /** @hidden push claimed slots after the capability handshake completes. */
         public void handlePlayerReady(ServerPlayer player) {
+            bindings.remove(player.getUUID());
             if (bySlot.isEmpty() || !hasCapability(player, "keybinds")) return;
             java.util.List<Integer> slots = new java.util.ArrayList<>(bySlot.keySet());
             java.util.Collections.sort(slots);
@@ -1371,6 +1419,7 @@ public final class PandoricalApi {
 
         /** @hidden */
         public void removePlayer(UUID playerUuid) {
+            bindings.remove(playerUuid);
             pressCounters.remove(playerUuid);
         }
     }
