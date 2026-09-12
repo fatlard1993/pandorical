@@ -12,6 +12,8 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.EntityCollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import java.util.HashMap;
+import java.util.function.IntFunction;
 
 /**
  * Rails a player can stand on, when a server has asked for them.
@@ -85,7 +87,7 @@ public final class RailCollision {
 		return null;
 	}
 
-	private static final Map<String, RailShape> BY_NAME = new java.util.HashMap<>();
+	private static final Map<String, RailShape> BY_NAME = new HashMap<>();
 
 	static {
 		for (RailShape shape : RailShape.values()) BY_NAME.put(shape.getSerializedName(), shape);
@@ -107,7 +109,7 @@ public final class RailCollision {
 		};
 	}
 
-	private static VoxelShape ramp(java.util.function.IntFunction<VoxelShape> step) {
+	private static VoxelShape ramp(IntFunction<VoxelShape> step) {
 		VoxelShape ramp = Shapes.empty();
 		for (int i = 0; i < STEPS; i++) {
 			ramp = Shapes.or(ramp, step.apply(i));

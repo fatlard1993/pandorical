@@ -8,6 +8,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
 import java.util.Map;
+import justfatlard.pandorical.api.ComponentType;
 
 /**
  * Clickable button that sends ScreenActionC2S on click.
@@ -66,10 +67,10 @@ public class ButtonComponent extends AbstractComponent {
         } else {
             label = parseString("label", "");
         }
-        String iconId = props.get(justfatlard.pandorical.api.ComponentType.PROP_ICON);
+        String iconId = props.get(ComponentType.PROP_ICON);
         icon = (iconId == null || iconId.isEmpty()) ? null : Identifier.tryParse(iconId);
-        String tooltipKey = props.get(justfatlard.pandorical.api.ComponentType.PROP_TOOLTIP_KEY);
-        String tooltipText = props.get(justfatlard.pandorical.api.ComponentType.PROP_TOOLTIP);
+        String tooltipKey = props.get(ComponentType.PROP_TOOLTIP_KEY);
+        String tooltipText = props.get(ComponentType.PROP_TOOLTIP);
         tooltip = tooltipKey != null && !tooltipKey.isEmpty() ? Component.translatable(tooltipKey)
             : tooltipText != null && !tooltipText.isEmpty() ? Component.literal(tooltipText) : null;
         enabled = parseBool("enabled", true);

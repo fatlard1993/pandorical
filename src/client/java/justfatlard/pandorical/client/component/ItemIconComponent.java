@@ -9,6 +9,7 @@ import net.minecraft.world.item.Items;
 
 import java.util.Map;
 import java.util.Optional;
+import justfatlard.pandorical.protocol.ComponentDef;
 
 /**
  * Renders a single item icon at the component's position.
@@ -19,7 +20,7 @@ public class ItemIconComponent extends AbstractComponent {
     private ItemStack stack = ItemStack.EMPTY;
 
     @Override
-    public void init(justfatlard.pandorical.protocol.ComponentDef def, ComponentContext context) {
+    public void init(ComponentDef def, ComponentContext context) {
         super.init(def, context);
         if (width == 0) width = 16;
         if (height == 0) height = 16;

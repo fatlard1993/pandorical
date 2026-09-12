@@ -15,6 +15,23 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.GZIPOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import justfatlard.pandorical.api.VanillaItemOverride;
+import justfatlard.pandorical.rail.RailCollision;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.EmptyBlockGetter;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
  * Server-side content registry. Stores block/item registrations and asset data.
@@ -30,7 +47,7 @@ public class ContentRegistry implements ContentApi {
     private volatile List<SyncAssetsS2C> cachedAssetChunks = null;
 
     /** Vanilla item overrides: keyed by full item ID, e.g. "minecraft:rabbit_hide" */
-    private final Map<String, justfatlard.pandorical.api.VanillaItemOverride> vanillaItemOverrides = new LinkedHashMap<>();
+    private final Map<String, VanillaItemOverride> vanillaItemOverrides = new LinkedHashMap<>();
 
     /**
      * Set of mod namespaces that have registered content through Pandorical.
@@ -82,7 +99,7 @@ public class ContentRegistry implements ContentApi {
     @Override
     public void solidRails() {
         solidRails = true;
-        justfatlard.pandorical.rail.RailCollision.setSolid(true);
+        RailCollision.setSolid(true);
         Pandorical.LOGGER.info("Rails are solid for players");
     }
 
@@ -112,7 +129,7 @@ public class ContentRegistry implements ContentApi {
     public static Set<String> getServerOnlyNamespaces() {
         Set<String> cached = cachedUnmodifiableView;
         if (cached == null) {
-            cached = java.util.Collections.unmodifiableSet(serverOnlyNamespaces);
+            cached = Collections.unmodifiableSet(serverOnlyNamespaces);
             cachedUnmodifiableView = cached;
         }
         return cached;
@@ -127,7 +144,7 @@ public class ContentRegistry implements ContentApi {
 
         // Scan the mod's jar for assets/{modId}/ files and register them
         try {
-            var modContainer = net.fabricmc.loader.api.FabricLoader.getInstance()
+            var modContainer = FabricLoader.getInstance()
                 .getModContainer(modId);
             if (modContainer.isEmpty()) {
                 Pandorical.LOGGER.warn("Mod '{}' not found — cannot register assets", modId);
@@ -148,14 +165,14 @@ public class ContentRegistry implements ContentApi {
                     if (namespace.equals("minecraft") && modId.equals("minecraft")) continue;
 
                     var assetsDir = root.resolve("assets").resolve(namespace);
-                    if (!java.nio.file.Files.exists(assetsDir)) continue;
+                    if (!Files.exists(assetsDir)) continue;
 
-                    try (var walk = java.nio.file.Files.walk(assetsDir)) {
-                        walk.filter(java.nio.file.Files::isRegularFile).forEach(file -> {
+                    try (var walk = Files.walk(assetsDir)) {
+                        walk.filter(Files::isRegularFile).forEach(file -> {
                             try {
                                 String relativePath = "assets/" + namespace + "/"
                                     + assetsDir.relativize(file).toString();
-                                byte[] data = java.nio.file.Files.readAllBytes(file);
+                                byte[] data = Files.readAllBytes(file);
 
                                 // Two mods writing one vanilla path is a real possibility now
                                 // that this namespace is in scope, and the loser would fail
@@ -186,7 +203,7 @@ public class ContentRegistry implements ContentApi {
     }
 
     @Override
-    public void overrideVanillaItem(String vanillaItemId, justfatlard.pandorical.api.VanillaItemOverride override) {
+    public void overrideVanillaItem(String vanillaItemId, VanillaItemOverride override) {
         if (vanillaItemId == null || !vanillaItemId.contains(":")) {
             Pandorical.LOGGER.warn("Invalid vanilla item ID (must be namespace:path): {}", vanillaItemId);
             return;
@@ -205,7 +222,7 @@ public class ContentRegistry implements ContentApi {
      * by the built-in vanilla pack). Only the items/ redirect JSON must live in the
      * item's own namespace, a single file far less likely to be shadowed.
      */
-    private void applyVanillaItemOverrideAssets(String vanillaItemId, justfatlard.pandorical.api.VanillaItemOverride override) {
+    private void applyVanillaItemOverrideAssets(String vanillaItemId, VanillaItemOverride override) {
         String[] parts = vanillaItemId.split(":", 2);
         String namespace = parts[0];
         String itemName = parts[1];
@@ -219,7 +236,7 @@ public class ContentRegistry implements ContentApi {
             String autoModel = "{\n  \"parent\": \"minecraft:item/generated\",\n  \"textures\": {\n    \"layer0\": \""
                 + escapeJson("pandorical:item/" + flatKey) + "\"\n  }\n}\n";
             registerAsset("assets/pandorical/models/item/" + flatKey + ".json",
-                autoModel.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                autoModel.getBytes(StandardCharsets.UTF_8));
 
             // Redirect the vanilla item's definition to the generated model, unless an
             // explicit model override is set (handled below).
@@ -227,7 +244,7 @@ public class ContentRegistry implements ContentApi {
                 String itemsJson = "{\n  \"model\": {\n    \"type\": \"minecraft:model\",\n    \"model\": \""
                     + escapeJson("pandorical:item/" + flatKey) + "\"\n  }\n}\n";
                 registerAsset("assets/" + namespace + "/items/" + itemName + ".json",
-                    itemsJson.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    itemsJson.getBytes(StandardCharsets.UTF_8));
             }
         }
 
@@ -235,7 +252,7 @@ public class ContentRegistry implements ContentApi {
             String json = "{\n  \"model\": {\n    \"type\": \"minecraft:model\",\n    \"model\": \""
                 + escapeJson(override.getModelPath()) + "\"\n  }\n}\n";
             registerAsset("assets/" + namespace + "/items/" + itemName + ".json",
-                json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                json.getBytes(StandardCharsets.UTF_8));
         }
 
         if (override.hasName()) {
@@ -284,7 +301,7 @@ public class ContentRegistry implements ContentApi {
         }
         sb.append("}");
         registerAsset("assets/pandorical/lang/en_us.json",
-            sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            sb.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     private static String escapeJson(String s) {
@@ -409,12 +426,12 @@ public class ContentRegistry implements ContentApi {
         reportedUnsyncedNamespaces = true;
 
         Map<String, Integer> counts = new LinkedHashMap<>();
-        countUntracked(net.minecraft.core.registries.BuiltInRegistries.BLOCK, counts);
-        countUntracked(net.minecraft.core.registries.BuiltInRegistries.ITEM, counts);
+        countUntracked(BuiltInRegistries.BLOCK, counts);
+        countUntracked(BuiltInRegistries.ITEM, counts);
         if (counts.isEmpty()) return;
 
-        boolean dedicated = net.fabricmc.loader.api.FabricLoader.getInstance()
-            .getEnvironmentType() == net.fabricmc.api.EnvType.SERVER;
+        boolean dedicated = FabricLoader.getInstance()
+            .getEnvironmentType() == EnvType.SERVER;
         Pandorical.LOGGER.warn(
             "{} namespace(s) own registry entries but are not registered with Pandorical: {}. "
                 + "Their blocks/items sync to Pandorical clients only if the client has that mod installed too. "
@@ -426,11 +443,11 @@ public class ContentRegistry implements ContentApi {
                     + "PandoricalApi.content().registerServerOnlyNamespace(...) or registerBlock/registerItem.");
     }
 
-    private static void countUntracked(net.minecraft.core.Registry<?> registry, Map<String, Integer> counts) {
+    private static void countUntracked(Registry<?> registry, Map<String, Integer> counts) {
         for (var entry : registry.entrySet()) {
             String namespace = entry.getKey().identifier().getNamespace();
             if (namespace.equals("minecraft") || isServerOnlyNamespace(namespace)) continue;
-            if (net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer(namespace).isEmpty()) continue;
+            if (FabricLoader.getInstance().getModContainer(namespace).isEmpty()) continue;
             counts.merge(namespace, 1, Integer::sum);
         }
     }
@@ -478,9 +495,9 @@ public class ContentRegistry implements ContentApi {
     }
 
     public List<SyncContentS2C.BlockEntry> buildBlockEntries() {
-        List<SyncContentS2C.BlockEntry> blockEntries = new java.util.ArrayList<>();
-        List<String> inferred = new java.util.ArrayList<>();
-        for (var entry : net.minecraft.core.registries.BuiltInRegistries.BLOCK.entrySet()) {
+        List<SyncContentS2C.BlockEntry> blockEntries = new ArrayList<>();
+        List<String> inferred = new ArrayList<>();
+        for (var entry : BuiltInRegistries.BLOCK.entrySet()) {
             String namespace = entry.getKey().identifier().getNamespace();
             String id = entry.getKey().identifier().toString();
 
@@ -492,19 +509,19 @@ public class ContentRegistry implements ContentApi {
             if (!isServerOnlyNamespace(namespace) && !blocks.containsKey(id)) continue;
 
             var block = entry.getValue();
-            List<Integer> stateIds = new java.util.ArrayList<>();
-            List<String> stateProps = new java.util.ArrayList<>();
+            List<Integer> stateIds = new ArrayList<>();
+            List<String> stateProps = new ArrayList<>();
             for (var prop : block.getStateDefinition().getProperties()) {
                 stateProps.add(StatePropertySpec.encode(prop));
             }
             for (var state : block.getStateDefinition().getPossibleStates()) {
-                stateIds.add(net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY.getId(state));
+                stateIds.add(Block.BLOCK_STATE_REGISTRY.getId(state));
             }
             String baseBlockId = "";
             String modelId = "";
             boolean interactive = false;
-            float destroyTime = justfatlard.pandorical.api.BlockRegistration.INHERIT;
-            int requiresCorrectTool = justfatlard.pandorical.api.BlockRegistration.INHERIT_FLAG;
+            float destroyTime = BlockRegistration.INHERIT;
+            int requiresCorrectTool = BlockRegistration.INHERIT_FLAG;
             var registered = blocks.get(id);
             if (registered != null) {
                 baseBlockId = registered.registration().getBaseBlockId();
@@ -520,13 +537,13 @@ public class ContentRegistry implements ContentApi {
             // as snow dug in half the server's time, so with a shovel the client broke it instantly,
             // the server put it back, and the client broke it again, over and over.
             var real = block.defaultBlockState();
-            if (destroyTime == justfatlard.pandorical.api.BlockRegistration.INHERIT) {
+            if (destroyTime == BlockRegistration.INHERIT) {
                 // An unbreakable block's -1 reads as "inherit" on the wire, which leaves such a
                 // block exactly as it was before this: no worse, and nothing to predict.
-                destroyTime = real.getDestroySpeed(net.minecraft.world.level.EmptyBlockGetter.INSTANCE,
-                    net.minecraft.core.BlockPos.ZERO);
+                destroyTime = real.getDestroySpeed(EmptyBlockGetter.INSTANCE,
+                    BlockPos.ZERO);
             }
-            if (requiresCorrectTool == justfatlard.pandorical.api.BlockRegistration.INHERIT_FLAG) {
+            if (requiresCorrectTool == BlockRegistration.INHERIT_FLAG) {
                 requiresCorrectTool = real.requiresCorrectToolForDrops() ? 1 : 0;
             }
 
@@ -546,7 +563,7 @@ public class ContentRegistry implements ContentApi {
 
             // Read off the block's own default state: climbability is a property of the block, and
             // no vanilla climbable varies it by state.
-            boolean climbable = block.defaultBlockState().is(net.minecraft.tags.BlockTags.CLIMBABLE);
+            boolean climbable = block.defaultBlockState().is(BlockTags.CLIMBABLE);
 
             blockEntries.add(new SyncContentS2C.BlockEntry(
                 id, baseBlockId, stateProps, modelId, stateIds, shapeData, lightData, climbable, interactive,
@@ -570,7 +587,7 @@ public class ContentRegistry implements ContentApi {
     }
 
     /** One byte of light per state, in the order the block's own definition lists its states. */
-    private static byte[] serializeBlockLight(net.minecraft.world.level.block.Block block) {
+    private static byte[] serializeBlockLight(Block block) {
         var states = block.getStateDefinition().getPossibleStates();
         byte[] light = new byte[states.size()];
         for (int i = 0; i < light.length; i++) {
@@ -584,13 +601,13 @@ public class ContentRegistry implements ContentApi {
      * Format per state: [numOutlineBoxes:byte][boxes...][numCollisionBoxes:byte][boxes...]
      * Each box: [minX:float][minY:float][minZ:float][maxX:float][maxY:float][maxZ:float]
      */
-    private static byte[] serializeBlockShapes(net.minecraft.world.level.block.Block block) {
+    private static byte[] serializeBlockShapes(Block block) {
         try {
             var baos = new ByteArrayOutputStream();
             var dos = new DataOutputStream(baos);
-            var emptyGetter = net.minecraft.world.level.EmptyBlockGetter.INSTANCE;
-            var origin = net.minecraft.core.BlockPos.ZERO;
-            var ctx = net.minecraft.world.phys.shapes.CollisionContext.empty();
+            var emptyGetter = EmptyBlockGetter.INSTANCE;
+            var origin = BlockPos.ZERO;
+            var ctx = CollisionContext.empty();
 
             for (var state : block.getStateDefinition().getPossibleStates()) {
                 var outline = state.getShape(emptyGetter, origin, ctx);
@@ -607,7 +624,7 @@ public class ContentRegistry implements ContentApi {
         }
     }
 
-    private static void writeShape(DataOutputStream dos, net.minecraft.world.phys.shapes.VoxelShape shape) throws IOException {
+    private static void writeShape(DataOutputStream dos, VoxelShape shape) throws IOException {
         var boxes = shape.toAabbs();
         dos.writeByte(boxes.size());
         for (var box : boxes) {
@@ -622,8 +639,8 @@ public class ContentRegistry implements ContentApi {
 
     /** Used by both play-phase and config-phase sync. */
     public List<SyncContentS2C.ItemEntry> buildItemEntries() {
-        List<SyncContentS2C.ItemEntry> itemEntries = new java.util.ArrayList<>();
-        for (var entry : net.minecraft.core.registries.BuiltInRegistries.ITEM.entrySet()) {
+        List<SyncContentS2C.ItemEntry> itemEntries = new ArrayList<>();
+        for (var entry : BuiltInRegistries.ITEM.entrySet()) {
             String namespace = entry.getKey().identifier().getNamespace();
             if (!isServerOnlyNamespace(namespace)) continue;
 
@@ -634,11 +651,11 @@ public class ContentRegistry implements ContentApi {
             boolean glint = registered != null && registered.registration().hasGlint();
 
             int maxStack = item.getDefaultMaxStackSize();
-            Integer maxDamageObj = item.components().get(net.minecraft.core.component.DataComponents.MAX_DAMAGE);
+            Integer maxDamageObj = item.components().get(DataComponents.MAX_DAMAGE);
             int maxDamage = maxDamageObj != null ? maxDamageObj : 0;
 
             String equipSlot = "";
-            var equippable = item.components().get(net.minecraft.core.component.DataComponents.EQUIPPABLE);
+            var equippable = item.components().get(DataComponents.EQUIPPABLE);
             if (equippable != null) {
                 equipSlot = equippable.slot().getName();
                 // The asset id as well, because the slot alone only says where a thing is worn.
@@ -674,11 +691,11 @@ public class ContentRegistry implements ContentApi {
      * reckoning - you hold right-click and nothing whatsoever happens on screen while the server
      * quietly feeds you.
      */
-    private static String foodSpec(net.minecraft.world.item.Item item) {
-        var food = item.components().get(net.minecraft.core.component.DataComponents.FOOD);
+    private static String foodSpec(Item item) {
+        var food = item.components().get(DataComponents.FOOD);
         if (food == null) return "";
 
-        var consumable = item.components().get(net.minecraft.core.component.DataComponents.CONSUMABLE);
+        var consumable = item.components().get(DataComponents.CONSUMABLE);
         float seconds = consumable != null ? consumable.consumeSeconds() : 1.6F;
 
         return String.join("|", String.valueOf(food.nutrition()),
@@ -687,8 +704,8 @@ public class ContentRegistry implements ContentApi {
     }
 
     /** Returns "tool" or "": tools are data-driven via the Tool component in MC 26.1+. */
-    private static String inferToolType(net.minecraft.world.item.Item item) {
-        var tool = item.components().get(net.minecraft.core.component.DataComponents.TOOL);
+    private static String inferToolType(Item item) {
+        var tool = item.components().get(DataComponents.TOOL);
         if (tool != null) return "tool";
         return "";
     }
@@ -702,7 +719,7 @@ public class ContentRegistry implements ContentApi {
             boolean hasAssets = assets.keySet().stream().anyMatch(k -> k.startsWith("assets/" + namespace + "/"));
             if (hasAssets) continue;
 
-            var modContainer = net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer(namespace);
+            var modContainer = FabricLoader.getInstance().getModContainer(namespace);
             if (modContainer.isEmpty()) continue;
 
             registerModAssets(namespace);
@@ -727,7 +744,7 @@ public class ContentRegistry implements ContentApi {
         byte[] raw = baos.toByteArray();
 
         ByteArrayOutputStream gzipBaos = new ByteArrayOutputStream();
-        try (java.util.zip.GZIPOutputStream gzos = new java.util.zip.GZIPOutputStream(gzipBaos)) {
+        try (GZIPOutputStream gzos = new GZIPOutputStream(gzipBaos)) {
             gzos.write(raw);
         }
         byte[] compressed = gzipBaos.toByteArray();
@@ -746,8 +763,8 @@ public class ContentRegistry implements ContentApi {
         return chunks;
     }
 
-    private List<String> scanRegistry(net.minecraft.core.Registry<?> registry) {
-        List<String> result = new java.util.ArrayList<>();
+    private List<String> scanRegistry(Registry<?> registry) {
+        List<String> result = new ArrayList<>();
         for (var entry : registry.entrySet()) {
             String namespace = entry.getKey().identifier().getNamespace();
             if (!isServerOnlyNamespace(namespace)) continue;
@@ -757,65 +774,65 @@ public class ContentRegistry implements ContentApi {
     }
 
     public List<String> buildEntityTypeEntries() {
-        return scanRegistry(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE);
+        return scanRegistry(BuiltInRegistries.ENTITY_TYPE);
     }
 
     public List<String> buildBlockEntityTypeEntries() {
-        return scanRegistry(net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE);
+        return scanRegistry(BuiltInRegistries.BLOCK_ENTITY_TYPE);
     }
 
     public List<String> buildVillagerProfessionEntries() {
-        return scanRegistry(net.minecraft.core.registries.BuiltInRegistries.VILLAGER_PROFESSION);
+        return scanRegistry(BuiltInRegistries.VILLAGER_PROFESSION);
     }
 
     public List<String> buildPoiTypeEntries() {
-        return scanRegistry(net.minecraft.core.registries.BuiltInRegistries.POINT_OF_INTEREST_TYPE);
+        return scanRegistry(BuiltInRegistries.POINT_OF_INTEREST_TYPE);
     }
 
     public List<String> buildMenuTypeEntries() {
-        return scanRegistry(net.minecraft.core.registries.BuiltInRegistries.MENU);
+        return scanRegistry(BuiltInRegistries.MENU);
     }
 
     public List<String> buildRecipeBookCategoryEntries() {
-        return scanRegistry(net.minecraft.core.registries.BuiltInRegistries.RECIPE_BOOK_CATEGORY);
+        return scanRegistry(BuiltInRegistries.RECIPE_BOOK_CATEGORY);
     }
 
-    private static String inferBaseBlockId(net.minecraft.world.level.block.Block block) {
+    private static String inferBaseBlockId(Block block) {
         // Match by SoundType to get the right break/place/step sounds and material feel;
         // the client detects block type (slab, stair, etc.) from state properties independently.
         var sound = block.defaultBlockState().getSoundType();
         return inferBaseBlockFromSound(sound);
     }
 
-    private static String inferBaseBlockFromSound(net.minecraft.world.level.block.SoundType sound) {
-        if (sound == net.minecraft.world.level.block.SoundType.GRASS)   return "minecraft:grass_block";
-        if (sound == net.minecraft.world.level.block.SoundType.GRAVEL)  return "minecraft:gravel";
-        if (sound == net.minecraft.world.level.block.SoundType.WOOD)    return "minecraft:oak_planks";
-        if (sound == net.minecraft.world.level.block.SoundType.STONE)   return "minecraft:stone";
-        if (sound == net.minecraft.world.level.block.SoundType.METAL)   return "minecraft:iron_block";
-        if (sound == net.minecraft.world.level.block.SoundType.GLASS)   return "minecraft:glass";
-        if (sound == net.minecraft.world.level.block.SoundType.SAND)    return "minecraft:sand";
-        if (sound == net.minecraft.world.level.block.SoundType.WOOL)    return "minecraft:white_wool";
-        if (sound == net.minecraft.world.level.block.SoundType.SNOW)    return "minecraft:snow_block";
+    private static String inferBaseBlockFromSound(SoundType sound) {
+        if (sound == SoundType.GRASS)   return "minecraft:grass_block";
+        if (sound == SoundType.GRAVEL)  return "minecraft:gravel";
+        if (sound == SoundType.WOOD)    return "minecraft:oak_planks";
+        if (sound == SoundType.STONE)   return "minecraft:stone";
+        if (sound == SoundType.METAL)   return "minecraft:iron_block";
+        if (sound == SoundType.GLASS)   return "minecraft:glass";
+        if (sound == SoundType.SAND)    return "minecraft:sand";
+        if (sound == SoundType.WOOL)    return "minecraft:white_wool";
+        if (sound == SoundType.SNOW)    return "minecraft:snow_block";
         // CLAY removed in MC 26.1
-        if (sound == net.minecraft.world.level.block.SoundType.COPPER)  return "minecraft:copper_block";
-        if (sound == net.minecraft.world.level.block.SoundType.CORAL_BLOCK)     return "minecraft:brain_coral_block";
-        if (sound == net.minecraft.world.level.block.SoundType.NETHER_BRICKS)   return "minecraft:nether_bricks";
-        if (sound == net.minecraft.world.level.block.SoundType.NYLIUM)          return "minecraft:crimson_nylium";
-        if (sound == net.minecraft.world.level.block.SoundType.NETHERRACK)      return "minecraft:netherrack";
-        if (sound == net.minecraft.world.level.block.SoundType.SOUL_SAND)       return "minecraft:soul_sand";
-        if (sound == net.minecraft.world.level.block.SoundType.SOUL_SOIL)       return "minecraft:soul_soil";
-        if (sound == net.minecraft.world.level.block.SoundType.BASALT)          return "minecraft:basalt";
-        if (sound == net.minecraft.world.level.block.SoundType.MOSS)            return "minecraft:moss_block";
-        if (sound == net.minecraft.world.level.block.SoundType.MUD)             return "minecraft:mud";
-        if (sound == net.minecraft.world.level.block.SoundType.MUDDY_MANGROVE_ROOTS) return "minecraft:muddy_mangrove_roots";
-        if (sound == net.minecraft.world.level.block.SoundType.ROOTED_DIRT)     return "minecraft:rooted_dirt";
-        if (sound == net.minecraft.world.level.block.SoundType.PACKED_MUD)      return "minecraft:packed_mud";
-        if (sound == net.minecraft.world.level.block.SoundType.DEEPSLATE)       return "minecraft:deepslate";
-        if (sound == net.minecraft.world.level.block.SoundType.CALCITE)         return "minecraft:calcite";
-        if (sound == net.minecraft.world.level.block.SoundType.TUFF)            return "minecraft:tuff";
-        if (sound == net.minecraft.world.level.block.SoundType.DRIPSTONE_BLOCK) return "minecraft:dripstone_block";
-        if (sound == net.minecraft.world.level.block.SoundType.AMETHYST)        return "minecraft:amethyst_block";
+        if (sound == SoundType.COPPER)  return "minecraft:copper_block";
+        if (sound == SoundType.CORAL_BLOCK)     return "minecraft:brain_coral_block";
+        if (sound == SoundType.NETHER_BRICKS)   return "minecraft:nether_bricks";
+        if (sound == SoundType.NYLIUM)          return "minecraft:crimson_nylium";
+        if (sound == SoundType.NETHERRACK)      return "minecraft:netherrack";
+        if (sound == SoundType.SOUL_SAND)       return "minecraft:soul_sand";
+        if (sound == SoundType.SOUL_SOIL)       return "minecraft:soul_soil";
+        if (sound == SoundType.BASALT)          return "minecraft:basalt";
+        if (sound == SoundType.MOSS)            return "minecraft:moss_block";
+        if (sound == SoundType.MUD)             return "minecraft:mud";
+        if (sound == SoundType.MUDDY_MANGROVE_ROOTS) return "minecraft:muddy_mangrove_roots";
+        if (sound == SoundType.ROOTED_DIRT)     return "minecraft:rooted_dirt";
+        if (sound == SoundType.PACKED_MUD)      return "minecraft:packed_mud";
+        if (sound == SoundType.DEEPSLATE)       return "minecraft:deepslate";
+        if (sound == SoundType.CALCITE)         return "minecraft:calcite";
+        if (sound == SoundType.TUFF)            return "minecraft:tuff";
+        if (sound == SoundType.DRIPSTONE_BLOCK) return "minecraft:dripstone_block";
+        if (sound == SoundType.AMETHYST)        return "minecraft:amethyst_block";
         return "minecraft:stone";
     }
 

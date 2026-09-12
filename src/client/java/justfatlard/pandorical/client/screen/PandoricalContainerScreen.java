@@ -14,12 +14,14 @@ import net.minecraft.world.entity.player.Inventory;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import justfatlard.pandorical.api.NavigableScreen;
 
 /**
  * Container screen with declarative UI + vanilla slot sync.
  * Used for screens that manage item slots (trade, backpack, etc.).
  */
-public class PandoricalContainerScreen extends AbstractContainerScreen<PandoricalMenu> implements justfatlard.pandorical.api.NavigableScreen {
+public class PandoricalContainerScreen extends AbstractContainerScreen<PandoricalMenu> implements NavigableScreen {
     private final OpenScreenS2C screenDef;
     private final ScreenComponents components = new ScreenComponents();
 
@@ -153,8 +155,8 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
      * book of its own and no opinion about whose should appear, only the answer to "what is this
      * screen for" that a book needs before it can offer anything.
      */
-    public java.util.Optional<String> getRecipeStation() {
-        return screenDef == null ? java.util.Optional.empty() : screenDef.recipeStation();
+    public Optional<String> getRecipeStation() {
+        return screenDef == null ? Optional.empty() : screenDef.recipeStation();
     }
 
     /**

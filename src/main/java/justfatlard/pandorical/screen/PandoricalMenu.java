@@ -14,6 +14,9 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.Set;
+import java.util.function.IntSupplier;
+import justfatlard.pandorical.Pandorical;
+import net.minecraft.world.inventory.ContainerInput;
 
 /**
  * Dynamic container menu for Pandorical screens.
@@ -39,10 +42,10 @@ public class PandoricalMenu extends AbstractContainerMenu {
      * before the menu is opened. Left alone on the server, where the count is passed in
      * directly. A negative answer means nobody knows, and the constructor falls back.
      */
-    private static java.util.function.IntSupplier incomingModSlots = () -> -1;
+    private static IntSupplier incomingModSlots = () -> -1;
 
     /** Installed once by the client, which is the only side that can see the pending definition. */
-    public static void setIncomingModSlots(java.util.function.IntSupplier supplier) {
+    public static void setIncomingModSlots(IntSupplier supplier) {
         incomingModSlots = supplier == null ? () -> -1 : supplier;
     }
 
@@ -61,7 +64,7 @@ public class PandoricalMenu extends AbstractContainerMenu {
      * old fixed maximum.
      */
     public PandoricalMenu(int syncId, Inventory playerInventory) {
-        super(justfatlard.pandorical.Pandorical.MENU_TYPE, syncId);
+        super(Pandorical.MENU_TYPE, syncId);
         int declared = incomingModSlots.getAsInt();
         int modSlots = declared < 0 ? MAX_MOD_SLOTS : Math.min(declared, MAX_MOD_SLOTS);
 
@@ -189,7 +192,7 @@ public class PandoricalMenu extends AbstractContainerMenu {
     }
 
     @Override
-    public void clicked(int slotIndex, int button, net.minecraft.world.inventory.ContainerInput actionType, Player player) {
+    public void clicked(int slotIndex, int button, ContainerInput actionType, Player player) {
         if (slotIndex >= 0 && slotIndex < this.slots.size() && readOnlySlots.contains(slotIndex)) {
             return;
         }

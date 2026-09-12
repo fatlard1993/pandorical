@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Leaves out the mixins named in {@code -Dpandorical.skipMixins}, for finding which one a machine
@@ -24,7 +25,7 @@ public final class DiagnosticMixinPlugin implements IMixinConfigPlugin {
 		.map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toSet());
 
 	/** The names in {@link #SKIP} that matched a mixin, so a misspelt one can be told apart from one that did nothing. */
-	private static final Set<String> MATCHED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+	private static final Set<String> MATCHED = ConcurrentHashMap.newKeySet();
 
 	/** Say which skip names matched no mixin. Mixin configs are prepared before any mod initialises, so call it from one. */
 	public static void reportUnmatched() {

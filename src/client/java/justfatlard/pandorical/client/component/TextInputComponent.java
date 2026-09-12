@@ -6,6 +6,9 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 
 import java.util.Map;
+import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
 
 /**
  * Wraps vanilla EditBox for text input fields.
@@ -98,12 +101,12 @@ public class TextInputComponent extends AbstractComponent {
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (editBox != null && editBox.isFocused()) {
             // keyPressed takes a KeyEvent; we construct one manually from the raw codes.
-            boolean handled = editBox.keyPressed(new net.minecraft.client.input.KeyEvent(keyCode, scanCode, modifiers));
+            boolean handled = editBox.keyPressed(new KeyEvent(keyCode, scanCode, modifiers));
             // A focused field owns the keyboard, escape aside. A letter the box has no use for
             // would otherwise fall through to the screen, and on a container screen the
             // inventory key is one of those letters: typing "e" into a search would close the
             // chest. Vanilla's anvil makes the same claim through canConsumeInput().
-            return handled || keyCode != com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE;
+            return handled || keyCode != InputConstants.KEY_ESCAPE;
         }
         return false;
     }
@@ -111,7 +114,7 @@ public class TextInputComponent extends AbstractComponent {
     @Override
     public boolean charTyped(char chr, int modifiers) {
         if (editBox != null && editBox.isFocused()) {
-            return editBox.charTyped(new net.minecraft.client.input.CharacterEvent(chr));
+            return editBox.charTyped(new CharacterEvent(chr));
         }
         return false;
     }

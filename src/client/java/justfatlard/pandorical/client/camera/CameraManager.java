@@ -3,6 +3,7 @@ package justfatlard.pandorical.client.camera;
 import justfatlard.pandorical.protocol.CameraHintS2C;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
+import justfatlard.pandorical.Pandorical;
 
 /**
  * Client-side camera hint manager.
@@ -26,7 +27,7 @@ public class CameraManager {
                     try {
                         overrideDistance = Float.parseFloat(distStr);
                     } catch (NumberFormatException e) {
-                        justfatlard.pandorical.Pandorical.LOGGER.warn("Invalid camera distance value: '{}'", distStr);
+                        Pandorical.LOGGER.warn("Invalid camera distance value: '{}'", distStr);
                     }
                 }
             }
@@ -35,7 +36,7 @@ public class CameraManager {
                 try {
                     zoomFactor = value == null ? 1.0F : Float.parseFloat(value);
                 } catch (NumberFormatException e) {
-                    justfatlard.pandorical.Pandorical.LOGGER.warn("Invalid camera zoom factor: '{}'", value);
+                    Pandorical.LOGGER.warn("Invalid camera zoom factor: '{}'", value);
                     zoomFactor = 1.0F;
                 }
             }

@@ -17,6 +17,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.objectweb.asm.Opcodes;
 
 /**
  * A minecart wears the texture the server set for it, the way a living entity already does.
@@ -50,7 +51,7 @@ public abstract class AbstractMinecartRendererMixin {
 	}
 
 	@Redirect(method = "submit(Lnet/minecraft/client/renderer/entity/state/MinecartRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
-		at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/entity/AbstractMinecartRenderer;MINECART_LOCATION:Lnet/minecraft/resources/Identifier;", opcode = org.objectweb.asm.Opcodes.GETSTATIC))
+		at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/entity/AbstractMinecartRenderer;MINECART_LOCATION:Lnet/minecraft/resources/Identifier;", opcode = Opcodes.GETSTATIC))
 	private Identifier pandorical$overlayTexture() {
 		Identifier overlay = pandorical$drawing == null ? null : ((OverlayTextureHolder) pandorical$drawing).pandorical$getOverlayTexture();
 		return overlay != null ? overlay : MINECART_LOCATION;

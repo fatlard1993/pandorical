@@ -17,6 +17,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import org.joml.Vector3f;
+import com.google.gson.JsonElement;
 
 /**
  * Animations a mod shipped, in a form the game can play.
@@ -106,7 +107,7 @@ public final class AnimationLibrary implements SimpleSynchronousResourceReloadLi
 		boolean looping = json.has("looping") && json.get("looping").getAsBoolean();
 
 		Map<String, List<AnimationChannel>> bones = new HashMap<>();
-		for (Map.Entry<String, com.google.gson.JsonElement> bone : json.getAsJsonObject("bones").entrySet()) {
+		for (Map.Entry<String, JsonElement> bone : json.getAsJsonObject("bones").entrySet()) {
 			List<AnimationChannel> channels = new ArrayList<>();
 			for (var element : bone.getValue().getAsJsonArray()) {
 				AnimationChannel channel = parseChannel(element.getAsJsonObject());

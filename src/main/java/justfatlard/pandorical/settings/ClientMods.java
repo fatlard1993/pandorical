@@ -12,6 +12,8 @@ import justfatlard.pandorical.protocol.ClientSettingS2C;
 import justfatlard.pandorical.protocol.ClientSettingsC2S;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 
 /**
  * The mods a player's own client brought, kept per player so the menu can list them.
@@ -36,9 +38,9 @@ public final class ClientMods {
     private static final int MOST_MODS = 64;
     private static final int MOST_SETTINGS_PER_MOD = 64;
     private static final int MOST_REGISTERED = 1024;
-    private static final java.util.regex.Pattern MOD_ID = java.util.regex.Pattern.compile("[a-z][a-z0-9_-]{1,63}");
-    private static final java.util.regex.Pattern KEY = java.util.regex.Pattern.compile("[A-Za-z0-9_.-]{1,64}");
-    private static final java.util.concurrent.atomic.AtomicInteger registered = new java.util.concurrent.atomic.AtomicInteger();
+    private static final Pattern MOD_ID = Pattern.compile("[a-z][a-z0-9_-]{1,63}");
+    private static final Pattern KEY = Pattern.compile("[A-Za-z0-9_.-]{1,64}");
+    private static final AtomicInteger registered = new AtomicInteger();
 
     public static void declare(ServerPlayer player, ClientSettingsC2S payload) {
         List<ClientSettingsC2S.Mod> mods = payload.mods().stream()

@@ -3,6 +3,7 @@ package justfatlard.pandorical.api;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.IntConsumer;
+import java.util.Base64;
 
 /**
  * The rule a {@link ComponentType#PIXEL_CANVAS} paints by, and its wire forms.
@@ -45,14 +46,14 @@ public final class PixelCanvas {
 
     /** The cells as base64. */
     public static String encode(byte[] cells) {
-        return java.util.Base64.getEncoder().encodeToString(cells);
+        return Base64.getEncoder().encodeToString(cells);
     }
 
     /** Exactly {@code size} cells: short or unreadable input is padded with index 0. */
     public static byte[] decode(String encoded, int size) {
         byte[] cells = new byte[size];
         try {
-            byte[] read = java.util.Base64.getDecoder().decode(encoded);
+            byte[] read = Base64.getDecoder().decode(encoded);
             System.arraycopy(read, 0, cells, 0, Math.min(size, read.length));
         } catch (IllegalArgumentException ignored) {
         }

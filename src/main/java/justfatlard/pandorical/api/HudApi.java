@@ -5,6 +5,7 @@ import justfatlard.pandorical.protocol.ShowHudS2C;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.List;
+import java.util.Collection;
 
 public interface HudApi {
     /**
@@ -51,7 +52,7 @@ public interface HudApi {
      * not restored automatically after a rejoin: re-request it when the player rejoins,
      * exactly like entity overlays.
      */
-    void hideVanillaElements(ServerPlayer player, String ownerId, java.util.Collection<String> elementIds);
+    void hideVanillaElements(ServerPlayer player, String ownerId, Collection<String> elementIds);
 
     /** Drop {@code ownerId}'s suppression request, restoring anything no other owner hides. */
     void restoreVanillaElements(ServerPlayer player, String ownerId);

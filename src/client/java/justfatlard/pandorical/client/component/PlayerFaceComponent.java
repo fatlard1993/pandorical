@@ -8,6 +8,8 @@ import net.minecraft.client.gui.components.PlayerFaceExtractor;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.world.entity.player.PlayerSkin;
+import justfatlard.pandorical.client.skin.SkinOverrides;
+import justfatlard.pandorical.protocol.ComponentDef;
 
 /**
  * A player's face with its hat layer, square at the component's size. See
@@ -21,7 +23,7 @@ public class PlayerFaceComponent extends AbstractComponent {
     private UUID player;
 
     @Override
-    public void init(justfatlard.pandorical.protocol.ComponentDef def, ComponentContext context) {
+    public void init(ComponentDef def, ComponentContext context) {
         super.init(def, context);
         if (width == 0) width = 8;
         if (height == 0) height = width;
@@ -66,7 +68,7 @@ public class PlayerFaceComponent extends AbstractComponent {
         } else {
             theirs = DefaultPlayerSkin.get(player);
         }
-        PlayerSkin worn = justfatlard.pandorical.client.skin.SkinOverrides.forPlayer(player, theirs);
+        PlayerSkin worn = SkinOverrides.forPlayer(player, theirs);
         return worn != null ? worn : theirs;
     }
 }

@@ -16,6 +16,7 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import justfatlard.pandorical.BlockMarkLookup;
 
 /**
  * Fence gates side by side drawn as one wide gate.
@@ -99,8 +100,8 @@ public final class FenceGateJoins implements ContextModels.Provider {
 		boolean open = state.getValue(FenceGateBlock.OPEN);
 		String swing = "";
 		if (open && !left && !right) {
-			if (justfatlard.pandorical.BlockMarkLookup.client.test(pos, BlockMarkApi.GATE_HINGE_LEFT)) swing = "left";
-			else if (justfatlard.pandorical.BlockMarkLookup.client.test(pos, BlockMarkApi.GATE_HINGE_RIGHT)) swing = "right";
+			if (BlockMarkLookup.client.test(pos, BlockMarkApi.GATE_HINGE_LEFT)) swing = "left";
+			else if (BlockMarkLookup.client.test(pos, BlockMarkApi.GATE_HINGE_RIGHT)) swing = "right";
 		}
 		if (!left && !right && !stacked && swing.isEmpty()) return null;
 		String join = left && right ? "both" : left ? "left" : right ? "right" : "none";

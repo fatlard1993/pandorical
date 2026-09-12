@@ -23,6 +23,9 @@ import justfatlard.pandorical.protocol.ComponentUpdate;
 import justfatlard.pandorical.screen.Viewport;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.level.ServerPlayer;
+import java.util.Comparator;
+import java.util.Locale;
+import net.minecraft.server.permissions.Permissions;
 
 /**
  * Every mod's settings, and the one screen that shows them.
@@ -179,7 +182,7 @@ public final class SettingsRegistry implements SettingsApi {
 
     /** The one bar for touching the server's own settings: the same one that runs its commands. */
     public static boolean isOp(ServerPlayer player) {
-        return player.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER);
+        return player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER);
     }
 
     public boolean groupIsServer(SettingImpl<?> setting) {
@@ -236,7 +239,7 @@ public final class SettingsRegistry implements SettingsApi {
         for (ModCatalog.ModInfo mine : ClientMods.of(player)) {
             if (mods.stream().noneMatch(mod -> mod.id().equals(mine.id()))) mods.add(mine);
         }
-        mods.sort(java.util.Comparator.comparing(mod -> mod.name().toLowerCase()));
+        mods.sort(Comparator.comparing(mod -> mod.name().toLowerCase()));
         ModCatalog.ModInfo selected = null;
         if (selectedId != null) {
             for (ModCatalog.ModInfo mod : mods) {
@@ -802,7 +805,7 @@ public final class SettingsRegistry implements SettingsApi {
                 @Override boolean displayIsKey() { return true; }
                 @Override Boolean next(Boolean v, int direction) { return !v; }
                 @Override public Boolean parse(String s) {
-                    return switch (s.toLowerCase(java.util.Locale.ROOT)) {
+                    return switch (s.toLowerCase(Locale.ROOT)) {
                         case "true", "on" -> true;
                         case "false", "off" -> false;
                         default -> null;

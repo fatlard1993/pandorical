@@ -1,5 +1,7 @@
 package justfatlard.pandorical.api;
 
+import net.minecraft.world.item.ToolMaterial;
+
 /**
  * Builder for custom item registration.
  */
@@ -55,7 +57,7 @@ public class ItemRegistration {
      *
      * @param kind one of {@code axe}, {@code pickaxe}, {@code shovel}, {@code hoe}, {@code sword}
      */
-    public ItemRegistration tool(String kind, net.minecraft.world.item.ToolMaterial material,
+    public ItemRegistration tool(String kind, ToolMaterial material,
             float attackDamage, float attackSpeed) {
         this.toolSpec = String.join("|",
             kind,

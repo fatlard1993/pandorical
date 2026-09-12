@@ -6,6 +6,7 @@ import justfatlard.pandorical.protocol.ShowHudS2C;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 /**
  * Fluent builder for constructing ShowHudS2C payloads.
@@ -87,7 +88,7 @@ public class HudBuilder {
 	public HudBuilder particleBurst(String id, int x, int y, int w, int h,
 									 int count, float radius, float speedDegPerSec,
 									 Map<String, String> extraProps) {
-		Map<String, String> props = new java.util.HashMap<>(extraProps);
+		Map<String, String> props = new HashMap<>(extraProps);
 		props.put(ComponentType.PROP_PARTICLE_COUNT, String.valueOf(count));
 		props.put(ComponentType.PROP_RADIUS, String.valueOf(radius));
 		props.put(ComponentType.PROP_SPEED, String.valueOf(speedDegPerSec));

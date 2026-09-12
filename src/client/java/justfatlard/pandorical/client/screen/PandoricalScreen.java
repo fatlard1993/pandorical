@@ -12,12 +12,13 @@ import net.minecraft.network.chat.Component;
 
 import java.util.List;
 import java.util.Map;
+import justfatlard.pandorical.api.NavigableScreen;
 
 /**
  * Non-container declarative screen. Used for dialogue, message detail,
  * recipe browsers, and other screens that don't need inventory slots.
  */
-public class PandoricalScreen extends Screen implements justfatlard.pandorical.api.NavigableScreen {
+public class PandoricalScreen extends Screen implements NavigableScreen {
     private final OpenScreenS2C screenDef;
     private final ScreenComponents components = new ScreenComponents();
 

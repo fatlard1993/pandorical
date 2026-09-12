@@ -9,6 +9,12 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 /**
  * The settings for anyone who cannot see the screen.
@@ -116,7 +122,7 @@ public final class SettingsCommand {
     }
 
     /** Pandorical's own English, read out of this jar, for the games that do not have it. */
-    private static final java.util.Map<String, String> ENGLISH = readEnglish();
+    private static final Map<String, String> ENGLISH = readEnglish();
 
     /**
      * Text a player on any game can read: the key for one with Pandorical's language, and the
@@ -126,13 +132,13 @@ public final class SettingsCommand {
         return Component.translatableWithFallback(key, ENGLISH.getOrDefault(key, key), args);
     }
 
-    private static java.util.Map<String, String> readEnglish() {
+    private static Map<String, String> readEnglish() {
         try (var in = SettingsCommand.class.getResourceAsStream("/assets/pandorical/lang/en_us.json")) {
-            if (in == null) return java.util.Map.of();
-            return new com.google.gson.Gson().fromJson(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8),
-                new com.google.gson.reflect.TypeToken<java.util.Map<String, String>>() {}.getType());
-        } catch (java.io.IOException | RuntimeException e) {
-            return java.util.Map.of();
+            if (in == null) return Map.of();
+            return new Gson().fromJson(new InputStreamReader(in, StandardCharsets.UTF_8),
+                new TypeToken<Map<String, String>>() {}.getType());
+        } catch (IOException | RuntimeException e) {
+            return Map.of();
         }
     }
 }

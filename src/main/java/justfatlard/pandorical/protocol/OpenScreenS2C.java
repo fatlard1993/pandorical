@@ -8,6 +8,8 @@ import net.minecraft.resources.Identifier;
 
 import java.util.List;
 import java.util.Optional;
+import io.netty.handler.codec.DecoderException;
+import java.util.ArrayList;
 
 public record OpenScreenS2C(
     String screenId,
@@ -58,10 +60,10 @@ public record OpenScreenS2C(
             // Never size the list from the wire: ComponentDef caps its own children and
             // depth, but this root count was allocating before a single component decoded.
             if (compCount < 0 || compCount > MAX_ROOT_COMPONENTS) {
-                throw new io.netty.handler.codec.DecoderException(
+                throw new DecoderException(
                     "OpenScreenS2C component count " + compCount + " exceeds " + MAX_ROOT_COMPONENTS);
             }
-            List<ComponentDef> components = new java.util.ArrayList<>();
+            List<ComponentDef> components = new ArrayList<>();
             for (int i = 0; i < compCount; i++) {
                 components.add(ComponentDef.STREAM_CODEC.decode(buf));
             }

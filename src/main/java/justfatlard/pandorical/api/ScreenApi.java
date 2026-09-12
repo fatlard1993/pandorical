@@ -10,6 +10,8 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.Set;
+import java.util.function.Consumer;
 
 public interface ScreenApi {
     /**
@@ -34,7 +36,7 @@ public interface ScreenApi {
      * @param readOnlySlots slot indices that the player cannot modify (e.g., "their offer")
      */
     void openContainer(ServerPlayer player, OpenScreenS2C screen,
-                       Container serverContainer, java.util.Set<Integer> readOnlySlots);
+                       Container serverContainer, Set<Integer> readOnlySlots);
 
     /**
      * Send partial property updates to a live screen.
@@ -61,7 +63,7 @@ public interface ScreenApi {
     /**
      * Register a handler for screen close events.
      */
-    void onClose(String screenType, java.util.function.Consumer<ServerPlayer> handler);
+    void onClose(String screenType, Consumer<ServerPlayer> handler);
 
     /**
      * Register a catch-all handler for actions with dynamic component IDs.
@@ -120,7 +122,7 @@ public interface ScreenApi {
      * Register a handler for container menu removal (player closes screen, disconnects, etc).
      * Use this to return items to the player.
      */
-    void onContainerRemoved(String screenType, java.util.function.Consumer<ServerPlayer> handler);
+    void onContainerRemoved(String screenType, Consumer<ServerPlayer> handler);
 
     @FunctionalInterface
     interface SlotChangeHandler {

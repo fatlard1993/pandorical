@@ -12,6 +12,9 @@ import justfatlard.pandorical.mixin.ConnectionChannelAccessor;
 import net.minecraft.network.Connection;
 import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 import net.minecraft.util.Util;
+import java.util.ArrayList;
+import java.util.List;
+import net.minecraft.network.chat.Component;
 
 /**
  * Time for a slow machine to take the content in.
@@ -76,7 +79,7 @@ public final class ConfigPatience {
 	public static void expire() {
 		if (waiting.isEmpty()) return;
 		long now = Util.getMillis();
-		java.util.List<ServerConfigurationPacketListenerImpl> expired = new java.util.ArrayList<>();
+		List<ServerConfigurationPacketListenerImpl> expired = new ArrayList<>();
 		synchronized (waiting) {
 			waiting.forEach((handler, wait) -> {
 				if (now - wait.since() >= LONGEST_MILLIS) expired.add(handler);
@@ -84,7 +87,7 @@ public final class ConfigPatience {
 			expired.forEach(waiting::remove);
 		}
 		for (ServerConfigurationPacketListenerImpl handler : expired) {
-			handler.disconnect(net.minecraft.network.chat.Component.literal(
+			handler.disconnect(Component.literal(
 				"Pandorical: the content sync went unanswered for " + PATIENT_SECONDS / 60 + " minutes"));
 		}
 	}

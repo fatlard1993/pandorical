@@ -7,6 +7,7 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+import io.netty.handler.codec.DecoderException;
 
 /**
  * Buttons a server mod wants on the player's own inventory screen.
@@ -43,7 +44,7 @@ public record InventoryButtonsS2C(List<Button> buttons) implements CustomPacketP
             public InventoryButtonsS2C decode(ByteBuf buf) {
                 int count = ByteBufCodecs.VAR_INT.decode(buf);
                 if (count < 0 || count > MAX_BUTTONS) {
-                    throw new io.netty.handler.codec.DecoderException(
+                    throw new DecoderException(
                         "inventory button count " + count + " exceeds " + MAX_BUTTONS);
                 }
                 List<Button> buttons = new ArrayList<>();

@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
+import java.util.function.Consumer;
 
 /**
  * API for registering extra slots that appear in the vanilla inventory screen.
@@ -116,7 +117,7 @@ public interface PlayerInventoryApi {
     // setButtonGlyph below, so a switch can change its face between two sprites.
 
     /** Called when somebody presses one of {@link #registerButton}'s buttons. */
-    void onButton(Identifier namespace, String id, java.util.function.Consumer<ServerPlayer> handler);
+    void onButton(Identifier namespace, String id, Consumer<ServerPlayer> handler);
 
     /**
      * Change what one player sees drawn on a button.

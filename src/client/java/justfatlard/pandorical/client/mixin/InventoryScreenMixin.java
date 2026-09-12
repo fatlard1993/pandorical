@@ -15,6 +15,8 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import justfatlard.pandorical.client.inventory.ClientInventoryButtons;
+import net.minecraft.client.Minecraft;
 
 /**
  * Draws slot backgrounds for Pandorical's extra inventory slots.
@@ -96,10 +98,10 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
     @Inject(method = "extractRenderState", at = @At("TAIL"))
     private void pandorical$drawInventoryButtons(GuiGraphicsExtractor graphics,
             int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
-        var buttons = justfatlard.pandorical.client.inventory.ClientInventoryButtons.all();
+        var buttons = ClientInventoryButtons.all();
         if (buttons.isEmpty()) return;
 
-        var font = net.minecraft.client.Minecraft.getInstance().font;
+        var font = Minecraft.getInstance().font;
         for (var button : buttons) {
             int bx = this.leftPos + button.screenX();
             int by = this.topPos + button.screenY();

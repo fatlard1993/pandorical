@@ -3,6 +3,7 @@ package justfatlard.pandorical.client.component;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.util.Map;
+import justfatlard.pandorical.protocol.ComponentDef;
 
 /**
  * Background panel with optional beveled borders.
@@ -14,7 +15,7 @@ public class PanelComponent extends AbstractComponent {
     private int borderColor;
 
     @Override
-    public void init(justfatlard.pandorical.protocol.ComponentDef def, ComponentContext context) {
+    public void init(ComponentDef def, ComponentContext context) {
         super.init(def, context);
         parseStyle();
     }

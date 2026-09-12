@@ -9,6 +9,10 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import justfatlard.pandorical.client.inventory.ClientInventoryButtons;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.sounds.SoundEvents;
 
 /**
  * Answers a press on one of the buttons drawn on the player's own inventory panel.
@@ -37,17 +41,17 @@ public abstract class InventoryButtonClickMixin extends AbstractContainerScreen<
 		// Only the player's own inventory draws these, so only it should answer for them.
 		if (!((Object) this instanceof InventoryScreen)) return;
 
-		for (var button : justfatlard.pandorical.client.inventory.ClientInventoryButtons.all()) {
+		for (var button : ClientInventoryButtons.all()) {
 			int bx = this.leftPos + button.screenX();
 			int by = this.topPos + button.screenY();
 			int size = button.size();
 			if (click.x() < bx || click.x() >= bx + size) continue;
 			if (click.y() < by || click.y() >= by + size) continue;
 
-			justfatlard.pandorical.client.inventory.ClientInventoryButtons.press(button);
-			net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-				net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-					net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+			ClientInventoryButtons.press(button);
+			Minecraft.getInstance().getSoundManager().play(
+				SimpleSoundInstance.forUI(
+					SoundEvents.UI_BUTTON_CLICK, 1.0F));
 			cir.setReturnValue(true);
 			return;
 		}

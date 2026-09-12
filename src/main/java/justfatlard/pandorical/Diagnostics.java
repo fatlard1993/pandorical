@@ -5,6 +5,15 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import net.fabricmc.loader.api.FabricLoader;
+import java.lang.management.ManagementFactory;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.Locale;
+import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import javax.management.ObjectName;
+import net.fabricmc.api.EnvType;
 
 /**
  * A trail of what Pandorical was doing, for a crash on a machine nobody here can reach.
@@ -69,8 +78,8 @@ public final class Diagnostics {
 	public static void setGuarding(boolean on) {
 		guard = WINDOWS_CLIENT && on;
 		try {
-			java.nio.file.Files.createDirectories(GUARD_SETTING.getParent());
-			java.nio.file.Files.writeString(GUARD_SETTING, "# Windows only: see Diagnostics in Pandorical\nenabled=" + on + "\n");
+			Files.createDirectories(GUARD_SETTING.getParent());
+			Files.writeString(GUARD_SETTING, "# Windows only: see Diagnostics in Pandorical\nenabled=" + on + "\n");
 		} catch (IOException ignored) {
 			// A setting that did not save is a setting that reverts next launch, nothing worse.
 		}
@@ -86,9 +95,9 @@ public final class Diagnostics {
 
 	private static boolean readGuard() {
 		try {
-			if (!java.nio.file.Files.exists(GUARD_SETTING)) return true;
-			java.util.Properties props = new java.util.Properties();
-			try (var reader = java.nio.file.Files.newBufferedReader(GUARD_SETTING)) {
+			if (!Files.exists(GUARD_SETTING)) return true;
+			Properties props = new Properties();
+			try (var reader = Files.newBufferedReader(GUARD_SETTING)) {
 				props.load(reader);
 			}
 			return !"false".equalsIgnoreCase(props.getProperty("enabled", "true").trim());
@@ -99,8 +108,8 @@ public final class Diagnostics {
 
 	private static boolean detectWindowsClient() {
 		try {
-			return FabricLoader.getInstance().getEnvironmentType() == net.fabricmc.api.EnvType.CLIENT
-				&& System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).startsWith("windows");
+			return FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT
+				&& System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows");
 		} catch (Throwable ignored) {
 			return false;
 		}
@@ -155,8 +164,8 @@ public final class Diagnostics {
 			StringBuilder found = new StringBuilder();
 			for (String line : diagnosticCommand("threadPrint").split("\n")) {
 				if (!line.contains("CompilerThread")) continue;
-				java.util.regex.Matcher name = java.util.regex.Pattern.compile("\"([^\"]+)\"").matcher(line);
-				java.util.regex.Matcher nid = java.util.regex.Pattern.compile("nid=(0x[0-9a-fA-F]+|\\d+)").matcher(line);
+				Matcher name = Pattern.compile("\"([^\"]+)\"").matcher(line);
+				Matcher nid = Pattern.compile("nid=(0x[0-9a-fA-F]+|\\d+)").matcher(line);
 				if (!name.find() || !nid.find()) continue;
 				String id = nid.group(1);
 				long decimal = id.startsWith("0x") ? Long.parseLong(id.substring(2), 16) : Long.parseLong(id);
@@ -169,8 +178,8 @@ public final class Diagnostics {
 	}
 
 	private static String diagnosticCommand(String operation, String... args) throws Exception {
-		Object result = java.lang.management.ManagementFactory.getPlatformMBeanServer().invoke(
-			new javax.management.ObjectName("com.sun.management:type=DiagnosticCommand"), operation,
+		Object result = ManagementFactory.getPlatformMBeanServer().invoke(
+			new ObjectName("com.sun.management:type=DiagnosticCommand"), operation,
 			new Object[] {args}, new String[] {String[].class.getName()});
 		return result == null ? "" : result.toString();
 	}
@@ -196,9 +205,9 @@ public final class Diagnostics {
 			if (file == null) {
 				Path path = FabricLoader.getInstance().getGameDir().resolve("logs").resolve("pandorical-trace.log");
 				path.getParent().toFile().mkdirs();
-				if (java.nio.file.Files.exists(path)) {
-					java.nio.file.Files.move(path, path.resolveSibling("pandorical-trace-previous.log"),
-						java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+				if (Files.exists(path)) {
+					Files.move(path, path.resolveSibling("pandorical-trace-previous.log"),
+						StandardCopyOption.REPLACE_EXISTING);
 				}
 				file = new FileOutputStream(path.toFile(), false);
 			}

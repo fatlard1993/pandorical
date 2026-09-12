@@ -1,5 +1,7 @@
 package justfatlard.pandorical.api;
 
+import java.util.Objects;
+
 /**
  * A picture to stand in the world: a grid of palette-coloured cells on a thin panel.
  *
@@ -20,9 +22,9 @@ public record Picture(int columns, int rows, int[] palette, byte[] cells, Pose p
      *                                  {@code cells} does not hold exactly {@code columns * rows}
      */
     public Picture {
-        java.util.Objects.requireNonNull(palette, "palette");
-        java.util.Objects.requireNonNull(cells, "cells");
-        java.util.Objects.requireNonNull(pose, "pose");
+        Objects.requireNonNull(palette, "palette");
+        Objects.requireNonNull(cells, "cells");
+        Objects.requireNonNull(pose, "pose");
         if (columns < 1 || rows < 1 || columns > LARGEST_SIDE || rows > LARGEST_SIDE) {
             throw new IllegalArgumentException("picture size " + columns + "x" + rows + " is outside 1.." + LARGEST_SIDE);
         }

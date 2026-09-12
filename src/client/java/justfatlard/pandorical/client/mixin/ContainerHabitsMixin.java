@@ -17,6 +17,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import justfatlard.pandorical.client.screen.NavigationScroll;
 
 /**
  * Two container habits, on every container screen, for anyone with Pandorical: the wheel moves one
@@ -77,7 +78,7 @@ public abstract class ContainerHabitsMixin {
 			CallbackInfoReturnable<Boolean> cir) {
 		if (!ContainerHabits.enabled()) return;
 		// A controller's shoulder scroll is steering a list, not nudging the slot its cursor happens to rest on.
-		if (justfatlard.pandorical.client.screen.NavigationScroll.isActive()) return;
+		if (NavigationScroll.isActive()) return;
 		if (scrollY == 0 || this.hoveredSlot == null || !this.hoveredSlot.hasItem()) return;
 		// Not while something is on the cursor: the hand is mid-gesture, and taking a slot out from
 		// under it would be a surprise.

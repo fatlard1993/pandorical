@@ -9,6 +9,7 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
+import java.util.LinkedHashMap;
 
 /**
  * A client's own mods and their settings, for the mod menu.
@@ -32,7 +33,7 @@ public record ClientSettingsC2S(List<Mod> mods) implements CustomPacketPayload {
                 String description = ByteBufCodecs.STRING_UTF8.decode(buf);
                 String kind = ByteBufCodecs.STRING_UTF8.decode(buf);
                 int n = ByteBufCodecs.VAR_INT.decode(buf);
-                Map<String, String> options = new java.util.LinkedHashMap<>();
+                Map<String, String> options = new LinkedHashMap<>();
                 for (int i = 0; i < n; i++) {
                     options.put(ByteBufCodecs.STRING_UTF8.decode(buf), ByteBufCodecs.STRING_UTF8.decode(buf));
                 }

@@ -5,6 +5,8 @@ import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.resources.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
+import justfatlard.pandorical.client.animation.EntityAnimations;
+import justfatlard.pandorical.client.renderer.AnimationHolder;
 
 /**
  * Merges {@link OverlayTextureHolder} onto every render state so the overlay
@@ -15,19 +17,19 @@ import org.spongepowered.asm.mixin.Unique;
  */
 @Mixin(EntityRenderState.class)
 public class EntityRenderStateMixin implements OverlayTextureHolder,
-		justfatlard.pandorical.client.renderer.AnimationHolder {
+		AnimationHolder {
 
 	@Unique
-	private justfatlard.pandorical.client.animation.EntityAnimations.Active pandorical$animation;
+	private EntityAnimations.Active pandorical$animation;
 
 	@Override
 	public void pandorical$setAnimation(
-			justfatlard.pandorical.client.animation.EntityAnimations.Active animation) {
+			EntityAnimations.Active animation) {
 		this.pandorical$animation = animation;
 	}
 
 	@Override
-	public justfatlard.pandorical.client.animation.EntityAnimations.Active pandorical$getAnimation() {
+	public EntityAnimations.Active pandorical$getAnimation() {
 		return this.pandorical$animation;
 	}
 	@Unique

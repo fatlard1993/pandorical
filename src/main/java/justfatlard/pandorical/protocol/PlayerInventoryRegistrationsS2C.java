@@ -9,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import io.netty.handler.codec.DecoderException;
 
 /**
  * Sent during the Pandorical handshake (after HelloC2S) to inform the client of all registered
@@ -49,7 +50,7 @@ public record PlayerInventoryRegistrationsS2C(
             public PlayerInventoryRegistrationsS2C decode(ByteBuf buf) {
                 int groupCount = ByteBufCodecs.VAR_INT.decode(buf);
                 if (groupCount < 0 || groupCount > MAX_GROUPS) {
-                    throw new io.netty.handler.codec.DecoderException(
+                    throw new DecoderException(
                         "slot group count " + groupCount + " exceeds " + MAX_GROUPS);
                 }
                 List<SlotGroup> groups = new ArrayList<>();
@@ -57,7 +58,7 @@ public record PlayerInventoryRegistrationsS2C(
                     String namespace = ByteBufCodecs.STRING_UTF8.decode(buf);
                     int slotCount = ByteBufCodecs.VAR_INT.decode(buf);
                     if (slotCount < 0 || slotCount > MAX_SLOTS_PER_GROUP) {
-                        throw new io.netty.handler.codec.DecoderException(
+                        throw new DecoderException(
                             "slot count " + slotCount + " exceeds " + MAX_SLOTS_PER_GROUP);
                     }
                     List<SlotPosition> slots = new ArrayList<>();

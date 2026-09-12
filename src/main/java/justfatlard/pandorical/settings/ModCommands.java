@@ -17,6 +17,7 @@ import net.fabricmc.loader.api.ModContainer;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.PermissionSet;
 
 /**
  * Which mod each command came from, and what it looks like typed out.
@@ -67,9 +68,9 @@ public final class ModCommands {
 	private static Map<String, List<Entry>> read(MinecraftServer server, ServerPlayer player) {
 		CommandDispatcher<CommandSourceStack> dispatcher = server.getCommands().getDispatcher();
 		CommandSourceStack ops = player.createCommandSourceStack()
-			.withPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
+			.withPermission(PermissionSet.ALL_PERMISSIONS);
 		CommandSourceStack anyone = ops
-			.withPermission(net.minecraft.server.permissions.PermissionSet.NO_PERMISSIONS);
+			.withPermission(PermissionSet.NO_PERMISSIONS);
 		Map<String, List<Entry>> found = new LinkedHashMap<>();
 		for (CommandNode<CommandSourceStack> root : dispatcher.getRoot().getChildren()) {
 			String mod = ownerOf(root);

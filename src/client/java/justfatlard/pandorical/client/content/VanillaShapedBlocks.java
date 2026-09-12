@@ -5,6 +5,7 @@ import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.TrapDoorBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.properties.BlockSetType;
+import java.lang.reflect.Field;
 
 /**
  * Stand-ins that are the real thing.
@@ -40,7 +41,7 @@ final class VanillaShapedBlocks {
 
     /** A trapdoor keeps its set type to itself; read it off the field, or fall back to oak. */
     private static BlockSetType setTypeOf(TrapDoorBlock trapdoor) {
-        for (java.lang.reflect.Field field : TrapDoorBlock.class.getDeclaredFields()) {
+        for (Field field : TrapDoorBlock.class.getDeclaredFields()) {
             if (field.getType() != BlockSetType.class) continue;
             try {
                 field.setAccessible(true);

@@ -12,6 +12,9 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 import java.io.*;
 import java.util.*;
+import justfatlard.pandorical.Pandorical;
+import justfatlard.pandorical.rail.RailCollision;
+import net.minecraft.world.phys.shapes.BooleanOp;
 
 /**
  * A block that dynamically creates its state definition from a list of property names.
@@ -48,7 +51,7 @@ public class DynamicBlock extends Block {
     @Override
     protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         // A stand-in for a rail is a rail: same floor for a player, when the server has asked.
-        VoxelShape floor = justfatlard.pandorical.rail.RailCollision.shapeFor(state, context);
+        VoxelShape floor = RailCollision.shapeFor(state, context);
         if (floor != null) return floor;
         if (collisionShapes != null) {
             VoxelShape shape = collisionShapes.get(state);
@@ -62,7 +65,7 @@ public class DynamicBlock extends Block {
         // If the block has a non-full-cube outline shape, it shouldn't occlude adjacent faces.
         if (outlineShapes != null) {
             VoxelShape shape = outlineShapes.get(state);
-            if (shape != null && !Shapes.joinIsNotEmpty(Shapes.block(), shape, net.minecraft.world.phys.shapes.BooleanOp.NOT_SAME)) {
+            if (shape != null && !Shapes.joinIsNotEmpty(Shapes.block(), shape, BooleanOp.NOT_SAME)) {
                 return shape; // Full cube: use normal occlusion
             }
             return Shapes.empty(); // Non-full: don't occlude
@@ -135,7 +138,7 @@ public class DynamicBlock extends Block {
                 collisionMap.put(state, readShape(dis));
             }
         } catch (IOException e) {
-            justfatlard.pandorical.Pandorical.LOGGER.warn("Failed to deserialize shapes for {}: {}",
+            Pandorical.LOGGER.warn("Failed to deserialize shapes for {}: {}",
                 block, e.getMessage());
             return;
         }
@@ -148,7 +151,7 @@ public class DynamicBlock extends Block {
             // Say so rather than drop them. A stand-in built as a stock Block or SlabBlock has
             // nowhere to put these, and the block then wears vanilla geometry for the rest of
             // the session while the server believes it sent the real thing.
-            justfatlard.pandorical.Pandorical.LOGGER.warn(
+            Pandorical.LOGGER.warn(
                 "Block {} is a {} and cannot hold server shapes — it keeps stand-in geometry",
                 block, block.getClass().getSimpleName());
             return;
@@ -251,7 +254,7 @@ public class DynamicBlock extends Block {
                 if (!wireDescribesValues || matchesWire(prop, propType, valueCount, intMin, wireEnumNames)) {
                     return prop;
                 }
-                justfatlard.pandorical.Pandorical.LOGGER.debug(
+                Pandorical.LOGGER.debug(
                     "Base block property '{}' ({} values) does not match the server's ({} values) — rebuilding from the wire",
                     name, prop.getPossibleValues().size(),
                     wireEnumNames != null ? wireEnumNames.size() : valueCount);

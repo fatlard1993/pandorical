@@ -37,9 +37,50 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.text.NumberFormat;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
+import justfatlard.pandorical.BlockMarkLookup;
+import justfatlard.pandorical.Diagnostics;
+import justfatlard.pandorical.MountPolicy;
+import justfatlard.pandorical.api.Capabilities;
+import justfatlard.pandorical.client.animation.AnimationLibrary;
+import justfatlard.pandorical.client.animation.EntityAnimations;
+import justfatlard.pandorical.client.api.PandoricalClientApi;
+import justfatlard.pandorical.client.contextmodel.ContextModels;
+import justfatlard.pandorical.client.contextmodel.DoorBanks;
+import justfatlard.pandorical.client.contextmodel.DoorJambs;
+import justfatlard.pandorical.client.contextmodel.FenceGateJoins;
+import justfatlard.pandorical.client.contextmodel.RailDiagonals;
+import justfatlard.pandorical.client.contextmodel.SlabHung;
+import justfatlard.pandorical.client.contextmodel.TrapdoorBanks;
+import justfatlard.pandorical.client.decal.BannerDecalRenderer;
+import justfatlard.pandorical.client.decal.BannerDecalStore;
+import justfatlard.pandorical.client.diag.StackSampler;
+import justfatlard.pandorical.client.hud.VanillaHudElementSuppressor;
+import justfatlard.pandorical.client.inventory.ClientInventoryButtons;
+import justfatlard.pandorical.client.keepsake.ClientKeepsakes;
+import justfatlard.pandorical.client.keybind.KeybindManager;
+import justfatlard.pandorical.client.picture.ClientPictures;
+import justfatlard.pandorical.client.render.LeafCulling;
+import justfatlard.pandorical.client.renderer.ChestOverlayStore;
+import justfatlard.pandorical.client.renderer.ClientBlockMarks;
+import justfatlard.pandorical.client.renderer.EntityOverlayStore;
+import justfatlard.pandorical.client.renderer.PositionalTintStore;
+import justfatlard.pandorical.client.settings.ClientSettings;
+import justfatlard.pandorical.client.settings.ContainerHabits;
+import justfatlard.pandorical.client.settings.ServerCapabilities;
+import justfatlard.pandorical.client.settings.ServerSettingsButton;
+import justfatlard.pandorical.client.settings.ViewportReporter;
+import justfatlard.pandorical.client.skin.SkinOverrides;
+import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
+import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
+import net.minecraft.ChatFormatting;
+import net.minecraft.server.packs.PackType;
 
 public class PandoricalClient implements ClientModInitializer {
-    private static final List<String> CLIENT_CAPABILITIES = justfatlard.pandorical.api.Capabilities.CLIENT;
+    private static final List<String> CLIENT_CAPABILITIES = Capabilities.CLIENT;
 
     // Pending screen defs keyed by screenId; LinkedHashMap preserves insertion order
     // so the last entry is always the most recently added.
@@ -50,14 +91,14 @@ public class PandoricalClient implements ClientModInitializer {
      * Startup pieces left out by {@code -Dpandorical.skip=a,b,...}, or all of them. For finding which
      * one a crash lives in on a machine nobody here can reach; nothing is left out without the property.
      */
-    private static final java.util.Set<String> SKIP = java.util.Arrays.stream(
+    private static final Set<String> SKIP = Arrays.stream(
             System.getProperty("pandorical.skip", "").split(","))
-        .map(String::trim).filter(s -> !s.isEmpty()).collect(java.util.stream.Collectors.toSet());
-    private static final java.util.Set<String> SKIPPABLE = java.util.Set.of(
+        .map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toSet());
+    private static final Set<String> SKIPPABLE = Set.of(
         "keybinds", "contextmodels", "suppressor", "hud", "structures", "decals", "pictures", "all");
 
     private static boolean skipped(String piece) {
-        justfatlard.pandorical.Diagnostics.mark("startup: " + piece);
+        Diagnostics.mark("startup: " + piece);
         boolean skip = SKIP.contains(piece) || SKIP.contains("all");
         if (skip) Pandorical.LOGGER.warn("[pandorical] diagnostic: leaving out {}", piece);
         return skip;
@@ -68,31 +109,31 @@ public class PandoricalClient implements ClientModInitializer {
         for (String piece : SKIP) {
             if (!SKIPPABLE.contains(piece)) Pandorical.LOGGER.warn("[pandorical] diagnostic: pandorical.skip names {}, which is not one of {}", piece, SKIPPABLE);
         }
-        justfatlard.pandorical.client.diag.StackSampler.start();
-        justfatlard.pandorical.Diagnostics.mark("client init begins");
+        StackSampler.start();
+        Diagnostics.mark("client init begins");
         // The load guard (see Diagnostics): up from launch already, and raised again for every join,
         // from the first packet of the configuration phase - where the synced pack loads - until
         // the player has been in the world a while.
-        net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationConnectionEvents.INIT.register((handler, client) -> {
-            justfatlard.pandorical.Diagnostics.guardFor(justfatlard.pandorical.Diagnostics.JOIN_WINDOW_MILLIS);
-            justfatlard.pandorical.client.diag.StackSampler.start();
+        ClientConfigurationConnectionEvents.INIT.register((handler, client) -> {
+            Diagnostics.guardFor(Diagnostics.JOIN_WINDOW_MILLIS);
+            StackSampler.start();
         });
-        if (justfatlard.pandorical.Diagnostics.windowsClient()) {
-            justfatlard.pandorical.client.api.PandoricalClientApi.settings().group(Pandorical.MOD_ID, "Pandorical")
+        if (Diagnostics.windowsClient()) {
+            PandoricalClientApi.settings().group(Pandorical.MOD_ID, "Pandorical")
                 .toggle("loadGuard", "Load guard",
                     "Loads a little slower on Windows, to dodge a crash some Windows players get while loading",
-                    justfatlard.pandorical.Diagnostics::guarding, justfatlard.pandorical.Diagnostics::setGuarding);
+                    Diagnostics::guarding, Diagnostics::setGuarding);
         }
         // The block-shape hooks in common code ask about marks; this is the client's answer.
-        justfatlard.pandorical.BlockMarkLookup.client = justfatlard.pandorical.client.renderer.ClientBlockMarks::has;
-        justfatlard.pandorical.client.settings.ContainerHabits.register();
+        BlockMarkLookup.client = ClientBlockMarks::has;
+        ContainerHabits.register();
         ComponentRegistry.registerDefaults();
 
         // The menu is built by vanilla's MenuType factory, which is handed nothing but a sync
         // id and an inventory - so the slot count has to be fetched from the definition that
         // arrived just before it. See PandoricalMenu's client constructor for what a wrong
         // count does to the player's inventory.
-        justfatlard.pandorical.screen.PandoricalMenu.setIncomingModSlots(() -> {
+        PandoricalMenu.setIncomingModSlots(() -> {
             OpenScreenS2C newest = null;
             for (var entry : pendingContainerDefs.entrySet()) newest = entry.getValue();
             return newest == null ? -1 : newest.container().map(c -> c.slotCount()).orElse(-1);
@@ -100,29 +141,29 @@ public class PandoricalClient implements ClientModInitializer {
 
         // Keybind pool must register during client init: the options system
         // does not accept KeyMappings added later (see KeybindApi javadoc)
-        if (!skipped("keybinds")) justfatlard.pandorical.client.keybind.KeybindManager.init();
+        if (!skipped("keybinds")) KeybindManager.init();
         if (!skipped("contextmodels")) {
-            justfatlard.pandorical.client.contextmodel.ContextModels.register(new justfatlard.pandorical.client.contextmodel.RailDiagonals());
-            justfatlard.pandorical.client.contextmodel.ContextModels.register(new justfatlard.pandorical.client.contextmodel.FenceGateJoins());
-            justfatlard.pandorical.client.contextmodel.ContextModels.register(new justfatlard.pandorical.client.contextmodel.DoorBanks());
-            justfatlard.pandorical.client.contextmodel.ContextModels.register(new justfatlard.pandorical.client.contextmodel.TrapdoorBanks());
-            justfatlard.pandorical.client.contextmodel.ContextModels.register(new justfatlard.pandorical.client.contextmodel.DoorJambs());
-            justfatlard.pandorical.client.contextmodel.ContextModels.register(new justfatlard.pandorical.client.contextmodel.SlabHung());
-            justfatlard.pandorical.client.contextmodel.ContextModels.init();
+            ContextModels.register(new RailDiagonals());
+            ContextModels.register(new FenceGateJoins());
+            ContextModels.register(new DoorBanks());
+            ContextModels.register(new TrapdoorBanks());
+            ContextModels.register(new DoorJambs());
+            ContextModels.register(new SlabHung());
+            ContextModels.init();
         }
 
         // Same startup-time constraint as keybinds: Fabric's HUD element registry
         // is only writable during client init (see the suppressor's javadoc)
-        if (!skipped("suppressor")) justfatlard.pandorical.client.hud.VanillaHudElementSuppressor.init();
+        if (!skipped("suppressor")) VanillaHudElementSuppressor.init();
 
         // Exact count for oversized stacks (whose slot label is abbreviated
         // by ItemCountRendererMixin), absorbed from stackz's client
-        net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback.EVENT.register((stack, context, flag, lines) -> {
+        ItemTooltipCallback.EVENT.register((stack, context, flag, lines) -> {
             int count = stack.getCount();
             if (count >= 100) {
-                lines.add(net.minecraft.network.chat.Component.literal(
-                        "Count: " + java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(count))
-                    .withStyle(net.minecraft.ChatFormatting.GRAY));
+                lines.add(Component.literal(
+                        "Count: " + NumberFormat.getNumberInstance(Locale.US).format(count))
+                    .withStyle(ChatFormatting.GRAY));
             }
         });
 
@@ -133,20 +174,20 @@ public class PandoricalClient implements ClientModInitializer {
 
         if (!skipped("hud")) HudRenderer.register();
         if (!skipped("structures")) StructureRenderer.register();
-        if (!skipped("decals")) justfatlard.pandorical.client.decal.BannerDecalRenderer.register();
-        if (!skipped("pictures")) justfatlard.pandorical.client.picture.ClientPictures.register();
+        if (!skipped("decals")) BannerDecalRenderer.register();
+        if (!skipped("pictures")) ClientPictures.register();
 
         // Tick content manager for sync timeout detection + show sync overlay
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             ContentManager.tick();
             StructureManager.tick();
             HudManager.tick();
-            justfatlard.pandorical.client.keybind.KeybindManager.tick(client);
-            justfatlard.pandorical.client.settings.ViewportReporter.tick(client);
+            KeybindManager.tick(client);
+            ViewportReporter.tick(client);
             if (ContentManager.isSyncing() && client.gui != null) {
                 // Show as both title and actionbar for visibility
-                client.gui.hud.setTitle(net.minecraft.network.chat.Component.literal(ContentManager.getSyncStatus())
-                    .withStyle(net.minecraft.ChatFormatting.GOLD));
+                client.gui.hud.setTitle(Component.literal(ContentManager.getSyncStatus())
+                    .withStyle(ChatFormatting.GOLD));
                 client.gui.hud.setTimes(0, 40, 10);
             }
         });
@@ -207,16 +248,16 @@ public class PandoricalClient implements ClientModInitializer {
         });
 
         ClientConfigurationNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE, (payload, context) -> {
-                justfatlard.pandorical.client.inventory.ClientInventoryButtons.set(payload.buttons());
+            InventoryButtonsS2C.TYPE, (payload, context) -> {
+                ClientInventoryButtons.set(payload.buttons());
                 Pandorical.LOGGER.debug("Inventory buttons received: {}", payload.buttons().size());
             });
 
         // The same list again, mid-game, when a button that is a switch has been thrown. The
         // screen reads the list every frame, so an open inventory shows the new face at once.
-        net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE, (payload, context) ->
-                justfatlard.pandorical.client.inventory.ClientInventoryButtons.set(payload.buttons()));
+        ClientPlayNetworking.registerGlobalReceiver(
+            InventoryButtonsS2C.TYPE, (payload, context) ->
+                ClientInventoryButtons.set(payload.buttons()));
 
         // The server refuses any client it cannot send this to, on the grounds that a client
         // too old to receive it is too old to read the content that follows. That test only
@@ -224,7 +265,7 @@ public class PandoricalClient implements ClientModInitializer {
         // only when something is listening on it, so for as long as this was missing the check
         // turned away every client, current ones included.
         ClientConfigurationNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.RequirementS2C.TYPE, (payload, context) -> {
+            RequirementS2C.TYPE, (payload, context) -> {
                 if (Pandorical.PROTOCOL_VERSION < payload.minimumProtocol()) {
                     Pandorical.LOGGER.warn("Server needs Pandorical {} (protocol v{}); this client speaks v{}",
                         payload.serverModVersion(), payload.minimumProtocol(), Pandorical.PROTOCOL_VERSION);
@@ -237,8 +278,8 @@ public class PandoricalClient implements ClientModInitializer {
         ClientConfigurationNetworking.registerGlobalReceiver(BlockTintsConfigS2C.TYPE, (payload, context) -> {
             Pandorical.LOGGER.debug("Config phase: received {} block tint group(s)", payload.entries().size());
             // A fresh connection starts unpainted; the server states every colour again on join.
-            justfatlard.pandorical.client.renderer.PositionalTintStore.clear();
-            justfatlard.pandorical.client.decal.BannerDecalStore.clear();
+            PositionalTintStore.clear();
+            BannerDecalStore.clear();
             payload.entries().forEach(PandoricalClient::applyBlockTints);
         });
     }
@@ -250,7 +291,7 @@ public class PandoricalClient implements ClientModInitializer {
             case "sugar_cane"-> BlockTintSources.sugarCane();
             case "foliage"   -> BlockTintSources.foliage();
             case "constant"  -> BlockTintSources.constant(entry.constantColor());
-            case "positional"-> justfatlard.pandorical.client.renderer.PositionalTintStore.source(entry.constantColor());
+            case "positional"-> PositionalTintStore.source(entry.constantColor());
             default -> {
                 Pandorical.LOGGER.warn("Unknown block tint type '{}' — skipping", entry.tintType());
                 yield null;
@@ -264,28 +305,28 @@ public class PandoricalClient implements ClientModInitializer {
             .toArray(Block[]::new);
         if (blocks.length > 0) BlockColorRegistry.register(List.of(source), blocks);
         if (blocks.length > 0 && "positional".equals(entry.tintType())) {
-            justfatlard.pandorical.client.renderer.PositionalTintStore.track(blocks);
+            PositionalTintStore.track(blocks);
         }
     }
 
     private void registerClientHandlers() {
         // Respond to server hello
         ClientPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.BlockMarksS2C.TYPE, (payload, context) ->
-                context.client().execute(() -> justfatlard.pandorical.client.renderer.ClientBlockMarks.apply(payload)));
+            BlockMarksS2C.TYPE, (payload, context) ->
+                context.client().execute(() -> ClientBlockMarks.apply(payload)));
         ClientPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.BlockTintPositionsS2C.TYPE, (payload, context) ->
+            BlockTintPositionsS2C.TYPE, (payload, context) ->
                 context.client().execute(() -> payload.entries().forEach(entry ->
-                    justfatlard.pandorical.client.renderer.PositionalTintStore.paint(
+                    PositionalTintStore.paint(
                         entry.pos(), entry.argb()))));
         ClientPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.ClientSettingS2C.TYPE, (payload, context) ->
-                context.client().execute(() -> justfatlard.pandorical.client.settings.ClientSettings.INSTANCE.apply(payload)));
+            ClientSettingS2C.TYPE, (payload, context) ->
+                context.client().execute(() -> ClientSettings.INSTANCE.apply(payload)));
         ClientPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.BannerDecalsS2C.TYPE, (payload, context) ->
-                context.client().execute(() -> justfatlard.pandorical.client.decal.BannerDecalStore.apply(payload)));
+            BannerDecalsS2C.TYPE, (payload, context) ->
+                context.client().execute(() -> BannerDecalStore.apply(payload)));
 
-        justfatlard.pandorical.client.keepsake.ClientKeepsakes.register();
+        ClientKeepsakes.register();
 
         ClientPlayNetworking.registerGlobalReceiver(HelloS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> {
@@ -295,11 +336,11 @@ public class PandoricalClient implements ClientModInitializer {
                 }
                 Pandorical.LOGGER.debug("Server hello received, protocol v{}, capabilities: {}",
                     payload.protocolVersion(), payload.capabilities());
-                justfatlard.pandorical.client.settings.ServerCapabilities.set(payload.capabilities());
+                ServerCapabilities.set(payload.capabilities());
                 ClientPlayNetworking.send(new HelloC2S(Pandorical.PROTOCOL_VERSION, CLIENT_CAPABILITIES));
                 // And what this client's own mods want in the menu, now that there is a server to tell.
-                justfatlard.pandorical.client.settings.ClientSettings.INSTANCE.send();
-                justfatlard.pandorical.client.settings.ViewportReporter.send(context.client());
+                ClientSettings.INSTANCE.send();
+                ViewportReporter.send(context.client());
             });
         });
 
@@ -350,9 +391,9 @@ public class PandoricalClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(HideHudS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> HudManager.handleHide(payload));
         });
-        ClientPlayNetworking.registerGlobalReceiver(justfatlard.pandorical.protocol.SetVanillaHudElementsS2C.TYPE, (payload, context) -> {
+        ClientPlayNetworking.registerGlobalReceiver(SetVanillaHudElementsS2C.TYPE, (payload, context) -> {
             context.client().execute(() ->
-                justfatlard.pandorical.client.hud.VanillaHudElementSuppressor.handle(payload));
+                VanillaHudElementSuppressor.handle(payload));
         });
 
         // Content sync
@@ -370,40 +411,40 @@ public class PandoricalClient implements ClientModInitializer {
 
         // Animations are ordinary client resources, so they arrive through the same asset sync as
         // the models they move and reload with them.
-        net.fabricmc.fabric.api.resource.ResourceManagerHelper
-            .get(net.minecraft.server.packs.PackType.CLIENT_RESOURCES)
-            .registerReloadListener(new justfatlard.pandorical.client.animation.AnimationLibrary());
+        ResourceManagerHelper
+            .get(PackType.CLIENT_RESOURCES)
+            .registerReloadListener(new AnimationLibrary());
 
         ClientPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.MountPolicyS2C.TYPE, (payload, context) -> {
-                context.client().execute(() -> justfatlard.pandorical.MountPolicy.set(
+            MountPolicyS2C.TYPE, (payload, context) -> {
+                context.client().execute(() -> MountPolicy.set(
                     payload.doubleRiders(), payload.freeLook()));
             });
 
         ClientPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.PlayAnimationS2C.TYPE, (payload, context) -> {
+            PlayAnimationS2C.TYPE, (payload, context) -> {
                 context.client().execute(() -> {
                     if (payload.animation().isEmpty()) {
-                        justfatlard.pandorical.client.animation.EntityAnimations.stop(payload.entityId());
+                        EntityAnimations.stop(payload.entityId());
                     } else {
-                        justfatlard.pandorical.client.animation.EntityAnimations.play(
+                        EntityAnimations.play(
                             payload.entityId(),
-                            net.minecraft.resources.Identifier.parse(payload.animation()),
+                            Identifier.parse(payload.animation()),
                             payload.looping());
                     }
                 });
             });
 
         ClientPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.RenderPolicyS2C.TYPE, (payload, context) -> {
+            RenderPolicyS2C.TYPE, (payload, context) -> {
                 context.client().execute(() ->
-                    justfatlard.pandorical.client.render.LeafCulling.setEnforced(payload.cullLeaves()));
+                    LeafCulling.setEnforced(payload.cullLeaves()));
             });
 
         ClientPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.SkinOverrideS2C.TYPE, (payload, context) -> {
+            SkinOverrideS2C.TYPE, (payload, context) -> {
                 context.client().execute(() ->
-                    justfatlard.pandorical.client.skin.SkinOverrides.handle(payload));
+                    SkinOverrides.handle(payload));
             });
 
         // Entity renderer registrations: apply to EntityRenderers.PROVIDERS
@@ -431,33 +472,33 @@ public class PandoricalClient implements ClientModInitializer {
         // Entity overlays
         ClientPlayNetworking.registerGlobalReceiver(EntityOverlayS2C.TYPE, (payload, context) -> {
             context.client().execute(() ->
-                justfatlard.pandorical.client.renderer.EntityOverlayStore.handle(payload));
+                EntityOverlayStore.handle(payload));
         });
 
         // Chest overlays
         ClientPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.ChestOverlayS2C.TYPE, (payload, context) -> {
+            ChestOverlayS2C.TYPE, (payload, context) -> {
                 context.client().execute(() ->
-                    justfatlard.pandorical.client.renderer.ChestOverlayStore.handle(payload));
+                    ChestOverlayStore.handle(payload));
             });
 
         // Keybind slot declarations
         ClientPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.KeybindRebindS2C.TYPE, (payload, context) -> {
+            KeybindRebindS2C.TYPE, (payload, context) -> {
                 context.client().execute(() ->
-                    justfatlard.pandorical.client.keybind.KeybindManager.handleRebindRequest(payload.slot()));
+                    KeybindManager.handleRebindRequest(payload.slot()));
             });
         ClientPlayNetworking.registerGlobalReceiver(KeybindDeclarationsS2C.TYPE, (payload, context) -> {
             context.client().execute(() ->
-                justfatlard.pandorical.client.keybind.KeybindManager.handleDeclarations(payload));
+                KeybindManager.handleDeclarations(payload));
         });
-        ClientPlayNetworking.registerGlobalReceiver(justfatlard.pandorical.protocol.KeybindDefaultsS2C.TYPE, (payload, context) -> {
+        ClientPlayNetworking.registerGlobalReceiver(KeybindDefaultsS2C.TYPE, (payload, context) -> {
             context.client().execute(() ->
-                justfatlard.pandorical.client.keybind.KeybindManager.applyDefaults(payload));
+                KeybindManager.applyDefaults(payload));
         });
 
         // When entering play phase, inject resource pack if config-phase synced assets
-        justfatlard.pandorical.client.settings.ServerSettingsButton.register();
+        ServerSettingsButton.register();
 
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             if (ContentManager.wasConfigPhaseSynced()) {
@@ -490,18 +531,18 @@ public class PandoricalClient implements ClientModInitializer {
         ClientInventorySlotRegistry.reset();
         ClientEntityRendererRegistry.reset();
         StructureManager.clear();
-        justfatlard.pandorical.client.renderer.EntityOverlayStore.clear();
-        justfatlard.pandorical.client.renderer.ChestOverlayStore.clear();
-        justfatlard.pandorical.client.keybind.KeybindManager.clear();
-        justfatlard.pandorical.client.hud.VanillaHudElementSuppressor.clear();
-        justfatlard.pandorical.client.settings.ServerCapabilities.clear();
-        justfatlard.pandorical.client.settings.ViewportReporter.clear();
-        justfatlard.pandorical.client.renderer.ClientBlockMarks.clear();
-        justfatlard.pandorical.client.render.LeafCulling.onDisconnect();
-        justfatlard.pandorical.client.animation.EntityAnimations.clearAll();
-        justfatlard.pandorical.MountPolicy.clear();
+        EntityOverlayStore.clear();
+        ChestOverlayStore.clear();
+        KeybindManager.clear();
+        VanillaHudElementSuppressor.clear();
+        ServerCapabilities.clear();
+        ViewportReporter.clear();
+        ClientBlockMarks.clear();
+        LeafCulling.onDisconnect();
+        EntityAnimations.clearAll();
+        MountPolicy.clear();
         // A texture is released on the render thread only, and the connection starts on the
         // network thread.
-        net.minecraft.client.Minecraft.getInstance().execute(justfatlard.pandorical.client.skin.SkinOverrides::clearAll);
+        Minecraft.getInstance().execute(SkinOverrides::clearAll);
     }
 }

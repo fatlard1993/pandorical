@@ -9,6 +9,14 @@ import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.block.state.BlockState;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Set;
+import justfatlard.pandorical.client.mixin.SingleQuadParticleAccessor;
+import net.minecraft.client.particle.Particle;
+import net.minecraft.client.particle.SingleQuadParticle;
+import net.minecraft.world.level.block.Block;
 
 /**
  * Colours the server has asked for at particular places.
@@ -52,11 +60,11 @@ public final class PositionalTintStore {
 	}
 
 	/** Blocks registered with a positional tint, whose particles take the tint too. */
-	private static final java.util.Set<net.minecraft.world.level.block.Block> positional =
-		java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+	private static final Set<Block> positional =
+		Collections.newSetFromMap(new IdentityHashMap<>());
 
-	public static void track(net.minecraft.world.level.block.Block... blocks) {
-		positional.addAll(java.util.List.of(blocks));
+	public static void track(Block... blocks) {
+		positional.addAll(List.of(blocks));
 	}
 
 	/**
@@ -80,9 +88,9 @@ public final class PositionalTintStore {
 	 * particle's brightness: a portal's particles are purple, and purple times white is purple.
 	 * Brightness is the strongest channel, so a white portal throws white sparks and not grey.
 	 */
-	public static void tintParticle(net.minecraft.client.particle.Particle particle) {
-		if (emitting == 0 || !(particle instanceof net.minecraft.client.particle.SingleQuadParticle quad)) return;
-		var colours = (justfatlard.pandorical.client.mixin.SingleQuadParticleAccessor) quad;
+	public static void tintParticle(Particle particle) {
+		if (emitting == 0 || !(particle instanceof SingleQuadParticle quad)) return;
+		var colours = (SingleQuadParticleAccessor) quad;
 		float bright = Math.max(colours.pandorical$rCol(), Math.max(colours.pandorical$gCol(), colours.pandorical$bCol()));
 		quad.setColor(
 			((emitting >> 16) & 0xFF) / 255F * bright,

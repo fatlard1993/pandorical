@@ -10,6 +10,12 @@ import net.minecraft.server.packs.resources.IoSupplier;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import justfatlard.pandorical.Pandorical;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packs.metadata.pack.PackMetadataSection;
+import net.minecraft.server.packs.repository.PackSource;
+import net.minecraft.util.InclusiveRange;
 
 /**
  * In-memory resource pack that serves assets synced from the server.
@@ -21,7 +27,7 @@ public class VirtualResourcePack implements PackResources {
 
     // Concurrent: a resource reload lists this on a worker thread while a content sync, or a
     // disconnect clearing it, writes on another. A plain map iterated then throws mid-reload.
-    private final Map<Identifier, byte[]> resources = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<Identifier, byte[]> resources = new ConcurrentHashMap<>();
 
     /**
      * Add a resource. Path format: "assets/{namespace}/{type}/{name}"
@@ -38,7 +44,7 @@ public class VirtualResourcePack implements PackResources {
                 return;
             }
         }
-        justfatlard.pandorical.Pandorical.LOGGER.warn(
+        Pandorical.LOGGER.warn(
             "Skipped asset with invalid path format: '{}' (expected 'assets/{{namespace}}/...')", path);
     }
 
@@ -78,7 +84,7 @@ public class VirtualResourcePack implements PackResources {
             }
         }
         if (path.contains("lang") && found > 0) {
-            justfatlard.pandorical.Pandorical.LOGGER.info("VirtualPack listResources ns={} path={} found={}", namespace, path, found);
+            Pandorical.LOGGER.info("VirtualPack listResources ns={} path={} found={}", namespace, path, found);
         }
     }
 
@@ -97,11 +103,11 @@ public class VirtualResourcePack implements PackResources {
     public <T> T getMetadataSection(MetadataSectionType<T> type) {
         // Only return metadata for pack metadata section types
         try {
-            var packMetaClass = net.minecraft.server.packs.metadata.pack.PackMetadataSection.class;
+            var packMetaClass = PackMetadataSection.class;
             // Check if the requested type matches any PackMetadataSection type
             boolean isPackMeta = false;
             for (var field : packMetaClass.getDeclaredFields()) {
-                if (net.minecraft.server.packs.metadata.MetadataSectionType.class.isAssignableFrom(field.getType())) {
+                if (MetadataSectionType.class.isAssignableFrom(field.getType())) {
                     field.setAccessible(true);
                     if (field.get(null) == type) {
                         isPackMeta = true;
@@ -114,8 +120,8 @@ public class VirtualResourcePack implements PackResources {
                 for (var ctor : ctors) {
                     if (ctor.getParameterCount() == 2) {
                         ctor.setAccessible(true);
-                        var desc = net.minecraft.network.chat.Component.literal("Pandorical synced assets");
-                        var range = new net.minecraft.util.InclusiveRange<>(46, 46);
+                        var desc = Component.literal("Pandorical synced assets");
+                        var range = new InclusiveRange<>(46, 46);
                         return (T) ctor.newInstance(desc, range);
                     }
                 }
@@ -129,8 +135,8 @@ public class VirtualResourcePack implements PackResources {
     @Override
     public PackLocationInfo location() {
         return new PackLocationInfo(PACK_ID,
-            net.minecraft.network.chat.Component.literal("Pandorical Virtual Assets"),
-            net.minecraft.server.packs.repository.PackSource.BUILT_IN,
+            Component.literal("Pandorical Virtual Assets"),
+            PackSource.BUILT_IN,
             Optional.empty());
     }
 

@@ -1,5 +1,10 @@
 package justfatlard.pandorical.api;
 
+import java.util.Collection;
+import java.util.Map;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+
 /**
  * API for registering block tint (color) mappings.
  * Registrations are synced to connecting clients during the configuration phase.
@@ -45,10 +50,10 @@ public interface BlockTintApi {
      * <p>No-op for a client that has not registered for it, so a player on an older Pandorical
      * simply sees the block's ordinary colour.
      */
-    void paint(net.minecraft.server.level.ServerPlayer player,
-        java.util.Map<net.minecraft.core.BlockPos, Integer> argbByPosition);
+    void paint(ServerPlayer player,
+        Map<BlockPos, Integer> argbByPosition);
 
     /** Put these positions back to their ordinary colour. */
-    void unpaint(net.minecraft.server.level.ServerPlayer player,
-        java.util.Collection<net.minecraft.core.BlockPos> positions);
+    void unpaint(ServerPlayer player,
+        Collection<BlockPos> positions);
 }

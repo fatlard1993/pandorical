@@ -27,6 +27,43 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import java.io.*;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
+import com.google.common.collect.ImmutableSet;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+import justfatlard.pandorical.api.EntityRendererRegistry;
+import justfatlard.pandorical.client.renderer.ClientEntityRendererRegistry;
+import justfatlard.pandorical.rail.RailCollision;
+import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
+import net.minecraft.client.color.block.BlockTintSource;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.packs.PackLocationInfo;
+import net.minecraft.server.packs.PackMetadataResources;
+import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.PackSelectionConfig;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.repository.Pack;
+import net.minecraft.server.packs.repository.PackCompatibility;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.repository.RepositorySource;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.food.FoodProperties;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ToolMaterial;
+import net.minecraft.world.item.component.Consumable;
+import net.minecraft.world.item.equipment.EquipmentAssets;
+import net.minecraft.world.item.equipment.Equippable;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SlabBlock;
+import net.minecraft.world.level.block.state.properties.Property;
 
 /**
  * Client-side content sync: registers the server's blocks, items and registry stubs, fills the
@@ -78,7 +115,7 @@ public class ContentManager {
 
     public static void reset() {
         pendingContent = null;
-        justfatlard.pandorical.rail.RailCollision.setSolid(false);
+        RailCollision.setSolid(false);
         assetChunks.clear();
         expectedAssetChunks = -1;
         contentRegistered = false;
@@ -424,8 +461,8 @@ public class ContentManager {
      * tag would mean depending on tag membership surviving that. Cleared and refilled on every
      * connection so a second server's answer never inherits the first's.
      */
-    private static final java.util.Set<Block> climbable =
-        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+    private static final Set<Block> climbable =
+        Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     /**
      * Synced blocks whose right-click the server handles.
@@ -433,8 +470,8 @@ public class ContentManager {
      * <p>Kept per block rather than set on construction, because a reconnect reuses the block
      * object from the previous session and never runs a constructor again.
      */
-    private static final java.util.Set<Block> interactive =
-        java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    private static final Set<Block> interactive =
+        Collections.newSetFromMap(new IdentityHashMap<>());
 
     /** Whether this is a synced block whose right-click belongs to the server. */
     public static boolean isInteractive(BlockState state) {
@@ -578,7 +615,7 @@ public class ContentManager {
      */
     private static int registerContent(SyncedContent content, StateIds stateIds) {
         registeredContent = content;
-        justfatlard.pandorical.rail.RailCollision.setSolid(content.solidRails());
+        RailCollision.setSolid(content.solidRails());
         for (SyncContentS2C.BlockEntry entry : content.blocks()) {
             registerBlock(entry, stateIds);
         }
@@ -609,7 +646,7 @@ public class ContentManager {
      * a caller waiting to acknowledge the server must hear back on every path, a throw included.
      */
     public static void injectResourcePack(Runnable afterReload) {
-        java.util.concurrent.atomic.AtomicBoolean ran = new java.util.concurrent.atomic.AtomicBoolean();
+        AtomicBoolean ran = new AtomicBoolean();
         Runnable once = () -> {
             if (ran.compareAndSet(false, true)) afterReload.run();
         };
@@ -635,7 +672,7 @@ public class ContentManager {
             return;
         }
 
-        var namespaces = virtualPack.getNamespaces(net.minecraft.server.packs.PackType.CLIENT_RESOURCES);
+        var namespaces = virtualPack.getNamespaces(PackType.CLIENT_RESOURCES);
         Pandorical.LOGGER.info("Virtual pack contains {} namespaces: {}", namespaces.size(), namespaces);
 
         // Registering a RepositorySource (rather than adding the pack once) keeps the
@@ -647,40 +684,40 @@ public class ContentManager {
             if (packSourceInjected) {
                 Pandorical.LOGGER.debug("Pandorical virtual pack source already registered");
             } else {
-            var sourcesField = net.minecraft.server.packs.repository.PackRepository.class.getDeclaredField("sources");
+            var sourcesField = PackRepository.class.getDeclaredField("sources");
             sourcesField.setAccessible(true);
             @SuppressWarnings("unchecked")
-            var sources = (java.util.Set<net.minecraft.server.packs.repository.RepositorySource>) sourcesField.get(packRepo);
+            var sources = (Set<RepositorySource>) sourcesField.get(packRepo);
 
-            var pandoricalSource = new net.minecraft.server.packs.repository.RepositorySource() {
+            var pandoricalSource = new RepositorySource() {
                 @Override
-                public void loadPacks(java.util.function.Consumer<net.minecraft.server.packs.repository.Pack> consumer) {
+                public void loadPacks(Consumer<Pack> consumer) {
                     Pandorical.LOGGER.debug("PackRepository is loading packs — providing Pandorical virtual pack");
-                    var supplier = new net.minecraft.server.packs.repository.Pack.ResourcesSupplier() {
+                    var supplier = new Pack.ResourcesSupplier() {
                         @Override
-                        public net.minecraft.server.packs.PackMetadataResources openMetadata(net.minecraft.server.packs.PackLocationInfo info) { return virtualPack; }
+                        public PackMetadataResources openMetadata(PackLocationInfo info) { return virtualPack; }
                         @Override
-                        public java.util.stream.Stream<net.minecraft.server.packs.PackResources> openResources(net.minecraft.server.packs.PackLocationInfo info, net.minecraft.server.packs.repository.Pack.Metadata metadata) { return java.util.stream.Stream.of(virtualPack); }
+                        public Stream<PackResources> openResources(PackLocationInfo info, Pack.Metadata metadata) { return Stream.of(virtualPack); }
                     };
 
-                    var metadata = new net.minecraft.server.packs.repository.Pack.Metadata(
-                        net.minecraft.network.chat.Component.literal("Pandorical synced assets"),
-                        net.minecraft.server.packs.repository.PackCompatibility.COMPATIBLE,
-                        net.minecraft.world.flag.FeatureFlags.DEFAULT_FLAGS,
+                    var metadata = new Pack.Metadata(
+                        Component.literal("Pandorical synced assets"),
+                        PackCompatibility.COMPATIBLE,
+                        FeatureFlags.DEFAULT_FLAGS,
                         List.of()
                     );
 
-                    var pack = new net.minecraft.server.packs.repository.Pack(
+                    var pack = new Pack(
                         virtualPack.location(),
                         supplier,
                         metadata,
-                        new net.minecraft.server.packs.PackSelectionConfig(true, net.minecraft.server.packs.repository.Pack.Position.TOP, false)
+                        new PackSelectionConfig(true, Pack.Position.TOP, false)
                     );
                     consumer.accept(pack);
                 }
             };
 
-            var mutableSources = new java.util.LinkedHashSet<>(sources);
+            var mutableSources = new LinkedHashSet<>(sources);
             mutableSources.add(pandoricalSource);
             sourcesField.set(packRepo, mutableSources);
             packSourceInjected = true;
@@ -700,7 +737,7 @@ public class ContentManager {
         registerBlockColors(client);
         registerCreativeTabItems();
 
-        java.util.concurrent.CompletableFuture<Void> reload = client.reloadResourcePacks();
+        CompletableFuture<Void> reload = client.reloadResourcePacks();
         reload.whenComplete((unused, error) -> {
             if (error != null) Pandorical.LOGGER.error("Resource reload failed: {}", error.toString());
             afterReload.run();
@@ -740,24 +777,24 @@ public class ContentManager {
         SyncedContent content = registeredContent;
         if (content == null) return;
         try {
-            List<Item> buildingBlocks = new java.util.ArrayList<>();
-            List<Item> combat = new java.util.ArrayList<>();
-            List<Item> tools = new java.util.ArrayList<>();
-            List<Item> ingredients = new java.util.ArrayList<>();
-            List<Item> naturalBlocks = new java.util.ArrayList<>();
-            List<Item> functional = new java.util.ArrayList<>();
+            List<Item> buildingBlocks = new ArrayList<>();
+            List<Item> combat = new ArrayList<>();
+            List<Item> tools = new ArrayList<>();
+            List<Item> ingredients = new ArrayList<>();
+            List<Item> naturalBlocks = new ArrayList<>();
+            List<Item> functional = new ArrayList<>();
 
             for (SyncContentS2C.ItemEntry entry : content.items()) {
                 Identifier id = Identifier.tryParse(entry.id());
                 if (id == null) continue;
                 Item item = BuiltInRegistries.ITEM.getValue(id);
-                if (item == null || item == net.minecraft.world.item.Items.AIR) continue;
+                if (item == null || item == Items.AIR) continue;
 
                 if (!entry.equipSlot().isEmpty()) {
                     combat.add(item);
                 } else if (!entry.toolType().isEmpty()) {
                     tools.add(item);
-                } else if (item instanceof net.minecraft.world.item.BlockItem blockItem) {
+                } else if (item instanceof BlockItem blockItem) {
                     var block = blockItem.getBlock();
                     String blockId = entry.id();
                     if (blockId.contains("slab") || blockId.contains("stair") || blockId.contains("fence")
@@ -776,12 +813,12 @@ public class ContentManager {
                 }
             }
 
-            registerForTab(net.minecraft.world.item.CreativeModeTabs.BUILDING_BLOCKS, buildingBlocks);
-            registerForTab(net.minecraft.world.item.CreativeModeTabs.COMBAT, combat);
-            registerForTab(net.minecraft.world.item.CreativeModeTabs.TOOLS_AND_UTILITIES, tools);
-            registerForTab(net.minecraft.world.item.CreativeModeTabs.NATURAL_BLOCKS, naturalBlocks);
-            registerForTab(net.minecraft.world.item.CreativeModeTabs.FUNCTIONAL_BLOCKS, functional);
-            registerForTab(net.minecraft.world.item.CreativeModeTabs.INGREDIENTS, ingredients);
+            registerForTab(CreativeModeTabs.BUILDING_BLOCKS, buildingBlocks);
+            registerForTab(CreativeModeTabs.COMBAT, combat);
+            registerForTab(CreativeModeTabs.TOOLS_AND_UTILITIES, tools);
+            registerForTab(CreativeModeTabs.NATURAL_BLOCKS, naturalBlocks);
+            registerForTab(CreativeModeTabs.FUNCTIONAL_BLOCKS, functional);
+            registerForTab(CreativeModeTabs.INGREDIENTS, ingredients);
 
             int total = buildingBlocks.size() + combat.size() + tools.size()
                 + naturalBlocks.size() + functional.size() + ingredients.size();
@@ -794,15 +831,15 @@ public class ContentManager {
     }
 
     /** Each tab's synced items, replaced by every sync and read by the one listener its tab gets. */
-    private static final Map<net.minecraft.resources.ResourceKey<net.minecraft.world.item.CreativeModeTab>, List<Item>> tabItems =
-        new java.util.concurrent.ConcurrentHashMap<>();
+    private static final Map<ResourceKey<CreativeModeTab>, List<Item>> tabItems =
+        new ConcurrentHashMap<>();
 
-    private static void registerForTab(net.minecraft.resources.ResourceKey<net.minecraft.world.item.CreativeModeTab> tabKey,
+    private static void registerForTab(ResourceKey<CreativeModeTab> tabKey,
                                         List<Item> items) {
         boolean listening = tabItems.containsKey(tabKey);
         tabItems.put(tabKey, List.copyOf(items));
         if (listening) return;
-        net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents
+        CreativeModeTabEvents
             .modifyOutputEvent(tabKey)
             .register(output -> {
                 for (Item item : tabItems.getOrDefault(tabKey, List.of())) {
@@ -835,7 +872,7 @@ public class ContentManager {
 
                 // getTintSources() returns the sources registered for the base block's
                 // default state, so the biome behaviour matches exactly.
-                List<net.minecraft.client.color.block.BlockTintSource> tintSources = null;
+                List<BlockTintSource> tintSources = null;
 
                 String baseBlockId = entry.baseBlockId();
                 if (baseBlockId != null && !baseBlockId.isEmpty()) {
@@ -944,7 +981,7 @@ public class ContentManager {
             props.setId(key);
 
             Block baseBlock = baseId != null ? BuiltInRegistries.BLOCK.getValue(baseId) : null;
-            List<net.minecraft.world.level.block.state.properties.Property<?>> stateProps = new java.util.ArrayList<>();
+            List<Property<?>> stateProps = new ArrayList<>();
             for (String propSpec : entry.stateProperties()) {
                 StatePropertySpec spec = StatePropertySpec.parse(propSpec, entry.id());
                 var prop = DynamicBlock.resolveProperty(spec.name(), baseBlock, spec.valueCount(), spec.intMin(),
@@ -1019,7 +1056,7 @@ public class ContentManager {
         if (spec.isEmpty()) return;
 
         String[] parts = spec.split("\\|", 2);
-        var slot = net.minecraft.world.entity.EquipmentSlot.byName(parts[0]);
+        var slot = EquipmentSlot.byName(parts[0]);
         if (slot == null) {
             Pandorical.LOGGER.warn("Unknown equipment slot '{}' — item left unwearable", parts[0]);
             return;
@@ -1036,10 +1073,10 @@ public class ContentManager {
             return;
         }
 
-        props.component(net.minecraft.core.component.DataComponents.EQUIPPABLE,
-            net.minecraft.world.item.equipment.Equippable.builder(slot)
+        props.component(DataComponents.EQUIPPABLE,
+            Equippable.builder(slot)
                 .setAsset(ResourceKey.create(
-                    net.minecraft.world.item.equipment.EquipmentAssets.ROOT_ID, asset))
+                    EquipmentAssets.ROOT_ID, asset))
                 .build());
     }
 
@@ -1061,12 +1098,12 @@ public class ContentManager {
         }
 
         try {
-            var food = new net.minecraft.world.food.FoodProperties.Builder()
+            var food = new FoodProperties.Builder()
                 .nutrition(Integer.parseInt(p[0]))
                 .saturationModifier(Float.parseFloat(p[1]));
             if (Boolean.parseBoolean(p[2])) food.alwaysEdible();
 
-            props.food(food.build(), net.minecraft.world.item.component.Consumable.builder()
+            props.food(food.build(), Consumable.builder()
                 .consumeSeconds(Float.parseFloat(p[3]))
                 .build());
         } catch (RuntimeException e) {
@@ -1096,13 +1133,13 @@ public class ContentManager {
         }
 
         try {
-            var material = new net.minecraft.world.item.ToolMaterial(
-                net.minecraft.tags.TagKey.create(Registries.BLOCK, Identifier.parse(p[1])),
+            var material = new ToolMaterial(
+                TagKey.create(Registries.BLOCK, Identifier.parse(p[1])),
                 Integer.parseInt(p[2]),
                 Float.parseFloat(p[3]),
                 Float.parseFloat(p[4]),
                 Integer.parseInt(p[5]),
-                net.minecraft.tags.TagKey.create(Registries.ITEM, Identifier.parse(p[6])));
+                TagKey.create(Registries.ITEM, Identifier.parse(p[6])));
             float damage = Float.parseFloat(p[7]);
             float speed = Float.parseFloat(p[8]);
 
@@ -1152,10 +1189,10 @@ public class ContentManager {
             Block block = registeredBlocks.get(id);
             if (block == null) {
                 block = BuiltInRegistries.BLOCK.getValue(id);
-                if (block == net.minecraft.world.level.block.Blocks.AIR) block = null;
+                if (block == Blocks.AIR) block = null;
             }
             if (block != null) {
-                item = new net.minecraft.world.item.BlockItem(block, props.useBlockDescriptionPrefix());
+                item = new BlockItem(block, props.useBlockDescriptionPrefix());
             } else {
                 item = new Item(props);
             }
@@ -1172,7 +1209,7 @@ public class ContentManager {
      * and interaction logic that a plain Block/DynamicBlock cannot.
      */
     private static Block createBlock(BlockBehaviour.Properties props,
-                                     List<net.minecraft.world.level.block.state.properties.Property<?>> stateProps,
+                                     List<Property<?>> stateProps,
                                      Block baseBlock, List<String> rawPropSpecs) {
         // All dynamic blocks need noOcclusion: the shape isn't known at construction time
         // (server-provided VoxelShapes arrive after), and without it MC assumes full-cube
@@ -1184,11 +1221,11 @@ public class ContentManager {
         Block vanillaShaped = VanillaShapedBlocks.forBase(baseBlock, props);
         if (vanillaShaped != null) return vanillaShaped;
 
-        boolean isSlab = baseBlock instanceof net.minecraft.world.level.block.SlabBlock || isSlabFromProperties(rawPropSpecs);
+        boolean isSlab = baseBlock instanceof SlabBlock || isSlabFromProperties(rawPropSpecs);
 
         if (isSlab) {
             // Filter out type and waterlogged; SlabBlock adds those itself
-            List<net.minecraft.world.level.block.state.properties.Property<?>> extraProps = new java.util.ArrayList<>();
+            List<Property<?>> extraProps = new ArrayList<>();
             for (var prop : stateProps) {
                 String name = prop.getName();
                 if (!name.equals("type") && !name.equals("waterlogged")) {
@@ -1254,14 +1291,14 @@ public class ContentManager {
                 // thrown_item projectile in the suite was invisible.
                 final String typeIdStr = idStr;
                 EntityType<?> stub = EntityType.Builder.of((type, level) -> {
-                        String rendererKey = justfatlard.pandorical.client.renderer.ClientEntityRendererRegistry.getRendererKey(typeIdStr);
+                        String rendererKey = ClientEntityRendererRegistry.getRendererKey(typeIdStr);
                         Pandorical.LOGGER.debug("Stub entity factory: {} rendererKey={}", typeIdStr, rendererKey);
-                        if (justfatlard.pandorical.api.EntityRendererRegistry.KEY_THROWN_ITEM.equals(rendererKey)) {
+                        if (EntityRendererRegistry.KEY_THROWN_ITEM.equals(rendererKey)) {
                             @SuppressWarnings({"unchecked", "rawtypes"})
                             StubThrownItemEntity thrown = new StubThrownItemEntity((EntityType) type, level);
                             return thrown;
                         }
-                        if (justfatlard.pandorical.api.EntityRendererRegistry.KEY_INVISIBLE.equals(rendererKey)) {
+                        if (EntityRendererRegistry.KEY_INVISIBLE.equals(rendererKey)) {
                             return new StubEntity(type, level);
                         }
                         return null;
@@ -1293,7 +1330,7 @@ public class ContentManager {
                     continue;
                 }
                 // Use access-widened constructor: (BlockEntitySupplier, Set<Block>)
-                BlockEntityType<?> stub = new BlockEntityType<>((pos, state) -> null, java.util.Set.of());
+                BlockEntityType<?> stub = new BlockEntityType<>((pos, state) -> null, Set.of());
                 registerWithHolder(BuiltInRegistries.BLOCK_ENTITY_TYPE, id, stub);
                 count++;
                 Pandorical.LOGGER.debug("Config phase: registered stub block entity type: {}", idStr);
@@ -1318,13 +1355,13 @@ public class ContentManager {
                     continue;
                 }
                 VillagerProfession stub = new VillagerProfession(
-                    net.minecraft.network.chat.Component.literal(idStr),
+                    Component.literal(idStr),
                     holder -> false,  // heldJobSite: matches nothing
                     holder -> false,  // acquirableJobSite: matches nothing
-                    com.google.common.collect.ImmutableSet.of(),
-                    com.google.common.collect.ImmutableSet.of(),
+                    ImmutableSet.of(),
+                    ImmutableSet.of(),
                     null,  // workSound
-                    new it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<>()
+                    new Int2ObjectOpenHashMap<>()
                 );
                 registerWithHolder(BuiltInRegistries.VILLAGER_PROFESSION, id, stub);
                 count++;
@@ -1349,7 +1386,7 @@ public class ContentManager {
                     Pandorical.LOGGER.debug("Config phase: POI type '{}' already registered — skipping", idStr);
                     continue;
                 }
-                PoiType stub = new PoiType(java.util.Set.of(), 0, 0);
+                PoiType stub = new PoiType(Set.of(), 0, 0);
                 registerWithHolder(BuiltInRegistries.POINT_OF_INTEREST_TYPE, id, stub);
                 count++;
                 Pandorical.LOGGER.debug("Config phase: registered stub POI type: {}", idStr);
@@ -1429,7 +1466,7 @@ public class ContentManager {
                 var field = MappedRegistry.class.getDeclaredField("unregisteredIntrusiveHolders");
                 field.setAccessible(true);
                 if (field.get(mapped) == null) {
-                    field.set(mapped, new java.util.IdentityHashMap<>());
+                    field.set(mapped, new IdentityHashMap<>());
                 }
             } catch (Exception e) {
                 Pandorical.LOGGER.warn("Could not restore intrusive holder cache for {}", registry, e);
@@ -1551,11 +1588,11 @@ public class ContentManager {
      * holes in terrain.
      */
     private static BlockState fallbackState() {
-        return net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
+        return Blocks.STONE.defaultBlockState();
     }
 
     private static String propertyNames(Block block) {
-        List<String> names = new java.util.ArrayList<>();
+        List<String> names = new ArrayList<>();
         for (var prop : block.getStateDefinition().getProperties()) names.add(prop.getName());
         return names.toString();
     }

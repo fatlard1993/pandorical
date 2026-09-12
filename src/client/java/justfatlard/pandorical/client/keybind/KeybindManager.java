@@ -18,6 +18,16 @@ import net.minecraft.resources.Identifier;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import justfatlard.pandorical.protocol.KeybindDefaultsS2C;
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.input.KeyEvent;
 
 /**
  * The client half of the pooled keybind capability: a fixed pool of real,
@@ -72,7 +82,7 @@ public final class KeybindManager {
 
 	/** The keybinds whose default key this client has already put on, one {@code id@slot} to a line. */
 	private static final int MOST_REMEMBERED = 512;
-	private static final java.nio.file.Path DEFAULTS_APPLIED = net.fabricmc.loader.api.FabricLoader.getInstance()
+	private static final Path DEFAULTS_APPLIED = FabricLoader.getInstance()
 		.getConfigDir().resolve("pandorical").resolve("keybind-defaults.txt");
 
 	/**
@@ -83,15 +93,15 @@ public final class KeybindManager {
 	 * and is never put back. A slot the player had already bound keeps their key. A keybind the
 	 * server moves to another slot is a new binding and gets its default once more.
 	 */
-	public static void applyDefaults(justfatlard.pandorical.protocol.KeybindDefaultsS2C payload) {
-		Set<String> applied = new java.util.LinkedHashSet<>();
+	public static void applyDefaults(KeybindDefaultsS2C payload) {
+		Set<String> applied = new LinkedHashSet<>();
 		try {
-			if (java.nio.file.Files.exists(DEFAULTS_APPLIED)) {
-				for (String line : java.nio.file.Files.readAllLines(DEFAULTS_APPLIED)) {
+			if (Files.exists(DEFAULTS_APPLIED)) {
+				for (String line : Files.readAllLines(DEFAULTS_APPLIED)) {
 					if (!line.isBlank()) applied.add(line.trim());
 				}
 			}
-		} catch (java.io.IOException e) {
+		} catch (IOException e) {
 			Pandorical.LOGGER.warn("Could not read {}: {}", DEFAULTS_APPLIED, e.toString());
 			return;
 		}
@@ -111,15 +121,15 @@ public final class KeybindManager {
 		if (remembered) {
 			// Every server's ids land here, so the oldest go once there are more than any one
 			// player's servers could want remembered.
-			java.util.Iterator<String> oldest = applied.iterator();
+			Iterator<String> oldest = applied.iterator();
 			while (applied.size() > MOST_REMEMBERED && oldest.hasNext()) {
 				oldest.next();
 				oldest.remove();
 			}
 			try {
-				java.nio.file.Files.createDirectories(DEFAULTS_APPLIED.getParent());
-				java.nio.file.Files.write(DEFAULTS_APPLIED, applied);
-			} catch (java.io.IOException e) {
+				Files.createDirectories(DEFAULTS_APPLIED.getParent());
+				Files.write(DEFAULTS_APPLIED, applied);
+			} catch (IOException e) {
 				Pandorical.LOGGER.warn("Could not write {}: {}", DEFAULTS_APPLIED, e.toString());
 			}
 		}
@@ -134,7 +144,7 @@ public final class KeybindManager {
 	/** Tell the server what each pool slot is bound to now, as this client's controls screen says. */
 	public static void sendBindings() {
 		if (!ClientPlayNetworking.canSend(KeybindBindingsC2S.TYPE)) return;
-		java.util.List<String> keys = new java.util.ArrayList<>(MAX_SLOTS);
+		List<String> keys = new ArrayList<>(MAX_SLOTS);
 		for (int i = 0; i < MAX_SLOTS; i++) {
 			keys.add(pool[i] == null || pool[i].isUnbound() ? "" : pool[i].getTranslatedKeyMessage().getString());
 		}
@@ -155,7 +165,7 @@ public final class KeybindManager {
 	 * one already used elsewhere, is taken. Two things on one key is the player's to sort out, and
 	 * refusing it here would be the one place in the game that does.
 	 */
-	public static boolean captureKey(net.minecraft.client.input.KeyEvent event) {
+	public static boolean captureKey(KeyEvent event) {
 		int slot = rebinding;
 		if (slot < 0) return false;
 		rebinding = -1;

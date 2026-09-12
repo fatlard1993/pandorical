@@ -15,6 +15,8 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import justfatlard.pandorical.client.animation.EntityAnimations;
+import justfatlard.pandorical.client.renderer.AnimationHolder;
 
 /**
  * Two hooks that make server-pushed entity overlays render:
@@ -51,7 +53,7 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extend
 
 		// The model is posed from the state alone, long after the entity is out of reach, so what
 		// it is playing has to travel with it.
-		((justfatlard.pandorical.client.renderer.AnimationHolder) state).pandorical$setAnimation(
-			justfatlard.pandorical.client.animation.EntityAnimations.playing(entity.getId()));
+		((AnimationHolder) state).pandorical$setAnimation(
+			EntityAnimations.playing(entity.getId()));
 	}
 }

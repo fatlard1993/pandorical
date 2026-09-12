@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
+import net.minecraft.world.ContainerHelper;
 
 /**
  * Server-side mixin that adds extra inventory slots to {@link InventoryMenu} for
@@ -112,10 +114,10 @@ public abstract class InventoryMenuMixin extends AbstractContainerMenu {
     private static final class PersistingContainer implements Container {
         private final NonNullList<ItemStack> items;
         private final Runnable onChanged;
-        private final java.util.function.BiConsumer<Integer, ItemStack> onItemChanged;
+        private final BiConsumer<Integer, ItemStack> onItemChanged;
 
         PersistingContainer(NonNullList<ItemStack> items, Runnable onChanged,
-                            java.util.function.BiConsumer<Integer, ItemStack> onItemChanged) {
+                            BiConsumer<Integer, ItemStack> onItemChanged) {
             this.items = items;
             this.onChanged = onChanged;
             this.onItemChanged = onItemChanged;
@@ -125,12 +127,12 @@ public abstract class InventoryMenuMixin extends AbstractContainerMenu {
         @Override public boolean isEmpty() { return items.stream().allMatch(ItemStack::isEmpty); }
         @Override public ItemStack getItem(int slot) { return items.get(slot); }
         @Override public ItemStack removeItem(int slot, int amount) {
-            ItemStack result = net.minecraft.world.ContainerHelper.removeItem(items, slot, amount);
+            ItemStack result = ContainerHelper.removeItem(items, slot, amount);
             if (!result.isEmpty()) setChanged();
             return result;
         }
         @Override public ItemStack removeItemNoUpdate(int slot) {
-            return net.minecraft.world.ContainerHelper.takeItem(items, slot);
+            return ContainerHelper.takeItem(items, slot);
         }
         @Override public void setItem(int slot, ItemStack stack) {
             items.set(slot, stack == null ? ItemStack.EMPTY : stack);

@@ -2,6 +2,8 @@ package justfatlard.pandorical.client.diag;
 
 import java.util.Map;
 import justfatlard.pandorical.Diagnostics;
+import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Where the game's working threads are, ten times a second: for the first ten minutes on the
@@ -21,7 +23,7 @@ public final class StackSampler {
 	private static final int FRAMES = 14;
 
 	/** One sampler at a time; a window opening while one runs is simply more of the same run. */
-	private static final java.util.concurrent.atomic.AtomicBoolean running = new java.util.concurrent.atomic.AtomicBoolean();
+	private static final AtomicBoolean running = new AtomicBoolean();
 
 	/**
 	 * Start sampling, for as long as {@link Diagnostics#active} says: ten minutes on the diagnostic
@@ -41,7 +43,7 @@ public final class StackSampler {
 	}
 
 	private static void run() {
-		Map<Thread, String> last = new java.util.HashMap<>();
+		Map<Thread, String> last = new HashMap<>();
 		String compilers = "";
 		long until = System.currentTimeMillis() + FOR_MILLIS;
 		try {

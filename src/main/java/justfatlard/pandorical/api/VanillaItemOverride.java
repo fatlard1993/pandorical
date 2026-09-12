@@ -2,6 +2,7 @@ package justfatlard.pandorical.api;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import net.fabricmc.loader.api.FabricLoader;
 
 /**
  * Builder for overriding a vanilla item's appearance for Pandorical clients.
@@ -47,7 +48,7 @@ public class VanillaItemOverride {
      */
     public VanillaItemOverride textureFrom(String modId, String assetPath) {
         try {
-            var modContainer = net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer(modId);
+            var modContainer = FabricLoader.getInstance().getModContainer(modId);
             if (modContainer.isEmpty()) {
                 throw new IllegalArgumentException("Mod not found: " + modId);
             }

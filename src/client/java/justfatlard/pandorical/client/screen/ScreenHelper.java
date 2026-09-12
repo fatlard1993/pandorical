@@ -11,6 +11,7 @@ import org.joml.Matrix3x2fStack;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import justfatlard.pandorical.api.NavigableScreen;
 
 /**
  * Shared logic for PandoricalScreen and PandoricalContainerScreen.
@@ -352,8 +353,8 @@ public final class ScreenHelper {
     }
 
     /** Where the components in these trees can be pressed, for a {@link justfatlard.pandorical.api.NavigableScreen}. */
-    public static List<justfatlard.pandorical.api.NavigableScreen.NavRegion> navRegions(List<PandoricalComponent> roots) {
-        List<justfatlard.pandorical.api.NavigableScreen.NavRegion> regions = new ArrayList<>();
+    public static List<NavigableScreen.NavRegion> navRegions(List<PandoricalComponent> roots) {
+        List<NavigableScreen.NavRegion> regions = new ArrayList<>();
         for (PandoricalComponent component : roots) {
             collectNavRegions(component, 0, null, regions);
         }
@@ -377,7 +378,7 @@ public final class ScreenHelper {
      * so a region the click path would reject is worse than no region at all.
      */
     private static void collectNavRegions(PandoricalComponent component, int scrollShift,
-                                          int[] clip, List<justfatlard.pandorical.api.NavigableScreen.NavRegion> into) {
+                                          int[] clip, List<NavigableScreen.NavRegion> into) {
         // Hidden is hidden for the navigator too, children included: the click path
         // this mirrors rejects the whole subtree, so a region for any of it would be
         // a target that swallows presses
@@ -386,7 +387,7 @@ public final class ScreenHelper {
         int drawnY = component.getY() - scrollShift;
 
         if (component.isNavigable() && clickable(clip, component, drawnY)) {
-            into.add(new justfatlard.pandorical.api.NavigableScreen.NavRegion(
+            into.add(new NavigableScreen.NavRegion(
                 component.getId(),
                 component.getX(), drawnY,
                 component.getWidth(), component.getHeight()));

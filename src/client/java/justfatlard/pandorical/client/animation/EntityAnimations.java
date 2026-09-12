@@ -9,6 +9,9 @@ import net.minecraft.client.animation.AnimationDefinition;
 import net.minecraft.client.animation.KeyframeAnimation;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.resources.Identifier;
+import java.util.List;
+import java.util.function.Function;
+import net.minecraft.client.animation.AnimationChannel;
 
 /**
  * Which entities are playing what, and the baked animation to play them with.
@@ -75,8 +78,8 @@ public final class EntityAnimations {
 
 	/** The definition with every bone this model does not have dropped. */
 	private static AnimationDefinition onlyKnownBones(AnimationDefinition definition, ModelPart root) {
-		java.util.function.Function<String, ModelPart> lookup = root.createPartLookup();
-		Map<String, java.util.List<net.minecraft.client.animation.AnimationChannel>> known = new HashMap<>();
+		Function<String, ModelPart> lookup = root.createPartLookup();
+		Map<String, List<AnimationChannel>> known = new HashMap<>();
 		for (var bone : definition.boneAnimations().entrySet()) {
 			ModelPart part;
 			try {

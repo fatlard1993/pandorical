@@ -12,6 +12,10 @@ import net.minecraft.world.item.ItemStack;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import justfatlard.pandorical.protocol.InventoryButtonsS2C;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
 /**
  * Server-side implementation of {@link PlayerInventoryApi}.
@@ -63,22 +67,22 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
     // --- PlayerInventoryApi implementation ---
 
     /** Buttons mods have asked for on the inventory screen, in registration order. */
-    private final List<justfatlard.pandorical.protocol.InventoryButtonsS2C.Button> buttons =
-        new java.util.ArrayList<>();
+    private final List<InventoryButtonsS2C.Button> buttons =
+        new ArrayList<>();
 
-    private final Map<String, java.util.function.Consumer<ServerPlayer>> buttonHandlers =
-        new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<String, Consumer<ServerPlayer>> buttonHandlers =
+        new ConcurrentHashMap<>();
 
     @Override
     public void registerButton(Identifier namespace, String id, int x, int y, int size, String glyph) {
-        buttons.add(new justfatlard.pandorical.protocol.InventoryButtonsS2C.Button(
+        buttons.add(new InventoryButtonsS2C.Button(
             namespace.toString(), id, x, y, size, glyph));
         Pandorical.LOGGER.info("[pandorical] Registered inventory button '{}' for namespace '{}'",
             id, namespace);
     }
 
     @Override
-    public void onButton(Identifier namespace, String id, java.util.function.Consumer<ServerPlayer> handler) {
+    public void onButton(Identifier namespace, String id, Consumer<ServerPlayer> handler) {
         buttonHandlers.put(namespace + "/" + id, handler);
     }
 
@@ -101,38 +105,38 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
     }
 
     /** Faces a player has been shown instead of the registered one, keyed namespace/id. */
-    private final Map<java.util.UUID, Map<String, String>> glyphs =
-        new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<UUID, Map<String, String>> glyphs =
+        new ConcurrentHashMap<>();
 
     @Override
     public void setButtonGlyph(ServerPlayer player, Identifier namespace, String id, String glyph) {
-        glyphs.computeIfAbsent(player.getUUID(), key -> new java.util.concurrent.ConcurrentHashMap<>())
+        glyphs.computeIfAbsent(player.getUUID(), key -> new ConcurrentHashMap<>())
             .put(namespace + "/" + id, glyph);
 
-        if (!net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(
-                player, justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE)) {
+        if (!ServerPlayNetworking.canSend(
+                player, InventoryButtonsS2C.TYPE)) {
             return;
         }
-        net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-            new justfatlard.pandorical.protocol.InventoryButtonsS2C(buttonsFor(player.getUUID())));
+        ServerPlayNetworking.send(player,
+            new InventoryButtonsS2C(buttonsFor(player.getUUID())));
     }
 
     /** Everything registered, for the packet sent during configuration. */
-    public List<justfatlard.pandorical.protocol.InventoryButtonsS2C.Button> declaredButtons() {
+    public List<InventoryButtonsS2C.Button> declaredButtons() {
         return List.copyOf(buttons);
     }
 
     /** The same buttons, wearing whatever faces this player has been switched to. */
-    public List<justfatlard.pandorical.protocol.InventoryButtonsS2C.Button> buttonsFor(java.util.UUID player) {
+    public List<InventoryButtonsS2C.Button> buttonsFor(UUID player) {
         Map<String, String> mine = glyphs.get(player);
         if (mine == null || mine.isEmpty()) return declaredButtons();
 
-        List<justfatlard.pandorical.protocol.InventoryButtonsS2C.Button> shown =
-            new java.util.ArrayList<>(buttons.size());
+        List<InventoryButtonsS2C.Button> shown =
+            new ArrayList<>(buttons.size());
         for (var button : buttons) {
             String glyph = mine.get(button.namespace() + "/" + button.id());
             shown.add(glyph == null ? button
-                : new justfatlard.pandorical.protocol.InventoryButtonsS2C.Button(
+                : new InventoryButtonsS2C.Button(
                     button.namespace(), button.id(), button.screenX(), button.screenY(),
                     button.size(), glyph));
         }
@@ -140,7 +144,7 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
     }
 
     /** Dropped on disconnect: whoever set them will set them again on the next join. */
-    public void forgetButtonGlyphs(java.util.UUID player) {
+    public void forgetButtonGlyphs(UUID player) {
         glyphs.remove(player);
     }
 
@@ -296,8 +300,8 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
     }
 
     /** Slots a notification is already in flight for. See {@link #notifyListeners}. */
-    private final java.util.Set<String> notifying =
-        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+    private final Set<String> notifying =
+        Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     /**
      * Called by the server-side mixin after a slot click has been processed.

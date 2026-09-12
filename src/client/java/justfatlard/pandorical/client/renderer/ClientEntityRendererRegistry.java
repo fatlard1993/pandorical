@@ -17,6 +17,7 @@ import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.client.Minecraft;
 
 /**
  * Client-side handler for {@link EntityRenderersS2C} packets.
@@ -114,7 +115,7 @@ public final class ClientEntityRendererRegistry {
         // with a null-renderer NPE. Rebuild through vanilla's own reload
         // path so the map is complete before any synced entity can render.
         if (addedAny) {
-            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            Minecraft mc = Minecraft.getInstance();
             mc.getEntityRenderDispatcher().onResourceManagerReload(mc.getResourceManager());
             Pandorical.LOGGER.debug("[pandorical] Rebuilt entity renderer dispatcher for synced types");
         }

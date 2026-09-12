@@ -15,6 +15,7 @@ import net.minecraft.core.ClientAsset;
 import net.minecraft.world.entity.player.PlayerModelType;
 import net.minecraft.world.entity.player.PlayerSkin;
 import net.minecraft.world.item.component.ResolvableProfile;
+import java.util.Optional;
 
 /**
  * Skins the server has asked this client to draw instead of the ones profiles carry.
@@ -90,10 +91,10 @@ public final class SkinOverrides {
 			// texture was registered straight into the texture manager under that exact id rather
 			// than living in a resource pack, so the one-argument form would derive a path to a
 			// file that does not exist and draw nothing.
-			java.util.Optional.of(new ClientAsset.ResourceTexture(worn.texture(), worn.texture())),
-			java.util.Optional.empty(),
-			java.util.Optional.empty(),
-			java.util.Optional.of(worn.model())));
+			Optional.of(new ClientAsset.ResourceTexture(worn.texture(), worn.texture())),
+			Optional.empty(),
+			Optional.empty(),
+			Optional.of(worn.model())));
 	}
 
 	/** Whether a head carrying this profile has an override to wear. */

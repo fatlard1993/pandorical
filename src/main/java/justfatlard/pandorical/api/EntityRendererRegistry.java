@@ -5,6 +5,7 @@ import net.minecraft.world.entity.EntityType;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.core.registries.BuiltInRegistries;
 
 /**
  * Server-side registry that maps entity types to renderer keys.
@@ -40,7 +41,7 @@ public final class EntityRendererRegistry {
             throw new IllegalArgumentException(
                 "[pandorical] Unknown renderer key '" + rendererKey + "'. Valid keys: " + VALID_KEYS);
         }
-        Identifier id = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(entityType);
+        Identifier id = BuiltInRegistries.ENTITY_TYPE.getKey(entityType);
         if (id == null) {
             throw new IllegalStateException(
                 "[pandorical] EntityType is not registered — call registerEntityRenderer after registering the entity type");

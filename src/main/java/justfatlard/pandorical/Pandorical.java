@@ -34,6 +34,35 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Queue;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import justfatlard.pandorical.content.ContentRegistry;
+import justfatlard.pandorical.login.Keepsakes;
+import justfatlard.pandorical.mixin.ServerCommonConnectionAccessor;
+import justfatlard.pandorical.picture.PictureRegistry;
+import justfatlard.pandorical.portal.PortalPairing;
+import justfatlard.pandorical.screen.Viewport;
+import justfatlard.pandorical.settings.ClientMods;
+import justfatlard.pandorical.settings.ModCommands;
+import justfatlard.pandorical.settings.SettingsCommand;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.entity.event.v1.ServerEntityLevelChangeEvents;
+import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.EntityTrackingEvents;
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ConfigurationTask;
+import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 
 public class Pandorical implements ModInitializer {
     public static final String MOD_ID = "pandorical";
@@ -71,13 +100,13 @@ public class Pandorical implements ModInitializer {
 
     /** What the jar calls itself, so a refusal can name the version to go and install. */
     public static String modVersion() {
-        return net.fabricmc.loader.api.FabricLoader.getInstance()
+        return FabricLoader.getInstance()
             .getModContainer(MOD_ID)
             .map(container -> container.getMetadata().getVersion().getFriendlyString())
             .orElse("unknown");
     }
 
-    public static final List<String> SERVER_CAPABILITIES = justfatlard.pandorical.api.Capabilities.SERVER;
+    public static final List<String> SERVER_CAPABILITIES = Capabilities.SERVER;
 
     /**
      * Tracks player UUIDs (from GameProfile) that completed config-phase content sync.
@@ -92,13 +121,13 @@ public class Pandorical implements ModInitializer {
      * on any client, until the server restarted. The repeat guard is per-connection now, which is
      * the thing it was always describing.
      */
-    private static final Set<java.util.UUID> configPhaseSyncedPlayers = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final Set<UUID> configPhaseSyncedPlayers = ConcurrentHashMap.newKeySet();
 
     /**
      * Connections that have already acknowledged, so a second ack on the SAME connection is
      * ignored rather than completing a task that is no longer there.
      */
-    private static final Set<Object> ackedConfigConnections = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final Set<Object> ackedConfigConnections = ConcurrentHashMap.newKeySet();
 
     @SuppressWarnings("unchecked")
     public static final MenuType<PandoricalMenu> MENU_TYPE = (MenuType<PandoricalMenu>) Registry.register(
@@ -116,12 +145,12 @@ public class Pandorical implements ModInitializer {
         PandoricalApi.settings().serverGroup(MOD_ID, "Pandorical")
             .toggle("pairNetherPortals", "Nether portals go back the way they came", false)
             .describe("Each portal remembers the one its first traveller came out of, both ways round")
-            .backedBy(player -> justfatlard.pandorical.portal.PortalPairing.enabled(player.level().getServer()),
-                (player, on) -> justfatlard.pandorical.portal.PortalPairing.choose(player.level().getServer(), on));
+            .backedBy(player -> PortalPairing.enabled(player.level().getServer()),
+                (player, on) -> PortalPairing.choose(player.level().getServer(), on));
 
         // Auto-detect and register all non-system mod namespaces as server-only.
         // Only on dedicated server; on the client this would incorrectly filter everything.
-        if (net.fabricmc.loader.api.FabricLoader.getInstance().getEnvironmentType() == net.fabricmc.api.EnvType.SERVER) {
+        if (FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER) {
             autoRegisterServerOnlyNamespaces();
             PandoricalApi.contentRegistry().autoScanAllModAssets();
         }
@@ -133,7 +162,7 @@ public class Pandorical implements ModInitializer {
 
         LOGGER.info("Pandorical initialized — protocol v{}, server-only namespaces: {}",
             PROTOCOL_VERSION,
-            justfatlard.pandorical.content.ContentRegistry.getServerOnlyNamespaces());
+            ContentRegistry.getServerOnlyNamespaces());
     }
 
 
@@ -152,7 +181,7 @@ public class Pandorical implements ModInitializer {
      */
     private void autoRegisterServerOnlyNamespaces() {
         var contentApi = PandoricalApi.content();
-        var loader = net.fabricmc.loader.api.FabricLoader.getInstance();
+        var loader = FabricLoader.getInstance();
 
         for (var mod : loader.getAllMods()) {
             String modId = mod.getMetadata().getId();
@@ -191,44 +220,44 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundConfiguration().register(SyncAssetsConfigS2C.TYPE, SyncAssetsConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(PlayerInventoryRegistrationsS2C.TYPE, PlayerInventoryRegistrationsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(
-            justfatlard.pandorical.protocol.RequirementS2C.TYPE,
-            justfatlard.pandorical.protocol.RequirementS2C.STREAM_CODEC);
+            RequirementS2C.TYPE,
+            RequirementS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(
-            justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE,
-            justfatlard.pandorical.protocol.InventoryButtonsS2C.STREAM_CODEC);
+            InventoryButtonsS2C.TYPE,
+            InventoryButtonsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(BlockTintsConfigS2C.TYPE, BlockTintsConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(
-            justfatlard.pandorical.protocol.KeepsakesAskConfigS2C.TYPE,
-            justfatlard.pandorical.protocol.KeepsakesAskConfigS2C.STREAM_CODEC);
+            KeepsakesAskConfigS2C.TYPE,
+            KeepsakesAskConfigS2C.STREAM_CODEC);
         // C2S config
         PayloadTypeRegistry.serverboundConfiguration().register(ContentReadyConfigC2S.TYPE, ContentReadyConfigC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundConfiguration().register(
-            justfatlard.pandorical.protocol.KeepsakesConfigC2S.TYPE,
-            justfatlard.pandorical.protocol.KeepsakesConfigC2S.STREAM_CODEC);
+            KeepsakesConfigC2S.TYPE,
+            KeepsakesConfigC2S.STREAM_CODEC);
 
         // --- Play phase ---
         // S2C play
         PayloadTypeRegistry.clientboundPlay().register(HelloS2C.TYPE, HelloS2C.STREAM_CODEC);
-        justfatlard.pandorical.picture.PictureRegistry.register();
+        PictureRegistry.register();
         PayloadTypeRegistry.clientboundPlay().register(
-            justfatlard.pandorical.protocol.KeepsakeStoreS2C.TYPE,
-            justfatlard.pandorical.protocol.KeepsakeStoreS2C.STREAM_CODEC);
+            KeepsakeStoreS2C.TYPE,
+            KeepsakeStoreS2C.STREAM_CODEC);
         // Also in play, so a button that is a switch can change its face while somebody watches.
         PayloadTypeRegistry.clientboundPlay().register(
-            justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE,
-            justfatlard.pandorical.protocol.InventoryButtonsS2C.STREAM_CODEC);
+            InventoryButtonsS2C.TYPE,
+            InventoryButtonsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
-            justfatlard.pandorical.protocol.BlockTintPositionsS2C.TYPE,
-            justfatlard.pandorical.protocol.BlockTintPositionsS2C.STREAM_CODEC);
+            BlockTintPositionsS2C.TYPE,
+            BlockTintPositionsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
-            justfatlard.pandorical.protocol.BlockMarksS2C.TYPE,
-            justfatlard.pandorical.protocol.BlockMarksS2C.STREAM_CODEC);
+            BlockMarksS2C.TYPE,
+            BlockMarksS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
-            justfatlard.pandorical.protocol.BannerDecalsS2C.TYPE,
-            justfatlard.pandorical.protocol.BannerDecalsS2C.STREAM_CODEC);
+            BannerDecalsS2C.TYPE,
+            BannerDecalsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
-            justfatlard.pandorical.protocol.ClientSettingS2C.TYPE,
-            justfatlard.pandorical.protocol.ClientSettingS2C.STREAM_CODEC);
+            ClientSettingS2C.TYPE,
+            ClientSettingS2C.STREAM_CODEC);
         // Large, because a screen can carry a mod's readme, and a readme is more than a form.
         PayloadTypeRegistry.clientboundPlay().registerLarge(OpenScreenS2C.TYPE, OpenScreenS2C.STREAM_CODEC, 1048576);
         PayloadTypeRegistry.clientboundPlay().register(UpdateScreenS2C.TYPE, UpdateScreenS2C.STREAM_CODEC);
@@ -243,21 +272,21 @@ public class Pandorical implements ModInitializer {
         // An entity that has gone is not playing anything. Without this the table of what is
         // playing only ever grows: every fish, every companion, every mob that ever animated stays
         // in it for the life of the server, and each one is re-sent to every player who joins.
-        net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents.ENTITY_UNLOAD.register(
+        ServerEntityEvents.ENTITY_UNLOAD.register(
             (entity, level) -> PlayingAnimations.forget(entity.getId()));
 
         PayloadTypeRegistry.clientboundPlay().register(
-            justfatlard.pandorical.protocol.MountPolicyS2C.TYPE,
-            justfatlard.pandorical.protocol.MountPolicyS2C.STREAM_CODEC);
+            MountPolicyS2C.TYPE,
+            MountPolicyS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
-            justfatlard.pandorical.protocol.PlayAnimationS2C.TYPE,
-            justfatlard.pandorical.protocol.PlayAnimationS2C.STREAM_CODEC);
+            PlayAnimationS2C.TYPE,
+            PlayAnimationS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
-            justfatlard.pandorical.protocol.RenderPolicyS2C.TYPE,
-            justfatlard.pandorical.protocol.RenderPolicyS2C.STREAM_CODEC);
+            RenderPolicyS2C.TYPE,
+            RenderPolicyS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().registerLarge(
-            justfatlard.pandorical.protocol.SkinOverrideS2C.TYPE,
-            justfatlard.pandorical.protocol.SkinOverrideS2C.STREAM_CODEC, 1048576);
+            SkinOverrideS2C.TYPE,
+            SkinOverrideS2C.STREAM_CODEC, 1048576);
         PayloadTypeRegistry.clientboundPlay().register(EntityRenderersS2C.TYPE, EntityRenderersS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SpawnStructureS2C.TYPE, SpawnStructureS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(UpdateStructurePoseS2C.TYPE, UpdateStructurePoseS2C.STREAM_CODEC);
@@ -266,14 +295,14 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(DespawnStructureS2C.TYPE, DespawnStructureS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(EntityOverlayS2C.TYPE, EntityOverlayS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
-            justfatlard.pandorical.protocol.ChestOverlayS2C.TYPE,
-            justfatlard.pandorical.protocol.ChestOverlayS2C.STREAM_CODEC);
+            ChestOverlayS2C.TYPE,
+            ChestOverlayS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(KeybindDeclarationsS2C.TYPE, KeybindDeclarationsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
-            justfatlard.pandorical.protocol.KeybindDefaultsS2C.TYPE, justfatlard.pandorical.protocol.KeybindDefaultsS2C.STREAM_CODEC);
+            KeybindDefaultsS2C.TYPE, KeybindDefaultsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
-            justfatlard.pandorical.protocol.KeybindRebindS2C.TYPE,
-            justfatlard.pandorical.protocol.KeybindRebindS2C.STREAM_CODEC);
+            KeybindRebindS2C.TYPE,
+            KeybindRebindS2C.STREAM_CODEC);
 
         // C2S play
         PayloadTypeRegistry.serverboundPlay().register(HelloC2S.TYPE, HelloC2S.STREAM_CODEC);
@@ -281,22 +310,22 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.serverboundPlay().register(ContentReadyC2S.TYPE, ContentReadyC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(KeyPressC2S.TYPE, KeyPressC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(
-            justfatlard.pandorical.protocol.KeybindBindingsC2S.TYPE,
-            justfatlard.pandorical.protocol.KeybindBindingsC2S.STREAM_CODEC);
+            KeybindBindingsC2S.TYPE,
+            KeybindBindingsC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(
-            justfatlard.pandorical.protocol.KeyReleaseC2S.TYPE, justfatlard.pandorical.protocol.KeyReleaseC2S.STREAM_CODEC);
+            KeyReleaseC2S.TYPE, KeyReleaseC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(
-            justfatlard.pandorical.protocol.InventoryButtonC2S.TYPE,
-            justfatlard.pandorical.protocol.InventoryButtonC2S.STREAM_CODEC);
+            InventoryButtonC2S.TYPE,
+            InventoryButtonC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(
-            justfatlard.pandorical.protocol.OpenSettingsC2S.TYPE,
-            justfatlard.pandorical.protocol.OpenSettingsC2S.STREAM_CODEC);
+            OpenSettingsC2S.TYPE,
+            OpenSettingsC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(
-            justfatlard.pandorical.protocol.ClientSettingsC2S.TYPE,
-            justfatlard.pandorical.protocol.ClientSettingsC2S.STREAM_CODEC);
+            ClientSettingsC2S.TYPE,
+            ClientSettingsC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(
-            justfatlard.pandorical.protocol.ViewportC2S.TYPE,
-            justfatlard.pandorical.protocol.ViewportC2S.STREAM_CODEC);
+            ViewportC2S.TYPE,
+            ViewportC2S.STREAM_CODEC);
     }
 
     /**
@@ -306,15 +335,15 @@ public class Pandorical implements ModInitializer {
     private void registerConfigPhase() {
         // Keepsakes: asked for at login, and the login waits for the answer.
         ServerConfigurationNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.KeepsakesConfigC2S.TYPE, (payload, context) -> {
+            KeepsakesConfigC2S.TYPE, (payload, context) -> {
                 var handler = context.packetListener();
                 context.server().execute(() ->
-                    justfatlard.pandorical.login.Keepsakes.INSTANCE.answered(handler, payload));
+                    Keepsakes.INSTANCE.answered(handler, payload));
             });
         ServerConfigurationConnectionEvents.CONFIGURE.register((handler, server) -> {
-            justfatlard.pandorical.login.Keepsakes.INSTANCE.begin(handler);
-            if (justfatlard.pandorical.login.Keepsakes.INSTANCE.askable(handler)) {
-                handler.addTask(new justfatlard.pandorical.login.Keepsakes.Task());
+            Keepsakes.INSTANCE.begin(handler);
+            if (Keepsakes.INSTANCE.askable(handler)) {
+                handler.addTask(new Keepsakes.Task());
             }
         });
 
@@ -340,7 +369,7 @@ public class Pandorical implements ModInitializer {
                     return;
                 }
                 if (profile != null) configPhaseSyncedPlayers.add(profile.id());
-                ConfigPatience.end(handler, ((justfatlard.pandorical.mixin.ServerCommonConnectionAccessor) handler).pandorical$connection());
+                ConfigPatience.end(handler, ((ServerCommonConnectionAccessor) handler).pandorical$connection());
                 LOGGER.info("Client {} completed config-phase content sync",
                     profile != null ? profile.name() : "(unknown profile)");
 
@@ -368,7 +397,7 @@ public class Pandorical implements ModInitializer {
             ackedConfigConnections.remove(handler);
             ConfigPatience.forget(handler);
         });
-        net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(server -> ConfigPatience.expire());
+        ServerTickEvents.END_SERVER_TICK.register(server -> ConfigPatience.expire());
 
         // Server: add our sync task BEFORE Fabric's registry sync
         ServerConfigurationConnectionEvents.BEFORE_CONFIGURE.register((handler, server) -> {
@@ -402,12 +431,12 @@ public class Pandorical implements ModInitializer {
                             entityTypes, blockEntityTypes, villagerProfessions,
                             poiTypes, menuTypes, recipeBookCategories, contentRegistry.railsSolid());
                         try {
-                            var field = net.minecraft.server.network.ServerConfigurationPacketListenerImpl.class
+                            var field = ServerConfigurationPacketListenerImpl.class
                                 .getDeclaredField("configurationTasks");
                             field.setAccessible(true);
                             @SuppressWarnings("unchecked")
-                            var queue = (java.util.Queue<net.minecraft.server.network.ConfigurationTask>) field.get(handler);
-                            var newQueue = new java.util.ArrayDeque<net.minecraft.server.network.ConfigurationTask>();
+                            var queue = (Queue<ConfigurationTask>) field.get(handler);
+                            var newQueue = new ArrayDeque<ConfigurationTask>();
                             newQueue.add(task);
                             newQueue.addAll(queue);
                             queue.clear();
@@ -419,7 +448,7 @@ public class Pandorical implements ModInitializer {
                         LOGGER.info("Added PandoricalSyncTask for config phase ({} blocks, {} items)",
                             blocks.size(), items.size());
                         ConfigPatience.begin(handler,
-                            ((justfatlard.pandorical.mixin.ServerCommonConnectionAccessor) handler).pandorical$connection());
+                            ((ServerCommonConnectionAccessor) handler).pandorical$connection());
                     } catch (IOException e) {
                         LOGGER.error("Failed to build config-phase asset chunks", e);
                     }
@@ -475,15 +504,15 @@ public class Pandorical implements ModInitializer {
             });
         });
 
-        net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
-            justfatlard.pandorical.settings.ModCommands.forget();
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+            ModCommands.forget();
             PandoricalApi.blockMarksImpl().clear();
             PandoricalApi.structuresImpl().clear();
         });
-        net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.END_DATA_PACK_RELOAD.register(
-            (server, resources, success) -> justfatlard.pandorical.settings.ModCommands.forget());
+        ServerLifecycleEvents.END_DATA_PACK_RELOAD.register(
+            (server, resources, success) -> ModCommands.forget());
         ServerPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.KeybindBindingsC2S.TYPE, (payload, context) -> {
+            KeybindBindingsC2S.TYPE, (payload, context) -> {
                 context.player().level().getServer().execute(() ->
                     PandoricalApi.keybindsImpl().handleBindings(context.player(), payload.keys()));
             });
@@ -494,43 +523,43 @@ public class Pandorical implements ModInitializer {
                 PandoricalApi.keybindsImpl().handleKeyPress(context.player(), payload.slot()));
         });
         ServerPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.KeyReleaseC2S.TYPE, (payload, context) -> {
+            KeyReleaseC2S.TYPE, (payload, context) -> {
                 context.server().execute(() ->
                     PandoricalApi.keybindsImpl().handleKeyRelease(context.player(), payload.slot()));
             });
 
         ServerPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.InventoryButtonC2S.TYPE, (payload, context) -> {
+            InventoryButtonC2S.TYPE, (payload, context) -> {
                 context.server().execute(() -> PandoricalApi.playerInventoryImpl()
                     .handleButton(context.player(), payload.namespace(), payload.id()));
             });
 
         ServerPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.OpenSettingsC2S.TYPE, (payload, context) -> {
+            OpenSettingsC2S.TYPE, (payload, context) -> {
                 context.server().execute(() -> PandoricalApi.settings().open(context.player()));
             });
         ServerPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.ClientSettingsC2S.TYPE, (payload, context) -> {
+            ClientSettingsC2S.TYPE, (payload, context) -> {
                 context.server().execute(() ->
-                    justfatlard.pandorical.settings.ClientMods.declare(context.player(), payload));
+                    ClientMods.declare(context.player(), payload));
             });
         ServerPlayNetworking.registerGlobalReceiver(
-            justfatlard.pandorical.protocol.ViewportC2S.TYPE, (payload, context) -> {
+            ViewportC2S.TYPE, (payload, context) -> {
                 context.server().execute(() ->
-                    justfatlard.pandorical.screen.Viewport.declare(context.player(), payload));
+                    Viewport.declare(context.player(), payload));
             });
-        net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
-            justfatlard.pandorical.settings.ClientMods.forget(handler.player);
-            justfatlard.pandorical.screen.Viewport.forget(handler.player);
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            ClientMods.forget(handler.player);
+            Viewport.forget(handler.player);
         });
 
         PandoricalApi.settingsImpl().init();
         PandoricalApi.onPlayerReady(player -> PandoricalApi.blockMarksImpl().sendAll(player));
-        net.fabricmc.fabric.api.entity.event.v1.ServerEntityLevelChangeEvents.AFTER_PLAYER_CHANGE_LEVEL.register(
+        ServerEntityLevelChangeEvents.AFTER_PLAYER_CHANGE_LEVEL.register(
             (player, origin, destination) -> PandoricalApi.blockMarksImpl().sendAll(player));
-        net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.register(
+        CommandRegistrationCallback.EVENT.register(
             (dispatcher, registry, environment) ->
-                justfatlard.pandorical.settings.SettingsCommand.register(dispatcher, PandoricalApi.settingsImpl()));
+                SettingsCommand.register(dispatcher, PandoricalApi.settingsImpl()));
 
         ServerPlayNetworking.registerGlobalReceiver(ScreenActionC2S.TYPE, (payload, context) -> {
             context.server().execute(() -> {
@@ -571,7 +600,7 @@ public class Pandorical implements ModInitializer {
 
         // Respawn has the same stale-copy shape as join: the new ServerPlayer's menu is
         // built in its constructor, before restoreFrom copies the attachment over.
-        net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents.AFTER_RESPAWN.register(
+        ServerPlayerEvents.AFTER_RESPAWN.register(
             (oldPlayer, newPlayer, alive) ->
                 PandoricalApi.playerInventoryImpl().syncMenuFromAttachment(newPlayer));
 
@@ -580,7 +609,7 @@ public class Pandorical implements ModInitializer {
             // Otherwise the worn-skin table keeps a row per player who ever wore one, for the life
             // of the server, and hands every new arrival a wardrobe of people who are not here.
             SkinOverrides.forget(handler.getPlayer().getUUID());
-            justfatlard.pandorical.login.Keepsakes.INSTANCE.forget(handler.getPlayer().getUUID());
+            Keepsakes.INSTANCE.forget(handler.getPlayer().getUUID());
             PandoricalApi.settingsImpl().forget(handler.getPlayer().getUUID());
         });
     }
@@ -602,7 +631,7 @@ public class Pandorical implements ModInitializer {
      * @return false if the client was turned away and nothing more should be sent to it
      */
     private static boolean agreeOnVersion(
-            net.minecraft.server.network.ServerConfigurationPacketListenerImpl handler) {
+            ServerConfigurationPacketListenerImpl handler) {
         // No Pandorical at all: not our business, and never was.
         if (!ServerConfigurationNetworking.canSend(handler, SyncContentConfigS2C.TYPE)) return true;
 
@@ -613,9 +642,9 @@ public class Pandorical implements ModInitializer {
         // at all has to be current.
 
         if (ServerConfigurationNetworking.canSend(handler,
-                justfatlard.pandorical.protocol.RequirementS2C.TYPE)) {
+                RequirementS2C.TYPE)) {
             ServerConfigurationNetworking.send(handler,
-                new justfatlard.pandorical.protocol.RequirementS2C(
+                new RequirementS2C(
                     PROTOCOL_VERSION, MINIMUM_PROTOCOL, modVersion()));
             return true;
         }
@@ -625,7 +654,7 @@ public class Pandorical implements ModInitializer {
         String needed = modVersion();
         LOGGER.warn("Refused a client running a Pandorical older than {}: it cannot read this"
             + " server's content format", needed);
-        handler.disconnect(net.minecraft.network.chat.Component.literal(
+        handler.disconnect(Component.literal(
             "Your Pandorical is out of date.\n\n"
             + "This server needs Pandorical " + needed + " or newer.\n"
             + "Replace the pandorical jar in your mods folder and reconnect."));
@@ -639,13 +668,13 @@ public class Pandorical implements ModInitializer {
      * {@code IndexOutOfBoundsException} caused by mismatched slot counts.
      */
     private static void sendConfigPhaseInventoryRegistrations(
-            net.minecraft.server.network.ServerConfigurationPacketListenerImpl handler) {
+            ServerConfigurationPacketListenerImpl handler) {
         List<PlayerInventoryApi.SlotRegistration> regs = PandoricalApi.playerInventoryImpl().getRegistrations();
         if (regs.isEmpty()) return;
 
-        List<PlayerInventoryRegistrationsS2C.SlotGroup> groups = new java.util.ArrayList<>();
+        List<PlayerInventoryRegistrationsS2C.SlotGroup> groups = new ArrayList<>();
         for (PlayerInventoryApi.SlotRegistration reg : regs) {
-            List<PlayerInventoryRegistrationsS2C.SlotPosition> positions = new java.util.ArrayList<>();
+            List<PlayerInventoryRegistrationsS2C.SlotPosition> positions = new ArrayList<>();
             for (PlayerInventoryApi.SlotEntry entry : reg.slots()) {
                 positions.add(new PlayerInventoryRegistrationsS2C.SlotPosition(
                     entry.slotIndex(), entry.screenX(), entry.screenY(), entry.backgroundSprite()));
@@ -660,15 +689,15 @@ public class Pandorical implements ModInitializer {
         // buttons, rather than a packet it cannot read.
         var buttons = PandoricalApi.playerInventoryImpl().declaredButtons();
         if (!buttons.isEmpty() && ServerConfigurationNetworking.canSend(
-                handler, justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE)) {
+                handler, InventoryButtonsS2C.TYPE)) {
             ServerConfigurationNetworking.send(handler,
-                new justfatlard.pandorical.protocol.InventoryButtonsS2C(buttons));
+                new InventoryButtonsS2C(buttons));
         }
         LOGGER.debug("Sent {} extra inventory slot group(s) during config phase", groups.size());
     }
 
     private static void sendConfigPhaseBlockTints(
-            net.minecraft.server.network.ServerConfigurationPacketListenerImpl handler) {
+            ServerConfigurationPacketListenerImpl handler) {
         var impl = PandoricalApi.blockTintsImpl();
         if (!impl.hasEntries()) return;
         ServerConfigurationNetworking.send(handler, impl.buildPacket());
@@ -682,16 +711,16 @@ public class Pandorical implements ModInitializer {
      * See {@link justfatlard.pandorical.api.StructureApi} for the broadcast-scoped design.
      */
     private void registerStructureTracking() {
-        net.fabricmc.fabric.api.networking.v1.EntityTrackingEvents.START_TRACKING.register(
+        EntityTrackingEvents.START_TRACKING.register(
             (entity, player) -> {
                 PandoricalApi.structuresImpl().handleStartTracking(entity, player);
                 PandoricalApi.entityOverlaysImpl().handleStartTracking(entity, player);
             });
-        net.fabricmc.fabric.api.networking.v1.EntityTrackingEvents.STOP_TRACKING.register(
+        EntityTrackingEvents.STOP_TRACKING.register(
             (entity, player) -> PandoricalApi.structuresImpl().handleStopTracking(entity, player));
         // Overlay state does not persist: drop it when the entity unloads and
         // let the owning mod re-set it on load (see EntityOverlayApi javadoc)
-        net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents.ENTITY_UNLOAD.register(
+        ServerEntityEvents.ENTITY_UNLOAD.register(
             (entity, world) -> PandoricalApi.entityOverlaysImpl().handleEntityUnload(entity));
     }
 
@@ -699,11 +728,11 @@ public class Pandorical implements ModInitializer {
      * Send all registered entity renderer mappings to the player.
      * Called after the player completes the HelloC2S handshake.
      */
-    private static void sendEntityRenderers(net.minecraft.server.level.ServerPlayer player) {
-        java.util.Map<String, String> renderers = EntityRendererRegistry.getAll();
+    private static void sendEntityRenderers(ServerPlayer player) {
+        Map<String, String> renderers = EntityRendererRegistry.getAll();
         if (renderers.isEmpty()) return;
 
-        ServerPlayNetworking.send(player, new EntityRenderersS2C(new java.util.HashMap<>(renderers)));
+        ServerPlayNetworking.send(player, new EntityRenderersS2C(new HashMap<>(renderers)));
         LOGGER.debug("Sent {} entity renderer mapping(s) to {}", renderers.size(), player.getName().getString());
     }
 }
