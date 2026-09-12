@@ -28,7 +28,17 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 @Environment(EnvType.CLIENT)
 public final class FenceGateJoins implements ContextModels.Provider {
-	private record Key(Block block, boolean open, boolean wall, String join, boolean stacked, Direction facing) {}
+	private record Key(Block block, boolean open, boolean wall, String join, String swing, boolean stacked, Direction facing) {}
+
+	/**
+	 * A gate hung as one leaf from one post, marked so by whoever owns the setting (moredoor's
+	 * gate menu): open, it takes {@code <gate>[_wall]_open_swing_<left|right>[_stacked]_<facing>}
+	 * instead of the two leaves. Left and right are the gate's own. Only for a gate with no gate
+	 * beside it: a pair opens from the middle, and a leaf two blocks long has no model to fit in.
+	 */
+	public static final String HINGE_LEFT_MARK = "moredoor:gate_left";
+	public static final String HINGE_RIGHT_MARK = "moredoor:gate_right";
+	private static final String[] SWINGS = {"left", "right"};
 
 	private static final Map<Key, ExtraModelKey<BlockStateModel>> KEYS = new HashMap<>();
 	private static final String[] JOINS = {"left", "right", "both", "none"};
@@ -39,6 +49,7 @@ public final class FenceGateJoins implements ContextModels.Provider {
 		for (Block block : BuiltInRegistries.BLOCK) {
 			if (!(block instanceof FenceGateBlock)) continue;
 			Identifier id = BuiltInRegistries.BLOCK.getKey(block);
+			scanSwings(resources, add, block, id);
 			for (boolean wall : new boolean[] {false, true}) {
 				for (boolean open : new boolean[] {false, true}) {
 					for (String join : JOINS) {
@@ -48,10 +59,28 @@ public final class FenceGateJoins implements ContextModels.Provider {
 									+ "_join_" + join + (stacked ? "_stacked" : "") + "_" + facing.getSerializedName();
 								Identifier file = Identifier.fromNamespaceAndPath(id.getNamespace(), "models/block/" + path + ".json");
 								if (resources.getResource(file).isPresent()) {
-									KEYS.put(new Key(block, open, wall, join, stacked, facing),
+									KEYS.put(new Key(block, open, wall, join, "", stacked, facing),
 										add.add(Identifier.fromNamespaceAndPath(id.getNamespace(), "block/" + path)));
 								}
 							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	private static void scanSwings(ResourceManager resources, ContextModels.Registrar add, Block block, Identifier id) {
+		for (boolean wall : new boolean[] {false, true}) {
+			for (String swing : SWINGS) {
+				for (boolean stacked : new boolean[] {false, true}) {
+					for (Direction facing : Direction.Plane.HORIZONTAL) {
+						String path = id.getPath() + (wall ? "_wall" : "") + "_open_swing_" + swing
+							+ (stacked ? "_stacked" : "") + "_" + facing.getSerializedName();
+						Identifier file = Identifier.fromNamespaceAndPath(id.getNamespace(), "models/block/" + path + ".json");
+						if (resources.getResource(file).isPresent()) {
+							KEYS.put(new Key(block, true, wall, "none", swing, stacked, facing),
+								add.add(Identifier.fromNamespaceAndPath(id.getNamespace(), "block/" + path)));
 						}
 					}
 				}
@@ -68,10 +97,20 @@ public final class FenceGateJoins implements ContextModels.Provider {
 		// A gate on a gate: the posts run down to meet the one below, so a tall gate has posts
 		// the whole way rather than a gap at every storey.
 		boolean stacked = joined(state, level.getBlockState(pos.below()));
-		if (!left && !right && !stacked) return null;
+		boolean open = state.getValue(FenceGateBlock.OPEN);
+		String swing = "";
+		if (open && !left && !right) {
+			if (justfatlard.pandorical.BlockMarkLookup.client.test(pos, HINGE_LEFT_MARK)) swing = "left";
+			else if (justfatlard.pandorical.BlockMarkLookup.client.test(pos, HINGE_RIGHT_MARK)) swing = "right";
+		}
+		if (!left && !right && !stacked && swing.isEmpty()) return null;
 		String join = left && right ? "both" : left ? "left" : right ? "right" : "none";
-		ExtraModelKey<BlockStateModel> key = KEYS.get(new Key(state.getBlock(),
-			state.getValue(FenceGateBlock.OPEN), state.getValue(FenceGateBlock.IN_WALL), join, stacked, facing));
+		boolean wall = state.getValue(FenceGateBlock.IN_WALL);
+		ExtraModelKey<BlockStateModel> key = KEYS.get(new Key(state.getBlock(), open, wall, join, swing, stacked, facing));
+		if (key == null && !swing.isEmpty()) {
+			// A gate without single-leaf models opens the way it always did.
+			key = KEYS.get(new Key(state.getBlock(), open, wall, join, "", stacked, facing));
+		}
 		return key == null ? null : models.get(key);
 	}
 
