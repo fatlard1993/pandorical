@@ -1028,14 +1028,43 @@ public final class PandoricalApi {
             broadcastToTrackers(state.anchorEntity, packet);
         }
 
+        /** Structures whose pose changed since the tracker pass last sent it. */
+        private final java.util.Set<String> pendingPoses = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
         @Override
         public void updatePose(String structureId, StructurePose pose) {
             StructureState state = structures.get(structureId);
             if (state == null) return;
             state.pose = pose;
+            // Held until the game's own entity tracker runs, and sent from there: the deck and
+            // everything riding it then reach the client in one pass. Sent from here, mid-tick,
+            // the deck ran a full server tick ahead of the anchor, the cushions and the hull the
+            // tracker sends at the start of the next tick, and the pilot stood that tick off
+            // the helm and shook with it.
+            pendingPoses.add(structureId);
+        }
 
-            broadcastToTrackers(state.anchorEntity, new justfatlard.pandorical.protocol.UpdateStructurePoseS2C(
-                structureId, pose.x(), pose.y(), pose.z(), pose.yaw()));
+        /**
+         * Send every pose changed since the last pass, for structures anchored in this level.
+         *
+         * <p>Called at the head of {@code ChunkMap.tick()}, which is the pass that sends every
+         * tracked entity's position. Both go out together, so both land in the same client tick.
+         */
+        public void flushPoses(net.minecraft.server.level.ServerLevel level) {
+            if (pendingPoses.isEmpty()) return;
+            for (java.util.Iterator<String> it = pendingPoses.iterator(); it.hasNext();) {
+                String structureId = it.next();
+                StructureState state = structures.get(structureId);
+                if (state == null) {
+                    it.remove();
+                    continue;
+                }
+                if (state.anchorEntity.level() != level) continue;
+                it.remove();
+                StructurePose pose = state.pose;
+                broadcastToTrackers(state.anchorEntity, new justfatlard.pandorical.protocol.UpdateStructurePoseS2C(
+                    structureId, pose.x(), pose.y(), pose.z(), pose.yaw()));
+            }
         }
 
         @Override

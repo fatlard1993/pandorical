@@ -9,6 +9,7 @@
 		"HorseSteeringMixin",
 		"HorsePillionMixin",
 		"MountCapacityMixin",
+		"TrackerPoseFlushMixin",
 		"FencePostMixin",
 		"WallPostMixin"
 	],
