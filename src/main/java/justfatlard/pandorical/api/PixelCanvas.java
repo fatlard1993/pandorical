@@ -8,19 +8,16 @@ import java.util.Base64;
 /**
  * The rule a {@link ComponentType#PIXEL_CANVAS} paints by, and its wire forms.
  *
- * <p>One rule for both ends. The client lays a stroke the moment the hand moves and the server
- * lays the same stroke when the report arrives; they agree only because both call
- * {@link #apply} here, over the same cells and the same supply. A mod answering a canvas reads
- * the report with {@link Stroke#fromAction}, applies it to its own copy, and replies with
- * {@link ComponentType#PROP_CANVAS_ACK} (and {@link ComponentType#PROP_CANVAS_SUPPLY} when ink
- * is finite). It sends {@link ComponentType#PROP_CANVAS_PIXELS} only when its copy has moved
- * some way the client could not have predicted: a stroke it refused, or a change from anywhere
- * but this canvas.
+ * <p>The client lays each stroke at once and the server lays the same stroke when the report
+ * arrives; they agree only because both call {@link #apply} over the same cells and supply. A
+ * mod reads the report with {@link Stroke#fromAction}, applies it to its own copy, and replies
+ * with {@link ComponentType#PROP_CANVAS_ACK}, plus {@link ComponentType#PROP_CANVAS_SUPPLY} when
+ * ink is finite. It sends {@link ComponentType#PROP_CANVAS_PIXELS} only when its copy moved in a
+ * way the client could not predict: a refused stroke, or a change from outside this canvas.
  *
- * <p>Cells are palette indices, one byte each, read unsigned: a palette can have up to 256
- * colours. Row-major from the top left.
+ * <p>Cells are palette indices, one byte each, read unsigned, row-major from the top left.
  *
- * <p>New in 1.3.9 and shaped around one user so far; it may still change shape.
+ * <p>Not yet stable: it may still change shape.
  */
 public final class PixelCanvas {
     private PixelCanvas() {}
