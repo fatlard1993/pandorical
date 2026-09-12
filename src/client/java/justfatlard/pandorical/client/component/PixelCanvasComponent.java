@@ -316,7 +316,7 @@ public class PixelCanvasComponent extends AbstractComponent {
 
     /** The server's copy as folded here, and every report still in flight, which no prop carries. */
     @Override
-    public void inherit(PandoricalComponent previous) {
+    public void carryOverFrom(PandoricalComponent previous) {
         PixelCanvasComponent old = (PixelCanvasComponent) previous;
         confirmed = old.confirmed;
         confirmedSupply = old.confirmedSupply;

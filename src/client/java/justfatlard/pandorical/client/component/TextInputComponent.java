@@ -130,7 +130,7 @@ public class TextInputComponent extends AbstractComponent {
 
     /** What was typed, and whether it was being typed into: the server only ever hears the text. */
     @Override
-    public void inherit(PandoricalComponent previous) {
+    public void carryOverFrom(PandoricalComponent previous) {
         TextInputComponent old = (TextInputComponent) previous;
         if (editBox == null || old.editBox == null) return;
         editBox.setValue(old.editBox.getValue());

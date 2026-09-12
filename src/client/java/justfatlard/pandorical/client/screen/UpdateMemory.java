@@ -30,7 +30,7 @@ final class UpdateMemory {
             Map<String, String> props = latest.get(id);
             if (props != null) component.updateProps(props);
             PandoricalComponent old = previous.get(id);
-            if (old != null && old.getClass() == component.getClass()) component.inherit(old);
+            if (old != null && old.getClass() == component.getClass()) component.carryOverFrom(old);
         });
     }
 }
