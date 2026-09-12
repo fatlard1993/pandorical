@@ -51,15 +51,21 @@ public final class SkinOverrides {
 		Identifier id = Identifier.fromNamespaceAndPath("pandorical",
 			"skin/" + payload.subject().toString().replace("-", ""));
 
-		try (NativeImage image = NativeImage.read(payload.png())) {
-			// Released first: registering over a live id leaks the old texture, and a player
-			// changing skin twice in a session is exactly when that happens.
-			remove(payload.subject());
-			client.getTextureManager().register(id, new DynamicTexture(() -> id.toString(), image));
+		// The texture owns the image from here: it keeps the pixels, and the upload it records is
+		// run by the render backend later in the frame. Closing the image on the way out of this
+		// method freed that memory first, and on Windows the upload then read freed memory and
+		// took the whole process down four seconds after joining.
+		NativeImage image;
+		try {
+			image = NativeImage.read(payload.png());
 		} catch (Exception e) {
 			Pandorical.LOGGER.warn("Unreadable skin override for {}", payload.subject(), e);
 			return;
 		}
+		// Released first: registering over a live id leaks the old texture, and a player
+		// changing skin twice in a session is exactly when that happens.
+		remove(payload.subject());
+		client.getTextureManager().register(id, new DynamicTexture(() -> id.toString(), image));
 
 		WORN.put(payload.subject(),
 			new Worn(id, payload.slim() ? PlayerModelType.SLIM : PlayerModelType.WIDE));
