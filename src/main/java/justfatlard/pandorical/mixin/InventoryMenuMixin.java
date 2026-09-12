@@ -24,15 +24,6 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import net.minecraft.world.ContainerHelper;
 
-/**
- * Server-side mixin that adds extra inventory slots to {@link InventoryMenu} for
- * each {@link PlayerInventoryApi.SlotRegistration} registered via {@link PandoricalApi#playerInventory()}.
- *
- * <p>Only activates when the owning player is a {@link ServerPlayer} (not creative menu or
- * spectator, which also create InventoryMenu instances). Slots are backed by a
- * lightweight {@link PersistingContainer} whose contents are persisted to the player's
- * Fabric data attachment whenever {@code setChanged()} is called.
- */
 @Mixin(InventoryMenu.class)
 public abstract class InventoryMenuMixin extends AbstractContainerMenu {
 
@@ -43,14 +34,13 @@ public abstract class InventoryMenuMixin extends AbstractContainerMenu {
     @Inject(method = "<init>", at = @At("RETURN"))
     private void pandorical$addExtraSlots(Inventory playerInventory, boolean active, Player player,
                                           CallbackInfo ci) {
-        // Only run on the server side; the LocalPlayer check is in the client mixin.
+        // The client's slots are added by its own mixin.
         if (!(player instanceof ServerPlayer serverPlayer)) return;
 
         PlayerInventoryApiImpl impl = PandoricalApi.playerInventoryImpl();
         List<PlayerInventoryApi.SlotRegistration> registrations = impl.getRegistrations();
         if (registrations.isEmpty()) return;
 
-        // Ensure the player's attachment has correctly-sized lists.
         impl.ensureSlotLists(serverPlayer);
 
         for (PlayerInventoryApi.SlotRegistration reg : registrations) {
@@ -58,12 +48,10 @@ public abstract class InventoryMenuMixin extends AbstractContainerMenu {
             int size = slotEntries.size();
             if (size == 0) continue;
 
-            // Retrieve current items from the attachment so the container is pre-populated.
             Map<String, List<ItemStack>> allSlots = impl.getMutableSlots(serverPlayer);
             List<ItemStack> storedItems = allSlots.getOrDefault(reg.namespace().toString(),
                 Collections.emptyList());
 
-            // Build a backing container pre-populated with stored items.
             NonNullList<ItemStack> items = NonNullList.withSize(size, ItemStack.EMPTY);
             for (int i = 0; i < size && i < storedItems.size(); i++) {
                 ItemStack stored = storedItems.get(i);
@@ -73,10 +61,8 @@ public abstract class InventoryMenuMixin extends AbstractContainerMenu {
             }
 
             String namespaceKey = reg.namespace().toString();
-            // Record base menu slot index so we can compute the absolute menu slot in the listener.
             int baseMenuSlot = this.slots.size();
             PersistingContainer container = new PersistingContainer(items,
-                // onChanged: persist to attachment
                 () -> {
                     Map<String, List<ItemStack>> map = impl.getMutableSlots(serverPlayer);
                     List<ItemStack> updated = new ArrayList<>(size);
@@ -86,12 +72,10 @@ public abstract class InventoryMenuMixin extends AbstractContainerMenu {
                     map.put(namespaceKey, updated);
                     serverPlayer.setAttached(PlayerInventoryApiImpl.EXTRA_SLOTS, map);
                 },
-                // onItemChanged: fire registered slot-change listeners
                 (localSlot, newStack) -> impl.fireSlotChangeListeners(
                     serverPlayer, baseMenuSlot + localSlot, newStack)
             );
 
-            // Add Slot objects to the menu at the declared screen positions.
             for (PlayerInventoryApi.SlotEntry entry : slotEntries) {
                 int idx = entry.slotIndex();
                 PlayerInventoryApi.SlotEntry capturedEntry = entry;
@@ -105,12 +89,6 @@ public abstract class InventoryMenuMixin extends AbstractContainerMenu {
         }
     }
 
-    // --- Inner container implementation ---
-
-    /**
-     * Minimal {@link Container} backed by a {@link NonNullList} that persists its contents
-     * to the player's data attachment every time {@link #setChanged()} is called.
-     */
     private static final class PersistingContainer implements Container {
         private final NonNullList<ItemStack> items;
         private final Runnable onChanged;

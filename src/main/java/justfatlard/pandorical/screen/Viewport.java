@@ -6,12 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import justfatlard.pandorical.protocol.ViewportC2S;
 import net.minecraft.server.level.ServerPlayer;
 
-/**
- * The size of each player's window, in scaled pixels, for a screen built to fit it.
- *
- * <p>A client that has not said is taken to have the smallest window vanilla allows at any GUI
- * scale, which is what every screen was sized for before the client could say otherwise.
- */
+/** {@link #LEAST}, the smallest window vanilla allows at any GUI scale, stands until the client says. */
 public record Viewport(int width, int height) {
     public static final Viewport LEAST = new Viewport(320, 240);
 

@@ -11,14 +11,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 
-/** What each entity is animating, broadcast as it starts and stops and replayed to each arrival. */
 public final class PlayingAnimations implements AnimationApi {
 	public static final PlayingAnimations INSTANCE = new PlayingAnimations();
 
-	/**
-	 * What each entity is playing, so somebody who walks into view is told about an animation
-	 * that started before they arrived. Keyed by network id and cleared when the entity goes.
-	 */
 	private static final Map<Integer, PlayAnimationS2C> PLAYING = new ConcurrentHashMap<>();
 
 	private PlayingAnimations() {}
@@ -45,7 +40,6 @@ public final class PlayingAnimations implements AnimationApi {
 		}
 	}
 
-	/** Catch a joining client up on everything already playing. */
 	public static void sendAllTo(ServerPlayer player) {
 		if (!PandoricalApi.hasCapability(player, Capabilities.ANIMATIONS)) return;
 
@@ -54,7 +48,6 @@ public final class PlayingAnimations implements AnimationApi {
 		}
 	}
 
-	/** An entity that has gone is not playing anything. */
 	public static void forget(int entityId) {
 		PLAYING.remove(entityId);
 	}

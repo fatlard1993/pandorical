@@ -12,24 +12,12 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
-/** Every skin override in force, broadcast as it changes and replayed to each arrival. */
 public final class SkinOverrides implements SkinApi {
 	public static final SkinOverrides INSTANCE = new SkinOverrides();
 
-	/**
-	 * Every override currently in force, so a player who joins later still sees them.
-	 *
-	 * <p>A skin is not an event, it is a state, and a client that missed the announcement would
-	 * otherwise see that person as Steve for as long as both stayed logged in. Held by subject
-	 * so a second call about the same player replaces the first rather than piling up.
-	 */
 	private static final Map<UUID, SkinOverrideS2C> WORN = new ConcurrentHashMap<>();
 
-	/**
-	 * Subjects dressed for the life of the server: a leaver's row goes unless it is one of these.
-	 * The two lifetimes are told apart here rather than by two maps, so the one send loop and
-	 * the one replay on join serve both.
-	 */
+	/** Subjects dressed for the life of the server, whose rows outlive their leaving. */
 	private static final Set<UUID> KEPT = ConcurrentHashMap.newKeySet();
 
 	private SkinOverrides() {}
@@ -64,8 +52,6 @@ public final class SkinOverrides implements SkinApi {
 	public void clear(MinecraftServer server, UUID subject) {
 		KEPT.remove(subject);
 		WORN.remove(subject);
-		// An empty image is how "wear your own skin again" is said; the alternative would be a
-		// second packet type that means nothing else.
 		send(server, new SkinOverrideS2C(subject, new byte[0], false));
 	}
 
@@ -82,7 +68,6 @@ public final class SkinOverrides implements SkinApi {
 		}
 	}
 
-	/** Catch a newly arrived client up on everyone already wearing something. */
 	public static void sendAllTo(ServerPlayer viewer) {
 		if (WORN.isEmpty() || !PandoricalApi.hasCapability(viewer, Capabilities.SKINS)) return;
 		for (SkinOverrideS2C worn : WORN.values()) {
@@ -90,7 +75,6 @@ public final class SkinOverrides implements SkinApi {
 		}
 	}
 
-	/** Drop a leaver's entry, so the map does not grow for the life of the server. */
 	public static void forget(UUID subject) {
 		if (!KEPT.contains(subject)) WORN.remove(subject);
 	}

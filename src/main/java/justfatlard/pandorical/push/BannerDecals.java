@@ -9,7 +9,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BannerPatternLayers;
 
-/** Banner decals sent to one player at a time and kept by nobody but that player's client. */
 public final class BannerDecals implements BannerDecalApi {
 	public static final BannerDecals INSTANCE = new BannerDecals();
 

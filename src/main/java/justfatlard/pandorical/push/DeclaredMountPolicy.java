@@ -8,7 +8,6 @@ import justfatlard.pandorical.protocol.MountPolicyS2C;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
 
-/** The riding rules a mod declared at startup, applied on the server and told to each client as it arrives. */
 public final class DeclaredMountPolicy implements MountApi {
 	public static final DeclaredMountPolicy INSTANCE = new DeclaredMountPolicy();
 
@@ -29,11 +28,6 @@ public final class DeclaredMountPolicy implements MountApi {
 		apply();
 	}
 
-	/**
-	 * The server's own mixins read the same holder the client's do, so it is set here rather
-	 * than only sent. Declared at mod initialise, before any player exists; {@link #sendTo}
-	 * tells each client as it arrives.
-	 */
 	private static void apply() {
 		MountPolicy.set(doubleRiders, freeLook);
 	}

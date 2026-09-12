@@ -11,7 +11,6 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 
-/** Which blocks take which tint, sent at login, and the colours painted on single blocks for one player. */
 public final class BlockTints implements BlockTintApi {
 	public static final BlockTints INSTANCE = new BlockTints();
 
@@ -40,16 +39,12 @@ public final class BlockTints implements BlockTintApi {
 	public void unpaint(ServerPlayer player, Collection<BlockPos> positions) {
 		if (positions.isEmpty()) return;
 
-		// Zero is the clear: a colour with no alpha is not a colour anybody meant to paint,
-		// so it can carry the other meaning without a second packet to say which.
 		send(player, positions.stream()
 			.map(pos -> new BlockTintPositionsS2C.Entry(pos.asLong(), 0))
 			.toList());
 	}
 
 	private void send(ServerPlayer player, List<BlockTintPositionsS2C.Entry> entries) {
-		// Asked rather than assumed: an older Pandorical has no receiver for this type, and
-		// sending it anyway disconnects them over a colour.
 		if (!ServerPlayNetworking.canSend(player, BlockTintPositionsS2C.TYPE)) return;
 
 		ServerPlayNetworking.send(player, new BlockTintPositionsS2C(entries));

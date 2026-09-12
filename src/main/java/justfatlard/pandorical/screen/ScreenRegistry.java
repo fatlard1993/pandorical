@@ -23,14 +23,12 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.item.crafting.display.RecipeDisplayId;
 
-/** Every declarative screen's handlers, which screen each player has open, and where an action goes. */
 public final class ScreenRegistry implements ScreenApi {
 	public static final ScreenRegistry INSTANCE = new ScreenRegistry();
 
 	private static final int MAX_ACTION_DATA_ENTRIES = 32;
 	private static final int MAX_ACTION_STRING_LENGTH = 1024;
 
-	/** Holds the type and ID of the screen currently open for a player. */
 	private record ScreenContext(String screenType, String screenId) {}
 
 	private final Map<UUID, ScreenContext> playerScreens = new ConcurrentHashMap<>();
@@ -44,12 +42,10 @@ public final class ScreenRegistry implements ScreenApi {
 
 	private ScreenRegistry() {}
 
-	/** The id of the screen this player has open through Pandorical, or null for none. */
 	public String openScreenId(UUID playerUuid) {
 		return getPlayerScreenId(playerUuid);
 	}
 
-	/** A player gone from the server has no screen open. */
 	public void forgetPlayer(UUID playerUuid) {
 		playerScreens.remove(playerUuid);
 	}
@@ -73,17 +69,9 @@ public final class ScreenRegistry implements ScreenApi {
 	}
 
 	/**
-	 * Forget this player's screen, but only when it is still the one being torn down.
-	 *
-	 * <p>{@code openMenu} closes the previous container <em>after</em> the incoming
-	 * screen has already registered, so the old container's removed-callback runs
-	 * while {@link #playerScreens} holds the new screen. Removing unconditionally
-	 * there erases that registration, and because {@code handleAction} returns
-	 * immediately when a player has no screen, every later click on the screen the
-	 * player is looking at is dropped in silence.
-	 *
-	 * <p>Screen ids are per-open (a random UUID from the builder), so comparing them
-	 * is what separates "this screen closed" from "a newer one replaced it".
+	 * Only while {@code screenId} is still the open one: {@code openMenu} closes the previous
+	 * container after the incoming screen has registered, so the old removed-callback runs while
+	 * {@link #playerScreens} holds the new screen. Screen ids are unique per open.
 	 */
 	private void clearPlayerScreen(UUID playerUuid, String screenId) {
 		playerScreens.computeIfPresent(playerUuid,
@@ -115,35 +103,21 @@ public final class ScreenRegistry implements ScreenApi {
 				player.getName().getString());
 			return;
 		}
-		// Tear down whatever is already open before registering this screen.
-		//
-		// openMenu closes the current container itself, but it does that *after*
-		// the new screen has registered, so the outgoing screen's removed-handler
-		// runs while this player's state already describes the incoming one. A
-		// consumer that keeps per-player state then cleans up the session it just
-		// created: player-trade cancels the new trade and returns its items,
-		// village-mail returns the new screen's attachment, fletch-craft empties
-		// the new grid. Closing first means every teardown sees its own state.
-		//
-		// Guarded on our own menu type so an unrelated vanilla container is never
-		// closed out from under the player.
+		// Close first, or the old screen's removed-handler runs against the new screen's
+		// per-player state (see clearPlayerScreen(UUID, String)).
 		if (player.containerMenu instanceof PandoricalMenu) {
 			player.closeContainer();
 		}
 
 		setPlayerScreen(player.getUUID(), screen.screenType(), screen.screenId());
 
-		// The screen definition must be sent before openMenu: the client stores it in
-		// a pending map and matches the incoming menu against it.
+		// Before openMenu: the client matches the incoming menu against this definition.
 		ServerPlayNetworking.send(player, screen);
 
 		String screenType = screen.screenType();
-		// Captured so the removed-callback can tell its own teardown from being
-		// replaced by a newer screen; see clearPlayerScreen(UUID, String).
 		String openedScreenId = screen.screenId();
 		int slotCount = screen.container().map(c -> c.slotCount()).orElse(0);
 		player.openMenu(new PandoricalMenuProvider(screen, serverContainer, readOnlySlots,
-			// slot change callback (reports every slot, not just changed ones)
 			() -> {
 				SlotChangeHandler handler = slotChangeHandlers.get(screenType);
 				if (handler != null) {
@@ -152,7 +126,6 @@ public final class ScreenRegistry implements ScreenApi {
 					}
 				}
 			},
-			// removed callback
 			() -> {
 				Consumer<ServerPlayer> handler = containerRemovedHandlers.get(screenType);
 				if (handler != null) handler.accept(player);
@@ -165,11 +138,7 @@ public final class ScreenRegistry implements ScreenApi {
 	public void update(ServerPlayer player, String screenId, List<ComponentUpdate> updates) {
 		if (!PandoricalApi.isAvailable(player)) return;
 
-		// The client matches updates on the screen ID, and drops anything else where it
-		// lands. That silence is the trap: the usual mistake is addressing an update by the
-		// screen TYPE, which is the constant a mod actually has on hand - ScreenBuilder mints
-		// the id itself, so the two are never equal unless id() was called. The feature then
-		// works perfectly on the server and never redraws, with nothing anywhere to say why.
+		// The client silently drops an update for any other screen id.
 		String open = getPlayerScreenId(player.getUUID());
 		if (open != null && !open.equals(screenId)) {
 			Pandorical.LOGGER.warn(
@@ -187,16 +156,11 @@ public final class ScreenRegistry implements ScreenApi {
 	@Override
 	public void close(ServerPlayer player, String screenId) {
 		if (!PandoricalApi.isAvailable(player)) return;
-		// Only act when this screenId is still the active one.
-		// If handleResponse() opened a NEW screen before we got here, the new
-		// screen's tracking must survive so its buttons can be handled.
+		// A screen opened since must keep its tracking.
 		String currentId = getPlayerScreenId(player.getUUID());
 		if (screenId.equals(currentId)) {
-			// For a container screen, close the server-side menu too. Otherwise the menu
-			// stays live after the client is told to hide the overlay, its removed-callback
-			// never runs, and any items held in the container are stranded (and destroyed on
-			// the eventual real close). The instanceof guard ensures we only ever close our
-			// own menu, never an unrelated vanilla one; removed() clears tracking itself.
+			// Close the server-side menu too, or its removed-callback never runs and its items
+			// are stranded. removed() clears the tracking.
 			if (player.containerMenu instanceof PandoricalMenu) {
 				player.closeContainer();
 			} else {
@@ -270,8 +234,7 @@ public final class ScreenRegistry implements ScreenApi {
 			return;
 		}
 
-		// The reserved ask a recipe book sends, before component handlers: no screen owns a
-		// component by this name, and a station should not have to register one to be filled.
+		// A reserved id owned by no component, so checked before the component handlers.
 		if (ScreenApi.PLACE_RECIPE_COMPONENT.equals(action.componentId())) {
 			PlaceRecipeHandler placer = placeRecipeHandlers.get(screenType);
 			if (placer == null) return;
@@ -303,7 +266,6 @@ public final class ScreenRegistry implements ScreenApi {
 			}
 		}
 
-		// Fallback handler for dynamic component IDs
 		BiConsumer<ServerPlayer, Map<String, String>> fallback = fallbackHandlers.get(screenType);
 		if (fallback != null) {
 			Map<String, String> dataWithId = new HashMap<>(action.data());

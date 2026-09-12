@@ -19,7 +19,6 @@ import justfatlard.pandorical.protocol.UpdateHudS2C;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
 
-/** HUD overlays sent to each player, and which vanilla HUD elements each mod has asked to hide. */
 public final class HudRegistry implements HudApi {
 	public static final HudRegistry INSTANCE = new HudRegistry();
 

@@ -16,15 +16,11 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 
-/** Every entity's overlay texture, sent to its trackers; broadcast design mirrors StructureRegistry. */
 public final class EntityOverlays implements EntityOverlayApi {
 	public static final EntityOverlays INSTANCE = new EntityOverlays();
 
 	private record OverlayEntry(Entity entity, Identifier texture) {}
 
-	// Keyed by entity UUID; entries dropped on entity unload (see
-	// handleEntityUnload). The wire protocol uses the network id, which is
-	// unique per server run, so a cleared client never confuses entities.
 	private final Map<UUID, OverlayEntry> overlays = new ConcurrentHashMap<>();
 
 	private EntityOverlays() {}
@@ -47,7 +43,7 @@ public final class EntityOverlays implements EntityOverlayApi {
 		broadcastToTrackers(entity, new EntityOverlayS2C(entity.getId(), ""));
 	}
 
-	/** @hidden called from Pandorical's EntityTrackingEvents.START_TRACKING handler. */
+	/** @hidden */
 	public void handleStartTracking(Entity entity, ServerPlayer player) {
 		if (!PandoricalApi.hasCapability(player, Capabilities.ENTITY_OVERLAYS)) return;
 		OverlayEntry entry = overlays.get(entity.getUUID());
@@ -56,11 +52,7 @@ public final class EntityOverlays implements EntityOverlayApi {
 		}
 	}
 
-	/**
-	 * @hidden called after HelloC2S registers capabilities: on join, entity
-	 * tracking starts before the handshake completes, so overlays for
-	 * already-tracked entities must be replayed here.
-	 */
+	/** @hidden */
 	public void handlePlayerReady(ServerPlayer player) {
 		if (!PandoricalApi.hasCapability(player, Capabilities.ENTITY_OVERLAYS)) return;
 		for (OverlayEntry entry : overlays.values()) {
@@ -71,7 +63,7 @@ public final class EntityOverlays implements EntityOverlayApi {
 		}
 	}
 
-	/** @hidden called from Pandorical's ServerEntityEvents.ENTITY_UNLOAD handler. */
+	/** @hidden */
 	public void handleEntityUnload(Entity entity) {
 		overlays.remove(entity.getUUID());
 	}

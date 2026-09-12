@@ -10,7 +10,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 
-/** Chest textures swapped for one player at a time, kept by nobody but that player's client. */
 public final class ChestOverlays implements ChestOverlayApi {
 	public static final ChestOverlays INSTANCE = new ChestOverlays();
 
@@ -30,7 +29,7 @@ public final class ChestOverlays implements ChestOverlayApi {
 	@Override
 	public void remove(ServerPlayer player, Collection<BlockPos> positions) {
 		if (positions.isEmpty()) return;
-		// The texture is irrelevant to a removal, and the client ignores it.
+		// The client ignores a removal's texture.
 		send(player, ChestOverlayS2C.OP_REMOVE, Identifier.fromNamespaceAndPath("pandorical", "none"), positions);
 	}
 

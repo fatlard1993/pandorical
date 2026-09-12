@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** The server's record of every picture shown, and who is sent what as tracking comes and goes. */
 public final class PictureRegistry implements PictureApi {
     public static final PictureRegistry INSTANCE = new PictureRegistry();
 
@@ -26,7 +25,7 @@ public final class PictureRegistry implements PictureApi {
 
     private PictureRegistry() {}
 
-    /** Called once from Pandorical's initializer, on both sides, before any player connects. */
+    /** Once on each side, before any player connects: it registers the payload type. */
     public static void register() {
         PayloadTypeRegistry.clientboundPlay().register(PicturesS2C.TYPE, PicturesS2C.STREAM_CODEC);
         EntityTrackingEvents.START_TRACKING.register((entity, player) -> INSTANCE.sendTo(entity, player));
@@ -34,7 +33,6 @@ public final class PictureRegistry implements PictureApi {
             if (INSTANCE.shown.containsKey(entity.getUUID())) send(player, PicturesS2C.clear(entity.getId()));
         });
         ServerEntityEvents.ENTITY_UNLOAD.register((entity, level) -> INSTANCE.shown.remove(entity.getUUID()));
-        // Tracking can begin before a joining client has said what it understands; say it again once it has
         PandoricalApi.onPlayerReady(player -> {
             for (Shown picture : INSTANCE.shown.values()) {
                 if (PlayerLookup.tracking(picture.anchor()).contains(player)) INSTANCE.sendTo(picture.anchor(), player);

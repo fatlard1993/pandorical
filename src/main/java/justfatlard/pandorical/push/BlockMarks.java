@@ -14,7 +14,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 
-/** Marks by level, pushed as they change and whole to whoever arrives. */
 public final class BlockMarks implements BlockMarkApi {
 	public static final BlockMarks INSTANCE = new BlockMarks();
 
@@ -47,12 +46,11 @@ public final class BlockMarks implements BlockMarkApi {
 		return at != null && at.contains(mark);
 	}
 
-	/** @hidden A stopped server's marks belong to its world; the next world starts with none. */
+	/** @hidden */
 	public void clear() {
 		marks.clear();
 	}
 
-	/** Everything marked in the player's level, for someone who has just arrived in it. */
 	public void sendAll(ServerPlayer player) {
 		Map<Long, Set<String>> inLevel = marks.get(player.level().dimension());
 		if (inLevel == null || inLevel.isEmpty()) return;

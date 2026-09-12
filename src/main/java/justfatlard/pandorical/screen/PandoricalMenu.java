@@ -18,15 +18,7 @@ import java.util.function.IntSupplier;
 import justfatlard.pandorical.Pandorical;
 import net.minecraft.world.inventory.ContainerInput;
 
-/**
- * Dynamic container menu for Pandorical screens.
- *
- * Two construction paths:
- * - Client: PandoricalMenu(int, Inventory) via MenuType factory: creates max slots, screen def set later
- * - Server: PandoricalMenu(MenuType, int, Inventory, Container, readOnlySlots, screenDef)
- */
 public class PandoricalMenu extends AbstractContainerMenu {
-    // Max slots we'll ever need (9x6 mod slots + 36 player inv)
     private static final int MAX_MOD_SLOTS = 54;
 
     private OpenScreenS2C screenDef;
@@ -35,33 +27,17 @@ public class PandoricalMenu extends AbstractContainerMenu {
     private Runnable slotChangeCallback;
     private Runnable removedCallback;
 
-    /**
-     * How many mod slots the menu about to be built will have.
-     *
-     * <p>Answered on the client by the screen definition, which is always sent immediately
-     * before the menu is opened. Left alone on the server, where the count is passed in
-     * directly. A negative answer means nobody knows, and the constructor falls back.
-     */
+    /** Client only: the slot count of the definition sent just before the menu; negative if unknown. */
     private static IntSupplier incomingModSlots = () -> -1;
 
-    /** Installed once by the client, which is the only side that can see the pending definition. */
     public static void setIncomingModSlots(IntSupplier supplier) {
         incomingModSlots = supplier == null ? () -> -1 : supplier;
     }
 
     /**
-     * Client constructor, called by the MenuType factory.
-     *
-     * <p>The slot count has to match the server's exactly. Vanilla addresses slots by index
-     * and nothing reconciles the two lists: with a different number of mod slots here, every
-     * index the server sends lands on the wrong slot, and since the player inventory slots on
-     * this side are backed by the real {@link Inventory}, the contents of the server's slots
-     * get written straight into it. That is not a display fault - opening a container with a
-     * mismatched count rearranges the player's own inventory.
-     *
-     * <p>So the count comes from the screen definition, which openContainer sends before it
-     * opens the menu. Only when there is no definition to read does this fall back to the
-     * old fixed maximum.
+     * Client side. The slot count must match the server's exactly: slots are addressed by index,
+     * and the player slots here are backed by the real {@link Inventory}, so a mismatch writes the
+     * server's slots into the player's own inventory.
      */
     public PandoricalMenu(int syncId, Inventory playerInventory) {
         super(Pandorical.MENU_TYPE, syncId);
@@ -75,7 +51,6 @@ public class PandoricalMenu extends AbstractContainerMenu {
             this.addSlot(new PandoricalSlot(modContainer, i, -1000, -1000, true));
         }
 
-        // Player inventory
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 this.addSlot(new Slot(playerInventory, 9 + row * 9 + col, -1000, -1000));
@@ -86,7 +61,6 @@ public class PandoricalMenu extends AbstractContainerMenu {
         }
     }
 
-    /** Whether this menu told its container it was opened, so it knows to say when it closes. */
     private boolean ranContainerLifecycle = false;
 
     public PandoricalMenu(MenuType<?> menuType, int syncId, Inventory playerInventory,
@@ -96,19 +70,9 @@ public class PandoricalMenu extends AbstractContainerMenu {
         this.modContainer = serverContainer;
         this.readOnlySlots = readOnlySlots != null ? readOnlySlots : Set.of();
 
-        // A container a mod built is entitled to know it has been opened.
-        //
-        // Containers rely on this: loot-ender notices a copy came back empty here, and it is
-        // where a mod gets to draw a conclusion about what is left. Wrapping somebody's
-        // Container without running its lifecycle skipped all of it, so a loot chest emptied
-        // through one of these screens was never marked spent and its clasp stayed bright.
-        //
-        // Never where the container is a block's own, though. A chest's opener count is
-        // vanilla's, and vanilla keeps it honest by periodically recounting the players it can
-        // see holding that container open - through menus it recognises, which this is not.
-        // Telling it we opened a chest it then cannot find an opener for leaves the count
-        // fighting itself, and the lid ends up showing the opposite of the truth. Whatever owns
-        // the block owns its lid.
+        // A mod's container is told it was opened and closed; a block's own is not. Vanilla
+        // recounts a chest's openers through menus it recognises, which this is not, and the lid
+        // count would fight itself.
         if (playerInventory.player instanceof ServerPlayer opener
                 && serverContainer != null && !ownsItsOwnLid(serverContainer)) {
             serverContainer.startOpen(opener);
@@ -118,7 +82,6 @@ public class PandoricalMenu extends AbstractContainerMenu {
         int slotCount = screenDef.container().map(c -> c.slotCount()).orElse(0);
         boolean includePlayerInv = screenDef.container().map(c -> c.includePlayerInventory()).orElse(false);
 
-        // Mod slots backed by the server container
         for (int i = 0; i < slotCount; i++) {
             boolean editable = !this.readOnlySlots.contains(i);
             this.addSlot(new PandoricalSlot(modContainer, i, -1000, -1000, editable));
@@ -136,9 +99,6 @@ public class PandoricalMenu extends AbstractContainerMenu {
         }
     }
 
-    /**
-     * Set screen definition on client side. Called after the pending def is received.
-     */
     public void setScreenDef(OpenScreenS2C screenDef) {
         this.screenDef = screenDef;
     }
@@ -174,11 +134,8 @@ public class PandoricalMenu extends AbstractContainerMenu {
         return original;
     }
 
-    // Shift-click from inventory into the mod container. Vanilla's moveItemStackTo only
-    // consults Slot#mayPlace on its empty-slot pass, not its stack-merge pass, so a single
-    // moveItemStackTo(stack, 0, modSlotCount) would let a merge top off an existing stack in a
-    // read-only slot. Move only across the editable sub-ranges so read-only slots are never a
-    // merge or place target.
+    // Vanilla's moveItemStackTo consults Slot#mayPlace only on its empty-slot pass, not its merge
+    // pass, so moving across the whole range would top off stacks in read-only slots.
     private boolean moveIntoEditableModSlots(ItemStack stack, int modSlotCount) {
         boolean moved = false;
         int i = 0;
@@ -200,15 +157,7 @@ public class PandoricalMenu extends AbstractContainerMenu {
         if (slotChangeCallback != null) slotChangeCallback.run();
     }
 
-    /**
-     * Whether this container belongs to a block that is already keeping its own open state.
-     *
-     * <p>Testing for a {@link BlockEntity} alone is the single-chest half of the question. A
-     * DOUBLE chest is handed over as a {@link CompoundContainer} wrapping the two halves, which is
-     * not a block entity and sailed straight past that test into vanilla's opener count - so
-     * double chests opened through a Pandorical screen had their lids driven by a count vanilla
-     * could not see an opener for, and left them standing open.
-     */
+    /** A double chest arrives as a {@link CompoundContainer}, which is not a block entity. */
     private static boolean ownsItsOwnLid(Container container) {
         return container instanceof BlockEntity || container instanceof CompoundContainer;
     }
@@ -222,7 +171,6 @@ public class PandoricalMenu extends AbstractContainerMenu {
     public void removed(Player player) {
         super.removed(player);
 
-        // The other half, and only where we ran the first half.
         if (this.ranContainerLifecycle && player instanceof ServerPlayer closer) {
             modContainer.stopOpen(closer);
         }
@@ -243,24 +191,11 @@ public class PandoricalMenu extends AbstractContainerMenu {
     }
 
     /**
-     * The client's copy of the mod's slots, which keeps whatever the server put in them.
-     *
-     * <p>{@code SimpleContainer.setItem} ends with {@code stack.limitSize(getMaxStackSize(stack))},
-     * and on a client the answer to that is sixty-four: the mod that lifts stack limits runs on
-     * the server only, so the client has vanilla's numbers. Every oversized stack the server sent
-     * was therefore trimmed the moment it arrived, and a slot holding a hundred and ten of
-     * something drew as sixty-four while the screen's own text, computed server-side, correctly
-     * said a hundred and ten.
-     *
-     * <p>Nothing is decided here - the server owns what is in its container - so the honest thing
-     * for this side to do is carry the number across unaltered rather than second-guess it with a
-     * limit it is not the authority on.
+     * {@code SimpleContainer.setItem} trims a stack to {@code getMaxStackSize}, and a client has
+     * vanilla's limits even where the server lifts them, so this keeps the server's count as sent.
      */
     private static class KeepsWhatItIsGiven extends SimpleContainer {
-        /**
-         * Not {@link Integer#MAX_VALUE}: vanilla multiplies a stack limit by a hundred in places
-         * and that overflows into a negative. A hundredth of it is still past any real stack.
-         */
+        /** Not {@link Integer#MAX_VALUE}: vanilla multiplies a stack limit by a hundred in places. */
         private static final int NO_LIMIT = Integer.MAX_VALUE / 100;
 
         KeepsWhatItIsGiven(int size) {
@@ -286,14 +221,6 @@ public class PandoricalMenu extends AbstractContainerMenu {
             this.editable = editable;
         }
 
-        /**
-         * Read-only slots refuse everything; the rest ask the container.
-         *
-         * <p>Vanilla's own slot delegates to {@code canPlaceItem} and this one did not, so a mod
-         * handing over a Container had no way to refuse an item short of taking it back
-         * afterwards. Anything that wants to be picky - a builder's table that only accepts what
-         * the next build needs - can just say so now, the way it would to any other menu.
-         */
         @Override
         public boolean mayPlace(ItemStack stack) {
             return editable && this.container.canPlaceItem(this.getContainerSlot(), stack);

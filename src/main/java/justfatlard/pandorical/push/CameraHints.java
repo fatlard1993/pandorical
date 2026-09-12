@@ -8,7 +8,6 @@ import justfatlard.pandorical.protocol.CameraHintS2C;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
 
-/** Camera distance, perspective and zoom, sent to one player at a time and kept nowhere. */
 public final class CameraHints implements CameraApi {
 	public static final CameraHints INSTANCE = new CameraHints();
 
