@@ -42,6 +42,7 @@ public record StatePropertySpec(String name, String type, int valueCount, int in
                     names.add((String) getNameMethod.invoke(prop, v));
                 }
             } catch (Exception ex) {
+                names = new StringJoiner(",");
                 for (var v : prop.getPossibleValues()) {
                     names.add(v.toString().toLowerCase(Locale.ROOT));
                 }
