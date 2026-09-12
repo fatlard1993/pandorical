@@ -67,6 +67,13 @@ public interface PandoricalComponent {
      */
     default void removed() {}
 
+    /**
+     * The component this one replaces when its screen is rebuilt for a resize, already told it has
+     * gone. Props are replayed without this; it is for what a component keeps that the server
+     * never sent, such as strokes painted ahead of the server. Nothing by default.
+     */
+    default void inherit(PandoricalComponent previous) {}
+
     // Component bounds for hit testing
     int getX();
     int getY();

@@ -238,6 +238,11 @@ screens.update(player, screenId, List.of(
 ));
 ```
 
+A window resize rebuilds the screen from its definitions with every update since the open
+replayed over them, so a swapped-in control stays swapped in. What a component keeps that
+no prop holds - the text typed into a field, strokes painted ahead of the server - is handed
+from the old component to its replacement through `PandoricalComponent#inherit`.
+
 ### Handlers
 
 All key on screen type, all registered once at init.

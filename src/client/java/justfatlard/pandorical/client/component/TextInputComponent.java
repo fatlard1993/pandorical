@@ -127,4 +127,13 @@ public class TextInputComponent extends AbstractComponent {
     public String getValue() {
         return editBox != null ? editBox.getValue() : "";
     }
+
+    /** What was typed, and whether it was being typed into: the server only ever hears the text. */
+    @Override
+    public void inherit(PandoricalComponent previous) {
+        TextInputComponent old = (TextInputComponent) previous;
+        if (editBox == null || old.editBox == null) return;
+        editBox.setValue(old.editBox.getValue());
+        editBox.setFocused(old.editBox.isFocused());
+    }
 }

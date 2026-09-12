@@ -31,6 +31,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     private final OpenScreenS2C screenDef;
     private final List<PandoricalComponent> components = new ArrayList<>();
     private final Map<String, PandoricalComponent> componentIndex = new HashMap<>();
+    private final UpdateMemory updateMemory = new UpdateMemory();
 
     /** Chat without leaving the screen; see {@link ScreenChatBar} for the ordering contract. */
     private final ScreenChatBar chatBar = new ScreenChatBar();
@@ -56,6 +57,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     protected void init() {
         super.init();
         components.forEach(ScreenHelper::removedTree);
+        Map<String, PandoricalComponent> previous = new HashMap<>(componentIndex);
         components.clear();
         componentIndex.clear();
 
@@ -74,6 +76,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
             PandoricalComponent component = ScreenHelper.buildComponent(def, context, this.leftPos, this.topPos, componentIndex);
             components.add(component);
         }
+        updateMemory.restore(componentIndex, previous);
     }
 
     @Override
@@ -226,6 +229,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     }
 
     public void applyUpdates(List<ComponentUpdate> updates) {
+        updateMemory.record(updates);
         ScreenHelper.applyUpdates(updates, componentIndex);
     }
 
