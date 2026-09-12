@@ -20,8 +20,6 @@ import java.util.function.Consumer;
 public interface PlayerInventoryApi {
 
     /**
-     * Describes a single extra inventory slot contributed by a namespace.
-     *
      * @param slotIndex        unique index within this namespace's slot group (0-based)
      * @param screenX          x pixel position on the vanilla inventory screen (176x166 coordinate space)
      * @param screenY          y pixel position on the vanilla inventory screen
