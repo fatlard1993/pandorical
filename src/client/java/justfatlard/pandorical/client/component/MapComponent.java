@@ -57,7 +57,10 @@ public class MapComponent extends AbstractComponent {
     private byte compassDecX = 0;
     private byte compassDecY = 0;
     // Mob Sight enchantment: serialized mob dot list from server
-    private String mobsData = "";
+    /** One mob dot as the server placed it: decoration coordinates, colour, and whether it is a person. */
+    private record Dot(int decX, int decZ, int color, boolean person) {}
+
+    private List<Dot> dots = List.of();
     /** How the map is shown, as the server says for this player: nothing here is the client's own choice. */
     private float zoom = 1.0f;
     private boolean showCoords = true;
@@ -89,7 +92,7 @@ public class MapComponent extends AbstractComponent {
         selfDecY = parseByte("self_dec_y");
         compassDecX = parseByte("compass_dec_x");
         compassDecY = parseByte("compass_dec_y");
-        mobsData = props.getOrDefault("mobs", "");
+        dots = parseDots(props.getOrDefault("mobs", ""));
         needleTexture = Identifier.tryParse(props.getOrDefault("needle", ""));
         compassOffMap = parseBool("compass_off_map", false);
         zoom = parseFloat("zoom", 1.0f);
@@ -101,6 +104,22 @@ public class MapComponent extends AbstractComponent {
     /**
      * Parse a world coordinate prop. Returns NaN if the prop is absent or empty (no target).
      */
+    /** {@code decX,decZ,colorARGB,entityTypeId} entries, semicolon-separated; the type id may itself hold a colon. */
+    private static List<Dot> parseDots(String raw) {
+        if (raw.isEmpty()) return List.of();
+        List<Dot> out = new ArrayList<>();
+        for (String entry : raw.split(";")) {
+            String[] parts = entry.split(",", 4);
+            if (parts.length < 3) continue;
+            try {
+                out.add(new Dot(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]),
+                    parts.length > 3 && parts[3].equals("minecraft:player")));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return out;
+    }
+
     private double parseCoord(String key) {
         String val = props.get(key);
         if (val == null || val.isEmpty()) return Double.NaN;
@@ -187,35 +206,21 @@ public class MapComponent extends AbstractComponent {
         pose.popMatrix();
 
         // --- Mob Sight: mob dots render first so the player marker lands on top ---
-        if (!mobsData.isEmpty()) {
-            String[] entries = mobsData.split(";");
-            for (String entry : entries) {
-                // Format: decX,decZ,colorARGB,entityTypeId
-                // Split on first 3 commas only so entityTypeId (which may contain ':') is kept intact
-                String[] parts = entry.split(",", 4);
-                if (parts.length < 3) continue;
-                try {
-                    int decX = Integer.parseInt(parts[0]);
-                    int decZ = Integer.parseInt(parts[1]);
-                    int color = Integer.parseInt(parts[2]);
-                    boolean person = parts.length > 3 && parts[3].equals("minecraft:player");
+        for (Dot dot : dots) {
+            // Category filters, by the colour the server gave the dot. A person's colour
+            // is their locator bar colour and can be anything, so it is never filtered.
+            if (!dot.person() && !showHostile && dot.color() == 0xFFFF3333) continue;
+            if (!dot.person() && !showPassive && (dot.color() == 0xFF33FF33 || dot.color() == 0xFFFFAA00)) continue;
 
-                    // Category filters, by the colour the server gave the dot. A person's colour
-                    // is their locator bar colour and can be anything, so it is never filtered.
-                    if (!person && !showHostile && color == 0xFFFF3333) continue;
-                    if (!person && !showPassive && (color == 0xFF33FF33 || color == 0xFFFFAA00)) continue;
-
-                    if (Math.abs(decX - clampedSelfDecX) <= 1 && Math.abs(decZ - clampedSelfDecY) <= 1) continue;
-                    int sx = Math.round(originX + (decX / 2.0f + 64f) * zoomScale);
-                    int sy = Math.round(originY + (decZ / 2.0f + 64f) * zoomScale);
-                    if (sx < mapX || sx >= mapX + mapSize || sy < mapY || sy >= mapY + mapSize) continue;
-                    if (person) {
-                        diamond(graphics, sx, sy, color);
-                    } else {
-                        // 2x2 dot; small enough not to obscure map detail
-                        graphics.fill(sx, sy, sx + 2, sy + 2, color);
-                    }
-                } catch (NumberFormatException ignored) {}
+            if (Math.abs(dot.decX() - clampedSelfDecX) <= 1 && Math.abs(dot.decZ() - clampedSelfDecY) <= 1) continue;
+            int sx = Math.round(originX + (dot.decX() / 2.0f + 64f) * zoomScale);
+            int sy = Math.round(originY + (dot.decZ() / 2.0f + 64f) * zoomScale);
+            if (sx < mapX || sx >= mapX + mapSize || sy < mapY || sy >= mapY + mapSize) continue;
+            if (dot.person()) {
+                diamond(graphics, sx, sy, dot.color());
+            } else {
+                // 2x2 dot; small enough not to obscure map detail
+                graphics.fill(sx, sy, sx + 2, sy + 2, dot.color());
             }
         }
 
