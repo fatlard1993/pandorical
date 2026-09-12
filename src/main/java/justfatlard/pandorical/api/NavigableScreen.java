@@ -3,40 +3,19 @@ package justfatlard.pandorical.api;
 import java.util.List;
 
 /**
- * A screen that can say where its interactive parts are, so something other
- * than a mouse can reach them.
- *
- * <p>Vanilla screens are already discoverable this way: container screens
- * expose their slots through the menu, and widget screens expose theirs
- * through {@code Screen.children()}. Pandorical screens are not, because
- * their components are a private list built from server-sent
- * {@link justfatlard.pandorical.protocol.ComponentDef}s and are deliberately
- * not vanilla widgets. Without this, a gamepad or any other directional
- * navigator sees a Pandorical screen as empty and simply cannot press
- * anything on it.
- *
- * <p>Regions are geometry only, with no activate hook, and that is the point:
- * a navigator moves the pointer onto the region and clicks it through the
- * screen's ordinary mouse path. One mechanism drives vanilla slots, vanilla
- * widgets, and these alike, and none of them need to know a gamepad exists.
+ * A screen that says where its interactive parts are, so a gamepad or other directional navigator
+ * can reach components that are not vanilla widgets. Regions are geometry only: a navigator moves
+ * the pointer onto one and clicks through the screen's ordinary mouse path.
  */
 public interface NavigableScreen {
 	/**
-	 * Every region a navigator may land on, in screen coordinates, in no
-	 * particular order — callers pick by direction, not by index.
-	 *
-	 * <p>Called fresh on each navigation step rather than cached, since
-	 * component geometry is mutable: the server can move or resize a
-	 * component at any time, and {@code AbstractComponent} interpolates
-	 * position over several ticks after it does.
+	 * Every region a navigator may land on, in screen coordinates, in no particular order. Ask
+	 * again on each step rather than caching: components move whenever the server says, and
+	 * interpolate for several ticks after.
 	 */
 	List<NavRegion> navRegions();
 
-	/**
-	 * One landable region. {@code id} is the component id it came from, kept
-	 * for debugging and for navigators that want to remember where they were
-	 * across a screen update.
-	 */
+	/** {@code id} is the id of the component the region came from. */
 	record NavRegion(String id, int x, int y, int width, int height) {
 		public int centerX() {
 			return x + width / 2;

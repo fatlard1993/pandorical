@@ -14,96 +14,59 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 public interface ScreenApi {
-    /**
-     * Key injected into the data map passed to
-     * {@link #onActionFallback} handlers so they can identify which component
-     * triggered the action. The value is the component's ID string.
-     */
     String FALLBACK_COMPONENT_ID_KEY = "_componentId";
     /**
-     * Open a non-container declarative screen for the player.
+     * For a screen without slots; one built with {@link ScreenBuilder#container} needs
+     * {@link #openContainer}.
      */
     void open(ServerPlayer player, OpenScreenS2C screen);
 
     /**
-     * Open a container screen with slot management.
-     * Creates a PandoricalMenu with the specified slots, opens via player.openMenu(),
-     * and sends the component layout via OpenScreenS2C.
-     *
-     * @param player the player to open the screen for
-     * @param screen the screen definition (must have container() present)
      * @param serverContainer the server-side container backing the mod slots
-     * @param readOnlySlots slot indices that the player cannot modify (e.g., "their offer")
+     * @param readOnlySlots slot indices that the player cannot modify
      */
     void openContainer(ServerPlayer player, OpenScreenS2C screen,
                        Container serverContainer, Set<Integer> readOnlySlots);
 
     /**
-     * Send partial property updates to a live screen.
+     * Only the listed props change.
      *
      * <p><b>The id, not the screen type.</b> {@link ScreenBuilder} mints a fresh id for every
-     * opening and the client matches on it, so the type constant a mod keeps as a field is the
-     * wrong argument here and the update goes nowhere. Hold on to {@code screenBuilder.screenId()}
-     * when the screen is opened and pass that back. Getting it wrong is logged rather than
-     * dropped in silence, but the compiler cannot tell the two strings apart.
+     * opening and the client matches on it: keep {@code screenBuilder.screenId()} from the
+     * opening and pass that. A type here is logged and the update goes nowhere.
      */
     void update(ServerPlayer player, String screenId, List<ComponentUpdate> updates);
 
-    /**
-     * Close a screen by ID.
-     */
     void close(ServerPlayer player, String screenId);
 
-    /**
-     * Register a handler for screen actions.
-     * Matched by screenType + componentId from ScreenActionC2S.
-     */
     void onAction(String screenType, String componentId, BiConsumer<ServerPlayer, Map<String, String>> handler);
 
-    /**
-     * Register a handler for screen close events.
-     */
     void onClose(String screenType, Consumer<ServerPlayer> handler);
 
     /**
-     * Register a catch-all handler for actions with dynamic component IDs.
-     * Called when no specific componentId handler matches.
-     * The componentId is passed in the data map as "_componentId".
+     * Called when no {@link #onAction} handler matches the component; the component id is in the
+     * data under {@link #FALLBACK_COMPONENT_ID_KEY}.
      */
     void onActionFallback(String screenType, BiConsumer<ServerPlayer, Map<String, String>> handler);
 
-    /**
-     * Register a handler for when a container slot changes.
-     * Called after any slot click in a Pandorical container screen.
-     */
+    /** Called after any slot click in a Pandorical container screen. */
     void onSlotChange(String screenType, SlotChangeHandler handler);
 
     /**
-     * Register a handler for a recipe book asking this station to lay a recipe out in its grid.
+     * A recipe book asks this station to lay a recipe out in its grid; the handler places the
+     * ingredients itself. Vanilla answers {@code ServerboundPlaceRecipePacket} only for a
+     * {@code RecipeBookMenu}, which a Pandorical menu is not.
      *
-     * <p>Vanilla's own route cannot serve these screens. {@code ServerboundPlaceRecipePacket} is
-     * answered only for a {@code RecipeBookMenu}, and a Pandorical menu is not one - so a book
-     * opened on a station could show a recipe and never fill it, which is exactly how it behaved
-     * before this existed. The station owns its container and its recipe type, so the station is
-     * what places the ingredients; this is only the doorbell.
-     *
-     * <p>Reaches the server as an ordinary screen action on the reserved component id
-     * {@link #PLACE_RECIPE_COMPONENT}, so no packet is anybody's own.
+     * <p>Arrives as a screen action on {@link #PLACE_RECIPE_COMPONENT}.
      */
     void onPlaceRecipe(String screenType, PlaceRecipeHandler handler);
 
     /**
-     * The reserved component id a client-side recipe book sends to ask for a recipe to be laid
-     * out, carrying {@link #PLACE_RECIPE_DATA_RECIPE} and {@link #PLACE_RECIPE_DATA_ALL}.
+     * Reserved component id; its data carries {@link #PLACE_RECIPE_DATA_RECIPE} and
+     * {@link #PLACE_RECIPE_DATA_ALL}.
      */
     String PLACE_RECIPE_COMPONENT = "_place_recipe";
-    /**
-     * The recipe's display index, as a decimal string.
-     *
-     * <p>A display id and not a registry name, because a display id is the only handle a client
-     * has: recipes reach it through the display sync, keyed by an index the server assigned.
-     * Pandorical turns it back into the recipe before the station ever sees it.
-     */
+    /** The recipe's display index, as a decimal string. */
     String PLACE_RECIPE_DATA_RECIPE = "recipe";
     /** "true" to fill the grid as far as the ingredients allow, "false" for a single craft. */
     String PLACE_RECIPE_DATA_ALL = "all";
@@ -118,10 +81,7 @@ public interface ScreenApi {
         void placeRecipe(ServerPlayer player, RecipeHolder<?> recipe, boolean useMaxItems);
     }
 
-    /**
-     * Register a handler for container menu removal (player closes screen, disconnects, etc).
-     * Use this to return items to the player.
-     */
+    /** When the container menu goes, by close or disconnect: return items to the player here. */
     void onContainerRemoved(String screenType, Consumer<ServerPlayer> handler);
 
     @FunctionalInterface

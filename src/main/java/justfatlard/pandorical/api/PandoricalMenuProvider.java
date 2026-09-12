@@ -11,10 +11,6 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 
 import java.util.Set;
 
-/**
- * MenuProvider that creates a PandoricalMenu with server-side container backing.
- * Used by PandoricalApi.screens().openContainer().
- */
 public class PandoricalMenuProvider implements MenuProvider {
     private final OpenScreenS2C screenDef;
     private final Container serverContainer;

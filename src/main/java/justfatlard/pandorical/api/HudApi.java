@@ -8,49 +8,25 @@ import java.util.List;
 import java.util.Collection;
 
 public interface HudApi {
-    /**
-     * Show a HUD overlay for a player.
-     * This is a no-op if the player lacks the {@code "hud"} capability (i.e. their client
-     * does not support HUD rendering). The {@code overlay} id must match the id used in
-     * subsequent {@link #update} and {@link #hide} calls. Use {@link HudBuilder} to construct
-     * the {@link ShowHudS2C} payload.
-     */
+    /** No-op without the {@code "hud"} capability. Build the overlay with {@link HudBuilder}. */
     void show(ServerPlayer player, ShowHudS2C overlay);
 
     /**
-     * Send delta updates to a live HUD overlay.
-     * Only the component entries present in {@code updates} are changed; all other components
-     * in the overlay retain their current state (partial update, not a full replace).
-     * The {@code overlayId} must match the id used in the corresponding {@link #show} call.
-     *
-     * <p>Geometry (position/size) and, on sprite/text, scale/rotation can be pushed the same way
-     * as any other prop; see {@link ComponentType#PROP_X}/{@code PROP_Y}/{@code PROP_WIDTH}/
-     * {@code PROP_HEIGHT}/{@code PROP_SCALE}/{@code PROP_ROTATION}, or build the update with
-     * {@link ComponentUpdateBuilder} for convenience. The client smoothly interpolates towards
-     * each new value rather than snapping; no special handling needed on the server side beyond
-     * calling this as often as the value changes (server-tick-rate calls, e.g. once/tick, render
-     * smoothly).
+     * Only the listed components and props change. Geometry, scale and rotation interpolate on the client, so
+     * pushing them once a tick draws smoothly.
      */
     void update(ServerPlayer player, String overlayId, List<ComponentUpdate> updates);
 
-    /**
-     * Hide a HUD overlay for a player.
-     * Instructs the client to stop rendering the overlay. Does not remove any server-side
-     * state associated with the overlay; call {@link #show} again to restore it.
-     */
+    /** To bring it back, {@link #show} it again. */
     void hide(ServerPlayer player, String overlayId);
 
     /**
-     * Ask this player's client to stop drawing the given vanilla HUD elements (see
-     * {@link VanillaHudElement}), so a Pandorical overlay can stand in for one. Replaces
-     * whatever {@code ownerId} previously asked for; other mods' requests are unaffected,
-     * and an element stays hidden while any owner still wants it hidden.
+     * Ask this player's client to stop drawing these {@link VanillaHudElement}s. Replaces what
+     * {@code ownerId} asked for before; an element stays hidden while any owner wants it hidden.
      *
      * <p>No-op without the {@code "hud_elements"} capability: those clients keep drawing
-     * vanilla's version, so a replacement overlay must still be legible over it, or the
-     * mod should skip pushing the overlay to them. Suppression is per connection and is
-     * not restored automatically after a rejoin: re-request it when the player rejoins,
-     * exactly like entity overlays.
+     * vanilla's version, so a replacement overlay must be legible over it or not be sent. Lasts
+     * one connection: ask again each session.
      */
     void hideVanillaElements(ServerPlayer player, String ownerId, Collection<String> elementIds);
 

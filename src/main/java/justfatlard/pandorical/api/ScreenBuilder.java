@@ -10,10 +10,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Fluent builder for constructing OpenScreenS2C payloads.
- * Server mods use this to describe screens declaratively.
- */
 public class ScreenBuilder {
     private final String screenType;
     private String screenId;
@@ -24,7 +20,6 @@ public class ScreenBuilder {
     private final List<ComponentDef> components = new ArrayList<>();
     private ContainerDef containerDef = null;
 
-    /** Set when this screen is a crafting station; see {@link #recipeStation(String)}. */
     private String recipeStation = null;
 
     public ScreenBuilder(String screenType) {
@@ -53,27 +48,14 @@ public class ScreenBuilder {
         return this;
     }
 
-    /**
-     * Mark this screen as a container screen with item slots.
-     * Must use openContainer() instead of open() when this is set.
-     */
     public ScreenBuilder container(int slotCount, boolean includePlayerInventory) {
         this.containerDef = new ContainerDef(slotCount, includePlayerInventory);
         return this;
     }
 
     /**
-     * Declare this screen a crafting station, so a recipe book can speak for it.
-     *
-     * <p>A Pandorical screen cannot carry the vanilla recipe book - that is bolted to
-     * {@code RecipeBookMenu} and this is not one - so instead it says which recipe book category
-     * it works from and leaves the showing to the client. A mod that replaces the book can put
-     * one on this screen; a client with nothing listening shows nothing and loses only the
-     * browsing.
-     *
-     * <p>Without this the only way to browse a custom station's recipes was to draw a browser
-     * into the screen by hand, which is how fletch-craft ended up with a grid of buttons labelled
-     * with the first two letters of each result.
+     * Declare this screen a crafting station, so a client-side recipe book can be shown on it.
+     * A client with no such book shows nothing. See {@link ScreenApi#onPlaceRecipe}.
      *
      * @param categoryId a registered {@code RecipeBookCategory} id, e.g. {@code fletch_craft:fletching}
      */
@@ -92,10 +74,6 @@ public class ScreenBuilder {
         return this;
     }
 
-    // Convenience methods for common components
-    // See ComponentType for valid prop keys per component type.
-
-    /** Add a panel component. Props: background, border, border_light/dark/mid_light/mid_dark, border_color */
     public ScreenBuilder panel(String id, int x, int y, int w, int h, Map<String, String> props) {
         this.components.add(new ComponentBuilder(id, ComponentType.PANEL)
             .bounds(x, y, w, h).props(props).build());
@@ -103,14 +81,9 @@ public class ScreenBuilder {
     }
 
     /**
-     * Add a scroll panel with child components. Children use panel-relative
-     * coordinates; the client scissor-clips them to the panel's bounds and
-     * scrolls them entirely client-side (mouse wheel), so the server lays
-     * children out once at their unscrolled positions and never repositions
-     * them. The client also reports "scroll_offset" as an action on this
-     * component id, for servers that care. The scrollbar only appears when
-     * total_items exceeds visible_items. Props: scroll_offset, item_height,
-     * visible_items, total_items, show_scrollbar, background.
+     * Children use panel-relative coordinates and are laid out once, unscrolled: the client clips
+     * and scrolls them itself, and reports {@code scroll_offset} as an action on this component
+     * id. The scrollbar appears only when total_items exceeds visible_items.
      */
     public ScreenBuilder scrollPanel(String id, int x, int y, int w, int h,
             Map<String, String> props, List<ComponentDef> children) {
@@ -123,14 +96,12 @@ public class ScreenBuilder {
         return this;
     }
 
-    /** Add a button component. Props: label, label_key, enabled, style ("default" or "accepted") */
     public ScreenBuilder button(String id, int x, int y, int w, int h, Map<String, String> props) {
         this.components.add(new ComponentBuilder(id, ComponentType.BUTTON)
             .bounds(x, y, w, h).props(props).build());
         return this;
     }
 
-    /** Add a text component with simple text. Props: text, text_key, color, shadow, wrap_width, max_lines */
     public ScreenBuilder text(String id, int x, int y, String text) {
         this.components.add(new ComponentBuilder(id, ComponentType.TEXT)
             .pos(x, y).prop("text", text).build());
@@ -143,19 +114,11 @@ public class ScreenBuilder {
         return this;
     }
 
-    /** Add an inventory grid. */
     public ScreenBuilder inventoryGrid(String id, int x, int y, int rows, int cols, int startSlot) {
         return inventoryGrid(id, x, y, rows, cols, startSlot, Map.of());
     }
 
-    /**
-     * Add an inventory grid, with extra props: {@code locked_above},
-     * {@link ComponentType#PROP_SLOT_STYLE}.
-     *
-     * <p>Those two were documented on this builder before there was any way to pass them, so a
-     * grid could only ever be the default. The grid's own shape (rows, columns, first slot) is
-     * applied after {@code props} and cannot be overridden from it.
-     */
+    /** Rows, columns and first slot are applied after {@code props} and win over them. */
     public ScreenBuilder inventoryGrid(String id, int x, int y, int rows, int cols, int startSlot,
             Map<String, String> props) {
         this.components.add(new ComponentBuilder(id, ComponentType.INVENTORY_GRID)
@@ -168,7 +131,7 @@ public class ScreenBuilder {
         return this;
     }
 
-    /** Add an item icon. itemId is a registry path e.g. "minecraft:red_shrub". count > 1 shows stack overlay. */
+    /** @param count shown on the icon when above 1 */
     public ScreenBuilder itemIcon(String id, int x, int y, String itemId, int count) {
         this.components.add(new ComponentBuilder(id, ComponentType.ITEM_ICON)
             .bounds(x, y, 16, 16)
@@ -178,7 +141,6 @@ public class ScreenBuilder {
         return this;
     }
 
-    /** Add a sprite (colored rectangle). Props: color */
     public ScreenBuilder sprite(String id, int x, int y, int w, int h, Map<String, String> props) {
         this.components.add(new ComponentBuilder(id, ComponentType.SPRITE)
             .bounds(x, y, w, h).props(props).build());
