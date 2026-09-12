@@ -18,6 +18,8 @@ import java.util.function.IntConsumer;
  *
  * <p>Cells are palette indices, one byte each, read unsigned: a palette can have up to 256
  * colours. Row-major from the top left.
+ *
+ * <p>New in 1.3.9 and shaped around one user so far; it may still change shape.
  */
 public final class PixelCanvas {
     private PixelCanvas() {}

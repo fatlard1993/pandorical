@@ -17,6 +17,8 @@ import net.minecraft.world.entity.Entity;
  * <p>State is kept in memory by the anchor's UUID and dropped when the anchor unloads. It does
  * not persist: a mod whose picture should outlive a reload keeps its own cells and calls
  * {@link #show} again when its anchor loads.
+ *
+ * <p>New in 1.3.9 and shaped around one user so far; it may still change shape.
  */
 public interface PictureApi {
     /** Show a picture on an entity, replacing any it had. */
