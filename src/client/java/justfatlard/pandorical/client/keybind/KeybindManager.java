@@ -30,33 +30,24 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.input.KeyEvent;
 
 /**
- * The client half of the pooled keybind capability: a fixed pool of real,
- * rebindable KeyMappings registered at normal client startup (the only time
- * the options system accepts them), whose meaning is assigned per server.
- *
- * <p>Slot 1 defaults to G and slot 2 to B, the rest start unbound; all live under the
- * "Pandorical" controls category with shipped default names ("Pandorical
- * Action N") that a server's synced lang overrides for its claimed slots.
- * Presses are only forwarded for slots the current server declared, so
- * unclaimed keys are inert.
+ * A fixed pool of rebindable KeyMappings, registered at client startup (the only time the options
+ * system accepts them) and given meaning per server. Only slots the server claimed are forwarded.
  */
 @Environment(EnvType.CLIENT)
 public final class KeybindManager {
 	private KeybindManager() {}
 
 	private static final int MAX_SLOTS = KeybindPool.MAX_SLOTS;
-	/** Whether each slot was down on the last tick, so the release edge can be reported. */
 	private static final boolean[] wasDown = new boolean[MAX_SLOTS];
 
 	private static final KeyMapping[] pool = new KeyMapping[MAX_SLOTS];
 	private static final Set<Integer> claimedSlots = ConcurrentHashMap.newKeySet();
-	/** The slot the server asked us to rebind, or -1: the next key pressed goes here. */
+	/** The slot the next key press binds, or -1. */
 	private static volatile int rebinding = -1;
 
-	/** Register the pool. Call once from client mod init, never later. */
+	/** Call once from client mod init, never later. */
 	public static void init() {
-		// The server names keys by number and cannot see this table, so a snapshot that
-		// renumbered it would put every mod's default on the wrong key without a word.
+		// Servers name default keys by these numbers.
 		if (KeybindApi.letter('G') != InputConstants.KEY_G || KeybindApi.letter('B') != InputConstants.KEY_B) {
 			Pandorical.LOGGER.error("InputConstants no longer numbers keys the way KeybindApi.letter does;"
 				+ " every keybind default will land on the wrong key");
@@ -75,23 +66,18 @@ public final class KeybindManager {
 			if (slot != null && slot >= 0 && slot < MAX_SLOTS) claimedSlots.add(slot);
 		}
 		Pandorical.LOGGER.debug("Server declared keybind slots: {}", claimedSlots);
-		// The server can name a key but not read one: the binding is a line in this player's
-		// options and nowhere else, so the mods menu learns it here or not at all.
+		// Only the client can read its bindings.
 		sendBindings();
 	}
 
-	/** The keybinds whose default key this client has already put on, one {@code id@slot} to a line. */
 	private static final int MOST_REMEMBERED = 512;
+	/** One {@code id@slot} per line for each keybind whose default was already offered. */
 	private static final Path DEFAULTS_APPLIED = FabricLoader.getInstance()
 		.getConfigDir().resolve("pandorical").resolve("keybind-defaults.txt");
 
 	/**
-	 * Put on the keys the server's keybinds asked to start on, where nobody has chosen one.
-	 *
-	 * <p>Once per keybind and slot: {@code id@slot} goes in a file here the first time it is seen,
-	 * whether or not the slot was free, so a key the player clears or moves afterwards is theirs
-	 * and is never put back. A slot the player had already bound keeps their key. A keybind the
-	 * server moves to another slot is a new binding and gets its default once more.
+	 * Binds each default key to an unbound slot, once per {@code id@slot} ever seen, bound or not,
+	 * so a key the player later clears or moves is never put back.
 	 */
 	public static void applyDefaults(KeybindDefaultsS2C payload) {
 		Set<String> applied = new LinkedHashSet<>();
@@ -119,8 +105,6 @@ public final class KeybindManager {
 		}
 
 		if (remembered) {
-			// Every server's ids land here, so the oldest go once there are more than any one
-			// player's servers could want remembered.
 			Iterator<String> oldest = applied.iterator();
 			while (applied.size() > MOST_REMEMBERED && oldest.hasNext()) {
 				oldest.next();
@@ -141,7 +125,6 @@ public final class KeybindManager {
 		}
 	}
 
-	/** Tell the server what each pool slot is bound to now, as this client's controls screen says. */
 	public static void sendBindings() {
 		if (!ClientPlayNetworking.canSend(KeybindBindingsC2S.TYPE)) return;
 		List<String> keys = new ArrayList<>(MAX_SLOTS);
@@ -151,19 +134,14 @@ public final class KeybindManager {
 		ClientPlayNetworking.send(new KeybindBindingsC2S(keys));
 	}
 
-	/** The server asks for this slot to take the next key pressed; a negative slot calls it off. */
+	/** A negative slot cancels. */
 	public static void handleRebindRequest(int slot) {
 		rebinding = slot >= 0 && slot < MAX_SLOTS ? slot : -1;
 	}
 
 	/**
-	 * Take this key press as the new binding, if one was asked for. True when the press was
-	 * spent here and must go no further, which is the whole point: the key being bound is
-	 * usually a key that does something else on the screen it was pressed on.
-	 *
-	 * <p>Escape clears the binding, as it does in the controls screen; every other key, including
-	 * one already used elsewhere, is taken. Two things on one key is the player's to sort out, and
-	 * refusing it here would be the one place in the game that does.
+	 * Takes the press as the pending rebind; true when it was spent and must go no further. Escape
+	 * unbinds, as in the controls screen; keys already bound elsewhere are allowed.
 	 */
 	public static boolean captureKey(KeyEvent event) {
 		int slot = rebinding;
@@ -180,18 +158,14 @@ public final class KeybindManager {
 	}
 
 	/**
-	 * The pooled mapping for a slot, or null if the slot is out of range.
-	 *
-	 * <p>Exposed so an input source that is not the keyboard can drive a pooled
-	 * keybind the same way a key does. {@link #tick} reads presses through
-	 * {@code consumeClick}, so anything that makes the mapping report a click
-	 * reaches the server by the ordinary path and needs no separate protocol.
+	 * Null out of range. For non-keyboard input: {@link #tick} reads {@code consumeClick}, so a
+	 * click made on the mapping reaches the server like a key press.
 	 */
 	public static KeyMapping poolMapping(int slot) {
 		return slot >= 0 && slot < MAX_SLOTS ? pool[slot] : null;
 	}
 
-	/** Forward pool presses for claimed slots; drain unclaimed clicks so they cannot pile up. */
+	/** Drains unclaimed clicks too, so they cannot pile up. */
 	public static void tick(Minecraft client) {
 		if (pool[0] == null) return;
 		for (int i = 0; i < MAX_SLOTS; i++) {
@@ -200,7 +174,6 @@ public final class KeybindManager {
 					ClientPlayNetworking.send(new KeyPressC2S(i));
 				}
 			}
-			// The other edge. A held key is a press followed, some ticks later, by this.
 			boolean down = pool[i].isDown();
 			if (wasDown[i] && !down && claimedSlots.contains(i)
 					&& ClientPlayNetworking.canSend(KeyReleaseC2S.TYPE)) {

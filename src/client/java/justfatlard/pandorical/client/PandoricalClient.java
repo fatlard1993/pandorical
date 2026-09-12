@@ -82,15 +82,10 @@ import net.minecraft.server.packs.PackType;
 public class PandoricalClient implements ClientModInitializer {
     private static final List<String> CLIENT_CAPABILITIES = Capabilities.CLIENT;
 
-    // Pending screen defs keyed by screenId; LinkedHashMap preserves insertion order
-    // so the last entry is always the most recently added.
-    // Accessed only on the render thread (via client.execute), so no ConcurrentHashMap needed.
+    // The newest def is the last in insertion order.
     private static final Map<String, OpenScreenS2C> pendingContainerDefs = new LinkedHashMap<>();
 
-    /**
-     * Startup pieces left out by {@code -Dpandorical.skip=a,b,...}, or all of them. For finding which
-     * one a crash lives in on a machine nobody here can reach; nothing is left out without the property.
-     */
+    /** Startup pieces {@code -Dpandorical.skip=a,b,...} leaves out, to bisect a startup crash. */
     private static final Set<String> SKIP = Arrays.stream(
             System.getProperty("pandorical.skip", "").split(","))
         .map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toSet());
@@ -111,9 +106,7 @@ public class PandoricalClient implements ClientModInitializer {
         }
         StackSampler.start();
         Diagnostics.mark("client init begins");
-        // The load guard (see Diagnostics): up from launch already, and raised again for every join,
-        // from the first packet of the configuration phase - where the synced pack loads - until
-        // the player has been in the world a while.
+        // The load guard is raised again for every join, from the first configuration packet.
         ClientConfigurationConnectionEvents.INIT.register((handler, client) -> {
             Diagnostics.guardFor(Diagnostics.JOIN_WINDOW_MILLIS);
             StackSampler.start();
@@ -124,23 +117,18 @@ public class PandoricalClient implements ClientModInitializer {
                     "Loads a little slower on Windows, to dodge a crash some Windows players get while loading",
                     Diagnostics::guarding, Diagnostics::setGuarding);
         }
-        // The block-shape hooks in common code ask about marks; this is the client's answer.
         BlockMarkLookup.client = ClientBlockMarks::has;
         ContainerHabits.register();
         ComponentRegistry.registerDefaults();
 
-        // The menu is built by vanilla's MenuType factory, which is handed nothing but a sync
-        // id and an inventory - so the slot count has to be fetched from the definition that
-        // arrived just before it. See PandoricalMenu's client constructor for what a wrong
-        // count does to the player's inventory.
+        // Vanilla's MenuType factory gets only a sync id and an inventory, so the slot count
+        // comes from the definition that arrived just before it.
         PandoricalMenu.setIncomingModSlots(() -> {
             OpenScreenS2C newest = null;
             for (var entry : pendingContainerDefs.entrySet()) newest = entry.getValue();
             return newest == null ? -1 : newest.container().map(c -> c.slotCount()).orElse(-1);
         });
 
-        // Keybind pool must register during client init: the options system
-        // does not accept KeyMappings added later (see KeybindApi javadoc)
         if (!skipped("keybinds")) KeybindManager.init();
         if (!skipped("contextmodels")) {
             ContextModels.register(new RailDiagonals());
@@ -152,12 +140,9 @@ public class PandoricalClient implements ClientModInitializer {
             ContextModels.init();
         }
 
-        // Same startup-time constraint as keybinds: Fabric's HUD element registry
-        // is only writable during client init (see the suppressor's javadoc)
         if (!skipped("suppressor")) VanillaHudElementSuppressor.init();
 
-        // Exact count for oversized stacks (whose slot label is abbreviated
-        // by ItemCountRendererMixin), absorbed from stackz's client
+        // ItemCountRendererMixin abbreviates the slot label of an oversized stack.
         ItemTooltipCallback.EVENT.register((stack, context, flag, lines) -> {
             int count = stack.getCount();
             if (count >= 100) {
@@ -177,7 +162,6 @@ public class PandoricalClient implements ClientModInitializer {
         if (!skipped("decals")) BannerDecalRenderer.register();
         if (!skipped("pictures")) ClientPictures.register();
 
-        // Tick content manager for sync timeout detection + show sync overlay
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             ContentManager.tick();
             StructureManager.tick();
@@ -185,7 +169,6 @@ public class PandoricalClient implements ClientModInitializer {
             KeybindManager.tick(client);
             ViewportReporter.tick(client);
             if (ContentManager.isSyncing() && client.gui != null) {
-                // Show as both title and actionbar for visibility
                 client.gui.hud.setTitle(Component.literal(ContentManager.getSyncStatus())
                     .withStyle(ChatFormatting.GOLD));
                 client.gui.hud.setTimes(0, 40, 10);
@@ -195,16 +178,11 @@ public class PandoricalClient implements ClientModInitializer {
         Pandorical.LOGGER.info("Pandorical client initialized");
     }
 
-    /**
-     * Factory for creating PandoricalContainerScreen from a PandoricalMenu.
-     * Takes the most recently added pending def (insertion-ordered via LinkedHashMap).
-     */
     private static PandoricalContainerScreen createContainerScreen(
             PandoricalMenu menu, Inventory inventory, Component title) {
         OpenScreenS2C screenDef = null;
         String foundKey = null;
 
-        // LinkedHashMap iteration is insertion-ordered; last entry is newest
         for (var entry : pendingContainerDefs.entrySet()) {
             screenDef = entry.getValue();
             foundKey = entry.getKey();
@@ -220,28 +198,23 @@ public class PandoricalClient implements ClientModInitializer {
     }
 
     /**
-     * Register config-phase receivers for content sync.
-     * These run BEFORE Fabric's registry sync, on the network thread.
-     * The client registers blocks/items here so Fabric's sync sees them.
+     * These run on the network thread before Fabric's registry sync, so the blocks and items
+     * registered here are ones it sees.
      */
     private void registerConfigPhaseReceivers() {
-        // Receive content definitions during config phase
         ClientConfigurationNetworking.registerGlobalReceiver(SyncContentConfigS2C.TYPE, (payload, context) -> {
             Pandorical.LOGGER.info("Config phase: received content sync — {} blocks, {} items, {} expected asset chunks",
                 payload.blocks().size(), payload.items().size(), payload.expectedAssetChunks());
             ContentManager.handleConfigSyncContent(payload);
         });
 
-        // Receive asset chunks during config phase
         ClientConfigurationNetworking.registerGlobalReceiver(SyncAssetsConfigS2C.TYPE, (payload, context) -> {
             Pandorical.LOGGER.debug("Config phase: received asset chunk {}/{}",
                 payload.chunkIndex() + 1, payload.totalChunks());
             ContentManager.handleConfigSyncAssets(payload);
         });
 
-        // Receive extra inventory slot registrations during config phase so that
-        // ClientInventorySlotRegistry is populated BEFORE InventoryMenu is constructed
-        // on play-phase entry (InventoryMenu.<init> fires before any play packets arrive).
+        // In the configuration phase: InventoryMenu is built before any play packet arrives.
         ClientConfigurationNetworking.registerGlobalReceiver(PlayerInventoryRegistrationsS2C.TYPE, (payload, context) -> {
             Pandorical.LOGGER.debug("Config phase: received {} extra inventory slot group(s)", payload.groups().size());
             ClientInventorySlotRegistry.receive(payload);
@@ -253,17 +226,12 @@ public class PandoricalClient implements ClientModInitializer {
                 Pandorical.LOGGER.debug("Inventory buttons received: {}", payload.buttons().size());
             });
 
-        // The same list again, mid-game, when a button that is a switch has been thrown. The
-        // screen reads the list every frame, so an open inventory shows the new face at once.
         ClientPlayNetworking.registerGlobalReceiver(
             InventoryButtonsS2C.TYPE, (payload, context) ->
                 ClientInventoryButtons.set(payload.buttons()));
 
-        // The server refuses any client it cannot send this to, on the grounds that a client
-        // too old to receive it is too old to read the content that follows. That test only
-        // measures anything if a receiver exists: Fabric advertises a channel to the server
-        // only when something is listening on it, so for as long as this was missing the check
-        // turned away every client, current ones included.
+        // Required: the server refuses a client that cannot receive this, and Fabric advertises
+        // a channel only when a receiver is registered.
         ClientConfigurationNetworking.registerGlobalReceiver(
             RequirementS2C.TYPE, (payload, context) -> {
                 if (Pandorical.PROTOCOL_VERSION < payload.minimumProtocol()) {
@@ -277,7 +245,6 @@ public class PandoricalClient implements ClientModInitializer {
 
         ClientConfigurationNetworking.registerGlobalReceiver(BlockTintsConfigS2C.TYPE, (payload, context) -> {
             Pandorical.LOGGER.debug("Config phase: received {} block tint group(s)", payload.entries().size());
-            // A fresh connection starts unpainted; the server states every colour again on join.
             PositionalTintStore.clear();
             BannerDecalStore.clear();
             payload.entries().forEach(PandoricalClient::applyBlockTints);
@@ -310,7 +277,6 @@ public class PandoricalClient implements ClientModInitializer {
     }
 
     private void registerClientHandlers() {
-        // Respond to server hello
         ClientPlayNetworking.registerGlobalReceiver(
             BlockMarksS2C.TYPE, (payload, context) ->
                 context.client().execute(() -> ClientBlockMarks.apply(payload)));
@@ -338,17 +304,15 @@ public class PandoricalClient implements ClientModInitializer {
                     payload.protocolVersion(), payload.capabilities());
                 ServerCapabilities.set(payload.capabilities());
                 ClientPlayNetworking.send(new HelloC2S(Pandorical.PROTOCOL_VERSION, CLIENT_CAPABILITIES));
-                // And what this client's own mods want in the menu, now that there is a server to tell.
                 ClientSettings.INSTANCE.send();
                 ViewportReporter.send(context.client());
             });
         });
 
-        // Open screen
         ClientPlayNetworking.registerGlobalReceiver(OpenScreenS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> {
                 if (payload.container().isPresent()) {
-                    // Store by screenId; the vanilla menu open arrives next
+                    // The vanilla menu open arrives next.
                     pendingContainerDefs.put(payload.screenId(), payload);
                 } else {
                     PandoricalScreen screen = new PandoricalScreen(payload);
@@ -357,7 +321,6 @@ public class PandoricalClient implements ClientModInitializer {
             });
         });
 
-        // Update screen
         ClientPlayNetworking.registerGlobalReceiver(UpdateScreenS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> {
                 Screen current = Minecraft.getInstance().gui.screen();
@@ -369,7 +332,6 @@ public class PandoricalClient implements ClientModInitializer {
             });
         });
 
-        // Close screen
         ClientPlayNetworking.registerGlobalReceiver(CloseScreenS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> {
                 Screen current = Minecraft.getInstance().gui.screen();
@@ -381,7 +343,6 @@ public class PandoricalClient implements ClientModInitializer {
             });
         });
 
-        // HUD handlers
         ClientPlayNetworking.registerGlobalReceiver(ShowHudS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> HudManager.handleShow(payload));
         });
@@ -396,7 +357,6 @@ public class PandoricalClient implements ClientModInitializer {
                 VanillaHudElementSuppressor.handle(payload));
         });
 
-        // Content sync
         ClientPlayNetworking.registerGlobalReceiver(SyncContentS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> ContentManager.handleSyncContent(payload));
         });
@@ -404,13 +364,10 @@ public class PandoricalClient implements ClientModInitializer {
             context.client().execute(() -> ContentManager.handleSyncAssets(payload));
         });
 
-        // Camera hints
         ClientPlayNetworking.registerGlobalReceiver(CameraHintS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> CameraManager.handleHint(payload));
         });
 
-        // Animations are ordinary client resources, so they arrive through the same asset sync as
-        // the models they move and reload with them.
         ResourceManagerHelper
             .get(PackType.CLIENT_RESOURCES)
             .registerReloadListener(new AnimationLibrary());
@@ -447,12 +404,10 @@ public class PandoricalClient implements ClientModInitializer {
                     SkinOverrides.handle(payload));
             });
 
-        // Entity renderer registrations: apply to EntityRenderers.PROVIDERS
         ClientPlayNetworking.registerGlobalReceiver(EntityRenderersS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> ClientEntityRendererRegistry.applyRenderers(payload));
         });
 
-        // Structure handlers
         ClientPlayNetworking.registerGlobalReceiver(SpawnStructureS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> StructureManager.handleSpawn(payload));
         });
@@ -469,20 +424,17 @@ public class PandoricalClient implements ClientModInitializer {
             context.client().execute(() -> StructureManager.handleDespawn(payload));
         });
 
-        // Entity overlays
         ClientPlayNetworking.registerGlobalReceiver(EntityOverlayS2C.TYPE, (payload, context) -> {
             context.client().execute(() ->
                 EntityOverlayStore.handle(payload));
         });
 
-        // Chest overlays
         ClientPlayNetworking.registerGlobalReceiver(
             ChestOverlayS2C.TYPE, (payload, context) -> {
                 context.client().execute(() ->
                     ChestOverlayStore.handle(payload));
             });
 
-        // Keybind slot declarations
         ClientPlayNetworking.registerGlobalReceiver(
             KeybindRebindS2C.TYPE, (payload, context) -> {
                 context.client().execute(() ->
@@ -497,16 +449,14 @@ public class PandoricalClient implements ClientModInitializer {
                 KeybindManager.applyDefaults(payload));
         });
 
-        // When entering play phase, inject resource pack if config-phase synced assets
         ServerSettingsButton.register();
 
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             if (ContentManager.wasConfigPhaseSynced()) {
-                // Remap SYNCHRONOUSLY before any chunks are decoded
+                // Synchronously, before any chunk is decoded.
                 Pandorical.LOGGER.info("Play phase joined — remapping block state IDs synchronously");
                 ContentManager.remapBlockStateIds();
-                // The configuration phase reloads before the level exists; only a client that
-                // somehow reached play without that still reloads here, on top of the level.
+                // Normally the configuration phase has already reloaded, before the level exists.
                 if (!ContentManager.wasConfigReloadDone()) {
                     client.execute(ContentManager::injectResourcePack);
                 }
@@ -518,10 +468,8 @@ public class PandoricalClient implements ClientModInitializer {
     }
 
     /**
-     * Everything one server told this client, dropped. Run as a connection starts as well as when
-     * one ends: a connection that fails in the configuration phase (Fabric's registry sync
-     * refusing a block, say) ends without the play-phase disconnect ever firing, and what it left
-     * behind would stall the next join.
+     * Also run as a connection starts: one that fails in the configuration phase never fires the
+     * play disconnect, and its leftovers would stall the next join.
      */
     private static void forgetConnection() {
         pendingContainerDefs.clear();
@@ -541,8 +489,7 @@ public class PandoricalClient implements ClientModInitializer {
         LeafCulling.onDisconnect();
         EntityAnimations.clearAll();
         MountPolicy.clear();
-        // A texture is released on the render thread only, and the connection starts on the
-        // network thread.
+        // Textures are released on the render thread; a connection starts on the network thread.
         Minecraft.getInstance().execute(SkinOverrides::clearAll);
     }
 }
