@@ -12,15 +12,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A grid of cells painted by hand, drawn from this client's own copy so a stroke lands under the
- * brush the frame it is made.
- *
- * <p>Two copies are kept: the server's, as of the last report it acknowledged, and the one shown,
- * which is the server's with every unacknowledged report laid back on top. An acknowledgement
- * folds the reports it covers into the server's copy, by the same {@link PixelCanvas#apply} the
- * server ran, so the two agree without the cells crossing the wire; when the server does send
- * cells, they replace the copy outright and whatever is still unacknowledged is replayed over
- * them.
+ * A paintable grid drawn from a local copy: the server's cells as of the last acknowledged report,
+ * with every unacknowledged report replayed on top. An ack folds the reports it covers into the
+ * server's copy with the same {@link PixelCanvas#apply} the server ran; cells the server sends
+ * replace that copy outright.
  */
 public class PixelCanvasComponent extends AbstractComponent {
     private static final long REPORT_EVERY_MS = 50;
@@ -108,7 +103,6 @@ public class PixelCanvasComponent extends AbstractComponent {
         }
     }
 
-    /** Lay every report the server has now applied onto the server's copy, in the order it applied them. */
     private void fold(int ack) {
         while (!unacknowledged.isEmpty() && unacknowledged.get(0).seq() <= ack) {
             PixelCanvas.apply(confirmed, columns, rows, confirmedSupply, unacknowledged.remove(0), null);
@@ -131,8 +125,6 @@ public class PixelCanvasComponent extends AbstractComponent {
         for (int i = 0; i < anchors.length; i++) anchors[i] = gathering.get(i);
         return new PixelCanvas.Stroke(seq, gatheringInk, gatheringBrush, anchors);
     }
-
-    // --- Geometry ---
 
     private int cellSize() {
         return Math.max(1, Math.min(width / columns, height / rows));
@@ -164,8 +156,6 @@ public class PixelCanvasComponent extends AbstractComponent {
             || shownSupply[ink] == PixelCanvas.UNLIMITED || shownSupply[ink] > 0;
     }
 
-    // --- Drawing ---
-
     @Override
     public void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         if (painting) drag(mouseX, mouseY);
@@ -175,7 +165,6 @@ public class PixelCanvasComponent extends AbstractComponent {
         int top = gridTop();
         graphics.fill(left - 1, top - 1, left + size * columns + 1, top + size * rows + 1, FRAME_COLOR);
 
-        // One fill per run of like cells along a row, not one per cell
         for (int cy = 0; cy < rows; cy++) {
             int runStart = 0;
             for (int cx = 1; cx <= columns; cx++) {
@@ -213,8 +202,6 @@ public class PixelCanvasComponent extends AbstractComponent {
         graphics.fill(x1 - 1, y0, x1, y1, light);
     }
 
-    // --- Painting ---
-
     private void drag(int mouseX, int mouseY) {
         int cx = cellX(mouseX);
         int cy = cellY(mouseY);
@@ -232,7 +219,6 @@ public class PixelCanvasComponent extends AbstractComponent {
         lastCellY = cy;
     }
 
-    /** Every cell between two, so a quick sweep leaves a line rather than a trail of dots. */
     private void line(int x0, int y0, int x1, int y1) {
         int dx = Math.abs(x1 - x0);
         int dy = -Math.abs(y1 - y0);
@@ -314,7 +300,6 @@ public class PixelCanvasComponent extends AbstractComponent {
         report();
     }
 
-    /** The server's copy as folded here, and every report still in flight, which no prop carries. */
     @Override
     public void carryOverFrom(PandoricalComponent previous) {
         PixelCanvasComponent old = (PixelCanvasComponent) previous;

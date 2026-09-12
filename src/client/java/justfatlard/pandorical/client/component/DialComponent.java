@@ -8,38 +8,14 @@ import justfatlard.pandorical.protocol.ComponentDef;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.lwjgl.sdl.SDLMouse;
 
-/**
- * A sprite worked by hand: it is swept round its own centre and then pushed, and it tells the
- * server where it is and when the push begins and ends.
- *
- * <p>The sweep is the mouse's sideways travel, or a held A or D, left or right: not where the
- * pointer is, how far it has moved. The pointer is hidden while this is up, because a cursor
- * crawling across a lock is a cursor the hand tries to aim, and a pick is not aimed, it is
- * felt round. The angle is clamped to the sweep, drawn from here every frame without asking
- * anyone, and reported in steps spaced far enough apart to be cheap and close enough together
- * to be current.
- *
- * <p>A push - the left button, space, W, up or enter - freezes the angle where it is until the
- * release, which is how a pick in a lock behaves: you cannot move it while you are turning it.
- * Whatever the server turns this by (its rotation prop) is added on top, so a pick sitting in
- * a cylinder goes round with the cylinder; and while the server says it is shaking, it trembles
- * about the frozen angle, drawn here so a jam looks like a jam without a stream of updates to
- * say so.
- */
+/** See {@link ComponentType#DIAL}. A push freezes the angle until release. */
 public class DialComponent extends SpriteComponent {
     private static final long AIM_EVERY_MS = 40;
     private static final float AIM_STEP_DEGREES = 0.5F;
-    /** The tremble at its worst, the frame before the snap. */
     private static final float SHAKE_DEGREES = 7F;
-    /** Degrees of sweep per window pixel of mouse travel: the whole arc in about a hand's width. */
     private static final float MOUSE_DEGREES_PER_PIXEL = 0.16F;
-    /** Degrees per second under a held key: end to end in two seconds, slow enough to stop on a notch. */
     private static final float KEY_DEGREES_PER_SECOND = 70F;
-    /**
-     * Window pixels a hand cannot cross in one frame. The pointer is warped when a screen opens
-     * and again when the mouse is let go of, and a warp arriving as travel would throw the pick
-     * across the arc before the hand had touched it.
-     */
+    /** Travel above this in one frame is a pointer warp, as on screen open, not movement. */
     private static final double WARP_PIXELS = 300;
 
     private static final int[] LEFT_KEYS = {InputConstants.KEY_A, InputConstants.KEY_LEFT};
@@ -48,7 +24,7 @@ public class DialComponent extends SpriteComponent {
         InputConstants.KEY_UP, InputConstants.KEY_RETURN};
 
     private float sweep = 140F;
-    /** Nought still, one about to snap. */
+    /** 0 to 1. */
     private float shake;
     private float angle;
     private boolean held;
@@ -66,10 +42,8 @@ public class DialComponent extends SpriteComponent {
         holdCursor();
     }
 
-    /** Whether this dial has the pointer hidden now. */
     private boolean cursorHidden;
 
-    /** The pointer is hidden while the dial shows on a screen; a HUD has no pointer to hide. */
     private void holdCursor() {
         boolean hide = visible && !"hud".equals(context.screenType());
         if (hide == cursorHidden) return;
@@ -110,8 +84,7 @@ public class DialComponent extends SpriteComponent {
         float seconds = lastFrameNanos == 0 ? 0F : (now - lastFrameNanos) / 1.0e9F;
         lastFrameNanos = now;
 
-        // Window pixels rather than the scaled GUI coordinates handed in, so a small movement
-        // is a small movement and not a rounding to nothing
+        // Window pixels, not the scaled GUI coordinates, which round small movements away.
         double x = context.minecraft().mouseHandler.xpos();
         double travel = x - lastMouseX;
         lastMouseX = x;
@@ -147,13 +120,11 @@ public class DialComponent extends SpriteComponent {
         return false;
     }
 
-    /** The geometry the renderer turns this by: the server's turn, plus where the hand has it, trembling if the server says so. */
     @Override
     public GeometrySnapshot displayedGeometry(float partialTick) {
         GeometrySnapshot g = interpolatedGeometry(partialTick);
         float shown = g.rotation() + angle;
         if (shake > 0F) {
-            // Wider and quicker as it worsens: the pick is being asked for more than it has
             double period = 9.0e6 - 6.0e6 * shake;
             shown += (float) Math.sin(System.nanoTime() / period) * SHAKE_DEGREES * (0.15F + 0.85F * shake);
         }
@@ -188,7 +159,7 @@ public class DialComponent extends SpriteComponent {
         report("release");
     }
 
-    /** Anywhere on the screen: with the pointer hidden there is nothing to aim a click at. */
+    /** Anywhere on the screen, since the pointer is hidden. */
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button != InputConstants.MOUSE_BUTTON_LEFT) return false;

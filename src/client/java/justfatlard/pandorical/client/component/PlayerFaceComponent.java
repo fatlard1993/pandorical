@@ -11,14 +11,7 @@ import net.minecraft.world.entity.player.PlayerSkin;
 import justfatlard.pandorical.client.skin.SkinOverrides;
 import justfatlard.pandorical.protocol.ComponentDef;
 
-/**
- * A player's face with its hat layer, square at the component's size. See
- * {@link ComponentType#PLAYER_FACE}.
- *
- * <p>The skin is looked up every frame rather than once, because a skin arrives late: a player
- * just joined has the default one for a moment while theirs downloads, and a face fixed at open
- * would keep that. The lookup is two map reads.
- */
+/** See {@link ComponentType#PLAYER_FACE}. The skin is looked up every frame: it downloads late. */
 public class PlayerFaceComponent extends AbstractComponent {
     private UUID player;
 
@@ -50,14 +43,7 @@ public class PlayerFaceComponent extends AbstractComponent {
         PlayerFaceExtractor.extractRenderState(graphics, skin(), x, y, Math.min(width, height));
     }
 
-    /**
-     * The skin they are wearing, whether or not they are in sight: a skin the server dressed
-     * them in first, then their body's, then the tab list's.
-     *
-     * <p>The worn skin is asked for by player, not read off the body, because only the body
-     * carries it: a face read from the tab list whenever the player walked out of sight turned
-     * into the default skin on an offline server, whose tab list has no skins at all.
-     */
+    /** An offline server's tab list has no skins, so the override is looked up by player. */
     private PlayerSkin skin() {
         var minecraft = context.minecraft();
         PlayerSkin theirs;

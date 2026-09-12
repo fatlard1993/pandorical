@@ -7,10 +7,6 @@ import net.minecraft.client.gui.Font;
 import java.util.Map;
 import java.util.function.BiConsumer;
 
-/**
- * Context passed to components during initialization and rendering.
- * Provides access to screen-level resources and event dispatch.
- */
 public record ComponentContext(
     String screenId,
     String screenType,
@@ -18,7 +14,7 @@ public record ComponentContext(
     int screenY,
     Font font,
     BiConsumer<String, Map<String, String>> sendAction,
-    PandoricalMenu menu // null for non-container screens
+    PandoricalMenu menu // null outside a container screen
 ) {
     public Minecraft minecraft() {
         return Minecraft.getInstance();

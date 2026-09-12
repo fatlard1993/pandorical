@@ -11,14 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Dots on a disc that turns with the player. See {@link ComponentType#RADAR}.
- *
- * <p>Everything that moves with the camera is worked out here, every frame: where the player is,
- * which way they face, and where each blip sits against both. The server's part is the list, a
- * few times a second. A radar turned on the server trails the camera by a round trip every time
- * the player looks round, which is the one moment a radar is being read.
- */
+/** See {@link ComponentType#RADAR}. */
 public class RadarComponent extends AbstractComponent {
     private static final int DISC = 0x90000000;
     private static final int RIM = 0xC0D8D8D8;
@@ -27,7 +20,6 @@ public class RadarComponent extends AbstractComponent {
     private static final int TARGET = 0xFFFFD84A;
     private static final int NEEDLE = 0xFFC9A93A;
 
-    /** Past this far above or below, a blip is dimmed: it is near on the map and not in reach. */
     private static final double DIM_HEIGHT = 6.0;
 
     private record Blip(int entityId, double x, double y, double z, int color, int size, boolean person) {}
@@ -66,7 +58,6 @@ public class RadarComponent extends AbstractComponent {
                     Integer.parseInt(parts[4]), Math.clamp(Integer.parseInt(parts[5]), 1, 3),
                     parts.length > 6 && parts[6].equals("p")));
             } catch (NumberFormatException ignored) {
-                // One bad entry costs that dot, not the radar.
             }
         }
     }
@@ -113,7 +104,6 @@ public class RadarComponent extends AbstractComponent {
                     Math.round(cy - (float) ahead * perBlock), color);
                 continue;
             }
-            // Two, three or four pixels across: a chicken, a cow, a ravager.
             int across = blip.size() + 1;
             int px = Math.round(cx + (float) side * perBlock) - across / 2;
             int py = Math.round(cy - (float) ahead * perBlock) - across / 2;
@@ -124,19 +114,12 @@ public class RadarComponent extends AbstractComponent {
             needle(graphics, cx, cy, radius, perBlock, targetX - self.x, targetZ - self.z, fx, fz, rx, rz);
         }
 
-        // The player, pointing the way they face: which on this disc is always up.
         int sx = Math.round(cx), sy = Math.round(cy);
         graphics.fill(sx, sy - 2, sx + 1, sy + 2, SELF);
         graphics.fill(sx - 1, sy, sx + 2, sy + 2, SELF);
         graphics.fill(sx - 2, sy + 1, sx + 3, sy + 2, SELF);
     }
 
-    /**
-     * The compass's own job, kept: a needle from the centre toward the target. It stops at the
-     * target when the target is on the disc, and at the rim with an arrowhead when it is further,
-     * which is most of the time. A dot on the rim said the same thing and nobody read it as the
-     * needle it replaced.
-     */
     private static void needle(GuiGraphicsExtractor graphics, float cx, float cy, float radius, float perBlock,
                                double dx, double dz, double fx, double fz, double rx, double rz) {
         double side = dx * rx + dz * rz;
@@ -156,8 +139,6 @@ public class RadarComponent extends AbstractComponent {
         }
 
         if (beyond) {
-            // An arrowhead pointing out through the rim: rows across the needle, widening back
-            // from the point.
             for (double back = 0; back <= 5; back += 0.5) {
                 double half = back * 0.6;
                 for (double across = -half; across <= half; across += 0.5) {
@@ -181,7 +162,6 @@ public class RadarComponent extends AbstractComponent {
         return (alpha << 24) | (argb & 0x00FFFFFF);
     }
 
-    /** A filled disc, a row at a time. */
     private static void disc(GuiGraphicsExtractor graphics, float cx, float cy, float r, int color) {
         int top = (int) Math.floor(cy - r), bottom = (int) Math.ceil(cy + r);
         for (int row = top; row < bottom; row++) {
@@ -192,7 +172,6 @@ public class RadarComponent extends AbstractComponent {
         }
     }
 
-    /** A one-pixel ring, stepped finely enough to leave no gaps at these sizes. */
     private static void circle(GuiGraphicsExtractor graphics, float cx, float cy, float r, int color) {
         int steps = Math.max(24, (int) (r * 7));
         int lastX = Integer.MIN_VALUE, lastY = Integer.MIN_VALUE;

@@ -5,24 +5,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 import java.util.Map;
 
-/**
- * A small burst of particle-like sprites, simulated entirely on the client every frame:
- * the server declares the motion pattern once (particle count, orbit radius/speed) and never
- * needs to push individual particle positions, same philosophy as vanilla's own particle systems.
- *
- * <p>Only the {@code "orbit"} motion pattern is implemented: particles are evenly spaced around a
- * circle centered on the component's bounds ({@code x + width/2}, {@code y + height/2}) and rotate
- * continuously at {@code speed} degrees/second.
- *
- * <p>Orbit phase is tracked as a real-time (wall-clock) angle rather than a server-tick-driven
- * one, so it keeps animating with no server updates. It is intentionally independent of the
- * generic geometry interpolation in {@link AbstractComponent}, which still applies on top for the
- * component's overall position/size/scale/rotation as a whole (the entire orbiting cluster can
- * itself be smoothly repositioned via x/y prop updates same as any other component).
- *
- * <p>When {@code speed}/{@code start_angle} change via {@link #updateProps}, the current animated
- * angle is captured first so the orbit continues smoothly rather than jumping.
- */
+/** Particles orbiting the bounds' centre at {@code speed} degrees per wall-clock second. */
 public class ParticleBurstComponent extends AbstractComponent {
     private static final int MAX_PARTICLES = 512;
     private static final int MAX_PARTICLE_SIZE = 32;
@@ -54,8 +37,7 @@ public class ParticleBurstComponent extends AbstractComponent {
     }
 
     private void parseStyle() {
-        // Clamped at the top as well as the bottom: this count drives a trig+fill loop
-        // every frame, so an unbounded value from a server is a render-thread freeze.
+        // Bounded: this drives a per-frame loop on the render thread.
         count = Math.clamp(parseInt("particle_count", 8), 1, MAX_PARTICLES);
         particleSize = Math.clamp(parseInt("particle_size", 3), 1, MAX_PARTICLE_SIZE);
         radius = parseFloat("radius", defaultRadius());

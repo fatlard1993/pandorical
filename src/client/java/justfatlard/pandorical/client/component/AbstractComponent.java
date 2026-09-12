@@ -9,49 +9,25 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Base class for components. Handles common fields, prop parsing, and client-side
- * interpolation of mutable numeric props (geometry, scale, rotation, and opt-in colors).
- *
- * <p><b>Interpolation model</b>: mirrors the technique {@code StructureManager} already uses
- * for structure pose interpolation: every time a numeric prop changes (via {@link #updateProps}),
- * the value the component is currently displaying (which may itself be mid-interpolation) is
- * captured as the new "previous" snapshot, the freshly-applied value becomes the new "target",
- * and a short fixed tick window ({@link #INTERPOLATION_TICKS}) blends between them. {@link #tick()}
- * advances that window once per client tick; render-time callers sample the blend with the
- * current partial tick. Geometry (x/y/width/height) and scale/rotation are tracked unconditionally
- * for every component so that {@code ScreenHelper}'s render-time transform wrapper can smooth them
- * generically for all component types, not just sprite/text; see {@code ScreenHelper.renderComponentTree}.
+ * Base class for components: common fields, prop parsing, and interpolation of geometry, scale,
+ * rotation and opt-in colors. On each change the displayed value, possibly mid-blend, becomes the
+ * start and the new value the target, blended over {@link #interpolationTicks} client ticks.
+ * Geometry is tracked for every component so {@code ScreenHelper} can smooth it generically.
  */
 public abstract class AbstractComponent implements PandoricalComponent {
-    /**
-     * Ticks over which a new value is blended in. Kept short and fixed rather than derived from
-     * the actual interval between server updates, same simplification {@code StructureManager}
-     * documents for pose interpolation; adequate as long as callers update roughly once per
-     * server tick (≤20/sec).
-     */
+    /** Fixed, not derived from the update interval; suits updates at most once per server tick. */
     protected static final int INTERPOLATION_TICKS = 3;
 
-    /**
-     * How long this component blends a new value in, in ticks. Defaults to the
-     * short window above, which is right for anything tracking a moving thing:
-     * the blend is there to hide the gap between server updates, not to be seen.
-     *
-     * <p>A component that changes rarely and wants the change *noticed* sets
-     * {@code interp_ticks} higher. A hunger bar that ticks down one point is the
-     * case in point: three ticks is a jump, and the point of drawing a stomach is
-     * to watch it empty.
-     */
+    /** From the {@code interp_ticks} prop. */
     protected int interpolationTicks = INTERPOLATION_TICKS;
 
     protected String id;
-    /** Where it is, on the screen. The server's x and y are {@link #originX}, {@link #originY} from here. */
+    /** Screen position; the server's x and y are relative to {@link #originX}, {@link #originY}. */
     protected int x, y, width, height;
     private int originX, originY;
     protected Map<String, String> props = new HashMap<>();
     protected ComponentContext context;
     protected final List<PandoricalComponent> children = new ArrayList<>();
-
-    // --- Geometry/scale/rotation interpolation ---
 
     protected float scale = 1f;
     protected float rotation = 0f;
@@ -59,12 +35,9 @@ public abstract class AbstractComponent implements PandoricalComponent {
 
     private GeometrySnapshot previousGeom;
     private GeometrySnapshot targetGeom;
-    private int geomTicksSinceUpdate = INTERPOLATION_TICKS; // start "arrived" — no bogus lerp-in on first render
+    private int geomTicksSinceUpdate = INTERPOLATION_TICKS;
 
-    /** Interpolated geometry sample: x/y/width/height/scale/rotation. */
     public record GeometrySnapshot(float x, float y, float width, float height, float scale, float rotation) {}
-
-    // --- Opt-in per-key color interpolation (subclasses call trackColor/interpolatedColor) ---
 
     private final Map<String, ColorAnim> colorAnims = new HashMap<>();
 
@@ -94,16 +67,10 @@ public abstract class AbstractComponent implements PandoricalComponent {
 
     @Override
     public void updateProps(Map<String, String> changedProps) {
-        // Capture wherever this component visually is RIGHT NOW (possibly mid-blend) as the new
-        // interpolation start point, so a steady stream of updates blends continuously instead of
-        // stair-stepping; same approach as StructureManager.ClientStructure.pushPose().
         GeometrySnapshot before = interpolatedGeometry(0f);
 
         this.props.putAll(changedProps);
 
-        // Geometry keys are recognized directly out of the shared string prop map rather than
-        // requiring a separate typed wire field; see the design note on ComponentType's
-        // PROP_X/PROP_Y/PROP_WIDTH/PROP_HEIGHT constants.
         int wasX = x;
         int wasY = y;
         if (changedProps.containsKey(ComponentType.PROP_X)) this.x = originX + parseInt(ComponentType.PROP_X, this.x - originX);
@@ -128,7 +95,6 @@ public abstract class AbstractComponent implements PandoricalComponent {
         this.originY = originY;
     }
 
-    /** Carried by a moving parent, blending the same way so the two travel together. */
     @Override
     public void shiftOrigin(int dx, int dy) {
         GeometrySnapshot before = interpolatedGeometry(0f);
@@ -143,7 +109,7 @@ public abstract class AbstractComponent implements PandoricalComponent {
         for (PandoricalComponent child : children) child.shiftOrigin(dx, dy);
     }
 
-    /** The position changed. For a component holding something placed where it was, such as a vanilla widget. */
+    /** For a component holding something positioned with it, such as a vanilla widget. */
     protected void moved() {}
 
     private void parseGeometryStyle() {
@@ -159,7 +125,6 @@ public abstract class AbstractComponent implements PandoricalComponent {
         return new GeometrySnapshot(x, y, width, height, scale, rotation);
     }
 
-    /** Advance interpolation progress by one client tick. Called once/tick via HudManager/ScreenHelper. */
     @Override
     public void tick() {
         if (geomTicksSinceUpdate < interpolationTicks) geomTicksSinceUpdate++;
@@ -169,29 +134,18 @@ public abstract class AbstractComponent implements PandoricalComponent {
     }
 
     /**
-     * Components that draw their own width/height interpolation return true so
-     * ScreenHelper's transform wrapper skips the corner-anchored size scale for
-     * them. A scale is wrong wherever size semantically means "how much is
-     * revealed" rather than "how large": a clip-mode sprite must re-clip at the
-     * interpolated size each frame (see SpriteComponent), or a width-animated
-     * fill renders as a squash/stretch of its full texture instead of a reveal.
-     * Position/scale/rotation interpolation still applies normally.
+     * True for a component that draws its own interpolated width and height, so ScreenHelper
+     * skips the size scale: for one where size means how much is revealed, not how large.
      */
     public boolean selfRendersInterpolatedSize() {
         return false;
     }
 
-    /**
-     * Blend fraction of the current geometry interpolation window, 0..1. Subclasses with props that
-     * must move in lockstep with geometry (a clip-mode sprite's texture_u/v, which arrive in the
-     * same update as the width/height they mirror) sample this so their own blend can never drift
-     * from the geometry's.
-     */
+    /** 0..1 through the geometry blend, for props that must move in lockstep with geometry. */
     protected float geometryBlend(float partialTick) {
         return clamp01((geomTicksSinceUpdate + partialTick) / (float) interpolationTicks);
     }
 
-    /** Interpolated geometry for the current render frame. Used by ScreenHelper's transform wrapper. */
     public GeometrySnapshot interpolatedGeometry(float partialTick) {
         float t = geometryBlend(partialTick);
         if (t >= 1f) return targetGeom;
@@ -206,23 +160,14 @@ public abstract class AbstractComponent implements PandoricalComponent {
     }
 
     /**
-     * What the renderer draws this at: the interpolated geometry, plus whatever a component adds
-     * of its own on top - a dial's angle under the hand, a tremble. Kept apart from
-     * {@link #interpolatedGeometry} because that is also what {@link #updateProps} captures as
-     * the start of the next blend, and a start that already carried the addition would have the
-     * addition applied twice, once inside the blend and once on top of it.
+     * The geometry drawn: {@link #interpolatedGeometry} plus any component-local addition. Add
+     * here, not there: that one seeds the next blend, and would carry the addition twice.
      */
     public GeometrySnapshot displayedGeometry(float partialTick) {
         return interpolatedGeometry(partialTick);
     }
 
-    // --- Opt-in color interpolation helpers ---
-
-    /**
-     * Record the logical (target) color for {@code key} so future {@link #interpolatedColor}
-     * calls blend smoothly towards it. Call from a subclass's style-parsing method every time
-     * props are (re)parsed, e.g. {@code trackColor("color", parseColor("color", 0xFFFFFFFF))}.
-     */
+    /** Sets the target color {@link #interpolatedColor} blends toward; call on every prop parse. */
     protected void trackColor(String key, int newColor) {
         ColorAnim anim = colorAnims.get(key);
         if (anim == null) {
@@ -237,7 +182,7 @@ public abstract class AbstractComponent implements PandoricalComponent {
         anim.ticksSinceUpdate = 0;
     }
 
-    /** Interpolated color for {@code key} at the current partial tick, falling back to a plain parse if untracked. */
+    /** Falls back to a plain parse for an untracked key. */
     protected int interpolatedColor(String key, int defaultColor, float partialTick) {
         ColorAnim anim = colorAnims.get(key);
         if (anim == null) return parseColor(key, defaultColor);
@@ -291,16 +236,14 @@ public abstract class AbstractComponent implements PandoricalComponent {
     @Override
     public List<PandoricalComponent> getChildren() { return children; }
 
-    // --- Prop parsing helpers ---
-
+    /** Hex {@code RRGGBB} (opaque) or {@code AARRGGBB}, with or without a leading {@code #}. */
     protected int parseColor(String key, int defaultColor) {
         String val = props.get(key);
         if (val == null) return defaultColor;
         try {
-            // Support #RRGGBB and #AARRGGBB
             if (val.startsWith("#")) val = val.substring(1);
             long parsed = Long.parseLong(val, 16);
-            if (val.length() <= 6) parsed |= 0xFF000000L; // add full alpha
+            if (val.length() <= 6) parsed |= 0xFF000000L;
             return (int) parsed;
         } catch (NumberFormatException e) {
             return defaultColor;

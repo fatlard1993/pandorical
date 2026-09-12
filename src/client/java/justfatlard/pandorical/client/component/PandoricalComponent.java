@@ -6,33 +6,22 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Client-side component rendered from a server-sent ComponentDef.
- */
+/** Client-side component rendered from a server-sent ComponentDef. */
 public interface PandoricalComponent {
-    /** Called once when the screen is built. */
     void init(ComponentDef def, ComponentContext context);
 
-    /** Called every frame. */
     void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta);
 
-    /**
-     * A second pass a container screen makes after vanilla has drawn the slot items, for the
-     * few things that belong over an item rather than under it. Nothing by default.
-     */
+    /** Drawn by a container screen after vanilla's slot items, for what belongs over an item. */
     default void renderOverlay(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {}
 
-    /**
-     * Whether the component is there at all. A hidden component is skipped by every tree walk:
-     * not drawn, not hit, not navigable, children included. See
-     * {@link justfatlard.pandorical.api.ComponentType#PROP_VISIBLE}.
-     */
+    /** A hidden component and its children are skipped by every draw, hit and navigation walk. */
     default boolean isVisible() { return true; }
 
     // Input handlers return true when the event is consumed.
 
     default boolean mouseClicked(double mouseX, double mouseY, int button) { return false; }
-    /** Offered to every component, not only the one under the pointer: what was pressed must hear its release wherever the mouse went. */
+    /** Offered to every component, not only the one under the pointer. */
     default boolean mouseReleased(double mouseX, double mouseY, int button) { return false; }
 
     default boolean keyPressed(int keyCode, int scanCode, int modifiers) { return false; }
@@ -42,40 +31,31 @@ public interface PandoricalComponent {
     default boolean mouseScrolled(double mouseX, double mouseY, double amount) { return false; }
 
     /**
-     * Where this component's x and y are measured from: its parent's corner, or the screen's for a
-     * component at the top. Told once, as it is built. A position the server sends later is measured
-     * from here too, the same as the one it was built with.
+     * The origin the server's x and y are measured from: the parent's corner, or the screen's at
+     * the top. Called once, as it is built; later position props are measured from it too.
      */
     default void placeIn(int originX, int originY) {}
 
-    /** Its parent has moved: move with it, by as much, children and all. */
+    /** The parent moved by this much; move with it, children included. */
     default void shiftOrigin(int dx, int dy) {}
 
-    /** Apply partial property updates from the server. */
     void updateProps(Map<String, String> changedProps);
 
-    /**
-     * Advance client-side interpolation progress by one client tick.
-     * No-op by default; {@link AbstractComponent} overrides this to advance geometry/color blending.
-     */
     default void tick() {}
 
     /**
-     * The screen this belongs to has gone: closed, replaced, or rebuilt for a resize. The place
-     * to put back anything borrowed from the window, such as the cursor a dial hides. Nothing
-     * by default.
+     * The screen closed, was replaced, or was rebuilt for a resize. Restore anything borrowed
+     * from the window here, such as a hidden cursor.
      */
     default void removed() {}
 
     /**
-     * Take over from the component this one replaces when its screen is rebuilt for a resize:
-     * {@code previous} has the same id and is always of this same class, and has already been
-     * told it is gone. Props are replayed without this; it is for what a component keeps that the
-     * server never sent, such as text typed or strokes painted ahead of the server. Nothing by default.
+     * Called when a resize rebuilds the screen. {@code previous} has the same id and class and has
+     * already been {@link #removed}. Props are replayed separately; carry over only client-side
+     * state the server never sent, such as typed text.
      */
     default void carryOverFrom(PandoricalComponent previous) {}
 
-    // Component bounds for hit testing
     int getX();
     int getY();
     int getWidth();
@@ -86,21 +66,13 @@ public interface PandoricalComponent {
             && mouseY >= getY() && mouseY < getY() + getHeight();
     }
 
-    /** Child components for recursive rendering and event routing. */
     List<PandoricalComponent> getChildren();
 
-    /** Component ID for event routing and updates. */
     String getId();
 
     /**
-     * Whether a non-mouse navigator (gamepad, keyboard focus) should be able
-     * to land on this component. Defaults to false, so a component is
-     * unreachable until it opts in — the safe direction, since landing on a
-     * component that ignores clicks is a dead end the player has to back out
-     * of manually.
-     *
-     * <p>Overriding this is the whole contract: anything that handles
-     * {@link #mouseClicked} should return true, and nothing else should.
+     * Whether a gamepad or keyboard navigator can land here. Return true exactly when
+     * {@link #mouseClicked} handles clicks.
      *
      * @see justfatlard.pandorical.api.NavigableScreen
      */

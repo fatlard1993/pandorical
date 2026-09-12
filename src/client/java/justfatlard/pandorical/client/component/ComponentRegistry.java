@@ -7,10 +7,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 
-/**
- * Maps component type strings to factory functions.
- * Built-in types are registered at startup; mods can add custom types.
- */
 public final class ComponentRegistry {
     private ComponentRegistry() {}
 

@@ -8,10 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Static/dynamic text display. Supports color, shadow, word wrapping, line
- * limits, and horizontal alignment within the component's own width.
- */
 public class TextComponent extends AbstractComponent {
     private String displayText;
     private int color;
@@ -46,7 +42,7 @@ public class TextComponent extends AbstractComponent {
         wrapWidth = parseInt("wrap_width", 0);
         maxLines = parseInt("max_lines", 0);
         align = parseString("align", "left");
-        cachedLines = null; // invalidate on prop change
+        cachedLines = null;
     }
 
     @Override
@@ -61,11 +57,6 @@ public class TextComponent extends AbstractComponent {
         }
     }
 
-    /**
-     * Where a line starts, given the alignment. Only the client can answer this:
-     * text length in pixels depends on the font and on the language the player
-     * reads in, neither of which a server knows.
-     */
     private int alignedX(String line) {
         return switch (align) {
             case "center" -> x + (width - context.font().width(line)) / 2;
@@ -94,14 +85,6 @@ public class TextComponent extends AbstractComponent {
 
     private static final String ELLIPSIS = "...";
 
-    /**
-     * Marks a line as cut short, giving up only as many characters as the mark actually costs.
-     *
-     * <p>The line handed here already fits: it is the lines after it that are being dropped. Paying
-     * for the mark in characters rather than pixels was throwing away three every time, so a name
-     * with room to spare still arrived shortened, and one whose last characters were wide could
-     * still overrun the edge it was being trimmed to fit.
-     */
     private String ellipsise(String line) {
         String trimmed = line;
         while (!trimmed.isEmpty() && context.font().width(trimmed + ELLIPSIS) > wrapWidth) {

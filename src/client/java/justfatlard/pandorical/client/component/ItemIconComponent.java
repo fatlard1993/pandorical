@@ -11,11 +11,6 @@ import java.util.Map;
 import java.util.Optional;
 import justfatlard.pandorical.protocol.ComponentDef;
 
-/**
- * Renders a single item icon at the component's position.
- * Props: item_id (e.g. "minecraft:red_shrub"), item_count (default 1).
- * Count > 1 is shown as the vanilla stack count overlay.
- */
 public class ItemIconComponent extends AbstractComponent {
     private ItemStack stack = ItemStack.EMPTY;
 
@@ -53,7 +48,7 @@ public class ItemIconComponent extends AbstractComponent {
     @Override
     public void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         if (stack.isEmpty()) return;
-        // Items need their own stratum so they render above the fill layers
+        // Without its own stratum the item draws under the fill layers.
         graphics.nextStratum();
         graphics.fakeItem(stack, x, y);
         if (stack.getCount() > 1) {

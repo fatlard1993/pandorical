@@ -10,14 +10,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 
-/**
- * Wraps vanilla EditBox for text input fields.
- * Sends "input" action with {"text": "..."} on every change.
- *
- * EditBox is a self-rendering widget: it handles its own rendering and input via the
- * widget event system. This component creates the EditBox, renders it via extractRenderState,
- * and forwards input events through the widget's own methods.
- */
+/** A vanilla EditBox that sends {@code {"text": ...}} on every change. */
 public class TextInputComponent extends AbstractComponent {
     private EditBox editBox;
 
@@ -63,9 +56,7 @@ public class TextInputComponent extends AbstractComponent {
             if (changedProps.containsKey("focused")) {
                 editBox.setFocused(parseBool("focused", false));
             }
-            // A hidden field must let go of the keyboard, or every key the screen gets from
-            // here on lands in something nobody can see. Setting the value on the way out is
-            // the server's job; only the focus is taken.
+            // A hidden field must not keep the keyboard.
             if (!visible && editBox.isFocused()) {
                 editBox.setFocused(false);
             }
@@ -80,7 +71,6 @@ public class TextInputComponent extends AbstractComponent {
     @Override
     public void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         if (editBox != null) {
-            // EditBox renders itself via extractRenderState
             editBox.extractRenderState(graphics, mouseX, mouseY, delta);
         }
     }
@@ -100,12 +90,8 @@ public class TextInputComponent extends AbstractComponent {
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (editBox != null && editBox.isFocused()) {
-            // keyPressed takes a KeyEvent; we construct one manually from the raw codes.
             boolean handled = editBox.keyPressed(new KeyEvent(keyCode, scanCode, modifiers));
-            // A focused field owns the keyboard, escape aside. A letter the box has no use for
-            // would otherwise fall through to the screen, and on a container screen the
-            // inventory key is one of those letters: typing "e" into a search would close the
-            // chest. Vanilla's anvil makes the same claim through canConsumeInput().
+            // A focused field takes every key but escape, or the inventory key closes the screen.
             return handled || keyCode != InputConstants.KEY_ESCAPE;
         }
         return false;
@@ -119,9 +105,6 @@ public class TextInputComponent extends AbstractComponent {
         return false;
     }
 
-    // Reachable only once the edit box exists, matching mouseClicked's own
-    // guard. Note that landing here is as far as a gamepad gets on its own:
-    // focusing the field is navigation, typing into it is not.
     @Override
     public boolean isNavigable() {
         return editBox != null;
@@ -131,7 +114,6 @@ public class TextInputComponent extends AbstractComponent {
         return editBox != null ? editBox.getValue() : "";
     }
 
-    /** What was typed, and whether it was being typed into: the server only ever hears the text. */
     @Override
     public void carryOverFrom(PandoricalComponent previous) {
         TextInputComponent old = (TextInputComponent) previous;

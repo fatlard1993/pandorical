@@ -5,9 +5,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import java.util.Map;
 import justfatlard.pandorical.protocol.ComponentDef;
 
-/**
- * Background panel with optional beveled borders.
- */
 public class PanelComponent extends AbstractComponent {
     private int background;
     private String borderStyle;
@@ -41,12 +38,10 @@ public class PanelComponent extends AbstractComponent {
         graphics.fill(x, y, x + width, y + height, background);
 
         if ("beveled".equals(borderStyle)) {
-            // Outer border
             graphics.fill(x, y, x + width, y + 2, borderLight);
             graphics.fill(x, y, x + 2, y + height, borderLight);
             graphics.fill(x, y + height - 2, x + width, y + height, borderDark);
             graphics.fill(x + width - 2, y, x + width, y + height, borderDark);
-            // Inner border
             graphics.fill(x + 2, y + 2, x + width - 2, y + 4, borderMidLight);
             graphics.fill(x + 2, y + 2, x + 4, y + height - 2, borderMidLight);
             graphics.fill(x + 2, y + height - 4, x + width - 2, y + height - 2, borderMidDark);

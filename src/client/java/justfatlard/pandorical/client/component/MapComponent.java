@@ -17,29 +17,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Renders a Minecraft map as a HUD minimap component. Always north-up.
- * Props:
- *   map_id: integer map ID to render
- *   rotate: "true" when compass is equipped, draws player dot as directional arrow
- */
+/** A map as a north-up HUD minimap. The {@code rotate} prop means the player holds a compass. */
 public class MapComponent extends AbstractComponent {
     private static final float MAP_PIXELS = 128.0f;
 
-    /** The vanilla frame art: border plus the unexplored-area checkerboard. */
+    /** Vanilla's frame, margin and unexplored-area checkerboard in one texture. */
     private static final Identifier CHECKERBOARD_TEXTURE =
         Identifier.fromNamespaceAndPath("minecraft", "textures/map/map_background_checkerboard.png");
 
-    // Vanilla 26.3 map frame geometry, measured from the snapshot jar:
-    // FirstPersonHandsAndItemsRenderer.renderMap draws the background quad over
-    // (-7,-7)..(135,135), i.e. a 7 map-px margin around the 128px map content.
+    // Vanilla's in-hand map background spans (-7,-7)..(135,135) around the 128px map.
     private static final float BORDER_TOTAL_MAP_PX = 7.0f;
 
-    /**
-     * Half the on-screen size of a marker. Vanilla scales its decoration quad by
-     * 4 in map space; here the same 4 is applied in screen space instead, so a
-     * marker stays legible on a minimap a third of a full map's size.
-     */
+    /** Vanilla's decoration scale, applied in screen space rather than map space. */
     private static final float MARKER_HALF_PX = 4.0f;
 
     /** Vanilla stores decoration facing in sixteenths of a turn. */
@@ -50,25 +39,19 @@ public class MapComponent extends AbstractComponent {
     private boolean compass = false;
     private double compassTargetX = Double.NaN;
     private double compassTargetZ = Double.NaN;
-    // Self decoration bytes sent from server (client can't compute them without map center)
+    // Server-computed: the client does not know the map's centre.
     private byte selfDecX = 0;
     private byte selfDecY = 0;
-    // Compass target as stable map dec bytes (server-computed; avoids edge drift)
     private byte compassDecX = 0;
     private byte compassDecY = 0;
-    // Mob Sight enchantment: serialized mob dot list from server
-    /** One mob dot as the server placed it: decoration coordinates, colour, and whether it is a person. */
     private record Dot(int decX, int decZ, int color, boolean person) {}
 
     private List<Dot> dots = List.of();
-    /** How the map is shown, as the server says for this player: nothing here is the client's own choice. */
     private float zoom = 1.0f;
     private boolean showCoords = true;
     private boolean showHostile = true;
     private boolean showPassive = true;
-    /** A heading arrow to lay in the corner, when the server supplies one. */
     private Identifier needleTexture = null;
-    /** Whether the compass is pointing past the edge of this map. */
     private boolean compassOffMap = false;
 
     @Override
@@ -85,7 +68,7 @@ public class MapComponent extends AbstractComponent {
 
     private void parseProps() {
         mapIdValue = parseInt("map_id", -1);
-        compass = parseBool("rotate", false); // the "rotate" prop carries "has compass"
+        compass = parseBool("rotate", false);
         compassTargetX = parseCoord("compass_tx");
         compassTargetZ = parseCoord("compass_tz");
         selfDecX = parseByte("self_dec_x");
@@ -117,9 +100,7 @@ public class MapComponent extends AbstractComponent {
         return out;
     }
 
-    /**
-     * Parse a world coordinate prop. Returns NaN if the prop is absent or empty (no target).
-     */
+    /** NaN when absent or empty: no target. */
     private double parseCoord(String key) {
         String val = props.get(key);
         if (val == null || val.isEmpty()) return Double.NaN;
@@ -145,9 +126,7 @@ public class MapComponent extends AbstractComponent {
 
         mc.getMapRenderer().extractRenderState(mapId, mapData, renderState);
 
-        // The frame is part of the component, not an overhang. Painting it outside
-        // the declared bounds put it past whichever screen edge the minimap was
-        // anchored to, and the anchored edges are the ones that got clipped.
+        // The frame stays inside the bounds, or an anchored minimap clips at the screen edge.
         int footprint = Math.min(width, height);
         int mapSize = Math.round(footprint * MAP_PIXELS / (MAP_PIXELS + 2f * BORDER_TOTAL_MAP_PX));
         int border = Math.max(1, (footprint - mapSize) / 2);
@@ -155,15 +134,10 @@ public class MapComponent extends AbstractComponent {
         int mapY = y + border;
         float scale = mapSize / MAP_PIXELS;
 
-        // Vanilla frame + backdrop in one stretched blit of the actual 26.3 map art:
-        // map_background_checkerboard.png carries the brown outline, tan margin, AND
-        // the two-tone checkerboard vanilla shows behind unexplored map pixels.
         graphics.blit(RenderPipelines.GUI_TEXTURED, CHECKERBOARD_TEXTURE,
             x, y, 0.0F, 0.0F, footprint, footprint, footprint, footprint);
 
-        // Decorations are drawn below, in screen space. Handing them to graphics.map()
-        // as well drew every landmark twice: vanilla's sprite first, then ours on top
-        // of it, which is what made a treasure X read as a white smudge.
+        // Decorations are drawn below in screen space, so graphics.map() must not draw them too.
         List<MapRenderState.MapDecorationRenderState> decorations = new ArrayList<>(renderState.decorations);
         renderState.decorations.clear();
 
@@ -171,11 +145,9 @@ public class MapComponent extends AbstractComponent {
 
         float zoomScale = scale * zoom;
 
-        // Belt-and-suspenders clamp of self decoration bytes
         int clampedSelfDecX = Math.max(-127, Math.min(127, (int) selfDecX));
         int clampedSelfDecY = Math.max(-127, Math.min(127, (int) selfDecY));
 
-        // When zoom > 1 we centre on the player; at 1x top-left is the map corner
         float originX, originY;
         if (zoom > 1.0f) {
             originX = mapX + mapSize / 2.0f - (clampedSelfDecX / 2.0f + 64f) * zoomScale;
@@ -185,10 +157,7 @@ public class MapComponent extends AbstractComponent {
             originY = mapY;
         }
 
-        // Drawn by vanilla rather than by us. It is the same sprite either way, but the
-        // transform, the scale and the way the quad is sampled then come from the map renderer
-        // instead of from a copy of it down here - so the marker on the minimap is the marker on
-        // the map in your hand, and stays that way when Mojang next changes it.
+        // The player marker goes through vanilla's map renderer, to match the in-hand map.
         MapRenderState.MapDecorationRenderState self = new MapRenderState.MapDecorationRenderState();
         self.atlasSprite = mapSprite(mc, "player");
         self.x = (byte) clampedSelfDecX;
@@ -197,7 +166,6 @@ public class MapComponent extends AbstractComponent {
         self.renderOnFrame = true;
         renderState.decorations.add(self);
 
-        // Map always north-up
         Matrix3x2fStack pose = graphics.pose();
         pose.pushMatrix();
         pose.translate(originX, originY);
@@ -205,10 +173,8 @@ public class MapComponent extends AbstractComponent {
         graphics.map(renderState);
         pose.popMatrix();
 
-        // --- Mob Sight: mob dots render first so the player marker lands on top ---
         for (Dot dot : dots) {
-            // Category filters, by the colour the server gave the dot. A person's colour
-            // is their locator bar colour and can be anything, so it is never filtered.
+            // Filtered by the server's colour. A person's is their locator bar colour, any colour.
             if (!dot.person() && !showHostile && dot.color() == 0xFFFF3333) continue;
             if (!dot.person() && !showPassive && (dot.color() == 0xFF33FF33 || dot.color() == 0xFFFFAA00)) continue;
 
@@ -219,15 +185,11 @@ public class MapComponent extends AbstractComponent {
             if (dot.person()) {
                 diamond(graphics, sx, sy, dot.color());
             } else {
-                // 2x2 dot; small enough not to obscure map detail
                 graphics.fill(sx, sy, sx + 2, sy + 2, dot.color());
             }
         }
 
-        // --- Landmarks, banners, treasure X: vanilla's own sprites ---
-        // renderOnFrame=false is the player-type set, which vanilla itself skips in a
-        // GUI; ours is drawn from the server props above and other players need
-        // tracking we do not have.
+        // renderOnFrame=false marks the player-type decorations, which vanilla skips in a GUI too.
         for (MapRenderState.MapDecorationRenderState dec : decorations) {
             if (!dec.renderOnFrame || dec.atlasSprite == null) continue;
 
@@ -238,16 +200,13 @@ public class MapComponent extends AbstractComponent {
             drawMarker(graphics, dec.atlasSprite, sx, sy, dec.rot * DEGREES_PER_ROT_STEP);
         }
 
-        // --- Compass destination marker: vanilla target_point, centred on the target ---
         boolean hasCompassTarget = compass && !Double.isNaN(compassTargetX) && !Double.isNaN(compassTargetZ);
         if (hasCompassTarget) {
             float cpx = originX + (compassDecX / 2.0f + 64f) * zoomScale;
             float cpy = originY + (compassDecY / 2.0f + 64f) * zoomScale;
             if (cpx >= mapX && cpx < mapX + mapSize && cpy >= mapY && cpy < mapY + mapSize) {
-                // Past the edge the server has already walked the point back along its own
-                // bearing to the border, so the marker sits where the thing actually lies rather
-                // than in whichever corner two independent clamps happened to meet. Turned to
-                // face outward there, which is the only way a marker on a border says "further".
+                // Off the map the server has moved the point to the border along its bearing;
+                // the marker turns to face outward there.
                 float turn = compassOffMap ? (float) Math.toDegrees(Math.atan2(
                     compassTargetX - mapData.centerX, -(compassTargetZ - mapData.centerZ))) : 0f;
                 drawMarker(graphics, mapSprite(mc, compassOffMap ? "target_x" : "target_point"),
@@ -255,33 +214,15 @@ public class MapComponent extends AbstractComponent {
             }
         }
 
-        // The heading arrow, small, in the corner the map has least to say in. Only with a
-        // compass: without one there is no heading to point along and an arrow would be a
-        // decoration pretending to be information.
         if (compass && needleTexture != null && hasCompassTarget) {
             int size = Math.max(8, mapSize / 5);
             int nx = mapX + 2;
             int ny = mapY + mapSize - size - 2;
 
-            // Taken from world coordinates, not from the map's decoration bytes.
-            //
-            // Those bytes are the target's position ON THE MAP, and a target off the map has
-            // already been walked back to the border before they are written - so past the edge
-            // the needle was reading the border point rather than the thing, and pointing at a
-            // spot on the frame. Worse the further out it was: the clamped point converges on
-            // the map's own rim, so out of range the needle swung toward the rim regardless of
-            // where the target actually lay, and near the rim the difference against the
-            // player's own clamped position collapsed toward zero and the heading became noise.
-            //
-            // The real coordinates are already here, sent beside those bytes, and they are
-            // subject to no clamp, no map scale and no edge. The needle is a heading; it should
-            // never have been asking the map.
+            // From world coordinates: the decoration bytes are clamped to the map's border.
             float bearing = (float) Math.toDegrees(Math.atan2(
                 compassTargetX - mc.player.getX(), -(compassTargetZ - mc.player.getZ())));
-            // Relative to the way the player faces, as a compass in the hand is and as the
-            // needle without a map already was: straight up means straight ahead. Measured from
-            // north it agreed with the map underneath and disagreed with the player, who turned
-            // and watched the needle stand still.
+            // Relative to the player's facing: straight up is straight ahead.
             float facingFromNorth = mc.player.getYRot() + 180.0f;
 
             Matrix3x2fStack npose = graphics.pose();
@@ -296,23 +237,15 @@ public class MapComponent extends AbstractComponent {
 
         graphics.disableScissor();
 
-        // --- Facing direction + coordinates, inside the map so the component
-        // --- never paints outside the bounds it told the layout it occupies.
         if (!showCoords) return;
         float yaw = mc.player.getYRot();
-        // Convert MC yaw (0=south) to degrees-from-north clockwise
+        // Yaw 0 is south.
         float fromNorth = ((yaw + 180) % 360 + 360) % 360;
         String[] dirs = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
         String facing = dirs[(int)((fromNorth + 22.5f) / 45f) % 8];
         int bx = mc.player.getBlockX(), by = mc.player.getBlockY(), bz = mc.player.getBlockZ();
-        // Centring alone does not keep the readout inside a small map: step down to
-        // shorter forms until one fits, and draw nothing rather than overflow.
         String coords = facing + "  " + bx + " / " + by + " / " + bz;
-        // Below the map when the component was handed room for it, over the map when it was not.
-        // The map is square at min(width, height), so any height beyond that is space the caller
-        // asked for on purpose, and a readout sitting under the frame beats one painted across
-        // the ground it is describing. A caller that declares a square still gets the old
-        // placement rather than text over the edge of its own bounds.
+        // Height beyond the square map is room for the readout below it; otherwise it goes over.
         int spare = height - footprint;
         boolean below = spare >= mc.font.lineHeight + 1;
         int room = below ? footprint : mapSize;
@@ -329,14 +262,8 @@ public class MapComponent extends AbstractComponent {
     }
 
     /**
-     * Draw a map decoration the way vanilla draws it, in screen pixels.
-     *
-     * <p>The transform and the quad are lifted from {@code GuiGraphicsExtractor.map}:
-     * translate to the marker, rotate, scale, nudge by an eighth of a pixel, then one
-     * quad from -1 to 1 with the sprite's V coordinates swapped. Swapped in the UVs and
-     * not by flipping the quad: a flipped quad winds the other way, and under 26.3-rc-1
-     * the GUI no longer draws one, so every landmark, treasure X and compass marker went
-     * missing while the player marker, drawn by vanilla, stayed.
+     * The transform and quad of {@code GuiGraphicsExtractor.map}, in screen pixels. The V flip is
+     * in the UVs, not the quad: the GUI culls a quad wound the other way.
      */
     private static void drawMarker(GuiGraphicsExtractor graphics, TextureAtlasSprite sprite,
                                     float cx, float cy, float rotDegrees) {
@@ -352,11 +279,7 @@ public class MapComponent extends AbstractComponent {
         pose.popMatrix();
     }
 
-    /**
-     * Another player: a diamond in their locator bar colour, outlined dark so it holds up on
-     * terrain of any colour. A different shape from a mob's square, because the colours overlap
-     * - a player whose dot came out red is still a person and not something to run from.
-     */
+    /** A player: a diamond, since a locator bar colour can match a mob category's colour. */
     static void diamond(GuiGraphicsExtractor graphics, int cx, int cy, int color) {
         diamondFill(graphics, cx, cy, 3, 0xE0101010);
         diamondFill(graphics, cx, cy, 2, color);
@@ -369,11 +292,7 @@ public class MapComponent extends AbstractComponent {
         }
     }
 
-    /**
-     * Map decorations live in their own atlas in 26.3, not the GUI atlas the
-     * Identifier blitSprite overload resolves against, so the sprite is fetched
-     * from that atlas explicitly.
-     */
+    /** Map decorations have their own atlas, not the GUI atlas blitSprite resolves against. */
     private static TextureAtlasSprite mapSprite(Minecraft mc, String name) {
         return mc.getAtlasManager()
             .getAtlasOrThrow(AtlasIds.MAP_DECORATIONS)

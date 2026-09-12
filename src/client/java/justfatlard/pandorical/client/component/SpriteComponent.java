@@ -8,14 +8,8 @@ import net.minecraft.resources.Identifier;
 import java.util.Map;
 
 /**
- * Renders colored rectangles or textured quads.
- * Used for indicators, dividers, backgrounds, and decorative elements.
- *
- * <p>With a {@code texture} prop (full identifier including extension, e.g.
- * {@code "mymod:textures/gui/icon.png"}) the texture is stretched over the
- * component bounds; without one, or when the id fails to parse, the sprite
- * falls back to its color fill. A missing texture renders the vanilla
- * missing-texture pattern rather than crashing.
+ * A colour fill, or a {@code texture} (full path with extension) stretched over the bounds.
+ * With {@code texture_width} and {@code texture_height} it is drawn at native size, clipped.
  */
 public class SpriteComponent extends AbstractComponent {
     private int color;
@@ -24,9 +18,8 @@ public class SpriteComponent extends AbstractComponent {
     private int textureHeight;
     private int textureU;
     private int textureV;
-    // The source origin blends on the geometry's own clock: a reveal that moves its v in step with
-    // its height (a bottom-anchored gauge) must see both interpolate together, or the anchored edge
-    // detaches for the length of the blend window
+    // The source origin blends on the geometry's clock, so a bottom-anchored gauge that moves v
+    // with height keeps its anchored edge pinned mid-blend.
     private float prevU;
     private float prevV;
 
@@ -40,8 +33,7 @@ public class SpriteComponent extends AbstractComponent {
 
     @Override
     public void updateProps(Map<String, String> changedProps) {
-        // Capture the origin currently displayed (possibly mid-blend) before the geometry blend
-        // restarts, same in-flight capture AbstractComponent does for geometry itself
+        // Before super restarts the geometry blend.
         float t = geometryBlend(0f);
         prevU = prevU + (textureU - prevU) * t;
         prevV = prevV + (textureV - prevV) * t;
@@ -70,11 +62,6 @@ public class SpriteComponent extends AbstractComponent {
         }
     }
 
-    /**
-     * Clip mode owns its size animation: the reveal must be re-clipped at the
-     * interpolated width/height every frame, never scaled (see
-     * AbstractComponent#selfRendersInterpolatedSize).
-     */
     @Override
     public boolean selfRendersInterpolatedSize() {
         return texture != null && textureWidth > 0 && textureHeight > 0;
@@ -84,18 +71,10 @@ public class SpriteComponent extends AbstractComponent {
     public void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         if (texture != null) {
             if (textureWidth > 0 && textureHeight > 0) {
-                // Native-size draw clipped to bounds; size interpolation is
-                // applied here as a per-frame re-clip, a true reveal
                 GeometrySnapshot g = interpolatedGeometry(delta);
-                // The origin blends on the same clock as the geometry: a server that moves v with
-                // height (v = textureHeight - height, the bottom-anchored gauge) then sees
-                // textureHeight - v == height at every point of the blend, keeping the anchored
-                // edge pinned instead of gapping while the size clamp below chases a snapped origin
                 float t = geometryBlend(delta);
                 int drawU = Math.round(prevU + (textureU - prevU) * t);
                 int drawV = Math.round(prevV + (textureV - prevV) * t);
-                // Clamped against the region left of the source origin, so a sprite
-                // revealing from a non-zero u/v can never sample past the texture
                 int drawW = Math.min(Math.round(g.width()), textureWidth - drawU);
                 int drawH = Math.min(Math.round(g.height()), textureHeight - drawV);
                 if (drawW > 0 && drawH > 0) {
