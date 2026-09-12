@@ -29,7 +29,7 @@ public final class ServerSettingsButton {
     public static void register() {
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             boolean pause = screen instanceof PauseScreen;
-            if (!(pause || screen instanceof OptionsScreen) || !ServerCapabilities.has("settings")) return;
+            if (!(pause || screen instanceof OptionsScreen) || !ServerCapabilities.has(justfatlard.pandorical.api.Capabilities.SETTINGS)) return;
             if (client.getConnection() == null) return;
             Screens.getWidgets(screen).add(Button.builder(Component.translatable("pandorical.mods.button"),
                     button -> ClientPlayNetworking.send(new OpenSettingsC2S()))

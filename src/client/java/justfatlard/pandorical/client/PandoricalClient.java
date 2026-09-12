@@ -39,7 +39,7 @@ import java.util.Map;
 import java.util.Objects;
 
 public class PandoricalClient implements ClientModInitializer {
-    private static final List<String> CLIENT_CAPABILITIES = List.of("screens", "content", "hud", "camera", "structures", "entity_overlays", "chest_overlays", "keybinds", "hud_elements", "skins", "render_policy", "animations", "mount_policy");
+    private static final List<String> CLIENT_CAPABILITIES = justfatlard.pandorical.api.Capabilities.CLIENT;
 
     // Pending screen defs keyed by screenId; LinkedHashMap preserves insertion order
     // so the last entry is always the most recently added.

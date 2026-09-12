@@ -1,5 +1,6 @@
 package justfatlard.pandorical;
 
+import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.EntityRendererRegistry;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.PlayerInventoryApi;
@@ -72,7 +73,7 @@ public class Pandorical implements ModInitializer {
             .orElse("unknown");
     }
 
-    public static final List<String> SERVER_CAPABILITIES = List.of("screens", "content", "camera", "hud", "structures", "entity_overlays", "chest_overlays", "keybinds", "hud_elements", "skins", "render_policy", "animations", "mount_policy", "settings", "block_marks");
+    public static final List<String> SERVER_CAPABILITIES = justfatlard.pandorical.api.Capabilities.SERVER;
 
     /**
      * Tracks player UUIDs (from GameProfile) that completed config-phase content sync.
@@ -446,7 +447,7 @@ public class Pandorical implements ModInitializer {
 
                 var contentRegistry = PandoricalApi.contentRegistry();
                 if (contentRegistry.hasContent()
-                        && PandoricalApi.hasCapability(player, "content")
+                        && PandoricalApi.hasCapability(player, Capabilities.CONTENT)
                         && !PandoricalApi.isContentReady(player)
                         && PandoricalApi.beginContentSync(player.getUUID())) {
                     contentRegistry.syncContentTo(player);

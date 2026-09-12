@@ -1,5 +1,6 @@
 package justfatlard.pandorical.settings;
 
+import justfatlard.pandorical.api.Capabilities;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -442,7 +443,7 @@ public final class SettingsRegistry implements SettingsApi {
         }
         int y = 2;
         int n = 0;
-        boolean listening = PandoricalApi.hasCapability(player, "keybinds");
+        boolean listening = PandoricalApi.hasCapability(player, Capabilities.KEYBINDS);
         if (!listening) {
             for (String line : Glyphs.wrap("Your client does not carry keybinds; these do nothing here.", at.proseW())) {
                 out.add(prose("keyhint:" + n++, y, line, HINT_COLOR, at));

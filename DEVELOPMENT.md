@@ -53,12 +53,15 @@ Three string shapes in this API look right and are not. Get any of them wrong an
 nothing throws, nothing logs, and the feature is absent. That is why they come
 before anything else.
 
-**Capability strings are a fixed list.** Only these nine are ever sent in the handshake:
+**Capability strings are a fixed list**, the constants in `Capabilities`. A client declares
+`Capabilities.CLIENT`, and nothing else is ever sent in the handshake:
 
 `screens` · `content` · `camera` · `hud` · `structures` · `entity_overlays` ·
-`chest_overlays` · `keybinds` · `hud_elements`
+`chest_overlays` · `keybinds` · `hud_elements` · `skins` · `render_policy` ·
+`animations` · `mount_policy`
 
-`hasCapability(player, "blockTints")` returns false forever, because `blockTints` is an
+Pass the constant, `hasCapability(player, Capabilities.SCREENS)`, and a typo is a compile
+error. `hasCapability(player, "blockTints")` returns false forever, because `blockTints` is an
 API surface, not a capability. Player inventory slots, block tints, and built-in entity
 renderers have no capability string and are not guarded that way.
 

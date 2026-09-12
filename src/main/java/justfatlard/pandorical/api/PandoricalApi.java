@@ -69,10 +69,9 @@ public final class PandoricalApi {
     }
 
     /**
-     * Returns true if the player's Pandorical client advertised the given capability.
-     * Known capability strings: {@code "screens"}, {@code "hud"}, {@code "camera"},
-     * {@code "structures"}, {@code "entity_overlays"}, {@code "keybinds"}.
-     * A capability being absent means the client version does not support that feature.
+     * Returns true if the player's Pandorical client advertised the given capability, one of
+     * {@link Capabilities#CLIENT}. Any other string is false for every player. A capability being
+     * absent means the client version does not support that feature.
      */
     public static boolean hasCapability(ServerPlayer player, String capability) {
         Set<String> caps = playerCapabilities.get(player.getUUID());
@@ -315,7 +314,7 @@ public final class PandoricalApi {
 
         private static void send(ServerPlayer player, byte op, net.minecraft.resources.Identifier texture,
                 java.util.Collection<net.minecraft.core.BlockPos> positions) {
-            if (!hasCapability(player, "chest_overlays")) return;
+            if (!hasCapability(player, Capabilities.CHEST_OVERLAYS)) return;
 
             long[] packed = new long[positions.size()];
             int i = 0;
@@ -428,7 +427,7 @@ public final class PandoricalApi {
 
         @Override
         public void open(ServerPlayer player, justfatlard.pandorical.protocol.OpenScreenS2C screen) {
-            if (!hasCapability(player, "screens")) {
+            if (!hasCapability(player, Capabilities.SCREENS)) {
                 justfatlard.pandorical.Pandorical.LOGGER.debug("Cannot open screen for {} — client lacks 'screens' capability",
                     player.getName().getString());
                 return;
@@ -446,7 +445,7 @@ public final class PandoricalApi {
         @Override
         public void openContainer(ServerPlayer player, justfatlard.pandorical.protocol.OpenScreenS2C screen,
                                   Container serverContainer, Set<Integer> readOnlySlots) {
-            if (!hasCapability(player, "screens")) {
+            if (!hasCapability(player, Capabilities.SCREENS)) {
                 justfatlard.pandorical.Pandorical.LOGGER.debug("Cannot open container for {} — client lacks 'screens' capability",
                     player.getName().getString());
                 return;
@@ -661,7 +660,7 @@ public final class PandoricalApi {
     public static final class HudApiImpl implements HudApi {
         @Override
         public void show(ServerPlayer player, justfatlard.pandorical.protocol.ShowHudS2C overlay) {
-            if (!hasCapability(player, "hud")) {
+            if (!hasCapability(player, Capabilities.HUD)) {
                 justfatlard.pandorical.Pandorical.LOGGER.warn(
                     "Cannot show HUD for {} — client does not support HUD rendering (not yet implemented on client)",
                     player.getName().getString());
@@ -690,7 +689,7 @@ public final class PandoricalApi {
 
         @Override
         public void hideVanillaElements(ServerPlayer player, String ownerId, java.util.Collection<String> elementIds) {
-            if (!hasCapability(player, "hud_elements")) return;
+            if (!hasCapability(player, Capabilities.HUD_ELEMENTS)) return;
             Map<String, java.util.Set<String>> byOwner = hiddenVanillaElements
                 .computeIfAbsent(player.getUUID(), k -> new java.util.concurrent.ConcurrentHashMap<>());
             if (elementIds.isEmpty()) {
@@ -705,7 +704,7 @@ public final class PandoricalApi {
         public void restoreVanillaElements(ServerPlayer player, String ownerId) {
             Map<String, java.util.Set<String>> byOwner = hiddenVanillaElements.get(player.getUUID());
             if (byOwner == null || byOwner.remove(ownerId) == null) return;
-            if (!hasCapability(player, "hud_elements")) return;
+            if (!hasCapability(player, Capabilities.HUD_ELEMENTS)) return;
             sendVanillaElementSet(player, byOwner);
         }
 
@@ -726,7 +725,7 @@ public final class PandoricalApi {
     public static final class CameraApiImpl implements CameraApi {
         @Override
         public void setDistance(ServerPlayer player, float distance) {
-            if (!hasCapability(player, "camera")) return;
+            if (!hasCapability(player, Capabilities.CAMERA)) return;
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
                 new justfatlard.pandorical.protocol.CameraHintS2C("distance",
                     Map.of("distance", String.valueOf(distance))));
@@ -734,7 +733,7 @@ public final class PandoricalApi {
 
         @Override
         public void setPerspective(ServerPlayer player, String perspective) {
-            if (!hasCapability(player, "camera")) return;
+            if (!hasCapability(player, Capabilities.CAMERA)) return;
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
                 new justfatlard.pandorical.protocol.CameraHintS2C("perspective",
                     Map.of("mode", perspective)));
@@ -742,7 +741,7 @@ public final class PandoricalApi {
 
         @Override
         public void zoom(ServerPlayer player, float factor) {
-            if (!hasCapability(player, "camera")) return;
+            if (!hasCapability(player, Capabilities.CAMERA)) return;
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
                 new justfatlard.pandorical.protocol.CameraHintS2C("zoom",
                     Map.of("factor", String.valueOf(factor))));
@@ -785,7 +784,7 @@ public final class PandoricalApi {
 
         public static void sendTo(ServerPlayer player) {
             if (!doubleRiders && !freeLook) return;
-            if (!hasCapability(player, "mount_policy")) return;
+            if (!hasCapability(player, Capabilities.MOUNT_POLICY)) return;
 
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
                 new justfatlard.pandorical.protocol.MountPolicyS2C(doubleRiders, freeLook));
@@ -822,14 +821,14 @@ public final class PandoricalApi {
             if (!(entity.level() instanceof net.minecraft.server.level.ServerLevel level)) return;
 
             for (ServerPlayer player : level.players()) {
-                if (!hasCapability(player, "animations")) continue;
+                if (!hasCapability(player, Capabilities.ANIMATIONS)) continue;
                 net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, payload);
             }
         }
 
         /** Catch a joining client up on everything already playing. */
         public static void sendAllTo(ServerPlayer player) {
-            if (!hasCapability(player, "animations")) return;
+            if (!hasCapability(player, Capabilities.ANIMATIONS)) return;
 
             for (var payload : PLAYING.values()) {
                 net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, payload);
@@ -865,7 +864,7 @@ public final class PandoricalApi {
         /** Tell one arriving client what this server asks for. */
         public static void sendTo(ServerPlayer player) {
             if (!cullLeaves) return;
-            if (!hasCapability(player, "render_policy")) return;
+            if (!hasCapability(player, Capabilities.RENDER_POLICY)) return;
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
                 new justfatlard.pandorical.protocol.RenderPolicyS2C(cullLeaves));
         }
@@ -940,14 +939,14 @@ public final class PandoricalApi {
                 justfatlard.pandorical.protocol.SkinOverrideS2C worn) {
             if (server == null) return;
             for (ServerPlayer viewer : server.getPlayerList().getPlayers()) {
-                if (!hasCapability(viewer, "skins")) continue;
+                if (!hasCapability(viewer, Capabilities.SKINS)) continue;
                 net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(viewer, worn);
             }
         }
 
         /** Catch a newly arrived client up on everyone already wearing something. */
         public static void sendAllTo(ServerPlayer viewer) {
-            if (WORN.isEmpty() || !hasCapability(viewer, "skins")) return;
+            if (WORN.isEmpty() || !hasCapability(viewer, Capabilities.SKINS)) return;
             for (justfatlard.pandorical.protocol.SkinOverrideS2C worn : WORN.values()) {
                 net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(viewer, worn);
             }
@@ -1144,7 +1143,7 @@ public final class PandoricalApi {
 
         /** @hidden called from Pandorical's EntityTrackingEvents.START_TRACKING handler. */
         public void handleStartTracking(Entity entity, ServerPlayer player) {
-            if (!hasCapability(player, "structures")) return;
+            if (!hasCapability(player, Capabilities.STRUCTURES)) return;
             for (Map.Entry<String, StructureState> entry : structures.entrySet()) {
                 if (entry.getValue().anchorEntity == entity) {
                     net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
@@ -1187,7 +1186,7 @@ public final class PandoricalApi {
 
         private void broadcastToTrackers(Entity anchorEntity, net.minecraft.network.protocol.common.custom.CustomPacketPayload packet) {
             for (ServerPlayer player : net.fabricmc.fabric.api.networking.v1.PlayerLookup.tracking(anchorEntity)) {
-                if (hasCapability(player, "structures")) {
+                if (hasCapability(player, Capabilities.STRUCTURES)) {
                     net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, packet);
                 }
             }
@@ -1225,7 +1224,7 @@ public final class PandoricalApi {
 
         /** @hidden called from Pandorical's EntityTrackingEvents.START_TRACKING handler. */
         public void handleStartTracking(Entity entity, ServerPlayer player) {
-            if (!hasCapability(player, "entity_overlays")) return;
+            if (!hasCapability(player, Capabilities.ENTITY_OVERLAYS)) return;
             OverlayEntry entry = overlays.get(entity.getUUID());
             if (entry != null) {
                 net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
@@ -1239,7 +1238,7 @@ public final class PandoricalApi {
          * already-tracked entities must be replayed here.
          */
         public void handlePlayerReady(ServerPlayer player) {
-            if (!hasCapability(player, "entity_overlays")) return;
+            if (!hasCapability(player, Capabilities.ENTITY_OVERLAYS)) return;
             for (OverlayEntry entry : overlays.values()) {
                 if (net.fabricmc.fabric.api.networking.v1.PlayerLookup.tracking(entry.entity()).contains(player)) {
                     net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
@@ -1256,7 +1255,7 @@ public final class PandoricalApi {
 
         private void broadcastToTrackers(Entity entity, net.minecraft.network.protocol.common.custom.CustomPacketPayload packet) {
             for (ServerPlayer player : net.fabricmc.fabric.api.networking.v1.PlayerLookup.tracking(entity)) {
-                if (hasCapability(player, "entity_overlays")) {
+                if (hasCapability(player, Capabilities.ENTITY_OVERLAYS)) {
                     net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, packet);
                 }
             }
@@ -1409,7 +1408,7 @@ public final class PandoricalApi {
 
         /** Ask this player's client to bind the next key it sees to this slot. */
         public void requestRebind(ServerPlayer player, int slot) {
-            if (!hasCapability(player, "keybinds")) return;
+            if (!hasCapability(player, Capabilities.KEYBINDS)) return;
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
                 new justfatlard.pandorical.protocol.KeybindRebindS2C(slot));
         }
@@ -1417,7 +1416,7 @@ public final class PandoricalApi {
         /** @hidden push claimed slots after the capability handshake completes. */
         public void handlePlayerReady(ServerPlayer player) {
             bindings.remove(player.getUUID());
-            if (bySlot.isEmpty() || !hasCapability(player, "keybinds")) return;
+            if (bySlot.isEmpty() || !hasCapability(player, Capabilities.KEYBINDS)) return;
             java.util.List<Integer> slots = new java.util.ArrayList<>(bySlot.keySet());
             java.util.Collections.sort(slots);
             net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
@@ -1441,7 +1440,7 @@ public final class PandoricalApi {
 
         /** @hidden validate and dispatch one press; called on the server thread. */
         public void handleKeyPress(ServerPlayer player, int slot) {
-            if (!hasCapability(player, "keybinds")) return;
+            if (!hasCapability(player, Capabilities.KEYBINDS)) return;
             if (slot < 0 || slot >= MAX_SLOTS) return;
             Registration registration = bySlot.get(slot);
             if (registration == null) return;
@@ -1466,7 +1465,7 @@ public final class PandoricalApi {
 
         /** @hidden validate and dispatch one release; called on the server thread. */
         public void handleKeyRelease(ServerPlayer player, int slot) {
-            if (!hasCapability(player, "keybinds")) return;
+            if (!hasCapability(player, Capabilities.KEYBINDS)) return;
             if (slot < 0 || slot >= MAX_SLOTS) return;
             Registration registration = bySlot.get(slot);
             if (registration == null) return;

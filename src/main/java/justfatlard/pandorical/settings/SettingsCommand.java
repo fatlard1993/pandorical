@@ -1,5 +1,6 @@
 package justfatlard.pandorical.settings;
 
+import justfatlard.pandorical.api.Capabilities;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -37,7 +38,7 @@ public final class SettingsCommand {
 
     private static int open(CommandSourceStack source, SettingsRegistry settings) throws CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
-        if (!PandoricalApi.hasCapability(player, "screens")) {
+        if (!PandoricalApi.hasCapability(player, Capabilities.SCREENS)) {
             source.sendSuccess(() -> Component.translatable("pandorical.settings.no_client"), false);
             return list(source, settings);
         }
@@ -48,7 +49,7 @@ public final class SettingsCommand {
     /** The mod menu on a Pandorical client; the list of mods, one line each, on any other. */
     private static int mods(CommandSourceStack source) throws CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
-        if (PandoricalApi.hasCapability(player, "screens")) {
+        if (PandoricalApi.hasCapability(player, Capabilities.SCREENS)) {
             PandoricalApi.settingsImpl().open(player, null);
             return 1;
         }
