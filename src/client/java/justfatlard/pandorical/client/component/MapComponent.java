@@ -320,10 +320,12 @@ public class MapComponent extends AbstractComponent {
     /**
      * Draw a map decoration the way vanilla draws it, in screen pixels.
      *
-     * <p>The transform is lifted from {@code GuiGraphicsExtractor.map}: translate to
-     * the marker, rotate, scale, then nudge by an eighth of a pixel. Vanilla samples
-     * the sprite with its V coordinates swapped, so the quad is flipped in Y here to
-     * match; without that the arrow points the wrong way down its own axis.
+     * <p>The transform and the quad are lifted from {@code GuiGraphicsExtractor.map}:
+     * translate to the marker, rotate, scale, nudge by an eighth of a pixel, then one
+     * quad from -1 to 1 with the sprite's V coordinates swapped. Swapped in the UVs and
+     * not by flipping the quad: a flipped quad winds the other way, and under 26.3-rc-1
+     * the GUI no longer draws one, so every landmark, treasure X and compass marker went
+     * missing while the player marker, drawn by vanilla, stayed.
      */
     private static void drawMarker(GuiGraphicsExtractor graphics, TextureAtlasSprite sprite,
                                     float cx, float cy, float rotDegrees) {
@@ -333,8 +335,9 @@ public class MapComponent extends AbstractComponent {
         pose.rotate((float) Math.toRadians(rotDegrees));
         pose.scale(MARKER_HALF_PX, MARKER_HALF_PX);
         pose.translate(-0.125f, 0.125f);
-        pose.scale(1f, -1f);
-        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, -1, -1, 2, 2);
+        // x0, x1, y0, y1: this overload takes its corners an axis at a time.
+        graphics.blit(sprite.atlasLocation(), -1, 1, -1, 1,
+            sprite.getU0(), sprite.getU1(), sprite.getV1(), sprite.getV0());
         pose.popMatrix();
     }
 
