@@ -6,49 +6,30 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * API for server mods to draw particular chests with a different texture, e.g.
- * marking the ones a village generated with so a player can tell them from
- * their own.
+ * Particular chests drawn with a different texture, per player.
  *
- * <p>The texture is a sprite id in the vanilla chests atlas: no extension, and
- * no {@code _left} / {@code _right} suffix, which the client appends itself for
- * each half of a double chest. That atlas is assembled from a directory source
- * covering every namespace, so shipping
- * {@code assets/<yourmod>/textures/entity/chest/<name>.png} is the whole of the
- * registration. All three files are needed: {@code <name>.png},
- * {@code <name>_left.png} and {@code <name>_right.png}.
+ * <p>The texture is a sprite id in the vanilla chests atlas, with no extension and no
+ * {@code _left}/{@code _right} suffix: the client appends those for each half of a double
+ * chest. Shipping {@code assets/<yourmod>/textures/entity/chest/<name>.png},
+ * {@code <name>_left.png} and {@code <name>_right.png} is the whole registration.
  *
- * <p><b>The id keeps the atlas's directory prefix.</b> It is
- * {@code <yourmod>:entity/chest/<name>}, not the bare {@code <yourmod>:<name>}:
- * the atlas names its sprites by their path under the source directory. A bare
- * name resolves to no sprite and the chest draws as missing-texture magenta,
- * which is the only symptom you get. Vanilla's own bases follow the same rule,
- * so a christmas chest is {@code minecraft:entity/chest/christmas}.
+ * <p><b>The id keeps the atlas's directory prefix:</b> {@code <yourmod>:entity/chest/<name>},
+ * not {@code <yourmod>:<name>}. A bare name draws missing-texture magenta and nothing else
+ * complains. Vanilla's are the same, e.g. {@code minecraft:entity/chest/christmas}.
  *
- * <p>Unlike {@link EntityOverlayApi}, these are addressed to one player rather
- * than broadcast, because whether a chest deserves marking can depend on who is
- * looking: the same chest may be a landlord's and a guest's.
- *
- * <p>Nothing is persisted and nothing is remembered across a reconnect. A mod
- * that wants marks to survive one must send them again on join, which is also
- * the only moment it can know which player it is talking to.
- *
- * <p>All calls are no-ops for players whose client lacks the
- * {@code "chest_overlays"} capability; vanilla clients are unaffected.
+ * <p>Nothing is persisted or kept across a reconnect: send marks again each session, from
+ * {@link PandoricalApi#onPlayerReady}. Players without the {@code "chest_overlays"} capability
+ * are sent nothing.
  */
 public interface ChestOverlayApi {
     /**
      * Replace everything this player has marked with {@code texture}. Positions
      * marked with a different texture are left alone.
-     *
-     * <p>This is the call for a join: it states the whole truth in one message
-     * rather than assuming what the client still remembers.
      */
     void replace(ServerPlayer player, Identifier texture, Collection<BlockPos> positions);
 
-    /** Mark more positions with {@code texture}, leaving existing marks in place. */
     void add(ServerPlayer player, Identifier texture, Collection<BlockPos> positions);
 
-    /** Unmark positions, whatever texture they were carrying. */
+    /** Whatever texture they were carrying. */
     void remove(ServerPlayer player, Collection<BlockPos> positions);
 }

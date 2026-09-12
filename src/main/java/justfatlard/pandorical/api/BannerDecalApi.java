@@ -9,16 +9,12 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BannerPatternLayers;
 
 /**
- * Banner patterns laid flat on a block, drawn by the client over whatever the block already is.
+ * Banner patterns laid flat on a block, drawn by the client over the block's own texture: only
+ * the pattern layers, no base colour.
  *
- * <p>Only the pattern layers are drawn - no base colour - so the block's own texture is the
- * ground the pattern sits on. That is what makes a patterned bed read as a bed with a pattern
- * rather than a banner lying on one. Patterns are per player and per position, sent as deltas;
- * a client draws a decal only while the chunk is loaded and the block is still there.
- *
- * <p>Vanilla clients see nothing. A mod that also keeps a vanilla-visible fallback, such as an
- * item display, can keep it out of Pandorical clients' sight by marking the displayed item's
- * custom data with {@link #HIDDEN_ITEM_KEY}.
+ * <p>Per player and per position, sent as deltas. A client draws a decal only while the chunk is
+ * loaded and the block is still there. Vanilla clients see nothing; a vanilla-visible fallback
+ * such as an item display can be hidden from Pandorical clients with {@link #HIDDEN_ITEM_KEY}.
  */
 public interface BannerDecalApi {
     /** Custom-data key on an item display's item that Pandorical clients take as "do not draw". */

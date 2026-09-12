@@ -1,12 +1,10 @@
 package justfatlard.pandorical.api;
 
 /**
- * API for server mods to change how mounts handle.
+ * Server-wide riding rules, declared once at mod init.
  *
- * <p>Server-wide, and declared once at startup: these describe how riding works here, not how one
- * particular horse behaves. Both settings need the rider's client to agree, so Pandorical syncs
- * them - a mod turning one on without a Pandorical client would be overruled by that client every
- * tick.
+ * <p>Both need the rider's client to agree, so Pandorical syncs them to each Pandorical client as
+ * it arrives; a client without Pandorical overrules them every tick.
  */
 public interface MountApi {
 
@@ -14,11 +12,8 @@ public interface MountApi {
 	void doubleRiders(boolean allow);
 
 	/**
-	 * Steer mounts like a boat instead of aiming them.
-	 *
-	 * <p>The mount keeps its own heading and turns with the strafe keys; the rider's view is their
-	 * own. Being able to look somewhere other than where you are going is the whole point - it is
-	 * what makes shooting from horseback possible.
+	 * Steer mounts like a boat: the mount keeps its own heading and turns with the strafe keys,
+	 * and the rider looks where they like.
 	 */
 	void freeLook(boolean enable);
 }
