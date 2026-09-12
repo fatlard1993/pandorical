@@ -3,7 +3,7 @@ package justfatlard.pandorical.client.keybind;
 import com.mojang.blaze3d.platform.InputConstants;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.KeybindApi;
-import justfatlard.pandorical.api.PandoricalApi;
+import justfatlard.pandorical.keybind.KeybindPool;
 import justfatlard.pandorical.protocol.KeyPressC2S;
 import justfatlard.pandorical.protocol.KeyReleaseC2S;
 import justfatlard.pandorical.protocol.KeybindBindingsC2S;
@@ -34,7 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class KeybindManager {
 	private KeybindManager() {}
 
-	private static final int MAX_SLOTS = PandoricalApi.KeybindApiImpl.MAX_SLOTS;
+	private static final int MAX_SLOTS = KeybindPool.MAX_SLOTS;
 	/** Whether each slot was down on the last tick, so the release edge can be reported. */
 	private static final boolean[] wasDown = new boolean[MAX_SLOTS];
 
@@ -55,7 +55,7 @@ public final class KeybindManager {
 			Identifier.fromNamespaceAndPath(Pandorical.MOD_ID, "pandorical"));
 		for (int i = 0; i < MAX_SLOTS; i++) {
 			pool[i] = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-				"key.pandorical.action" + (i + 1), PandoricalApi.KeybindApiImpl.poolDefaultKey(i), category));
+				"key.pandorical.action" + (i + 1), KeybindPool.poolDefaultKey(i), category));
 		}
 	}
 

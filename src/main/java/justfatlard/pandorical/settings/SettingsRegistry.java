@@ -17,6 +17,7 @@ import justfatlard.pandorical.api.ComponentType;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.ScreenBuilder;
 import justfatlard.pandorical.api.SettingsApi;
+import justfatlard.pandorical.keybind.KeybindPool;
 import justfatlard.pandorical.protocol.ComponentDef;
 import justfatlard.pandorical.protocol.ComponentUpdate;
 import justfatlard.pandorical.screen.Viewport;
@@ -450,7 +451,7 @@ public final class SettingsRegistry implements SettingsApi {
      */
     private int keybindsPane(ServerPlayer player, ModCatalog.ModInfo mod, List<ComponentDef> out, Layout at) {
         var keybinds = PandoricalApi.keybindsImpl();
-        List<PandoricalApi.KeybindApiImpl.Claim> claims = keybinds.claimsOf(mod.id());
+        List<KeybindPool.Claim> claims = keybinds.claimsOf(mod.id());
         if (claims.isEmpty()) {
             out.add(prose("none", 2, "This mod claims no keys.", HINT_COLOR, at));
             return LINE + 2;
@@ -466,7 +467,7 @@ public final class SettingsRegistry implements SettingsApi {
             y += 4;
         }
         Integer waiting = rebinding.get(player.getUUID());
-        for (PandoricalApi.KeybindApiImpl.Claim claim : claims) {
+        for (KeybindPool.Claim claim : claims) {
             boolean asking = waiting != null && waiting == claim.slot();
             String bound = keybinds.bindingOf(player, claim.slot());
             out.add(new ComponentBuilder("keyname:" + claim.slot(), ComponentType.TEXT)

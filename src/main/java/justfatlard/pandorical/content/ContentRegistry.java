@@ -244,7 +244,7 @@ public class ContentRegistry implements ContentApi {
     }
 
     // Extra lang entries contributed outside the vanilla-override path, e.g.
-    // keybind slot names from KeybindApiImpl. Merged into the same synced
+    // keybind slot names from KeybindPool. Merged into the same synced
     // pandorical lang file (registerAsset on one path overwrites, so all
     // contributors must go through the single rebuild below).
     private final Map<String, String> extraLangEntries = new LinkedHashMap<>();

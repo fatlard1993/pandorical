@@ -1,6 +1,7 @@
 package justfatlard.pandorical.api;
 
 import justfatlard.pandorical.hud.HudRegistry;
+import justfatlard.pandorical.keybind.KeybindPool;
 import justfatlard.pandorical.screen.ScreenRegistry;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
@@ -43,7 +44,7 @@ public final class PandoricalApi {
     private static final StructureApiImpl STRUCTURES = new StructureApiImpl();
     private static final EntityOverlayApiImpl ENTITY_OVERLAYS = new EntityOverlayApiImpl();
     private static final ChestOverlayApiImpl CHEST_OVERLAYS = new ChestOverlayApiImpl();
-    private static final KeybindApiImpl KEYBINDS = new KeybindApiImpl();
+    private static final KeybindPool KEYBINDS = KeybindPool.INSTANCE;
 
     // --- Per-player state ---
     private static final Map<UUID, Set<String>> playerCapabilities = new ConcurrentHashMap<>();
@@ -338,7 +339,7 @@ public final class PandoricalApi {
     public static EntityOverlayApiImpl entityOverlaysImpl() { return ENTITY_OVERLAYS; }
 
     /** @hidden used by Pandorical's KeyPressC2S receiver and handshake push */
-    public static KeybindApiImpl keybindsImpl() { return KEYBINDS; }
+    public static KeybindPool keybindsImpl() { return KEYBINDS; }
 
     /** @hidden */
     public static void registerPlayerCapabilities(UUID playerUuid, Set<String> capabilities) {
@@ -919,233 +920,6 @@ public final class PandoricalApi {
                     net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player, packet);
                 }
             }
-        }
-    }
-
-    /** @hidden implementation of {@link KeybindApi}; pool model rationale in the interface javadoc. */
-    public static final class KeybindApiImpl implements KeybindApi {
-        /** The pool the client registers at startup; the client reads its size and defaults from here. */
-        public static final int MAX_SLOTS = 8;
-        /** What an entry in {@link #POOL_DEFAULT_KEYS} says when the slot starts unbound. */
-        private static final int UNBOUND = 0;
-
-        // Two slots come pre-bound. A registration that names a slot's key gets that slot; see
-        // chooseSlot for why the others do not.
-        private static final int[] POOL_DEFAULT_KEYS = {KeybindApi.letter('G'), KeybindApi.letter('B'),
-                                                        UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND};
-
-        /** The key a pool slot starts bound to, or 0 for none. */
-        public static int poolDefaultKey(int slot) {
-            return POOL_DEFAULT_KEYS[slot];
-        }
-        private static final int MAX_PRESSES_PER_TICK = 8;
-
-        private record Registration(String id, String displayName, KeybindHandler handler, int preferredKey) {}
-
-        /** Keybinds that asked for their preferred key to be bound on clients by default. */
-        private final java.util.Set<String> boundByDefault = ConcurrentHashMap.newKeySet();
-
-        /** A claimed slot, as the mods menu shows it: which mod, what it is called, where it sits. */
-        public record Claim(int slot, String id, String displayName) {}
-
-        private final Map<Integer, Registration> bySlot = new ConcurrentHashMap<>();
-        /** What each player's client says its pool keys are bound to, by slot; empty until it says. */
-        private final Map<UUID, java.util.List<String>> bindings = new ConcurrentHashMap<>();
-        private final Set<String> registeredIds = ConcurrentHashMap.newKeySet();
-        // Per-player rate limit: [tick the count belongs to, dispatches that tick]
-        private final Map<UUID, long[]> pressCounters = new ConcurrentHashMap<>();
-
-        @Override
-        public void register(String id, int preferredDefaultKey, String displayName, KeybindHandler handler) {
-            if (id == null || displayName == null || handler == null) {
-                justfatlard.pandorical.Pandorical.LOGGER.warn("Ignoring keybind registration with null id/name/handler");
-                return;
-            }
-            if (!registeredIds.add(id)) {
-                justfatlard.pandorical.Pandorical.LOGGER.warn("Keybind id '{}' already registered — ignoring", id);
-                return;
-            }
-
-            int slot = chooseSlot(preferredDefaultKey);
-            if (slot < 0) {
-                registeredIds.remove(id);
-                justfatlard.pandorical.Pandorical.LOGGER.error(
-                    "Keybind pool exhausted ({} slots) — cannot register '{}'", MAX_SLOTS, id);
-                return;
-            }
-            bySlot.put(slot, new Registration(id, displayName, handler, preferredDefaultKey));
-
-            // The controls screen label for the claimed slot resolves through
-            // the synced pandorical lang, overriding the client's shipped
-            // "Pandorical Action N" default for this server only
-            CONTENT.addLangEntries(Map.of("key.pandorical.action" + (slot + 1), displayName));
-
-            justfatlard.pandorical.Pandorical.LOGGER.info(
-                "Keybind registered: '{}' -> slot {} (\"{}\", pool default {})",
-                id, slot, displayName, POOL_DEFAULT_KEYS[slot] == UNBOUND ? "unbound" : POOL_DEFAULT_KEYS[slot]);
-        }
-
-        /**
-         * Pick a slot for a registration, without giving away a key somebody else asked for.
-         *
-         * <p>A slot that carries a pool default is the only kind a player finds already bound, so
-         * it is the only kind worth competing for - and handing it to the first mod to ask for
-         * anything at all made the allocation depend on mod load order. Two mods, one of them
-         * naming the default key explicitly, and which one got it came down to which initialised
-         * first: the mod that wanted G got an unbound slot and did nothing, while the mod that
-         * wanted something else answered G.
-         *
-         * <p>So a defaulted slot now goes only to a registration that asked for that default.
-         * Everything else takes an unbound one, and the pre-bound key stays with whoever named it
-         * however the loader happens to order the mods that day.
-         */
-        private int chooseSlot(int preferredDefaultKey) {
-            for (int i = 0; i < MAX_SLOTS; i++) {
-                if (!bySlot.containsKey(i) && POOL_DEFAULT_KEYS[i] == preferredDefaultKey) return i;
-            }
-            for (int i = 0; i < MAX_SLOTS; i++) {
-                if (!bySlot.containsKey(i) && POOL_DEFAULT_KEYS[i] == UNBOUND) return i;
-            }
-
-            // Every unbound slot is spoken for. Taking a defaulted one now is still better than
-            // refusing to register at all, but it is worth saying out loud, because the mod that
-            // wanted that key is about to find something else answering it.
-            for (int i = 0; i < MAX_SLOTS; i++) {
-                if (!bySlot.containsKey(i)) {
-                    justfatlard.pandorical.Pandorical.LOGGER.warn(
-                        "Keybind pool has no unbound slot left: slot {} was pre-bound to key {} and"
-                        + " is being given to a registration that did not ask for it", i,
-                        POOL_DEFAULT_KEYS[i]);
-                    return i;
-                }
-            }
-            return -1;
-        }
-
-        @Override
-        public void bindByDefault(String id) {
-            if (!registeredIds.contains(id)) {
-                justfatlard.pandorical.Pandorical.LOGGER.warn("bindByDefault('{}'): no keybind registered by that id; call register('{}', ...) first", id, id);
-                return;
-            }
-            boundByDefault.add(id);
-        }
-
-        /** Every slot some mod has claimed, in pool order. */
-        public java.util.List<Claim> claims() {
-            java.util.List<Claim> out = new java.util.ArrayList<>();
-            for (int slot = 0; slot < MAX_SLOTS; slot++) {
-                Registration registration = bySlot.get(slot);
-                if (registration != null) out.add(new Claim(slot, registration.id(), registration.displayName()));
-            }
-            return out;
-        }
-
-        /** The claims whose id is namespaced to this mod. */
-        public java.util.List<Claim> claimsOf(String modId) {
-            java.util.List<Claim> out = new java.util.ArrayList<>();
-            for (Claim claim : claims()) {
-                int colon = claim.id().indexOf(':');
-                if (colon > 0 && claim.id().substring(0, colon).equals(modId)) out.add(claim);
-            }
-            return out;
-        }
-
-        /** What this player's client has this slot bound to, empty for nothing, or null when it has not said. */
-        public String bindingOf(ServerPlayer player, int slot) {
-            java.util.List<String> keys = bindings.get(player.getUUID());
-            if (keys == null || slot < 0 || slot >= keys.size()) return null;
-            String key = keys.get(slot);
-            return key == null ? "" : key;
-        }
-
-        /**
-         * @hidden the client reporting what its pool keys are bound to. The keys tab is laid out
-         * again only when that changed or a rebind is waiting on it, since each report is a rebuild.
-         */
-        public void handleBindings(ServerPlayer player, java.util.List<String> keys) {
-            java.util.List<String> now = java.util.List.copyOf(keys);
-            java.util.List<String> before = bindings.put(player.getUUID(), now);
-            if (now.equals(before) && !SETTINGS.isRebinding(player)) return;
-            SETTINGS.refreshKeybinds(player);
-        }
-
-        /** Ask this player's client to bind the next key it sees to this slot. */
-        public void requestRebind(ServerPlayer player, int slot) {
-            if (!hasCapability(player, Capabilities.KEYBINDS)) return;
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.KeybindRebindS2C(slot));
-        }
-
-        /** @hidden push claimed slots after the capability handshake completes. */
-        public void handlePlayerReady(ServerPlayer player) {
-            bindings.remove(player.getUUID());
-            if (bySlot.isEmpty() || !hasCapability(player, Capabilities.KEYBINDS)) return;
-            java.util.List<Integer> slots = new java.util.ArrayList<>(bySlot.keySet());
-            java.util.Collections.sort(slots);
-            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                new justfatlard.pandorical.protocol.KeybindDeclarationsS2C(slots));
-
-            java.util.List<justfatlard.pandorical.protocol.KeybindDefaultsS2C.Entry> defaults = new java.util.ArrayList<>();
-            for (int slot : slots) {
-                Registration registration = bySlot.get(slot);
-                if (registration != null && registration.preferredKey() != UNBOUND
-                        && boundByDefault.contains(registration.id())) {
-                    defaults.add(new justfatlard.pandorical.protocol.KeybindDefaultsS2C.Entry(
-                        slot, registration.id(), registration.preferredKey()));
-                }
-            }
-            if (!defaults.isEmpty() && net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.canSend(
-                    player, justfatlard.pandorical.protocol.KeybindDefaultsS2C.TYPE)) {
-                net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
-                    new justfatlard.pandorical.protocol.KeybindDefaultsS2C(defaults));
-            }
-        }
-
-        /** @hidden validate and dispatch one press; called on the server thread. */
-        public void handleKeyPress(ServerPlayer player, int slot) {
-            if (!hasCapability(player, Capabilities.KEYBINDS)) return;
-            if (slot < 0 || slot >= MAX_SLOTS) return;
-            Registration registration = bySlot.get(slot);
-            if (registration == null) return;
-
-            // A held or spammed key must not become a server-side amplifier
-            long currentTick = player.level().getServer().getTickCount();
-            long[] counter = pressCounters.computeIfAbsent(player.getUUID(), u -> new long[]{-1, 0});
-            if (counter[0] != currentTick) {
-                counter[0] = currentTick;
-                counter[1] = 0;
-            }
-            if (++counter[1] > MAX_PRESSES_PER_TICK) return;
-
-            try {
-                registration.handler().onPress(player);
-            } catch (Exception e) {
-                justfatlard.pandorical.Pandorical.LOGGER.error(
-                    "Keybind handler '{}' threw for player {}: {}",
-                    registration.id(), player.getName().getString(), e.getMessage(), e);
-            }
-        }
-
-        /** @hidden validate and dispatch one release; called on the server thread. */
-        public void handleKeyRelease(ServerPlayer player, int slot) {
-            if (!hasCapability(player, Capabilities.KEYBINDS)) return;
-            if (slot < 0 || slot >= MAX_SLOTS) return;
-            Registration registration = bySlot.get(slot);
-            if (registration == null) return;
-            try {
-                registration.handler().onRelease(player);
-            } catch (Exception e) {
-                justfatlard.pandorical.Pandorical.LOGGER.error(
-                    "Keybind release handler '{}' threw for player {}: {}",
-                    registration.id(), player.getName().getString(), e.getMessage(), e);
-            }
-        }
-
-        /** @hidden */
-        public void removePlayer(UUID playerUuid) {
-            bindings.remove(playerUuid);
-            pressCounters.remove(playerUuid);
         }
     }
 }
