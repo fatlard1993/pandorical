@@ -13,6 +13,14 @@ import net.minecraft.server.level.ServerLevel;
  * marks again when the level loads.
  */
 public interface BlockMarkApi {
+    /**
+     * A fence or wall that stands alone. Marked so, it joins nothing beside it and nothing
+     * beside it joins to it: a post, in the shape of whatever fence or wall it is. Pandorical
+     * applies the mark to the block's shape on both sides; who marks and who remembers is the
+     * mod that asks for it.
+     */
+    String POST = "post";
+
     void mark(ServerLevel level, BlockPos pos, String mark);
 
     void unmark(ServerLevel level, BlockPos pos, String mark);

@@ -48,6 +48,8 @@ public class PandoricalClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        // The block-shape hooks in common code ask about marks; this is the client's answer.
+        justfatlard.pandorical.BlockMarkLookup.client = justfatlard.pandorical.client.renderer.ClientBlockMarks::has;
         justfatlard.pandorical.client.settings.ContainerHabits.register();
         ComponentRegistry.registerDefaults();
 

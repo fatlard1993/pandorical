@@ -8,7 +8,9 @@
 		"InventoryMenuMixin",
 		"HorseSteeringMixin",
 		"HorsePillionMixin",
-		"MountCapacityMixin"
+		"MountCapacityMixin",
+		"FencePostMixin",
+		"WallPostMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
