@@ -1,5 +1,6 @@
 package justfatlard.pandorical.client.rail;
 
+import justfatlard.pandorical.api.BlockMarkApi;
 import java.util.HashMap;
 import java.util.Map;
 import net.fabricmc.api.EnvType;
@@ -31,13 +32,11 @@ public final class FenceGateJoins implements ContextModels.Provider {
 	private record Key(Block block, boolean open, boolean wall, String join, String swing, boolean stacked, Direction facing) {}
 
 	/**
-	 * A gate hung as one leaf from one post, marked so by whoever owns the setting (moredoor's
-	 * gate menu): open, it takes {@code <gate>[_wall]_open_swing_<left|right>[_stacked]_<facing>}
-	 * instead of the two leaves. Left and right are the gate's own. Only for a gate with no gate
-	 * beside it: a pair opens from the middle, and a leaf two blocks long has no model to fit in.
+	 * The single leaves a gate marked {@link BlockMarkApi#GATE_HINGE_LEFT} or
+	 * {@link BlockMarkApi#GATE_HINGE_RIGHT} opens as, drawn by
+	 * {@code <gate>[_wall]_open_swing_<left|right>[_stacked]_<facing>}. A pair never swings as one
+	 * leaf: a leaf two blocks long has no model to fit in.
 	 */
-	public static final String HINGE_LEFT_MARK = "moredoor:gate_left";
-	public static final String HINGE_RIGHT_MARK = "moredoor:gate_right";
 	private static final String[] SWINGS = {"left", "right"};
 
 	private static final Map<Key, ExtraModelKey<BlockStateModel>> KEYS = new HashMap<>();
@@ -100,8 +99,8 @@ public final class FenceGateJoins implements ContextModels.Provider {
 		boolean open = state.getValue(FenceGateBlock.OPEN);
 		String swing = "";
 		if (open && !left && !right) {
-			if (justfatlard.pandorical.BlockMarkLookup.client.test(pos, HINGE_LEFT_MARK)) swing = "left";
-			else if (justfatlard.pandorical.BlockMarkLookup.client.test(pos, HINGE_RIGHT_MARK)) swing = "right";
+			if (justfatlard.pandorical.BlockMarkLookup.client.test(pos, BlockMarkApi.GATE_HINGE_LEFT)) swing = "left";
+			else if (justfatlard.pandorical.BlockMarkLookup.client.test(pos, BlockMarkApi.GATE_HINGE_RIGHT)) swing = "right";
 		}
 		if (!left && !right && !stacked && swing.isEmpty()) return null;
 		String join = left && right ? "both" : left ? "left" : right ? "right" : "none";
