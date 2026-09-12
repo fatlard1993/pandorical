@@ -1,6 +1,7 @@
 package justfatlard.pandorical.client.contextmodel;
 
 import com.mojang.math.Quadrant;
+import justfatlard.pandorical.api.BlockMarkApi;
 import justfatlard.pandorical.client.renderer.ClientBlockMarks;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -36,10 +37,6 @@ public final class DoorBanks implements ContextModels.Provider {
 	private record Key(Block block, DoubleBlockHalf half, DoorHingeSide hinge, boolean open, String flags, Direction facing) {}
 
 	private static final Map<Key, ExtraModelKey<BlockStateModel>> KEYS = new HashMap<>();
-	/** More Doors' mark on a leaf cut loose from its neighbours. */
-	private static final String DETACHED = "more-doors:detached";
-	/** More Doors' mark on a sliding leaf, drawn without a knob. */
-	private static final String SLIDING = "more-doors:sliding";
 	private static final int MAX_LEAVES = 64;
 
 	private static final String[] LOWER_FLAGS = {"x", "h", "b", "bh", "r", "rh", "rb", "rbh",
@@ -111,8 +108,8 @@ public final class DoorBanks implements ContextModels.Provider {
 		// Leaves run along the wall while the door is closed, and out from it once it has swung.
 		Direction along = open ? facing : facing.getClockWise();
 		// A single leaf is vanilla's to draw, unless it slides.
-		boolean sliding = ClientBlockMarks.has(foot, SLIDING);
-		Set<BlockPos> leaves = ClientBlockMarks.has(foot, DETACHED) ? Set.of(foot) : bank(level, foot, footState, along, sliding);
+		boolean sliding = ClientBlockMarks.has(foot, BlockMarkApi.DOOR_SLIDING);
+		Set<BlockPos> leaves = ClientBlockMarks.has(foot, BlockMarkApi.DOOR_DETACHED) ? Set.of(foot) : bank(level, foot, footState, along, sliding);
 		if (leaves.size() < 2 && !sliding) return null;
 
 		int sMin = Integer.MAX_VALUE, sMax = Integer.MIN_VALUE, rMin = Integer.MAX_VALUE, rMax = Integer.MIN_VALUE;
@@ -161,7 +158,7 @@ public final class DoorBanks implements ContextModels.Provider {
 			for (BlockPos next : new BlockPos[] {at.relative(along), at.relative(along.getOpposite()),
 					at.above(2), at.below(2)}) {
 				if (found.contains(next) || !joins(level.getBlockState(next), like)) continue;
-				if (ClientBlockMarks.has(next, DETACHED) || ClientBlockMarks.has(next, SLIDING) != sliding) continue;
+				if (ClientBlockMarks.has(next, BlockMarkApi.DOOR_DETACHED) || ClientBlockMarks.has(next, BlockMarkApi.DOOR_SLIDING) != sliding) continue;
 				found.add(next);
 				pending.add(next);
 			}
