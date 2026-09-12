@@ -63,18 +63,32 @@ public class DialComponent extends SpriteComponent {
         super.init(def, context);
         readProps();
         lastMouseX = context.minecraft().mouseHandler.xpos();
-        SDLMouse.SDL_HideCursor();
+        holdCursor();
+    }
+
+    /** Whether this dial has the pointer hidden now. */
+    private boolean cursorHidden;
+
+    /** The pointer is hidden while the dial shows on a screen; a HUD has no pointer to hide. */
+    private void holdCursor() {
+        boolean hide = visible && !"hud".equals(context.screenType());
+        if (hide == cursorHidden) return;
+        if (hide) SDLMouse.SDL_HideCursor();
+        else SDLMouse.SDL_ShowCursor();
+        cursorHidden = hide;
     }
 
     @Override
     public void removed() {
-        SDLMouse.SDL_ShowCursor();
+        if (cursorHidden) SDLMouse.SDL_ShowCursor();
+        cursorHidden = false;
     }
 
     @Override
     public void updateProps(Map<String, String> changedProps) {
         super.updateProps(changedProps);
         readProps();
+        holdCursor();
     }
 
     private void readProps() {
