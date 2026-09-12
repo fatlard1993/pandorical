@@ -1,7 +1,10 @@
 package justfatlard.pandorical.api;
 
+import justfatlard.pandorical.config.Keepsakes;
+import justfatlard.pandorical.content.ContentRegistry;
 import justfatlard.pandorical.hud.HudRegistry;
 import justfatlard.pandorical.keybind.KeybindPool;
+import justfatlard.pandorical.picture.PictureRegistry;
 import justfatlard.pandorical.portal.PortalPairing;
 import justfatlard.pandorical.push.BannerDecals;
 import justfatlard.pandorical.push.BlockMarks;
@@ -14,27 +17,36 @@ import justfatlard.pandorical.push.EntityOverlays;
 import justfatlard.pandorical.push.PlayingAnimations;
 import justfatlard.pandorical.push.SkinOverrides;
 import justfatlard.pandorical.screen.ScreenRegistry;
+import justfatlard.pandorical.settings.SettingsRegistry;
 import justfatlard.pandorical.structure.StructureRegistry;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.Container;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.entity.EntityType;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiConsumer;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
- * Public API for server mods to interact with Pandorical.
+ * Start here. Each accessor returns one feature's API: {@link #screens()}, {@link #hud()},
+ * {@link #structures()} and the rest below.
+ *
+ * <p>Guard a send with {@link #isAvailable(ServerPlayer)}, or with
+ * {@link #hasCapability(ServerPlayer, String)} and one of {@link Capabilities} for a single feature;
+ * a vanilla client has neither.
+ *
+ * <p>Do per-player setup in {@link #onPlayerReady}, not Fabric's JOIN: JOIN fires before the
+ * handshake, so every capability-gated call made there sends nothing.
  */
 public final class PandoricalApi {
     private PandoricalApi() {}
 
     private static final ScreenRegistry SCREENS = ScreenRegistry.INSTANCE;
     private static final HudRegistry HUD = HudRegistry.INSTANCE;
-    private static final justfatlard.pandorical.content.ContentRegistry CONTENT = new justfatlard.pandorical.content.ContentRegistry();
+    private static final ContentRegistry CONTENT = new ContentRegistry();
     private static final CameraHints CAMERA = CameraHints.INSTANCE;
     private static final SkinOverrides SKINS = SkinOverrides.INSTANCE;
     private static final DeclaredRenderPolicy RENDER = DeclaredRenderPolicy.INSTANCE;
@@ -48,14 +60,22 @@ public final class PandoricalApi {
     private static final ChestOverlays CHEST_OVERLAYS = ChestOverlays.INSTANCE;
     private static final KeybindPool KEYBINDS = KeybindPool.INSTANCE;
 
-    // --- Per-player state ---
+    // --- Per-player session state ---
     private static final Map<UUID, Set<String>> playerCapabilities = new ConcurrentHashMap<>();
     private static final Set<UUID> contentReadyPlayers = ConcurrentHashMap.newKeySet();
     private static final Set<UUID> contentSyncStarted = ConcurrentHashMap.newKeySet();
+    private static final List<Consumer<ServerPlayer>> playerReadyListeners = new CopyOnWriteArrayList<>();
 
-    // --- Public API ---
+    private static final BannerDecals BANNER_DECALS = BannerDecals.INSTANCE;
+    private static final BlockMarks BLOCK_MARKS = BlockMarks.INSTANCE;
+    private static final SettingsRegistry SETTINGS = new SettingsRegistry();
 
-    /** Returns true when Pandorical is loaded on the server. */
+    // --- Framework ---
+
+    /**
+     * Returns true when Pandorical is loaded on the server. Always true: without Pandorical this
+     * class is not there to ask, so declare {@code "pandorical"} in {@code fabric.mod.json}'s depends.
+     */
     public static boolean isAvailable() { return true; }
 
     /**
@@ -88,9 +108,6 @@ public final class PandoricalApi {
         return contentReadyPlayers.contains(player.getUUID());
     }
 
-    private static final java.util.List<java.util.function.Consumer<ServerPlayer>> playerReadyListeners =
-        new java.util.concurrent.CopyOnWriteArrayList<>();
-
     /**
      * Run something once per session the moment a player's Pandorical client has announced itself:
      * capabilities registered, content sync underway. This, not Fabric's JOIN event, is when
@@ -102,86 +119,29 @@ public final class PandoricalApi {
      * hook existed; the replay pandorical does for its own entity overlays and keybinds happens at
      * this same moment for the same reason.
      */
-    public static void onPlayerReady(java.util.function.Consumer<ServerPlayer> listener) {
+    public static void onPlayerReady(Consumer<ServerPlayer> listener) {
         playerReadyListeners.add(listener);
     }
 
-    /** @hidden fired by the Hello handshake receiver once capabilities are registered */
-    public static void firePlayerReady(ServerPlayer player) {
-        for (var listener : playerReadyListeners) listener.accept(player);
+    /** Returns the content API for registering custom blocks, items, and assets. */
+    public static ContentApi content() { return CONTENT; }
+
+    /**
+     * Register an entity type to be rendered with the given renderer key on Pandorical clients.
+     * Supported keys: {@code "thrown_item"}, {@code "invisible"}.
+     * Must be called during server-side mod initialisation.
+     *
+     * @param entityType  the entity type (must already be registered in the vanilla registry)
+     * @param rendererKey a renderer key string
+     */
+    public static void registerEntityRenderer(EntityType<?> entityType, String rendererKey) {
+        EntityRendererRegistry.register(entityType, rendererKey);
     }
+
+    // --- Screens and HUD ---
 
     /** Returns the screen API for opening, updating, and closing declarative screens. */
     public static ScreenApi screens() { return SCREENS; }
-    /** Returns the HUD API for showing, updating, and hiding HUD overlays. */
-    public static HudApi hud() { return HUD; }
-
-    /** Values left with a player's own game, and handed back when they join. */
-    public static KeepsakeApi keepsakes() { return justfatlard.pandorical.config.Keepsakes.INSTANCE; }
-    /** Returns the content API for registering custom blocks, items, and assets. */
-    public static ContentApi content() { return CONTENT; }
-    /** Returns the camera API for adjusting camera distance and perspective for a player. */
-    public static CameraApi camera() { return CAMERA; }
-
-    public static SkinApi skins() { return SKINS; }
-
-    public static RenderApi render() { return RENDER; }
-
-    public static AnimationApi animations() { return ANIMATIONS; }
-
-    public static MountApi mounts() { return MOUNTS; }
-
-    /** Nether portals that go back the way they came. See {@link PortalApi}. */
-    public static PortalApi portals() { return PORTALS; }
-
-    /**
-     * Returns the player inventory API for registering extra inventory slots that appear
-     * in the vanilla inventory screen and persist across sessions.
-     */
-    public static PlayerInventoryApi playerInventory() { return PLAYER_INVENTORY; }
-
-    /** Returns the block tint API for registering biome-color and constant tint mappings. */
-    public static BlockTintApi blockTints() { return BLOCK_TINTS; }
-
-    /**
-     * Returns the structure API for displaying moving, rotating clusters of blocks
-     * (e.g. rideable ships) to Pandorical clients as a single batch-rendered object.
-     */
-    public static StructureApi structures() { return STRUCTURES; }
-
-    private static final BannerDecals BANNER_DECALS = BannerDecals.INSTANCE;
-
-    public static BannerDecalApi bannerDecals() { return BANNER_DECALS; }
-
-    public static PictureApi pictures() { return justfatlard.pandorical.picture.PictureRegistry.INSTANCE; }
-
-    /**
-     * Returns the entity overlay API for rendering an extra texture layer over a
-     * living entity's model on Pandorical clients (e.g. per-entity cosmetics).
-     */
-    public static EntityOverlayApi entityOverlays() { return ENTITY_OVERLAYS; }
-
-    /**
-     * Returns the chest overlay API for drawing particular chests with a
-     * different texture on Pandorical clients, addressed per player.
-     */
-    public static ChestOverlayApi chestOverlays() { return CHEST_OVERLAYS; }
-
-    /**
-     * Returns the keybind API for receiving rebindable keybind presses from
-     * Pandorical clients, with no client mod needed on the declaring mod's side.
-     */
-    public static KeybindApi keybinds() { return KEYBINDS; }
-
-    private static final BlockMarks BLOCK_MARKS = BlockMarks.INSTANCE;
-    public static BlockMarkApi blockMarks() { return BLOCK_MARKS; }
-    public static BlockMarks blockMarksImpl() { return BLOCK_MARKS; }
-
-    private static final justfatlard.pandorical.settings.SettingsRegistry SETTINGS =
-        new justfatlard.pandorical.settings.SettingsRegistry();
-    /** Per-player settings, shown to the player on one screen instead of behind commands. */
-    public static SettingsApi settings() { return SETTINGS; }
-    public static justfatlard.pandorical.settings.SettingsRegistry settingsImpl() { return SETTINGS; }
 
     /**
      * Returns the screen ID of the screen currently open for this player via Pandorical,
@@ -192,39 +152,70 @@ public final class PandoricalApi {
         return SCREENS.openScreenId(playerUuid);
     }
 
-    /**
-     * Register an entity type to be rendered with the given renderer key on Pandorical clients.
-     * Supported keys: {@code "thrown_item"}, {@code "invisible"}.
-     * Must be called during server-side mod initialisation.
-     *
-     * @param entityType  the entity type (must already be registered in the vanilla registry)
-     * @param rendererKey a renderer key string
-     */
-    public static void registerEntityRenderer(net.minecraft.world.entity.EntityType<?> entityType,
-                                              String rendererKey) {
-        EntityRendererRegistry.register(entityType, rendererKey);
-    }
+    /** Returns the HUD API for showing, updating, and hiding HUD overlays. */
+    public static HudApi hud() { return HUD; }
 
+    // --- World ---
+
+    /** Returns the structure API for showing moving, rotating block clusters as one batch-rendered object. */
+    public static StructureApi structures() { return STRUCTURES; }
+
+    /** Nether portals that go back the way they came. See {@link PortalApi}. */
+    public static PortalApi portals() { return PORTALS; }
+
+    /** Returns the picture API for pictures anchored to entities, painted and seen changing. */
+    public static PictureApi pictures() { return PictureRegistry.INSTANCE; }
+
+    /** Returns the animation API for playing synced animations on entities. */
+    public static AnimationApi animations() { return ANIMATIONS; }
+
+    /** Returns the entity overlay API for drawing an extra texture layer over a living entity's model. */
+    public static EntityOverlayApi entityOverlays() { return ENTITY_OVERLAYS; }
+
+    /** Returns the block tint API for registering biome-color and constant tint mappings. */
+    public static BlockTintApi blockTints() { return BLOCK_TINTS; }
+
+    /** Returns the block mark API for words on block positions that every client can read. */
+    public static BlockMarkApi blockMarks() { return BLOCK_MARKS; }
+
+    /** Returns the banner decal API for banner patterns laid flat on blocks, per player. */
+    public static BannerDecalApi bannerDecals() { return BANNER_DECALS; }
+
+    /** Returns the chest overlay API for drawing particular chests with another texture, per player. */
+    public static ChestOverlayApi chestOverlays() { return CHEST_OVERLAYS; }
+
+    /** Returns the render API for server-wide rendering policies, such as culled leaves. */
+    public static RenderApi render() { return RENDER; }
+
+    // --- Players ---
+
+    /** Returns the camera API for adjusting camera distance and perspective for a player. */
+    public static CameraApi camera() { return CAMERA; }
+
+    /** Returns the skin API for deciding what skin a player is seen wearing. */
+    public static SkinApi skins() { return SKINS; }
+
+    /** Returns the mount API for server-wide riding rules: double riders and free look. */
+    public static MountApi mounts() { return MOUNTS; }
+
+    /** Returns the player inventory API for extra inventory slots that persist across sessions. */
+    public static PlayerInventoryApi playerInventory() { return PLAYER_INVENTORY; }
+
+    /** Returns the keybind API for rebindable key presses from Pandorical clients. */
+    public static KeybindApi keybinds() { return KEYBINDS; }
+
+    /** Per-player settings, shown to the player on one screen instead of behind commands. */
+    public static SettingsApi settings() { return SETTINGS; }
+
+    /** Values left with a player's own game, and handed back when they join. */
+    public static KeepsakeApi keepsakes() { return Keepsakes.INSTANCE; }
 
     // --- Internal methods (used by Pandorical core, not for consuming mods) ---
 
-    /** @hidden */
-    public static justfatlard.pandorical.content.ContentRegistry contentRegistry() { return CONTENT; }
-
-    /** @hidden used by InventoryMenuMixin */
-    public static PlayerInventoryApiImpl playerInventoryImpl() { return PLAYER_INVENTORY; }
-
-    /** @hidden */
-    public static BlockTints blockTintsImpl() { return BLOCK_TINTS; }
-
-    /** @hidden used by Pandorical's EntityTrackingEvents registration */
-    public static StructureRegistry structuresImpl() { return STRUCTURES; }
-
-    /** @hidden used by Pandorical's EntityTrackingEvents/ServerEntityEvents registration */
-    public static EntityOverlays entityOverlaysImpl() { return ENTITY_OVERLAYS; }
-
-    /** @hidden used by Pandorical's KeyPressC2S receiver and handshake push */
-    public static KeybindPool keybindsImpl() { return KEYBINDS; }
+    /** @hidden fired by the Hello handshake receiver once capabilities are registered */
+    public static void firePlayerReady(ServerPlayer player) {
+        for (var listener : playerReadyListeners) listener.accept(player);
+    }
 
     /** @hidden */
     public static void registerPlayerCapabilities(UUID playerUuid, Set<String> capabilities) {
@@ -258,5 +249,29 @@ public final class PandoricalApi {
     }
 
     /** @hidden */
+    public static ContentRegistry contentRegistry() { return CONTENT; }
+
+    /** @hidden */
     public static ScreenRegistry screensImpl() { return SCREENS; }
+
+    /** @hidden used by InventoryMenuMixin */
+    public static PlayerInventoryApiImpl playerInventoryImpl() { return PLAYER_INVENTORY; }
+
+    /** @hidden */
+    public static BlockTints blockTintsImpl() { return BLOCK_TINTS; }
+
+    /** @hidden used by Pandorical's server-stop, player-ready and level-change hooks */
+    public static BlockMarks blockMarksImpl() { return BLOCK_MARKS; }
+
+    /** @hidden used by Pandorical's EntityTrackingEvents registration */
+    public static StructureRegistry structuresImpl() { return STRUCTURES; }
+
+    /** @hidden used by Pandorical's EntityTrackingEvents/ServerEntityEvents registration */
+    public static EntityOverlays entityOverlaysImpl() { return ENTITY_OVERLAYS; }
+
+    /** @hidden used by Pandorical's KeyPressC2S receiver and handshake push */
+    public static KeybindPool keybindsImpl() { return KEYBINDS; }
+
+    /** @hidden used by Pandorical's init and disconnect hook, SettingsCommand and ClientMods */
+    public static SettingsRegistry settingsImpl() { return SETTINGS; }
 }
