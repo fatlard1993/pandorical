@@ -1,6 +1,6 @@
 package justfatlard.pandorical.api;
 
-import justfatlard.pandorical.config.Keepsakes;
+import justfatlard.pandorical.login.Keepsakes;
 import justfatlard.pandorical.content.ContentRegistry;
 import justfatlard.pandorical.hud.HudRegistry;
 import justfatlard.pandorical.keybind.KeybindPool;

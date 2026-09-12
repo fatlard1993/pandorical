@@ -1,4 +1,4 @@
-package justfatlard.pandorical.client.rail;
+package justfatlard.pandorical.client.contextmodel;
 
 import java.util.HashMap;
 import java.util.Map;

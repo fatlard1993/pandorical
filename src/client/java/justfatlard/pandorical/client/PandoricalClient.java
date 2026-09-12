@@ -102,13 +102,13 @@ public class PandoricalClient implements ClientModInitializer {
         // does not accept KeyMappings added later (see KeybindApi javadoc)
         if (!skipped("keybinds")) justfatlard.pandorical.client.keybind.KeybindManager.init();
         if (!skipped("contextmodels")) {
-            justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.RailDiagonals());
-            justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.FenceGateJoins());
-            justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.DoorBanks());
-            justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.TrapdoorBanks());
-            justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.DoorJambs());
-            justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.SlabHung());
-            justfatlard.pandorical.client.rail.ContextModels.init();
+            justfatlard.pandorical.client.contextmodel.ContextModels.register(new justfatlard.pandorical.client.contextmodel.RailDiagonals());
+            justfatlard.pandorical.client.contextmodel.ContextModels.register(new justfatlard.pandorical.client.contextmodel.FenceGateJoins());
+            justfatlard.pandorical.client.contextmodel.ContextModels.register(new justfatlard.pandorical.client.contextmodel.DoorBanks());
+            justfatlard.pandorical.client.contextmodel.ContextModels.register(new justfatlard.pandorical.client.contextmodel.TrapdoorBanks());
+            justfatlard.pandorical.client.contextmodel.ContextModels.register(new justfatlard.pandorical.client.contextmodel.DoorJambs());
+            justfatlard.pandorical.client.contextmodel.ContextModels.register(new justfatlard.pandorical.client.contextmodel.SlabHung());
+            justfatlard.pandorical.client.contextmodel.ContextModels.init();
         }
 
         // Same startup-time constraint as keybinds: Fabric's HUD element registry

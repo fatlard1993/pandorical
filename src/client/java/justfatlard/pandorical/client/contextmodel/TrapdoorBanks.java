@@ -1,4 +1,4 @@
-package justfatlard.pandorical.client.rail;
+package justfatlard.pandorical.client.contextmodel;
 
 import com.mojang.math.Quadrant;
 import java.util.ArrayDeque;

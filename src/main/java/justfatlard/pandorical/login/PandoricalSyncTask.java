@@ -1,4 +1,4 @@
-package justfatlard.pandorical.config;
+package justfatlard.pandorical.login;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;

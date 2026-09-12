@@ -1,4 +1,4 @@
-package justfatlard.pandorical.config;
+package justfatlard.pandorical.login;
 
 import io.netty.channel.Channel;
 import io.netty.handler.timeout.ReadTimeoutHandler;

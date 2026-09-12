@@ -1,4 +1,4 @@
-package justfatlard.pandorical.config;
+package justfatlard.pandorical.login;
 
 import java.io.IOException;
 import java.nio.file.Files;

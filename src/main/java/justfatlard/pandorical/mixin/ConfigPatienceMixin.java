@@ -1,6 +1,6 @@
 package justfatlard.pandorical.mixin;
 
-import justfatlard.pandorical.config.ConfigPatience;
+import justfatlard.pandorical.login.ConfigPatience;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.common.ClientboundPingPacket;
 import net.minecraft.server.network.ServerCommonPacketListenerImpl;

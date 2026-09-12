@@ -1,6 +1,6 @@
 package justfatlard.pandorical.client.mixin;
 
-import justfatlard.pandorical.client.rail.ContextModels;
+import justfatlard.pandorical.client.contextmodel.ContextModels;
 import net.minecraft.client.renderer.block.BlockStateModelSet;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
 import net.minecraft.client.renderer.chunk.RenderSectionRegion;

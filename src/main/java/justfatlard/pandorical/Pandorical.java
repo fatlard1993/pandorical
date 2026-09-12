@@ -5,8 +5,8 @@ import justfatlard.pandorical.api.EntityRendererRegistry;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.PlayerInventoryApi;
 import justfatlard.pandorical.api.PlayerInventoryApiImpl;
-import justfatlard.pandorical.config.ConfigPatience;
-import justfatlard.pandorical.config.PandoricalSyncTask;
+import justfatlard.pandorical.login.ConfigPatience;
+import justfatlard.pandorical.login.PandoricalSyncTask;
 import justfatlard.pandorical.protocol.*;
 import justfatlard.pandorical.push.DeclaredMountPolicy;
 import justfatlard.pandorical.push.DeclaredRenderPolicy;
@@ -309,12 +309,12 @@ public class Pandorical implements ModInitializer {
             justfatlard.pandorical.protocol.KeepsakesConfigC2S.TYPE, (payload, context) -> {
                 var handler = context.packetListener();
                 context.server().execute(() ->
-                    justfatlard.pandorical.config.Keepsakes.INSTANCE.answered(handler, payload));
+                    justfatlard.pandorical.login.Keepsakes.INSTANCE.answered(handler, payload));
             });
         ServerConfigurationConnectionEvents.CONFIGURE.register((handler, server) -> {
-            justfatlard.pandorical.config.Keepsakes.INSTANCE.begin(handler);
-            if (justfatlard.pandorical.config.Keepsakes.INSTANCE.askable(handler)) {
-                handler.addTask(new justfatlard.pandorical.config.Keepsakes.Task());
+            justfatlard.pandorical.login.Keepsakes.INSTANCE.begin(handler);
+            if (justfatlard.pandorical.login.Keepsakes.INSTANCE.askable(handler)) {
+                handler.addTask(new justfatlard.pandorical.login.Keepsakes.Task());
             }
         });
 
@@ -580,7 +580,7 @@ public class Pandorical implements ModInitializer {
             // Otherwise the worn-skin table keeps a row per player who ever wore one, for the life
             // of the server, and hands every new arrival a wardrobe of people who are not here.
             SkinOverrides.forget(handler.getPlayer().getUUID());
-            justfatlard.pandorical.config.Keepsakes.INSTANCE.forget(handler.getPlayer().getUUID());
+            justfatlard.pandorical.login.Keepsakes.INSTANCE.forget(handler.getPlayer().getUUID());
             PandoricalApi.settingsImpl().forget(handler.getPlayer().getUUID());
         });
     }
