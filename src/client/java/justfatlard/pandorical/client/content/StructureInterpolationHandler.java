@@ -50,7 +50,9 @@ public final class StructureInterpolationHandler implements InterpolationHandler
 		from = entity.position();
 		fromYaw = entity.getYRot();
 		fromPitch = entity.getXRot();
-		to = path.endPosition();
+		// A turn without a move carries no path: the game passes null and means stay where you
+		// are. Docking a boat sends exactly that, and reading the path crashed the client.
+		to = path != null ? path.endPosition() : (to != null ? to : from);
 		toYaw = withRotation ? yaw : fromYaw;
 		toPitch = withRotation ? pitch : fromPitch;
 		ticks = 0;
