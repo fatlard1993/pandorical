@@ -148,17 +148,17 @@ public final class KeybindManager {
 	 * spent here and must go no further, which is the whole point: the key being bound is
 	 * usually a key that does something else on the screen it was pressed on.
 	 *
-	 * <p>Escape leaves the binding alone, the way the controls screen does; every other key,
-	 * including one already used elsewhere, is taken. Two things on one key is the player's to
-	 * sort out, and refusing it here would be the one place in the game that does.
+	 * <p>Escape clears the binding, as it does in the controls screen; every other key, including
+	 * one already used elsewhere, is taken. Two things on one key is the player's to sort out, and
+	 * refusing it here would be the one place in the game that does.
 	 */
 	public static boolean captureKey(net.minecraft.client.input.KeyEvent event) {
 		int slot = rebinding;
 		if (slot < 0) return false;
 		rebinding = -1;
 		Minecraft client = Minecraft.getInstance();
-		if (event.key() != InputConstants.KEY_ESCAPE && pool[slot] != null) {
-			pool[slot].setKey(InputConstants.getKey(event));
+		if (pool[slot] != null) {
+			pool[slot].setKey(event.key() == InputConstants.KEY_ESCAPE ? InputConstants.UNKNOWN : InputConstants.getKey(event));
 			KeyMapping.resetMapping();
 			if (client != null && client.options != null) client.options.save();
 		}
