@@ -47,14 +47,6 @@ public class VirtualResourcePack implements PackResources {
     }
 
     /** Dump lang files in the pack for debugging. */
-    public void debugLangFiles() {
-        for (var entry : resources.entrySet()) {
-            if (entry.getKey().getPath().contains("lang")) {
-                justfatlard.pandorical.Pandorical.LOGGER.info("VirtualPack lang resource: {} ({} bytes)",
-                    entry.getKey(), entry.getValue().length);
-            }
-        }
-    }
 
     public void clear() {
         resources.clear();
@@ -70,9 +62,6 @@ public class VirtualResourcePack implements PackResources {
         if (packType != PackType.CLIENT_RESOURCES) return null;
         byte[] data = resources.get(id);
         if (data == null) return null;
-        if (id.getPath().contains("lang")) {
-            justfatlard.pandorical.Pandorical.LOGGER.info("VirtualPack getResource HIT: {}", id);
-        }
         return () -> new ByteArrayInputStream(data);
     }
 

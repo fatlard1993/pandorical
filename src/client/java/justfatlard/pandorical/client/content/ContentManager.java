@@ -104,15 +104,6 @@ public class ContentManager {
 
     public static boolean isSyncing() { return syncing && !contentRegistered; }
 
-    /** Progress 0.0-1.0 based on asset chunks received. */
-    public static float getSyncProgress() {
-        if (expectedAssetChunks <= 0) return 0f;
-        int received = 0;
-        for (byte[] chunk : assetChunks) {
-            if (chunk != null) received++;
-        }
-        return (float) received / expectedAssetChunks;
-    }
 
     public static String getSyncStatus() {
         if (!syncing) return "";
@@ -812,7 +803,6 @@ public class ContentManager {
 
         var namespaces = virtualPack.getNamespaces(net.minecraft.server.packs.PackType.CLIENT_RESOURCES);
         Pandorical.LOGGER.info("Virtual pack contains {} namespaces: {}", namespaces.size(), namespaces);
-        virtualPack.debugLangFiles();
 
         // Registering a RepositorySource (rather than adding the pack once) keeps the
         // virtual pack included in every future resource reload. Once per game, not per
@@ -909,9 +899,6 @@ public class ContentManager {
                     repo.getAvailableIds(), repo.getSelectedIds());
             }
 
-            var lang = net.minecraft.locale.Language.getInstance();
-            String test = lang.getOrDefault("block.dirt-slab-justfatlard.dirt_slab", "NOT_FOUND");
-            Pandorical.LOGGER.info("Lang test: block.dirt-slab-justfatlard.dirt_slab = '{}'", test);
         });
     }
 
@@ -989,14 +976,11 @@ public class ContentManager {
             });
     }
 
-    public static void injectResourcePackAndReRender(Minecraft client) {
-        injectResourcePack();
-    }
 
     /**
      * Register block color providers for dynamically registered blocks: tint sources are
      * copied from the base block so biome-sensitive colours (foliage, grass, water) are
-     * inherited; blocks with no base tints fall back to the grass tint. Registering a
+     * inherited; blocks with no base tints are left untinted. Registering a
      * tint on a block whose model has no tintindex faces is harmless.
      */
     private static void registerBlockColors(Minecraft client) {
@@ -1333,11 +1317,6 @@ public class ContentManager {
             }
             registerWithHolder(BuiltInRegistries.ITEM, id, item);
 
-            if (entry.id().contains("dirt_slab") && !entry.id().contains("coarse")) {
-                Pandorical.LOGGER.info("ITEM DIAG: {} class={} descId='{}' block={}",
-                    entry.id(), item.getClass().getSimpleName(),
-                    item.getDescriptionId(), block != null ? block.getClass().getSimpleName() : "null");
-            }
         } catch (Exception e) {
             Pandorical.LOGGER.error("Failed to register item {}: {}", entry.id(), e.getMessage(), e);
         }
@@ -1692,51 +1671,6 @@ public class ContentManager {
 
         if (remapped > 0) {
             Pandorical.LOGGER.info("Remapped {} block state IDs to match server", remapped);
-            // One-block diagnostic dump (dirt_slab as the sample)
-            for (SyncContentS2C.BlockEntry entry : pendingConfigContent.blocks()) {
-                if (entry.id().contains("dirt_slab") && !entry.id().contains("coarse") && !entry.stateIds().isEmpty()) {
-                    Identifier testId = Identifier.tryParse(entry.id());
-                    Block testBlock = BuiltInRegistries.BLOCK.getValue(testId);
-                    Pandorical.LOGGER.info("DIAG: block {} class={}", entry.id(), testBlock.getClass().getName());
-                    Pandorical.LOGGER.info("DIAG: stateDefinition properties={}", testBlock.getStateDefinition().getProperties());
-                    Pandorical.LOGGER.info("DIAG: possibleStates count={}", testBlock.getStateDefinition().getPossibleStates().size());
-                    Pandorical.LOGGER.info("DIAG: defaultState={}", testBlock.defaultBlockState());
-                    int sid = entry.stateIds().get(0);
-                    var resolved = Block.BLOCK_STATE_REGISTRY.byId(sid);
-                    Pandorical.LOGGER.info("DIAG: stateId[0]={} resolves to {}", sid, resolved);
-                    Item testItem = BuiltInRegistries.ITEM.getValue(testId);
-                    Pandorical.LOGGER.info("DIAG: item={} class={} maxStack={}",
-                        testId, testItem != null ? testItem.getClass().getName() : "null",
-                        testItem != null ? testItem.getDefaultMaxStackSize() : -1);
-                    var bsId = Identifier.fromNamespaceAndPath("dirt-slab-justfatlard", "blockstates/rooted_dirt_slab.json");
-                    var bsResource = virtualPack.getResource(net.minecraft.server.packs.PackType.CLIENT_RESOURCES, bsId);
-                    Pandorical.LOGGER.info("DIAG: virtualPack has blockstate file? {}", bsResource != null);
-                    if (bsResource != null) {
-                        try {
-                            var is = bsResource.get();
-                            var bytes = is.readAllBytes();
-                            Pandorical.LOGGER.info("DIAG: blockstate file size={} content='{}'", bytes.length, new String(bytes).substring(0, Math.min(200, bytes.length)));
-                        } catch (Exception ex) { Pandorical.LOGGER.warn("DIAG: couldn't read blockstate", ex); }
-                    }
-                                var modelId = Identifier.fromNamespaceAndPath("dirt-slab-justfatlard", "models/block/rooted_dirt_slab.json");
-                    var modelResource = virtualPack.getResource(net.minecraft.server.packs.PackType.CLIENT_RESOURCES, modelId);
-                    Pandorical.LOGGER.info("DIAG: virtualPack has model file? {}", modelResource != null);
-                    for (var state : testBlock.getStateDefinition().getPossibleStates()) {
-                        Pandorical.LOGGER.info("DIAG: state.toString()='{}' regId={}", state.toString(), Block.BLOCK_STATE_REGISTRY.getId(state));
-                        break;
-                    }
-                    for (var state : testBlock.getStateDefinition().getPossibleStates()) {
-                        var props = new StringBuilder();
-                        for (var prop : state.getProperties()) {
-                            if (props.length() > 0) props.append(",");
-                            props.append(prop.getName()).append("=").append(state.getValue(prop));
-                        }
-                        int stateRegId = Block.BLOCK_STATE_REGISTRY.getId(state);
-                        Pandorical.LOGGER.info("DIAG: state variant='{}' regId={}", props, stateRegId);
-                    }
-                    break;
-                }
-            }
         } else {
             Pandorical.LOGGER.info("Block state IDs already match server — no remapping needed");
         }
@@ -1835,7 +1769,4 @@ public class ContentManager {
         }
     }
 
-    public static VirtualResourcePack getVirtualPack() {
-        return virtualPack;
-    }
 }

@@ -472,7 +472,7 @@ public class PandoricalClient implements ClientModInitializer {
                 // The configuration phase reloads before the level exists; only a client that
                 // somehow reached play without that still reloads here, on top of the level.
                 if (!ContentManager.wasConfigReloadDone()) {
-                    client.execute(() -> ContentManager.injectResourcePackAndReRender(client));
+                    client.execute(ContentManager::injectResourcePack);
                 }
             }
         });
