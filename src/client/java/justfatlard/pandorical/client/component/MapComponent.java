@@ -101,9 +101,6 @@ public class MapComponent extends AbstractComponent {
         showPassive = parseBool("show_passive", true);
     }
 
-    /**
-     * Parse a world coordinate prop. Returns NaN if the prop is absent or empty (no target).
-     */
     /** {@code decX,decZ,colorARGB,entityTypeId} entries, semicolon-separated; the type id may itself hold a colon. */
     private static List<Dot> parseDots(String raw) {
         if (raw.isEmpty()) return List.of();
@@ -120,6 +117,9 @@ public class MapComponent extends AbstractComponent {
         return out;
     }
 
+    /**
+     * Parse a world coordinate prop. Returns NaN if the prop is absent or empty (no target).
+     */
     private double parseCoord(String key) {
         String val = props.get(key);
         if (val == null || val.isEmpty()) return Double.NaN;
