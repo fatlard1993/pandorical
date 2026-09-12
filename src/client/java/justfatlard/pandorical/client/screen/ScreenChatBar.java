@@ -26,9 +26,9 @@ import com.mojang.blaze3d.platform.InputConstants;
  * lands in the bar, matching vanilla chat's modality - but the mouse stays with the screen, so
  * slots and buttons keep working mid-sentence.
  *
- * <p>The screens are responsible for ordering: an open bar is offered keys before anything else
- * (modality), and {@link #tryOpen} runs only after component dispatch has declined the key, so a
- * focused text field keeps its letter T.
+ * <p>{@link ScreenComponents} is responsible for ordering: an open bar is offered keys before
+ * anything else (modality), and {@link #tryOpen} runs only after component dispatch has declined
+ * the key, so a focused text field keeps its letter T.
  */
 public final class ScreenChatBar {
     private static final int MAX_CHAT_LENGTH = 256;

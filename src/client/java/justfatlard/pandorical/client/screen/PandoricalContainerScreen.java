@@ -1,7 +1,6 @@
 package justfatlard.pandorical.client.screen;
 
 import justfatlard.pandorical.client.component.*;
-import justfatlard.pandorical.protocol.ComponentDef;
 import justfatlard.pandorical.protocol.ComponentUpdate;
 import justfatlard.pandorical.protocol.OpenScreenS2C;
 import justfatlard.pandorical.screen.PandoricalMenu;
@@ -13,9 +12,6 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 
-
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,12 +21,7 @@ import java.util.Map;
  */
 public class PandoricalContainerScreen extends AbstractContainerScreen<PandoricalMenu> implements justfatlard.pandorical.api.NavigableScreen {
     private final OpenScreenS2C screenDef;
-    private final List<PandoricalComponent> components = new ArrayList<>();
-    private final Map<String, PandoricalComponent> componentIndex = new HashMap<>();
-    private final UpdateMemory updateMemory = new UpdateMemory();
-
-    /** Chat without leaving the screen; see {@link ScreenChatBar} for the ordering contract. */
-    private final ScreenChatBar chatBar = new ScreenChatBar();
+    private final ScreenComponents components = new ScreenComponents();
 
     public PandoricalContainerScreen(PandoricalMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title,
@@ -44,12 +35,11 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     @Override
     protected void init() {
         super.init();
-        components.forEach(ScreenHelper::removedTree);
-        Map<String, PandoricalComponent> previous = new HashMap<>(componentIndex);
-        components.clear();
-        componentIndex.clear();
 
-        if (screenDef == null) return;
+        if (screenDef == null) {
+            components.clear();
+            return;
+        }
 
         ComponentContext context = new ComponentContext(
             screenDef.screenId(),
@@ -60,20 +50,13 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
             this.menu
         );
 
-        for (ComponentDef def : screenDef.components()) {
-            PandoricalComponent component = ScreenHelper.buildComponent(def, context, this.leftPos, this.topPos, componentIndex);
-            components.add(component);
-        }
-        updateMemory.restore(componentIndex, previous);
+        components.rebuild(screenDef.components(), context, this.leftPos, this.topPos);
     }
 
     @Override
     public void containerTick() {
         super.containerTick();
-        chatBar.tick();
-        for (PandoricalComponent component : components) {
-            ScreenHelper.tickTree(component);
-        }
+        components.tick();
     }
 
     @Override
@@ -81,11 +64,9 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
         super.extractRenderState(context, mouseX, mouseY, delta);
 
         // Over the items, under the tooltip: the one layer a veil on a slot can live in
-        for (PandoricalComponent component : components) {
-            ScreenHelper.renderOverlayTree(component, context, mouseX, mouseY, delta);
-        }
+        components.renderOverlays(context, mouseX, mouseY, delta);
         this.extractTooltip(context, mouseX, mouseY);
-        chatBar.render(this, context, mouseX, mouseY, delta);
+        components.renderChat(this, context, mouseX, mouseY, delta);
     }
 
     /**
@@ -105,9 +86,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     @Override
     public void extractContents(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         // No pose translation is in effect yet; components carry absolute screen coordinates
-        for (PandoricalComponent component : components) {
-            ScreenHelper.renderComponentTree(component, context, mouseX, mouseY, delta);
-        }
+        components.render(context, mouseX, mouseY, delta);
         super.extractContents(context, mouseX, mouseY, delta);
     }
 
@@ -118,7 +97,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
 
     @Override
     public boolean mouseClicked(MouseButtonEvent click, boolean doubleClick) {
-        if (ScreenHelper.dispatchMouseClick(components, click.x(), click.y(), click.button())) {
+        if (components.mouseClicked(click)) {
             return true;
         }
         return super.mouseClicked(click, doubleClick);
@@ -126,20 +105,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        // A key being bound is spent on the binding. It comes first because the key most worth
-        // binding is one that already does something on the screen it is pressed on.
-        if (justfatlard.pandorical.client.keybind.KeybindManager.captureKey(event)) {
-            return true;
-        }
-        // An open chat bar owns the keyboard; the chat key only opens it once no
-        // component (a focused text field) has claimed the key for itself
-        if (chatBar.keyPressed(event)) {
-            return true;
-        }
-        if (ScreenHelper.dispatchKeyPressed(components, event.key(), event.keycode(), event.modifiers())) {
-            return true;
-        }
-        if (chatBar.tryOpen(event)) {
+        if (components.keyPressed(event)) {
             return true;
         }
         return super.keyPressed(event);
@@ -147,10 +113,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
 
     @Override
     public boolean charTyped(CharacterEvent event) {
-        if (chatBar.charTyped(event)) {
-            return true;
-        }
-        if (ScreenHelper.dispatchCharTyped(components, event.codepoint())) {
+        if (components.charTyped(event)) {
             return true;
         }
         return super.charTyped(event);
@@ -158,7 +121,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (ScreenHelper.dispatchMouseScrolled(components, mouseX, mouseY, verticalAmount)) {
+        if (components.mouseScrolled(mouseX, mouseY, verticalAmount)) {
             return true;
         }
         // What no component wanted goes to the slot underneath, through the container habits every
@@ -168,7 +131,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
-        if (ScreenHelper.dispatchMouseReleased(components, event.x(), event.y(), event.button())) {
+        if (components.mouseReleased(event)) {
             return true;
         }
         return super.mouseReleased(event);
@@ -176,12 +139,11 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
 
     @Override
     public List<NavRegion> navRegions() {
-        return ScreenHelper.navRegions(components);
+        return components.navRegions();
     }
 
     public void applyUpdates(List<ComponentUpdate> updates) {
-        updateMemory.record(updates);
-        ScreenHelper.applyUpdates(updates, componentIndex);
+        components.applyUpdates(updates);
     }
 
     /**
@@ -226,7 +188,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     @Override
     public void removed() {
         super.removed();
-        components.forEach(ScreenHelper::removedTree);
+        components.removed();
     }
 
     private void sendAction(String componentId, Map<String, String> data) {
