@@ -29,7 +29,6 @@
     "LivingEntityRendererMixin",
     "LoomScreenBedMixin",
     "MerchantStackSizeMixin",
-    "MinecartRenderStateMixin",
     "ModelAnimationMixin",
     "ParticleTintMixin",
     "PlayerSkinOverrideMixin",

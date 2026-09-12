@@ -2,7 +2,7 @@ package justfatlard.pandorical.client.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import justfatlard.pandorical.client.renderer.EntityOverlayStore;
-import justfatlard.pandorical.client.renderer.OverlayRenderState;
+import justfatlard.pandorical.client.renderer.OverlayTextureHolder;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.AbstractMinecartRenderer;
 import net.minecraft.client.renderer.entity.state.MinecartRenderState;
@@ -33,7 +33,7 @@ public abstract class AbstractMinecartRendererMixin {
 	@Inject(method = "extractRenderState(Lnet/minecraft/world/entity/vehicle/minecart/AbstractMinecart;Lnet/minecraft/client/renderer/entity/state/MinecartRenderState;F)V",
 		at = @At("TAIL"))
 	private void pandorical$stashOverlay(AbstractMinecart entity, MinecartRenderState state, float partialTick, CallbackInfo ci) {
-		((OverlayRenderState) state).pandorical$setOverlay(EntityOverlayStore.get(entity.getId()));
+		((OverlayTextureHolder) state).pandorical$setOverlayTexture(EntityOverlayStore.get(entity.getId()));
 	}
 
 	/**
@@ -52,7 +52,7 @@ public abstract class AbstractMinecartRendererMixin {
 	@Redirect(method = "submit(Lnet/minecraft/client/renderer/entity/state/MinecartRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
 		at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/entity/AbstractMinecartRenderer;MINECART_LOCATION:Lnet/minecraft/resources/Identifier;", opcode = org.objectweb.asm.Opcodes.GETSTATIC))
 	private Identifier pandorical$overlayTexture() {
-		Identifier overlay = pandorical$drawing == null ? null : ((OverlayRenderState) pandorical$drawing).pandorical$overlay();
+		Identifier overlay = pandorical$drawing == null ? null : ((OverlayTextureHolder) pandorical$drawing).pandorical$getOverlayTexture();
 		return overlay != null ? overlay : MINECART_LOCATION;
 	}
 }
