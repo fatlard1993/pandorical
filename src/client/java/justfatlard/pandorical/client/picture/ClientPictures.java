@@ -25,9 +25,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Pictures the server has stood in the world, each a texture of its cells drawn on a thin panel
- * at its anchor entity. The texture is rewritten only for the cells a paint changes, and sent to
- * the GPU at most once a frame however many paints arrived.
+ * Server pictures, each a texture on a thin panel at its anchor entity. A paint rewrites only its
+ * cells; the texture uploads at most once a frame.
  */
 public final class ClientPictures {
     private ClientPictures() {}
@@ -43,7 +42,7 @@ public final class ClientPictures {
         boolean dirty = true;
 
         Shown(Picture picture) {
-            // Never an id a picture it replaces still holds: releasing the old one would close this one
+            // A fresh id: releasing the replaced picture's texture would close this one.
             int serial = nextSerial++;
             this.picture = picture;
             this.textureId = Identifier.fromNamespaceAndPath("pandorical", "picture/" + serial);
@@ -79,7 +78,7 @@ public final class ClientPictures {
         ClientPlayNetworking.registerGlobalReceiver(PicturesS2C.TYPE,
             (payload, context) -> context.client().execute(() -> apply(payload)));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> client.execute(ClientPictures::clearAll));
-        // Whatever the server does or does not say when an anchor goes, its textures go with it
+        // The textures go with the anchor, whatever the server says.
         ClientEntityEvents.ENTITY_UNLOAD.register((entity, level) -> {
             Shown shown = SHOWN.remove(entity.getId());
             if (shown != null) shown.release();
@@ -135,14 +134,14 @@ public final class ClientPictures {
             int light = LightCoordsUtil.getLightCoords(level, BlockPos.containing(at.add(0, pose.height() / 2, 0)));
             poseStack.pushPose();
             poseStack.translate(at.x - cam.x, at.y - cam.y, at.z - cam.z);
-            // Local +z is the way the front faces, local +y up the picture
+            // Local +z is the way the front faces, local +y up the picture.
             poseStack.rotateDegrees(Axis.YP, -pose.yaw());
             poseStack.rotateDegrees(Axis.XP, -pose.tilt());
 
             float w = pose.width() / 2;
             float h = pose.height();
             float d = shown.picture.thickness();
-            // Unshaded, as vanilla draws a map in a frame: a picture is its colours, whichever way it faces
+            // Unshaded, like a map in a frame.
             context.submitNodeCollector().submitCustomGeometry(poseStack, RenderTypes.text(shown.textureId), (p, v) -> {
                 flat(p, v, light, -w, 0, 0, 1);
                 flat(p, v, light, w, 0, 1, 1);
@@ -157,7 +156,6 @@ public final class ClientPictures {
         }
     }
 
-    /** The back and the four edges, one colour, a thickness behind the front. */
     private static void panel(PoseStack.Pose p, VertexConsumer v, int light, float w, float h, float d) {
         face(p, v, light, 0, 0, -1, w, 0, -d, 0, 0, -w, 0, -d, 0, 0, -w, h, -d, 0, 0, w, h, -d, 0, 0);
         face(p, v, light, 0, 1, 0, -w, h, 0, 0, 0, w, h, 0, 0, 0, w, h, -d, 0, 0, -w, h, -d, 0, 0);
@@ -166,7 +164,7 @@ public final class ClientPictures {
         face(p, v, light, -1, 0, 0, -w, 0, -d, 0, 0, -w, 0, 0, 0, 0, -w, h, 0, 0, 0, -w, h, -d, 0, 0);
     }
 
-    /** One quad, corners counter-clockwise seen from the side it faces: x, y, z, u, v for each. */
+    /** Corners counter-clockwise seen from the side it faces, each x, y, z, u, v. */
     private static void face(PoseStack.Pose p, VertexConsumer v, int light, float nx, float ny, float nz,
             float x0, float y0, float z0, float u0, float v0,
             float x1, float y1, float z1, float u1, float v1,

@@ -20,18 +20,9 @@ import org.joml.Vector3f;
 import com.google.gson.JsonElement;
 
 /**
- * Animations a mod shipped, in a form the game can play.
- *
- * <p>Loaded as ordinary client resources from {@code assets/<namespace>/animations/<name>.json},
- * which means a server mod ships one alongside its models and Pandorical's asset sync carries it
- * over with everything else - there is no separate channel for animation and nothing to register
- * in code.
- *
- * <p>The file is vanilla's own animation structure written out: a length, whether it loops, and
- * for each named bone a list of channels. Bones are named, not indexed, so an animation written
- * for {@code body} and {@code head} plays on anything whose model spells its parts that way and
- * silently skips the parts of one that does not - which is what lets a single "lie down" be
- * written once for every four-legged animal in the game.
+ * Client resources at {@code assets/<namespace>/animations/<name>.json}, so asset sync carries
+ * them. Vanilla's animation structure by bone name; rotations in degrees; a bone the model lacks
+ * is skipped.
  *
  * <pre>{@code
  * {
@@ -53,7 +44,6 @@ public final class AnimationLibrary implements SimpleSynchronousResourceReloadLi
 	private static final String SUFFIX = ".json";
 	private static final Gson GSON = new Gson();
 
-	/** Rotations are written in degrees, because that is how anybody thinks about an angle. */
 	private static final float DEGREES_TO_RADIANS = (float) (Math.PI / 180.0);
 
 	private static volatile Map<Identifier, AnimationDefinition> animations = Map.of();
@@ -81,7 +71,6 @@ public final class AnimationLibrary implements SimpleSynchronousResourceReloadLi
 				AnimationDefinition definition = parse(GSON.fromJson(reader, JsonObject.class));
 				if (definition != null) loaded.put(id, definition);
 			} catch (Exception e) {
-				// One bad animation is not worth losing the rest of them over.
 				Pandorical.LOGGER.warn("Could not read animation {}", file, e);
 			}
 		}
@@ -90,7 +79,7 @@ public final class AnimationLibrary implements SimpleSynchronousResourceReloadLi
 		Pandorical.LOGGER.info("Loaded {} animations", animations.size());
 	}
 
-	/** Turns {@code ns:animations/name.json} back into {@code ns:name}. */
+	/** {@code ns:animations/name.json} to {@code ns:name}. */
 	private static Identifier nameOf(Identifier file) {
 		String path = file.getPath();
 		int start = DIRECTORY.length() + 1;

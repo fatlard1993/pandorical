@@ -6,7 +6,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import justfatlard.pandorical.protocol.BannerDecalsS2C;
 
-/** Every banner decal the server has laid, by block position. */
 public final class BannerDecalStore {
 	private BannerDecalStore() {}
 

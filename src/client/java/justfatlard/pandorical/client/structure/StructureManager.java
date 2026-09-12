@@ -16,31 +16,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Tracks active structures on the client and drives their pose interpolation.
- *
- * <p>Structure poses arrive from the server on a ticked (not continuous) cadence: every call
- * to {@code StructureApi.updatePose()} on the server is one discrete packet. To make movement
- * look smooth despite that, each structure keeps its last two known poses ("previous" and
- * "target") and linearly interpolates between them across a short fixed window
- * ({@link #INTERPOLATION_TICKS} ticks), the same general technique vanilla uses for networked
- * entity movement. {@link #tick()} advances that window once per client tick; the renderer
- * samples the interpolated pose once per render frame using the current partial tick.
- *
- * <p>Sampled the way an entity is drawn: between where the structure stood after the previous
- * tick and where it stands after this one, by the partial tick. It used to sample ahead of the
- * ticked state instead, a third of a tick further along the blend per frame, which put the deck
- * a tick in front of every entity riding on it - and at a boat's speed a tick is half a block.
- * Anything meant to stay on a structure ({@code StructureInterpolationHandler}) blends by the
- * same rule, so the two are drawn in the same place.
+ * Client structures. Each server pose is blended in over {@link #INTERPOLATION_TICKS} ticks, and
+ * a frame is drawn between the last two ticked poses like an entity. Riders blend by the same
+ * rule ({@code StructureInterpolationHandler}) so they are drawn where the deck is.
  */
 public final class StructureManager {
     private StructureManager() {}
 
-    /**
-     * Ticks over which a new pose is blended in. Kept short and fixed rather than derived from
-     * the actual interval between server updates; simple, and adequate for a first version
-     * since callers are documented to call {@code updatePose} roughly once per server tick.
-     */
+    /** Fixed, not derived from the update interval; suits updates about once per server tick. */
     public static final int INTERPOLATION_TICKS = 3;
 
     private static final Map<String, ClientStructure> structures = new ConcurrentHashMap<>();
@@ -86,7 +69,7 @@ public final class StructureManager {
         structures.remove(payload.structureId());
     }
 
-    /** Advance interpolation progress for every active structure. Call once per client tick. */
+    /** Once per client tick. */
     public static void tick() {
         for (ClientStructure structure : structures.values()) {
             structure.tick();
@@ -101,7 +84,6 @@ public final class StructureManager {
         structures.clear();
     }
 
-    /** Local relative-position key. Deliberately independent of the server-side {@code api.RelPos} record (client sourceSet has no dependency on it). */
     public record RelPosKey(int x, int y, int z) {}
 
     public record StructurePoseSnapshot(double x, double y, double z, float yaw) {}
@@ -112,10 +94,8 @@ public final class StructureManager {
 
         private StructurePoseSnapshot previousPose;
         private StructurePoseSnapshot targetPose;
-        // Start "arrived" so the very first pose renders immediately with no bogus lerp-in.
         private int ticksSinceUpdate = INTERPOLATION_TICKS;
 
-        /** Where the structure stood after the previous tick, and after this one. */
         private StructurePoseSnapshot lastTick;
         private StructurePoseSnapshot thisTick;
 
@@ -129,9 +109,6 @@ public final class StructureManager {
         }
 
         void pushPose(StructurePoseSnapshot newPose) {
-            // Resume the blend from where this tick left the structure rather than snapping to
-            // the old target, so a steady stream of updates blends continuously instead of
-            // stair-stepping.
             this.previousPose = thisTick;
             this.targetPose = newPose;
             this.ticksSinceUpdate = 0;
@@ -143,7 +120,6 @@ public final class StructureManager {
             thisTick = blended(ticksSinceUpdate / (float) INTERPOLATION_TICKS);
         }
 
-        /** Pose for the current render frame: between the last two ticks, like an entity. */
         public StructurePoseSnapshot interpolated(float partialTick) {
             if (partialTick >= 1.0f) return thisTick;
             if (partialTick <= 0.0f) return lastTick;

@@ -18,36 +18,9 @@ import java.util.Collection;
 import java.util.Map;
 
 /**
- * Renders active structures each frame as a batch of vanilla block models, positioned and
- * rotated as one unit via {@link PoseStack}, not one entity per block.
- *
- * <p>Hooks {@code LevelRenderEvents.COLLECT_SUBMITS}, the fabric-rendering-v1 hook for the
- * submit-node renderer architecture: it exposes a {@code SubmitNodeCollector} and a
- * camera-relative {@code PoseStack} for arbitrary world-space content. (The older
- * {@code WorldRenderEvents} class no longer exists on this Minecraft version.)
- *
- * <p>Per block, this uses {@code SubmitNodeCollector.submitMovingBlock(PoseStack,
- * MovingBlockRenderState, int)}: the same mechanism vanilla's own
- * {@code FallingBlockRenderer} and piston moving-block rendering use to draw a block state's
- * model at an arbitrary transformed position with real lighting/AO, rather than at its actual
- * placed position in a chunk. Model/texture/tint resolution is therefore entirely vanilla's
- * own responsibility; block model baking is never touched here.
- *
- * <p><b>Known simplifications</b> (acceptable for a first version per the design brief):
- * <ul>
- *   <li>{@code MovingBlockRenderState} always reports its own single block state for any
- *       neighbor query, so faces between two blocks placed adjacently within the <em>same</em>
- *       structure are not culled against each other (both render in full). Vanilla's own
- *       moving-block rendering (e.g. piston heads) behaves the same way; not a new
- *       limitation introduced here.</li>
- *   <li>Per-block world light/biome is sampled at that block's approximate rotated world
- *       position (cheap: the same {@code lightEngine}/{@code cardinalLighting} objects are
- *       reused for every block, only the queried {@code BlockPos} differs), which is more
- *       accurate than a single anchor-position sample. The manual yaw rotation used only for
- *       choosing that sample position is a best-effort match to the PoseStack's rotation.
- *       It affects lighting/biome-tint sampling only, never block placement, which is driven
- *       solely by the vanilla-composed PoseStack transform.</li>
- * </ul>
+ * Draws structures as vanilla moving blocks, as falling blocks and pistons are drawn, under one
+ * pose per structure. A moving block answers every neighbour query with itself, so faces between
+ * blocks of the same structure are not culled.
  */
 public final class StructureRenderer {
     private StructureRenderer() {}
@@ -65,10 +38,7 @@ public final class StructureRenderer {
         Collection<StructureManager.ClientStructure> structures = StructureManager.getActive();
         if (structures.isEmpty()) return;
 
-        // COLLECT_SUBMITS runs on the submission (post-extraction) phase, which doesn't hand us
-        // a DeltaTracker directly. Reuse the globally-accessible partial tick source HudRenderer
-        // already uses rather than introducing a second per-frame hook via LevelExtractionEvents;
-        // a simplification accepted for this first version.
+        // COLLECT_SUBMITS gets no DeltaTracker.
         float partialTick = mc.getDeltaTracker().getGameTimeDeltaPartialTick(true);
 
         Vec3 camPos = context.levelState().cameraRenderState.pos;
@@ -89,9 +59,7 @@ public final class StructureRenderer {
         double cos = Math.cos(yawRad);
         double sin = Math.sin(yawRad);
 
-        // poseStack from LevelRenderContext is camera-relative world space (standard MC
-        // convention; entity submit() likewise applies only local offsets on top of an
-        // already camera-relative incoming PoseStack).
+        // The context's pose stack is camera-relative.
         poseStack.pushPose();
         poseStack.translate(pose.x() - camPos.x, pose.y() - camPos.y, pose.z() - camPos.z);
         poseStack.rotateDegrees(Axis.YP, -pose.yaw());
@@ -106,8 +74,7 @@ public final class StructureRenderer {
 
             MovingBlockRenderState renderState = new MovingBlockRenderState();
             renderState.blockState = state;
-            // Stable per-block seed independent of the structure's movement, so position-seeded
-            // model/texture variants don't flicker as the structure moves.
+            // Seeded by relative position, so model variants hold still while the structure moves.
             renderState.randomSeedPos = new BlockPos(rel.x(), rel.y(), rel.z());
             renderState.blockPos = worldBlockPos(pose, rel, cos, sin);
             renderState.biome = level.getBiome(renderState.blockPos);
@@ -122,10 +89,7 @@ public final class StructureRenderer {
         poseStack.popPose();
     }
 
-    /**
-     * Approximate world-space block position for lighting/biome sampling only; see the
-     * class-level known-simplifications note. Never used for the visual transform.
-     */
+    /** Approximate, for light and biome sampling only; the pose stack places the block. */
     private static BlockPos worldBlockPos(StructureManager.StructurePoseSnapshot pose,
                                            StructureManager.RelPosKey rel, double cos, double sin) {
         double localX = rel.x() + 0.5;

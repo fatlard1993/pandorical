@@ -14,20 +14,13 @@ import java.util.function.Function;
 import net.minecraft.client.animation.AnimationChannel;
 
 /**
- * Which entities are playing what, and the baked animation to play them with.
- *
- * <p>Two caches for two different lifetimes. What an entity is playing is small, changes when the
- * server says so, and is keyed by network id. A baked animation is expensive - it resolves every
- * named bone against a real model - and depends on the model rather than the entity, so it is kept
- * against the model's root part and shared by every entity that renders through it.
- *
- * <p>The baked cache holds model parts weakly. A resource reload replaces every model in the game,
- * and a strong reference here would keep the old ones alive for as long as the client ran.
+ * What each entity plays, by network id, and animations baked per model root. The baked cache is
+ * weak: a resource reload replaces every model.
  */
 public final class EntityAnimations {
 	private EntityAnimations() {}
 
-	/** @param startedAt when it began, in client time, so elapsed can be worked out per frame */
+	/** @param startedAt client wall-clock millis */
 	public record Active(Identifier animation, boolean looping, long startedAt) {}
 
 	private static final Map<Integer, Active> PLAYING = new ConcurrentHashMap<>();
@@ -47,20 +40,14 @@ public final class EntityAnimations {
 		return PLAYING.get(entityId);
 	}
 
-	/** Everything stops at a disconnect; the next server has its own ideas. */
 	public static void clearAll() {
 		PLAYING.clear();
 		BAKED.clear();
 	}
 
 	/**
-	 * The animation baked against this particular model, or null if there is no such animation.
-	 *
-	 * <p>Baking is what binds bone names to real parts. A name the model does not have is left
-	 * out before baking, which is what lets one animation be written for every animal that
-	 * spells its parts the usual way: a flop written with a salmon's two body halves still plays
-	 * on a cod, on the parts the cod has. The game's own baker refuses such a name outright,
-	 * and a refusal inside the renderer is a crash for whoever is looking at the fish.
+	 * Null for an unknown animation. Bones the model lacks are dropped before baking: vanilla's
+	 * baker throws on them, inside the renderer.
 	 */
 	public static KeyframeAnimation baked(ModelPart root, Identifier animation) {
 		Map<Identifier, KeyframeAnimation> forModel =
@@ -76,7 +63,6 @@ public final class EntityAnimations {
 		}
 	}
 
-	/** The definition with every bone this model does not have dropped. */
 	private static AnimationDefinition onlyKnownBones(AnimationDefinition definition, ModelPart root) {
 		Function<String, ModelPart> lookup = root.createPartLookup();
 		Map<String, List<AnimationChannel>> known = new HashMap<>();
