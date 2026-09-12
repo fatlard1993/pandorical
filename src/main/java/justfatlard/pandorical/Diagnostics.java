@@ -34,6 +34,9 @@ public final class Diagnostics {
 	public static final boolean ON = detect();
 	private static final long START = System.currentTimeMillis();
 	private static FileOutputStream file;
+	/** Past this the trail goes to standard out alone: a guard raised over and over must not fill a disk. */
+	private static final long MOST_TRACE_BYTES = 64L << 20;
+	private static long traceBytes;
 
 	private static final boolean WINDOWS_CLIENT = detectWindowsClient();
 	private static final Path GUARD_SETTING = FabricLoader.getInstance().getConfigDir()
@@ -199,7 +202,10 @@ public final class Diagnostics {
 				}
 				file = new FileOutputStream(path.toFile(), false);
 			}
-			file.write((line + "\n").getBytes(StandardCharsets.UTF_8));
+			if (traceBytes > MOST_TRACE_BYTES) return;
+			byte[] bytes = (line + "\n").getBytes(StandardCharsets.UTF_8);
+			traceBytes += bytes.length;
+			file.write(traceBytes > MOST_TRACE_BYTES ? "[pandorical-trace] full; standard out only from here\n".getBytes(StandardCharsets.UTF_8) : bytes);
 		} catch (IOException ignored) {
 			// The trail is for somebody else's crash; it does not get to cause one.
 		}
