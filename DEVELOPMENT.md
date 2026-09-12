@@ -264,8 +264,8 @@ screens.update(player, screenId, List.of(
 
 A window resize rebuilds the screen from its definitions with every update since the open
 replayed over them, so a swapped-in control stays swapped in. What a component keeps that
-no prop holds - the text typed into a field, strokes painted ahead of the server - is handed
-from the old component to its replacement through `PandoricalComponent#inherit`.
+no prop holds - the text typed into a field, strokes painted ahead of the server - is carried
+over to the rebuilt component.
 
 ### Painting by hand
 
@@ -301,8 +301,9 @@ screens.onAction(SCREEN_TYPE, "canvas", (player, data) -> {
 Cells are bytes, read unsigned, so a palette can have up to 256 colours; `PixelCanvas.encode` is their base64. The supply lists only the inks there is any of, as `index:amount` pairs.
 
 A stroke carries the ink and brush the client saw while making it, so a colour chosen a
-moment before the server heard about it still paints in that colour. Check them before
-applying: they came from the client. mc-paint's easel is the working example.
+moment before the server heard about it still paints in that colour. They came from the
+client: `apply` holds the brush to `PixelCanvas.MAX_BRUSH` and gives an ink past the end of the
+supply none, and whether the ink is one your palette offers is yours to check.
 
 ### Handlers
 
@@ -478,7 +479,7 @@ Nothing is persisted across a reconnect. Send the marks again on join.
 A block can be drawn differently for what stands beside it. The client swaps the model where
 the chunk compiler looks it up, with the neighbours in hand; each case is a provider that names
 the extra models it wants (found by scanning, so nothing is loaded that nobody shipped) and
-picks one at render time. Three ship today.
+picks one at render time. Six ship today.
 
 **Rail diagonals.** A run of alternating curved rails is drawn as the straight diagonal it stands for. The
 client swaps a curve's model for a chord when both of its connected neighbours are the
@@ -491,11 +492,26 @@ Minecart Mania ships chords for vanilla's four rails and its own.
 **Joined fence gates.** A gate with the same gate beside it on its line takes a joined model,
 named `<gate>[_wall][_open]_join_<left|right|both>_<facing>`, the facing baked in because a
 model picked here has no blockstate rotation. More Doors ships them for every vanilla gate.
+A lone gate marked `BlockMarkApi.GATE_HINGE_LEFT` or `GATE_HINGE_RIGHT` opens as one leaf,
+`<gate>[_wall]_open_swing_<left|right>[_stacked]_<facing>`.
+
+**Door banks.** Doors of one kind hung on the same side and filling a rectangle are drawn as
+one door: frame round the outside, sheet across the inside, one handle. Each leaf takes
+`<door>_mega_<lower|upper>_<hinge>[_open]_<flags>`, the flags naming which frame pieces it
+keeps. More Doors ships them.
+
+**Trapdoor banks.** Trapdoors of one kind lying in one plane and filling a rectangle are one
+hatch or shutter, each tile taking `<trapdoor>_mega_<bottom|top|open>_<flags>`. More Doors
+ships them.
 
 **Door jambs.** A door with a fence connecting on its left or right takes a model with a
 post where the fence arm arrives and rails across to the panel, named
 `<door>_<lower|upper>_<hinge>[_open]_jamb_<left|right|both>_<facing>`. More Doors ships them
 for the wooden doors and iron.
+
+**Hung from a slab.** A ceiling-mounted block under a top slab would float half a block below
+it; a block that ships `<block>_hung_<facing>[_on]` takes that model there. Lever Torch ships
+them for its torch and vanilla's lever.
 
 ## Keybinds
 
@@ -585,8 +601,17 @@ PandoricalApi.settings().group("block-tip", "Block Tip")
     .backedBy(player -> ..., (player, value) -> ...);
 ```
 
+Four kinds of setting: a **toggle**, a **choice** among named options, a **number** with a
+range and step, and a **list** of the player's own entries, each with a button that takes it
+off - for what a mod collects by command or by play, where seeing the list and pruning it is
+the whole ask. Each is read with `get(player)` and written with `set(player, value)`, and takes
+`onChange` listeners. Values are kept per player by Pandorical, on the overworld, unless the
+mod already keeps them, in which case `backedBy` makes the screen another way to reach the mod's
+own store and the two can never disagree. A change from the screen re-labels the control in
+place, and lays the page out again only when a setting may have appeared or gone.
+
 A client-side mod, with no server half to declare anything, declares from the client instead:
-`PandoricalClientApi.settings().group(...)` takes the same three kinds, each as a getter and a
+`PandoricalClientApi.settings().group(...)` takes the first three kinds, each as a getter and a
 setter over whatever the mod already keeps. The client tells the server what it has after the
 hello, the mod appears in the same menu marked *this client*, and a change made there is handed
 back to the client to apply. `changed()` tells the server the values moved some other way.
@@ -603,37 +628,28 @@ installed, `shownWhen(other, value)` only while a setting declared before it has
 refused from the command, and the page is laid out again when a change may have shown or hidden
 one.
 
-Four kinds of setting: a **toggle**, a **choice** among named options, a **number** with a
-range and step, and a **list** of the player's own entries, each with a button that takes it
-off - for what a mod collects by command or by play, where seeing the list and pruning it is
-the whole ask. Each is read with `get(player)` and written with `set(player, value)`, and takes
-`onChange` listeners. Values are kept per player by Pandorical, on the overworld, unless the
-mod already keeps them, in which case `backedBy` makes the screen another way to reach the mod's
-own store and the two can never disagree. A change from the screen re-labels the control in
-place, and lays the page out again only when a setting may have appeared or gone.
+## Traps in structures, tints and renderers
 
-## Documented in the javadoc, not here
+`structures`, `playerInventory`, `blockTints` and built-in entity renderers work the same way,
+through `PandoricalApi`; read the javadoc on `StructureApi`, `PlayerInventoryApi`,
+`BlockTintApi` and `PandoricalApi#registerEntityRenderer` before wiring them up. Each carries a
+trap that nothing reports:
 
-`structures`, `playerInventory`, `blockTints`, and built-in entity renderers work the
-same way, through `PandoricalApi`. Each carries a trap this page will not save you from:
-structure IDs must be unique server-wide, structures must be despawned or they leak
-state, tints must be registered before the client asks. One more for structures: anything
-that has to be drawn on a moving structure must blend between positions by the structure's
-own rule (`StructureInterpolationHandler`, over `StructureManager.INTERPOLATION_TICKS`),
-because a vanilla blend sits a different distance behind the server and the gap is what a
-rider sees. Server-only entity stubs and cushions already do; push their position every tick
-(cushions need `needsSync`, vanilla never expects one to move). `BlockTintApi#positional` has a
-trap of its own worth naming here, because nothing reports it: a tint only reaches model
-faces carrying a `tintindex`, and most vanilla models carry none. And a tint multiplies, so
-over a coloured texture half the palette disappears; drain the texture to grey and give
-`positional(fallbackArgb, ...)` the colour every unpainted position should keep. Particles a
-painted block throws from its animate tick wear the paint too, brightness kept. Painting a vanilla
-block means also shipping a model override that adds one, through
-`ContentApi#registerAsset` under the `minecraft` namespace - the synced pack sits at
-`Pack.Position.TOP`, so it wins over vanilla's copy. Without that the colours arrive,
-land nowhere, and the block stays exactly as it was. Read the javadoc on
-`StructureApi`, `PlayerInventoryApi`, `BlockTintApi`, and
-`PandoricalApi#registerEntityRenderer` before wiring them up.
+- **Structure ids are unique server-wide**, and a structure not despawned leaks its state.
+- **Anything drawn on a moving structure blends by the structure's own rule**
+  (`StructureInterpolationHandler`, over `StructureManager.INTERPOLATION_TICKS`). A vanilla blend
+  sits a different distance behind the server, and the gap is what a rider sees. Server-only
+  entity stubs and cushions already do; push their position every tick (cushions need
+  `needsSync`, since vanilla never expects one to move).
+- **Tints are registered before the client asks.**
+- **A tint only reaches faces with a `tintindex`**, and most vanilla models carry none.
+- **A tint multiplies**, so over a coloured texture half the palette disappears. Drain the texture
+  to grey and give `positional(fallbackArgb, ...)` the colour every unpainted position keeps.
+  Particles a painted block throws from its animate tick wear the paint too, brightness kept.
+- **Painting a vanilla block needs a model override that adds a `tintindex`**, shipped through
+  `ContentApi#registerAsset` under the `minecraft` namespace; the synced pack sits at
+  `Pack.Position.TOP`, so it wins over vanilla's copy. Without it the colours arrive, land
+  nowhere, and the block stays exactly as it was.
 
 `playerInventory` covers more than slots, and the rest is easy to miss looking for it:
 `registerButton` puts a square glyph button on the vanilla inventory panel, `onButton`
@@ -641,3 +657,15 @@ answers a press, and `setButtonGlyph` changes what one player sees on one button
 is how a button that is a switch says which way it is set. `registeredSlots` walks every
 slot group, for the mods that have to empty the whole extra inventory rather than one
 slot they already know the name of.
+
+## For client-side mods
+
+A mod with no server half reaches Pandorical from the client. What the suite's client mods use:
+
+- `PandoricalClientApi.settings()`: a page in the mod menu, see Settings.
+- `NavigableScreen`: where a Pandorical screen's interactive parts are, for a navigator.
+- `PandoricalContainerScreen#getRecipeStation()`: what a crafting screen crafts, for a recipe book.
+- `InputHints`: whether the hands in use are a pad or a keyboard, which hint lines read.
+- `KeybindManager.poolMapping(slot)`: a pooled keybind to drive from another input.
+
+Only `client.api` is kept stable; the rest are classes a client mod can reach, and may move.
