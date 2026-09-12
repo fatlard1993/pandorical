@@ -954,7 +954,6 @@ public class ContentManager {
                 }
             }
 
-            var tabEvents = net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents.class;
             registerForTab(net.minecraft.world.item.CreativeModeTabs.BUILDING_BLOCKS, buildingBlocks);
             registerForTab(net.minecraft.world.item.CreativeModeTabs.COMBAT, combat);
             registerForTab(net.minecraft.world.item.CreativeModeTabs.TOOLS_AND_UTILITIES, tools);
@@ -972,13 +971,19 @@ public class ContentManager {
         }
     }
 
+    /** Each tab's synced items, replaced by every sync and read by the one listener its tab gets. */
+    private static final Map<net.minecraft.resources.ResourceKey<net.minecraft.world.item.CreativeModeTab>, List<Item>> tabItems =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
     private static void registerForTab(net.minecraft.resources.ResourceKey<net.minecraft.world.item.CreativeModeTab> tabKey,
                                         List<Item> items) {
-        if (items.isEmpty()) return;
+        boolean listening = tabItems.containsKey(tabKey);
+        tabItems.put(tabKey, List.copyOf(items));
+        if (listening) return;
         net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents
             .modifyOutputEvent(tabKey)
-            .register((output) -> {
-                for (Item item : items) {
+            .register(output -> {
+                for (Item item : tabItems.getOrDefault(tabKey, List.of())) {
                     output.accept(item);
                 }
             });
