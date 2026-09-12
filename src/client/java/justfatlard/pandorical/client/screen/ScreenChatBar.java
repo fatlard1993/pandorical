@@ -10,25 +10,9 @@ import net.minecraft.network.chat.Component;
 import com.mojang.blaze3d.platform.InputConstants;
 
 /**
- * Vanilla-style chat entry that lives INSIDE a Pandorical screen, so talking does not mean
- * leaving. A trade being haggled over, a mail screen mid-compose: these are exactly the moments a
- * player wants to say something, and vanilla's answer (chat is its own screen) would close the UI
- * they are talking about - for a container screen that is not just visual, closing is the cancel
- * action.
- *
- * <p>The vanilla chat key (and the command key, seeded with "/") opens a chat input bar along the
- * bottom of the window, drawn where vanilla's own chat input sits so it reads as chat at a glance.
- * Enter sends through the ordinary connection (commands included), Esc puts the bar away; either
- * way the screen underneath never moved. Incoming messages need nothing from us: the chat HUD
- * already renders under every screen.
- *
- * <p>While the bar is open it owns the KEYBOARD outright - inventory-close, navigation, every key
- * lands in the bar, matching vanilla chat's modality - but the mouse stays with the screen, so
- * slots and buttons keep working mid-sentence.
- *
- * <p>{@link ScreenComponents} is responsible for ordering: an open bar is offered keys before
- * anything else (modality), and {@link #tryOpen} runs only after component dispatch has declined
- * the key, so a focused text field keeps its letter T.
+ * Chat input inside a Pandorical screen, since vanilla's chat screen would close it, and closing a
+ * container screen is its cancel action. An open bar takes every key; the mouse stays with the
+ * screen. {@link ScreenComponents#keyPressed} orders it against the components.
  */
 public final class ScreenChatBar {
     private static final int MAX_CHAT_LENGTH = 256;
@@ -39,14 +23,11 @@ public final class ScreenChatBar {
 
     private EditBox input;
     /**
-     * The key press that opens the bar is followed by that key's own character event, which would
-     * otherwise land in the box as its first letter (vanilla dodges this by opening ChatScreen
-     * outside the event dispatch entirely). One swallowed character, cleared every tick so a
-     * trigger key that produces no character cannot cost a real one later.
+     * The opening key press is followed by its own character event. Cleared every tick, so a key
+     * that types no character cannot swallow a later one.
      */
     private boolean swallowOpeningChar;
 
-    /** Open the bar when this is the chat or command key; true when the event was consumed. */
     public boolean tryOpen(KeyEvent event) {
         if (this.input != null) return false;
 
@@ -71,7 +52,6 @@ public final class ScreenChatBar {
         return true;
     }
 
-    /** Keyboard while open: Enter sends, Esc dismisses, everything else is the box's. */
     public boolean keyPressed(KeyEvent event) {
         if (this.input == null) return false;
 
@@ -99,12 +79,11 @@ public final class ScreenChatBar {
         return true;
     }
 
-    /** Call once per screen tick; the opening-char swallow must not outlive its own frame. */
     public void tick() {
         this.swallowOpeningChar = false;
     }
 
-    /** Draw last, over everything, pinned to the window bottom where vanilla's chat input sits. */
+    /** Draw last, over everything. */
     public void render(Screen screen, GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         if (this.input == null) return;
 

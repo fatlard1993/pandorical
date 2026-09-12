@@ -14,10 +14,6 @@ import java.util.List;
 import java.util.Map;
 import justfatlard.pandorical.api.NavigableScreen;
 
-/**
- * Non-container declarative screen. Used for dialogue, message detail,
- * recipe browsers, and other screens that don't need inventory slots.
- */
 public class PandoricalScreen extends Screen implements NavigableScreen {
     private final OpenScreenS2C screenDef;
     private final ScreenComponents components = new ScreenComponents();
@@ -54,7 +50,7 @@ public class PandoricalScreen extends Screen implements NavigableScreen {
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
-        // Let super handle blur/background (blur can only fire once per frame in 26.3+)
+        // Blur may run only once per frame, so the background is left to super.
         super.extractRenderState(graphics, mouseX, mouseY, delta);
 
         components.render(graphics, mouseX, mouseY, delta);

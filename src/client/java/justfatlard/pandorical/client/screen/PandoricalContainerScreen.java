@@ -17,10 +17,6 @@ import java.util.Map;
 import java.util.Optional;
 import justfatlard.pandorical.api.NavigableScreen;
 
-/**
- * Container screen with declarative UI + vanilla slot sync.
- * Used for screens that manage item slots (trade, backpack, etc.).
- */
 public class PandoricalContainerScreen extends AbstractContainerScreen<PandoricalMenu> implements NavigableScreen {
     private final OpenScreenS2C screenDef;
     private final ScreenComponents components = new ScreenComponents();
@@ -30,7 +26,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
               menu.getScreenDef() != null ? menu.getScreenDef().width() : 176,
               menu.getScreenDef() != null ? menu.getScreenDef().height() : 166);
         this.screenDef = menu.getScreenDef();
-        this.inventoryLabelY = 1000; // hide default labels
+        this.inventoryLabelY = 1000;
         this.titleLabelX = 1000;
     }
 
@@ -65,36 +61,24 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         super.extractRenderState(context, mouseX, mouseY, delta);
 
-        // Over the items, under the tooltip: the one layer a veil on a slot can live in
+        // Over the slot items, under the tooltip.
         components.renderOverlays(context, mouseX, mouseY, delta);
         this.extractTooltip(context, mouseX, mouseY);
         components.renderChat(this, context, mouseX, mouseY, delta);
     }
 
     /**
-     * The declarative components, drawn before anything else this screen puts up.
-     *
-     * <p>Order is the whole point of overriding here. {@code extractContents} runs the widget
-     * pass first and the slot pass second, and the components used to go in with the slots -
-     * which put this screen's own background over every widget on it. Pandorical adds no widgets
-     * of its own, so nothing looked wrong until another mod put a button on one of these screens
-     * (a recipe book toggle on a crafting station) and watched the panel paint over it every
-     * frame: added, laid out, answering clicks, and invisible.
-     *
-     * <p>Drawn here they land under the widgets AND under the slot items, which is what a
-     * background is. Not after super, which is where they were before 26.3 and which painted the
-     * panels over the item icons instead - tooltips still worked, the items were not there.
+     * Components draw before super so they sit under both other mods' widgets and the slot items;
+     * {@code extractContents} draws widgets first, then slots.
      */
     @Override
     public void extractContents(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-        // No pose translation is in effect yet; components carry absolute screen coordinates
         components.render(context, mouseX, mouseY, delta);
         super.extractContents(context, mouseX, mouseY, delta);
     }
 
     @Override
     protected void extractLabels(GuiGraphicsExtractor context, int mouseX, int mouseY) {
-        // Labels are handled by TextComponent; suppress defaults
     }
 
     @Override
@@ -126,8 +110,6 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
         if (components.mouseScrolled(mouseX, mouseY, verticalAmount)) {
             return true;
         }
-        // What no component wanted goes to the slot underneath, through the container habits every
-        // container screen shares, so their switch and the pad's navigation scroll reach this one too.
         return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
     }
 
@@ -148,25 +130,12 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
         components.applyUpdates(updates);
     }
 
-    /**
-     * The recipe book category this screen crafts from, or empty if it is not a station.
-     *
-     * <p>Public so a recipe-book mod can ask. Pandorical draws nothing for this itself: it has no
-     * book of its own and no opinion about whose should appear, only the answer to "what is this
-     * screen for" that a book needs before it can offer anything.
-     */
+    /** The recipe book category this screen crafts from, for a recipe-book mod to read. */
     public Optional<String> getRecipeStation() {
         return screenDef == null ? Optional.empty() : screenDef.recipeStation();
     }
 
-    /**
-     * Top-left corner of the panel on screen.
-     *
-     * <p>Public because {@link #getRecipeStation()} is: a mod told what this bench crafts will
-     * want to put a control on it, and the panel moves with the window and with the recipe book
-     * pane. Working it out from screen centre instead only holds while the panel is one
-     * particular size.
-     */
+    /** The panel's top-left on screen; it moves with the recipe book pane. */
     public int getPanelX() {
         return this.leftPos;
     }

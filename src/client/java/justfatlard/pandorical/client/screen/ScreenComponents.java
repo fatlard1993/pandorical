@@ -17,27 +17,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * The declarative components on a Pandorical screen and its chat bar, owned by
- * {@link PandoricalScreen} and {@link PandoricalContainerScreen} alike, which extend different
- * vanilla screens and so cannot share a parent.
- *
- * <p>Each input method answers whether the event was spent here. One that was not goes on to the
- * screen's own super, and that is where the two screens differ: a plain screen's widgets, or a
- * container's slots and the container habits.
- */
+/** The components and chat bar of a PandoricalScreen or PandoricalContainerScreen. */
 final class ScreenComponents {
     private final List<PandoricalComponent> components = new ArrayList<>();
     private final Map<String, PandoricalComponent> componentIndex = new HashMap<>();
     private final UpdateMemory updateMemory = new UpdateMemory();
 
-    /** Chat without leaving the screen; see {@link ScreenChatBar} for the ordering contract. */
     private final ScreenChatBar chatBar = new ScreenChatBar();
 
-    /**
-     * Build the tree afresh, as {@code init} does on open and on every resize. The old tree is
-     * let go of properly, not just dropped, and the new one is brought up to date from it.
-     */
+    /** On open and on every resize; the new tree takes over from the old. */
     void rebuild(List<ComponentDef> defs, ComponentContext context, int originX, int originY) {
         Map<String, PandoricalComponent> previous = new HashMap<>(componentIndex);
         clear();
@@ -47,7 +35,6 @@ final class ScreenComponents {
         updateMemory.restore(componentIndex, previous);
     }
 
-    /** Let the tree go and build nothing in its place. */
     void clear() {
         components.forEach(ScreenHelper::removedTree);
         components.clear();
@@ -86,13 +73,11 @@ final class ScreenComponents {
     }
 
     boolean keyPressed(KeyEvent event) {
-        // A key being bound is spent on the binding. It comes first because the key most worth
-        // binding is one that already does something on the screen it is pressed on.
+        // Keybind capture first: the key being bound may already do something on this screen.
         if (KeybindManager.captureKey(event)) {
             return true;
         }
-        // An open chat bar owns the keyboard; the chat key only opens it once no
-        // component (a focused text field) has claimed the key for itself
+        // An open bar owns the keyboard; the chat key opens it only if no component claimed it.
         if (chatBar.keyPressed(event)) {
             return true;
         }
@@ -118,7 +103,6 @@ final class ScreenComponents {
         ScreenHelper.applyUpdates(updates, componentIndex);
     }
 
-    /** The screen has gone: every tree hears it. */
     void removed() {
         components.forEach(ScreenHelper::removedTree);
     }

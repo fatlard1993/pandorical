@@ -7,11 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Everything a screen's components have been told since it opened, so that rebuilding the tree
- * for a resize starts from now and not from the open: a control swapped in stays swapped in, a
- * relabelled button keeps its label.
- */
+/** The latest value of every prop updated since open, replayed onto a tree rebuilt for a resize. */
 final class UpdateMemory {
     private final Map<String, Map<String, String>> latest = new HashMap<>();
 
@@ -21,10 +17,6 @@ final class UpdateMemory {
         }
     }
 
-    /**
-     * Bring a freshly built tree up to date: the latest value of every prop ever updated, then
-     * each component handed the one it replaces, for whatever it keeps that no prop holds.
-     */
     void restore(Map<String, PandoricalComponent> fresh, Map<String, PandoricalComponent> previous) {
         fresh.forEach((id, component) -> {
             Map<String, String> props = latest.get(id);
