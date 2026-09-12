@@ -546,6 +546,22 @@ public class ContentRegistry implements ContentApi {
                 requiresCorrectTool = registered.registration().getRequiresCorrectTool();
             }
 
+            // What the registration leaves unsaid is read off the real block rather than left to
+            // the stand-in's base. The server times the dig from the real block's hardness and tool
+            // requirement, and the client predicts it from whatever it was sent: a cloud standing in
+            // as snow dug in half the server's time, so with a shovel the client broke it instantly,
+            // the server put it back, and the client broke it again, over and over.
+            var real = block.defaultBlockState();
+            if (destroyTime == justfatlard.pandorical.api.BlockRegistration.INHERIT) {
+                // An unbreakable block's -1 reads as "inherit" on the wire, which leaves such a
+                // block exactly as it was before this: no worse, and nothing to predict.
+                destroyTime = real.getDestroySpeed(net.minecraft.world.level.EmptyBlockGetter.INSTANCE,
+                    net.minecraft.core.BlockPos.ZERO);
+            }
+            if (requiresCorrectTool == justfatlard.pandorical.api.BlockRegistration.INHERIT_FLAG) {
+                requiresCorrectTool = real.requiresCorrectToolForDrops() ? 1 : 0;
+            }
+
             // Auto-detected blocks (not registered via PandoricalApi) get an inferred base
             // so the client can still pick the right block class and Properties.
             if (baseBlockId.isEmpty()) {
