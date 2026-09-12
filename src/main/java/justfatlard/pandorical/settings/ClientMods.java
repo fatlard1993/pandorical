@@ -28,14 +28,39 @@ public final class ClientMods {
     private static final Map<UUID, List<ClientSettingsC2S.Mod>> byPlayer = new ConcurrentHashMap<>();
     private static final Map<UUID, Map<String, String>> values = new ConcurrentHashMap<>();
 
+    /**
+     * What one client may declare, and what all of them together may add to the server's registry.
+     * A registered setting is kept for the life of the server, so a client that invents a new mod
+     * each time it connects would otherwise grow it without end.
+     */
+    private static final int MOST_MODS = 64;
+    private static final int MOST_SETTINGS_PER_MOD = 64;
+    private static final int MOST_REGISTERED = 1024;
+    private static final java.util.regex.Pattern MOD_ID = java.util.regex.Pattern.compile("[a-z][a-z0-9_-]{1,63}");
+    private static final java.util.regex.Pattern KEY = java.util.regex.Pattern.compile("[A-Za-z0-9_.-]{1,64}");
+    private static final java.util.concurrent.atomic.AtomicInteger registered = new java.util.concurrent.atomic.AtomicInteger();
+
     public static void declare(ServerPlayer player, ClientSettingsC2S payload) {
-        byPlayer.put(player.getUUID(), payload.mods());
+        List<ClientSettingsC2S.Mod> mods = payload.mods().stream()
+            .filter(mod -> MOD_ID.matcher(mod.id()).matches())
+            .limit(MOST_MODS)
+            .toList();
+        byPlayer.put(player.getUUID(), mods);
         Map<String, String> mine = values.computeIfAbsent(player.getUUID(), id -> new ConcurrentHashMap<>());
         SettingsRegistry registry = PandoricalApi.settingsImpl();
-        for (ClientSettingsC2S.Mod mod : payload.mods()) {
+        for (ClientSettingsC2S.Mod mod : mods) {
+            int settings = 0;
             for (ClientSettingsC2S.Setting setting : mod.settings()) {
+                if (!KEY.matcher(setting.key()).matches()) continue;
+                if (++settings > MOST_SETTINGS_PER_MOD) break;
                 mine.put(mod.id() + ":" + setting.key(), setting.value());
-                if (registry.find(mod.id(), setting.key()) == null) register(registry, mod, setting);
+                if (registry.find(mod.id(), setting.key()) == null) {
+                    if (registered.incrementAndGet() > MOST_REGISTERED) {
+                        registered.decrementAndGet();
+                        continue;
+                    }
+                    register(registry, mod, setting);
+                }
             }
         }
     }
