@@ -205,6 +205,17 @@ public abstract class AbstractComponent implements PandoricalComponent {
         return new GeometrySnapshot(ix, iy, iw, ih, is, ir);
     }
 
+    /**
+     * What the renderer draws this at: the interpolated geometry, plus whatever a component adds
+     * of its own on top - a dial's angle under the hand, a tremble. Kept apart from
+     * {@link #interpolatedGeometry} because that is also what {@link #updateProps} captures as
+     * the start of the next blend, and a start that already carried the addition would have the
+     * addition applied twice, once inside the blend and once on top of it.
+     */
+    public GeometrySnapshot displayedGeometry(float partialTick) {
+        return interpolatedGeometry(partialTick);
+    }
+
     // --- Opt-in color interpolation helpers ---
 
     /**

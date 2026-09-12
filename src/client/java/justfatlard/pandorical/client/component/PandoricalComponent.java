@@ -60,6 +60,13 @@ public interface PandoricalComponent {
      */
     default void tick() {}
 
+    /**
+     * The screen this belongs to has gone: closed, replaced, or rebuilt for a resize. The place
+     * to put back anything borrowed from the window, such as the cursor a dial hides. Nothing
+     * by default.
+     */
+    default void removed() {}
+
     // Component bounds for hit testing
     int getX();
     int getY();

@@ -55,6 +55,7 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     @Override
     protected void init() {
         super.init();
+        components.forEach(ScreenHelper::removedTree);
         components.clear();
         componentIndex.clear();
 
@@ -265,6 +266,12 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
             sendAction("_screen", Map.of());
         }
         super.onClose();
+    }
+
+    @Override
+    public void removed() {
+        super.removed();
+        components.forEach(ScreenHelper::removedTree);
     }
 
     private void sendAction(String componentId, Map<String, String> data) {

@@ -36,6 +36,8 @@ public class PandoricalScreen extends Screen implements justfatlard.pandorical.a
     @Override
     protected void init() {
         super.init();
+        // A resize rebuilds the tree; the old one is let go of properly, not just dropped
+        components.forEach(ScreenHelper::removedTree);
         components.clear();
         componentIndex.clear();
 
@@ -142,6 +144,12 @@ public class PandoricalScreen extends Screen implements justfatlard.pandorical.a
     public void onClose() {
         sendAction("_screen", Map.of());
         super.onClose();
+    }
+
+    @Override
+    public void removed() {
+        super.removed();
+        components.forEach(ScreenHelper::removedTree);
     }
 
     public void applyUpdates(List<ComponentUpdate> updates) {

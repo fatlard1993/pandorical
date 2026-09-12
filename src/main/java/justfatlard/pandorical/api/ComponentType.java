@@ -41,10 +41,16 @@ public final class ComponentType {
     /** A small burst of particle-like sprites the client simulates locally (currently: orbit motion). */
     public static final String PARTICLE_BURST = "particle_burst";
     /**
-     * A sprite that turns to follow the mouse about its own centre, within a sweep, and reports
-     * what it is doing: the angle as it moves, and the mouse button or space bar going down and
-     * coming up. A pick in a lock, a dial on a safe, anything worked by hand in real time. The
-     * turning is the client's, so it never waits on the server; only the reports cross the wire.
+     * A sprite swept round its own centre by hand, within a sweep, and then pushed: the mouse's
+     * sideways travel or a held A/D moves it, and the left button, space, W, up or enter holds
+     * it where it is. It reports what it is doing - the angle as it moves, and the push going
+     * down and coming up. A pick in a lock, a dial on a safe, anything worked by hand in real
+     * time. The sweeping is the client's, so it never waits on the server; only the reports
+     * cross the wire. The pointer is hidden while one is on screen, so a screen carrying a dial
+     * should not also rely on anything that has to be clicked.
+     *
+     * <p>Its {@link #PROP_ROTATION} is the server's to set and is added to the hand's angle, so
+     * a pick sitting in a cylinder turns with the cylinder when the cylinder is turned.
      */
     /**
      * A player's face, as the tab list draws it: the skin's face with its hat layer over it,
@@ -58,9 +64,13 @@ public final class ComponentType {
     /** Player face: the player's UUID. */
     public static final String PROP_PLAYER = "player";
     public static final String DIAL = "dial";
-    /** Dial: the full range it turns through, in degrees, centred on straight up. */
+    /** Dial: the full range it sweeps through, in degrees, centred on straight up. */
     public static final String PROP_SWEEP = "sweep";
-    /** Dial: whether it is drawn trembling, as a pick does against a jammed cylinder. */
+    /**
+     * Dial: how hard it is drawn trembling, nought to one, as a pick does against a jammed
+     * cylinder - harder and faster the nearer it is to snapping. "true" and "false" are taken
+     * as one and nought.
+     */
     public static final String PROP_SHAKE = "shake";
     /** Dial: the key in every report saying which it is - "aim", "press" or "release". */
     public static final String DIAL_ACTION = "action";

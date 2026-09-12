@@ -129,7 +129,7 @@ public final class ScreenHelper {
             return;
         }
 
-        AbstractComponent.GeometrySnapshot g = ac.interpolatedGeometry(delta);
+        AbstractComponent.GeometrySnapshot g = ac.displayedGeometry(delta);
         int rawX = ac.getX(), rawY = ac.getY(), rawW = ac.getWidth(), rawH = ac.getHeight();
 
         // Components that re-clip themselves at the interpolated size (see
@@ -173,6 +173,14 @@ public final class ScreenHelper {
         } finally {
             pose.popMatrix();
         }
+    }
+
+    /** Tell a component and its whole subtree that their screen has gone. */
+    public static void removedTree(PandoricalComponent component) {
+        for (PandoricalComponent child : component.getChildren()) {
+            removedTree(child);
+        }
+        component.removed();
     }
 
     /**
