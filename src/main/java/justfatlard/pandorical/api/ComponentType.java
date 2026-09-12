@@ -46,6 +46,17 @@ public final class ComponentType {
      * coming up. A pick in a lock, a dial on a safe, anything worked by hand in real time. The
      * turning is the client's, so it never waits on the server; only the reports cross the wire.
      */
+    /**
+     * A player's face, as the tab list draws it: the skin's face with its hat layer over it,
+     * square, at the component's size. {@link #PROP_PLAYER} names whose. The client draws it
+     * from the skin it already has for that player - the one on their body if they are in
+     * sight, else the tab list's - so a skin override shows here as it does in the world, and
+     * the server never has to know what anyone looks like. A client that has never heard of
+     * the player draws the default skin that UUID would get.
+     */
+    public static final String PLAYER_FACE = "player_face";
+    /** Player face: the player's UUID. */
+    public static final String PROP_PLAYER = "player";
     public static final String DIAL = "dial";
     /** Dial: the full range it turns through, in degrees, centred on straight up. */
     public static final String PROP_SWEEP = "sweep";

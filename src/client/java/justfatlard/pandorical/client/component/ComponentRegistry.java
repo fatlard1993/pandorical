@@ -44,5 +44,6 @@ public final class ComponentRegistry {
         register(ComponentType.RADAR, RadarComponent::new);
         register(ComponentType.PARTICLE_BURST, ParticleBurstComponent::new);
         register(ComponentType.DIAL, DialComponent::new);
+        register(ComponentType.PLAYER_FACE, PlayerFaceComponent::new);
     }
 }
