@@ -350,6 +350,11 @@ public final class SettingsRegistry implements SettingsApi {
      * The client has just said what its keys are bound to. Anyone sitting on the keys tab is
      * shown the answer, and whatever they were waiting for has arrived.
      */
+    /** Whether this player's keys tab is waiting on a key for one of its slots. */
+    public boolean isRebinding(ServerPlayer player) {
+        return rebinding.containsKey(player.getUUID());
+    }
+
     public void refreshKeybinds(ServerPlayer player) {
         Shown was = shown.get(player.getUUID());
         if (was == null || !"keybinds".equals(was.tab())) {
@@ -462,7 +467,7 @@ public final class SettingsRegistry implements SettingsApi {
             out.add(new ComponentBuilder("key:" + claim.slot(), ComponentType.BUTTON)
                 .bounds(at.proseW() - CONTROL_W, y, CONTROL_W, 20)
                 .prop(ComponentType.PROP_LABEL, asking ? "> Press a key <"
-                    : bound == null ? (listening ? "..." : "Unknown") : bound)
+                    : bound == null ? (listening ? "..." : "Unknown") : bound.isEmpty() ? "Not bound" : bound)
                 .prop(ComponentType.PROP_ENABLED, String.valueOf(listening))
                 .prop(ComponentType.PROP_STYLE, asking ? "pressed" : "default").build());
             y += ROW;

@@ -1397,19 +1397,23 @@ public final class PandoricalApi {
             return out;
         }
 
-        /** What this player's client has this slot bound to, or null when it has not said. */
+        /** What this player's client has this slot bound to, empty for nothing, or null when it has not said. */
         public String bindingOf(ServerPlayer player, int slot) {
             java.util.List<String> keys = bindings.get(player.getUUID());
             if (keys == null || slot < 0 || slot >= keys.size()) return null;
             String key = keys.get(slot);
-            return key == null || key.isEmpty() ? null : key;
+            return key == null ? "" : key;
         }
 
-        /** @hidden the client reporting what its pool keys are bound to. */
+        /**
+         * @hidden the client reporting what its pool keys are bound to. The keys tab is laid out
+         * again only when that changed or a rebind is waiting on it, since each report is a rebuild.
+         */
         public void handleBindings(ServerPlayer player, java.util.List<String> keys) {
-            bindings.put(player.getUUID(), java.util.List.copyOf(keys));
-            justfatlard.pandorical.settings.SettingsRegistry registry = SETTINGS;
-            registry.refreshKeybinds(player);
+            java.util.List<String> now = java.util.List.copyOf(keys);
+            java.util.List<String> before = bindings.put(player.getUUID(), now);
+            if (now.equals(before) && !SETTINGS.isRebinding(player)) return;
+            SETTINGS.refreshKeybinds(player);
         }
 
         /** Ask this player's client to bind the next key it sees to this slot. */

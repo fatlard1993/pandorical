@@ -136,8 +136,7 @@ public final class KeybindManager {
 		if (!ClientPlayNetworking.canSend(KeybindBindingsC2S.TYPE)) return;
 		java.util.List<String> keys = new java.util.ArrayList<>(MAX_SLOTS);
 		for (int i = 0; i < MAX_SLOTS; i++) {
-			keys.add(pool[i] == null || pool[i].isUnbound()
-				? "Not bound" : pool[i].getTranslatedKeyMessage().getString());
+			keys.add(pool[i] == null || pool[i].isUnbound() ? "" : pool[i].getTranslatedKeyMessage().getString());
 		}
 		ClientPlayNetworking.send(new KeybindBindingsC2S(keys));
 	}
