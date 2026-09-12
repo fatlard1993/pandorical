@@ -17,6 +17,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.ExperienceOrb;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantments;
@@ -51,7 +52,41 @@ public final class DropsFixes implements FabricClientGameTest {
 			orbsOfTwoValuesStayApartWhenOff(context, server, pit);
 			orbsClumpAndOneTouchTakesTheLot(context, server, connection, pit);
 			server.runCommand("tp @a " + spawn.getX() + " " + spawn.getY() + " " + spawn.getZ());
+
+			BlockPos floor = spawn.west(12);
+			check(stacksAfterAWhile(context, server, floor, false) == 2, "with the reach at vanilla's, stacks 1.5 apart merged");
+			server.runOnServer(s -> DropsPolicy.chooseMergeRadius(s, 20));
+			check(stacksAfterAWhile(context, server, floor, false) == 1, "with a 2-block reach, stacks 1.5 apart stayed apart");
+			check(stacksAfterAWhile(context, server, floor, true) == 2, "with a 2-block reach, stacks merged through glass");
+			server.runOnServer(s -> DropsPolicy.chooseMergeRadius(s, DropsPolicy.VANILLA_MERGE_TENTHS));
 		}
+	}
+
+	/**
+	 * Two stacks of cobblestone 1.5 blocks apart on the ground, with glass between them if asked,
+	 * and how many stacks there are a while later. Each box clears the glass's block.
+	 */
+	private static int stacksAfterAWhile(ClientGameTestContext context, TestServerContext server, BlockPos floor, boolean glass) {
+		BlockPos between = floor.east();
+		server.runOnServer(s -> {
+			ServerLevel level = s.overworld();
+			if (glass) level.setBlockAndUpdate(between, Blocks.GLASS.defaultBlockState());
+			for (double x : new double[] {0.75, 2.25}) {
+				ItemEntity stack = new ItemEntity(level, floor.getX() + x, floor.getY() + 0.05, floor.getZ() + 0.5, new ItemStack(Items.COBBLESTONE));
+				stack.setDeltaMovement(Vec3.ZERO);
+				level.addFreshEntity(stack);
+			}
+		});
+		context.waitTicks(100);
+		return server.computeOnServer(s -> {
+			List<ItemEntity> stacks = s.overworld().getEntitiesOfClass(ItemEntity.class, new AABB(between).inflate(3));
+			int left = stacks.size();
+			int items = stacks.stream().mapToInt(stack -> stack.getItem().getCount()).sum();
+			check(items == 2, "2 cobblestone became " + items);
+			stacks.forEach(Entity::discard);
+			s.overworld().setBlockAndUpdate(between, Blocks.AIR.defaultBlockState());
+			return left;
+		});
 	}
 
 	private static void orbsOfTwoValuesStayApartWhenOff(ClientGameTestContext context, TestServerContext server, BlockPos pit) {

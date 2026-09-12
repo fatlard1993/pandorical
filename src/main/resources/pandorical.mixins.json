@@ -17,7 +17,8 @@
 		"ConfigPatienceMixin",
 		"ServerCommonConnectionAccessor",
 		"NetherPortalPairingMixin",
-		"ExperienceOrbClumpMixin"
+		"ExperienceOrbClumpMixin",
+		"ItemMergeRadiusMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

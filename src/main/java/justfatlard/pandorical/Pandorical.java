@@ -118,6 +118,12 @@ public class Pandorical implements ModInitializer {
             .shownWhen(player -> !DropsPolicy.clumpsInstalled())
             .backedBy(player -> DropsPolicy.clumping(player.level().getServer()),
                 (player, on) -> DropsPolicy.chooseClumping(player.level().getServer(), on));
+        settings.number("itemMergeRadius", "Dropped stacks merge this far apart, in tenths of a block",
+                DropsPolicy.VANILLA_MERGE_TENTHS, DropsPolicy.MOST_MERGE_TENTHS, 5, DropsPolicy.VANILLA_MERGE_TENTHS)
+            .describe("5 is vanilla's. Stacks never merge through a block, or past a full stack")
+            .shownWhen(player -> !DropsPolicy.getItTogetherInstalled())
+            .backedBy(player -> DropsPolicy.mergeRadius(player.level().getServer()),
+                (player, tenths) -> DropsPolicy.chooseMergeRadius(player.level().getServer(), tenths));
 
         // Dedicated server only: on a client this would filter every namespace.
         if (FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER) {
