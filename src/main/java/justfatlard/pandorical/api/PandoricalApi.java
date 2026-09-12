@@ -1080,16 +1080,26 @@ public final class PandoricalApi {
                 }
                 if (state.anchorEntity.level() != level) continue;
                 it.remove();
-                StructurePose pose = state.pose;
-                broadcastToTrackers(state.anchorEntity, new justfatlard.pandorical.protocol.UpdateStructurePoseS2C(
-                    structureId, pose.x(), pose.y(), pose.z(), pose.yaw()));
+                sendPose(structureId, state);
             }
+        }
+
+        /** A pose still waiting for the tracker pass goes now, ahead of an update that cannot wait with it. */
+        private void sendPendingPose(String structureId, StructureState state) {
+            if (pendingPoses.remove(structureId)) sendPose(structureId, state);
+        }
+
+        private void sendPose(String structureId, StructureState state) {
+            StructurePose pose = state.pose;
+            broadcastToTrackers(state.anchorEntity, new justfatlard.pandorical.protocol.UpdateStructurePoseS2C(
+                structureId, pose.x(), pose.y(), pose.z(), pose.yaw()));
         }
 
         @Override
         public void updateBlocks(String structureId, List<BlockEntry> added, List<RelPos> removed, Map<RelPos, BlockState> changed) {
             StructureState state = structures.get(structureId);
             if (state == null) return;
+            sendPendingPose(structureId, state);
 
             for (BlockEntry entry : added) state.blocks.put(entry.pos(), entry.state());
             for (RelPos pos : removed) state.blocks.remove(pos);
@@ -1111,6 +1121,7 @@ public final class PandoricalApi {
         public void setVisible(String structureId, boolean visible) {
             StructureState state = structures.get(structureId);
             if (state == null) return;
+            sendPendingPose(structureId, state);
             state.visible = visible;
 
             broadcastToTrackers(state.anchorEntity,
@@ -1121,6 +1132,7 @@ public final class PandoricalApi {
         public void despawn(String structureId) {
             StructureState state = structures.remove(structureId);
             if (state == null) return;
+            pendingPoses.remove(structureId);
 
             broadcastToTrackers(state.anchorEntity, new justfatlard.pandorical.protocol.DespawnStructureS2C(structureId));
         }

@@ -46,9 +46,14 @@ public interface StructureApi {
     void spawn(Entity anchorEntity, String structureId, List<BlockEntry> blocks, StructurePose initialPose);
 
     /**
-     * Push a new world position/yaw for an existing structure. Clients interpolate towards
+     * Set a new world position/yaw for an existing structure. Clients interpolate towards
      * this pose from the previously known one, so call this as often as the structure moves
      * (e.g. once per server tick) for smooth motion.
+     *
+     * <p>The pose is sent at the start of the anchor level's next tick, with the entity
+     * positions, not from this call; call it again within the tick and only the last pose is
+     * sent. An {@link #updateBlocks} or {@link #setVisible} for the same structure sends a
+     * waiting pose first, so the calls reach clients in the order they were made.
      * No-op if {@code structureId} is unknown.
      */
     void updatePose(String structureId, StructurePose pose);
