@@ -9,8 +9,6 @@ import java.util.Map;
  * Renders a single item slot background with optional lock overlay.
  * When used inside a container screen, the actual item rendering is handled
  * by vanilla's slot overlay system; this draws only the visual frame.
- *
- * Rendering pattern from BackpackInventoryScreen.drawSlotBackground().
  */
 public class ItemSlotComponent extends AbstractComponent {
     private static final int SLOT_BORDER_DARK = 0xFF373737;

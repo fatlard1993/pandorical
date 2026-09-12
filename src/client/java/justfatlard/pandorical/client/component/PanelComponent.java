@@ -6,7 +6,6 @@ import java.util.Map;
 
 /**
  * Background panel with optional beveled borders.
- * Rendering pattern from BackpackInventoryScreen.drawPanel().
  */
 public class PanelComponent extends AbstractComponent {
     private int background;

@@ -146,10 +146,6 @@ public final class KeybindManager {
 		rebinding = slot >= 0 && slot < MAX_SLOTS ? slot : -1;
 	}
 
-	public static boolean isRebinding() {
-		return rebinding >= 0;
-	}
-
 	/**
 	 * Take this key press as the new binding, if one was asked for. True when the press was
 	 * spent here and must go no further, which is the whole point: the key being bound is
@@ -173,11 +169,6 @@ public final class KeybindManager {
 		return true;
 	}
 
-	/** How many slots the pool has. */
-	public static int poolSize() {
-		return MAX_SLOTS;
-	}
-
 	/**
 	 * The pooled mapping for a slot, or null if the slot is out of range.
 	 *
@@ -188,11 +179,6 @@ public final class KeybindManager {
 	 */
 	public static KeyMapping poolMapping(int slot) {
 		return slot >= 0 && slot < MAX_SLOTS ? pool[slot] : null;
-	}
-
-	/** Whether the current server declared this slot; unclaimed presses go nowhere. */
-	public static boolean isClaimed(int slot) {
-		return claimedSlots.contains(slot);
 	}
 
 	/** Forward pool presses for claimed slots; drain unclaimed clicks so they cannot pile up. */

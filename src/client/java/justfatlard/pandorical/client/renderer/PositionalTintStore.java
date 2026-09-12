@@ -90,11 +90,6 @@ public final class PositionalTintStore {
 			(emitting & 0xFF) / 255F * bright);
 	}
 
-	public static int colorAt(BlockPos pos) {
-		Integer argb = painted.get(pos.asLong());
-		return argb == null ? UNTINTED : argb;
-	}
-
 	/**
 	 * Take a colour, or drop one when {@code argb} is zero, and get the block redrawn.
 	 *
