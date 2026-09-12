@@ -669,3 +669,9 @@ A mod with no server half reaches Pandorical from the client. What the suite's c
 - `KeybindManager.poolMapping(slot)`: a pooled keybind to drive from another input.
 
 Only `client.api` is kept stable; the rest are classes a client mod can reach, and may move.
+
+## Checking a build
+
+`./gradlew build` compiles, which proves nothing about mixins: they bind at launch.
+`xvfb-run -a ./gradlew runClientGameTest` launches a client off-screen, applies every mixin,
+joins a world and opens a screen, and fails on any mixin whose target has moved.
