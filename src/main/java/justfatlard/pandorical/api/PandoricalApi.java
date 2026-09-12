@@ -1371,7 +1371,7 @@ public final class PandoricalApi {
         @Override
         public void bindByDefault(String id) {
             if (!registeredIds.contains(id)) {
-                justfatlard.pandorical.Pandorical.LOGGER.warn("bindByDefault('{}'): no keybind registered by that id", id);
+                justfatlard.pandorical.Pandorical.LOGGER.warn("bindByDefault('{}'): no keybind registered by that id; call register('{}', ...) first", id, id);
                 return;
             }
             boundByDefault.add(id);

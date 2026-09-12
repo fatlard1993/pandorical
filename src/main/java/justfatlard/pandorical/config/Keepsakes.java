@@ -102,7 +102,8 @@ public final class Keepsakes implements KeepsakeApi {
 	@Override
 	public void put(ServerPlayer player, String key, String value) {
 		if (key.length() > LONGEST_KEY || value.length() > LONGEST_VALUE) {
-			throw new IllegalArgumentException("keepsake too long: " + key);
+			throw new IllegalArgumentException("keepsake '" + key + "' is over the limit: keys " + LONGEST_KEY
+				+ " characters, values " + LONGEST_VALUE);
 		}
 		if (value.isEmpty()) {
 			remove(player, key);

@@ -16,8 +16,10 @@ public interface BlockMarkApi {
     /**
      * A fence or wall that stands alone. Marked so, it joins nothing beside it and nothing
      * beside it joins to it: a post, in the shape of whatever fence or wall it is. Pandorical
-     * applies the mark to the block's shape on both sides; who marks and who remembers is the
-     * mod that asks for it.
+     * applies the mark to the block's shape on both sides whenever the shape is worked out; who
+     * marks and who remembers is the mod that asks for it. Marking a block already standing does
+     * not reshape it, so update it and its neighbours ({@code Block.updateFromNeighbourShapes})
+     * after marking.
      */
     String POST = "post";
 

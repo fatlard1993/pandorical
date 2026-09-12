@@ -26,7 +26,8 @@ import net.minecraft.util.Util;
  * <p>So while a connection's sync is out and unanswered it gets five minutes rather than thirty
  * seconds, the keep-alive clock is held rather than run down, and a ping goes out every ten
  * seconds so the client's own read timeout, which is also thirty seconds, does not end it from
- * the other side. The ack puts everything back. Five minutes is a ceiling, not a target: a
+ * the other side. The ack puts everything back. The keep-alive hold and the ping are
+ * ConfigPatienceMixin's; this class owns the clock and the read timeout. Five minutes is a ceiling, not a target: a
  * client that has not answered by then is not coming back, and {@link #expire} closes it.
  */
 public final class ConfigPatience {

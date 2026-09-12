@@ -21,8 +21,9 @@ import net.minecraft.server.level.ServerLevel;
  */
 public interface PortalApi {
     /**
-     * Pair nether portals unless an op has said otherwise. For a mod whose portals make the
-     * vanilla muddle worse - several portals within reach of each other being the point of it.
+     * Whether nether portals pair when no op has chosen: true for a mod whose portals make the
+     * vanilla muddle worse, several portals within reach of each other being the point of it.
+     * Off until a mod asks. The last call wins among mods, and an op's choice outranks them all.
      */
     void pairNetherPortals(boolean byDefault);
 

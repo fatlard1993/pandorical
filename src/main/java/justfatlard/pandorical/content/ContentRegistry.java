@@ -298,8 +298,9 @@ public class ContentRegistry implements ContentApi {
     }
 
     /**
-     * Play-phase sync. Only covers non-registry content (screens, HUD, camera);
-     * block/item sync happens in the configuration phase via PandoricalSyncTask.
+     * The fallback content sync, sent in the play phase to a client the configuration phase did not
+     * make content-ready: the same blocks, items, registry stubs and assets PandoricalSyncTask sends
+     * there, in the play-phase payloads. Sends nothing when there are no blocks or items.
      */
     public void syncContentTo(ServerPlayer player) {
         List<SyncContentS2C.BlockEntry> blockEntries = buildBlockEntries();
