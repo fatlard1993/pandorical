@@ -3,6 +3,9 @@ package justfatlard.pandorical.api;
 /**
  * Component type constants and property name constants.
  * Use these instead of raw strings to avoid typos.
+ *
+ * <p>{@code PROP_} keys are the ones a server sets on a component. Keys named for their type,
+ * such as {@link #DIAL_ACTION}, are the ones a component's reports carry back to its handler.
  */
 public final class ComponentType {
     private ComponentType() {}
@@ -26,18 +29,18 @@ public final class ComponentType {
      * who is there. Each blip names its entity, and the client follows that entity while it can
      * see it, falling back to the position that came with the blip when it cannot.
      *
-     * <p>{@link #RADAR_BLIPS} is a list of {@code entityId,x,y,z,colour,size} separated by
+     * <p>{@link #PROP_RADAR_BLIPS} is a list of {@code entityId,x,y,z,colour,size} separated by
      * semicolons: colour an ARGB integer, size 1 to 3. A seventh field of {@code p} marks a
-     * player, drawn as a diamond rather than a square. {@link #RADAR_RANGE} is the disc's radius
-     * in blocks. {@link #RADAR_TARGET_X} and {@link #RADAR_TARGET_Z} mark one place to head for,
+     * player, drawn as a diamond rather than a square. {@link #PROP_RADAR_RANGE} is the disc's radius
+     * in blocks. {@link #PROP_RADAR_TARGET_X} and {@link #PROP_RADAR_TARGET_Z} mark one place to head for,
      * drawn where it lies or on the rim when it is further than the range; leave them empty for
      * none.
      */
     public static final String RADAR = "radar";
-    public static final String RADAR_BLIPS = "blips";
-    public static final String RADAR_RANGE = "range";
-    public static final String RADAR_TARGET_X = "target_x";
-    public static final String RADAR_TARGET_Z = "target_z";
+    public static final String PROP_RADAR_BLIPS = "blips";
+    public static final String PROP_RADAR_RANGE = "range";
+    public static final String PROP_RADAR_TARGET_X = "target_x";
+    public static final String PROP_RADAR_TARGET_Z = "target_z";
     /** A small burst of particle-like sprites the client simulates locally (currently: orbit motion). */
     public static final String PARTICLE_BURST = "particle_burst";
     /**
@@ -52,17 +55,6 @@ public final class ComponentType {
      * <p>Its {@link #PROP_ROTATION} is the server's to set and is added to the hand's angle, so
      * a pick sitting in a cylinder turns with the cylinder when the cylinder is turned.
      */
-    /**
-     * A player's face, as the tab list draws it: the skin's face with its hat layer over it,
-     * square, at the component's size. {@link #PROP_PLAYER} names whose. The client draws it
-     * from the skin it already has for that player - the one on their body if they are in
-     * sight, else the tab list's - so a skin override shows here as it does in the world, and
-     * the server never has to know what anyone looks like. A client that has never heard of
-     * the player draws the default skin that UUID would get.
-     */
-    public static final String PLAYER_FACE = "player_face";
-    /** Player face: the player's UUID. */
-    public static final String PROP_PLAYER = "player";
     public static final String DIAL = "dial";
     /** Dial: the full range it sweeps through, in degrees, centred on straight up. */
     public static final String PROP_SWEEP = "sweep";
@@ -76,6 +68,17 @@ public final class ComponentType {
     public static final String DIAL_ACTION = "action";
     /** Dial: the key carrying the angle, in degrees, in every report. */
     public static final String DIAL_ANGLE = "angle";
+    /**
+     * A player's face, as the tab list draws it: the skin's face with its hat layer over it,
+     * square, at the component's size. {@link #PROP_PLAYER} names whose. The client draws it
+     * from the skin it already has for that player - the one on their body if they are in
+     * sight, else the tab list's - so a skin override shows here as it does in the world, and
+     * the server never has to know what anyone looks like. A client that has never heard of
+     * the player draws the default skin that UUID would get.
+     */
+    public static final String PLAYER_FACE = "player_face";
+    /** Player face: the player's UUID. */
+    public static final String PROP_PLAYER = "player";
     /**
      * A grid of palette-coloured cells painted by hand: press and drag to lay the current ink under
      * a square brush, right-click to ask for the colour under the pointer. The client paints at

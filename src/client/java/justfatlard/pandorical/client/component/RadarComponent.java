@@ -50,12 +50,12 @@ public class RadarComponent extends AbstractComponent {
     }
 
     private void parseProps() {
-        range = Math.max(1f, parseFloat(ComponentType.RADAR_RANGE, 32f));
-        targetX = coord(ComponentType.RADAR_TARGET_X);
-        targetZ = coord(ComponentType.RADAR_TARGET_Z);
+        range = Math.max(1f, parseFloat(ComponentType.PROP_RADAR_RANGE, 32f));
+        targetX = coord(ComponentType.PROP_RADAR_TARGET_X);
+        targetZ = coord(ComponentType.PROP_RADAR_TARGET_Z);
 
         blips.clear();
-        String raw = props.getOrDefault(ComponentType.RADAR_BLIPS, "");
+        String raw = props.getOrDefault(ComponentType.PROP_RADAR_BLIPS, "");
         if (raw.isEmpty()) return;
         for (String entry : raw.split(";")) {
             String[] parts = entry.split(",");
