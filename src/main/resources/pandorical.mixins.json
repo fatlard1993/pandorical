@@ -16,7 +16,8 @@
 		"ConnectionChannelAccessor",
 		"ConfigPatienceMixin",
 		"ServerCommonConnectionAccessor",
-		"NetherPortalPairingMixin"
+		"NetherPortalPairingMixin",
+		"ExperienceOrbClumpMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

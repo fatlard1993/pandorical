@@ -11,7 +11,8 @@
 			"justfatlard.pandorical.gametest.GateContent"
 		],
 		"fabric-client-gametest": [
-			"justfatlard.pandorical.gametest.LaunchGate"
+			"justfatlard.pandorical.gametest.LaunchGate",
+			"justfatlard.pandorical.gametest.DropsFixes"
 		]
 	},
 	"depends": {

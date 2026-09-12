@@ -5,6 +5,8 @@ import justfatlard.pandorical.api.EntityRendererRegistry;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.PlayerInventoryApi;
 import justfatlard.pandorical.api.PlayerInventoryApiImpl;
+import justfatlard.pandorical.api.SettingsApi;
+import justfatlard.pandorical.drops.DropsPolicy;
 import justfatlard.pandorical.login.ConfigPatience;
 import justfatlard.pandorical.login.PandoricalSyncTask;
 import justfatlard.pandorical.protocol.*;
@@ -105,12 +107,17 @@ public class Pandorical implements ModInitializer {
     @Override
     public void onInitialize() {
         DiagnosticMixinPlugin.reportUnmatched();
-        // First, so the setting exists however far the rest of init gets.
-        PandoricalApi.settings().serverGroup(MOD_ID, "Pandorical")
-            .toggle("pairNetherPortals", "Nether portals go back the way they came", false)
+        // First, so the settings exist however far the rest of init gets.
+        SettingsApi.Group settings = PandoricalApi.settings().serverGroup(MOD_ID, "Pandorical");
+        settings.toggle("pairNetherPortals", "Nether portals go back the way they came", false)
             .describe("Each portal remembers the one its first traveller came out of, both ways round")
             .backedBy(player -> PortalPairing.enabled(player.level().getServer()),
                 (player, on) -> PortalPairing.choose(player.level().getServer(), on));
+        settings.toggle("clumpExperience", "XP orbs clump and are taken at once", false)
+            .describe("Nearby orbs of any value merge into one, and a touch takes all of it")
+            .shownWhen(player -> !DropsPolicy.clumpsInstalled())
+            .backedBy(player -> DropsPolicy.clumping(player.level().getServer()),
+                (player, on) -> DropsPolicy.chooseClumping(player.level().getServer(), on));
 
         // Dedicated server only: on a client this would filter every namespace.
         if (FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER) {
