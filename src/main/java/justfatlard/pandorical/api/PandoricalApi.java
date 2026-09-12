@@ -1051,6 +1051,12 @@ public final class PandoricalApi {
             broadcastToTrackers(state.anchorEntity, packet);
         }
 
+        /** @hidden A stopped server's structures belong to its world; the next world starts with none. */
+        public void clear() {
+            structures.clear();
+            pendingPoses.clear();
+        }
+
         /** Structures whose pose changed since the tracker pass last sent it. */
         private final java.util.Set<String> pendingPoses = java.util.concurrent.ConcurrentHashMap.newKeySet();
 

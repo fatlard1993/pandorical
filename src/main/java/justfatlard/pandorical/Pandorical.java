@@ -474,6 +474,7 @@ public class Pandorical implements ModInitializer {
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             justfatlard.pandorical.settings.ModCommands.forget();
             PandoricalApi.blockMarksImpl().clear();
+            PandoricalApi.structuresImpl().clear();
         });
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.END_DATA_PACK_RELOAD.register(
             (server, resources, success) -> justfatlard.pandorical.settings.ModCommands.forget());
