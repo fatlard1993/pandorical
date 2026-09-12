@@ -49,7 +49,7 @@ public final class ModCommands {
 	public static synchronized List<Entry> of(String modId, ServerPlayer player) {
 		MinecraftServer server = player.level().getServer();
 		if (server == null) return List.of();
-		if (byMod == null) byMod = read(server);
+		if (byMod == null) byMod = read(server, player);
 		return byMod.getOrDefault(modId, List.of());
 	}
 
@@ -59,9 +59,14 @@ public final class ModCommands {
 		owners = new HashMap<>();
 	}
 
-	private static Map<String, List<Entry>> read(MinecraftServer server) {
+	/**
+	 * Read as a player would meet it: a player's own source, raised to an operator's permissions for
+	 * what an operator may run and lowered to none for what anyone may. The console is no stand-in,
+	 * since a command that asks for a player refuses it whatever its permissions.
+	 */
+	private static Map<String, List<Entry>> read(MinecraftServer server, ServerPlayer player) {
 		CommandDispatcher<CommandSourceStack> dispatcher = server.getCommands().getDispatcher();
-		CommandSourceStack ops = server.createCommandSourceStack()
+		CommandSourceStack ops = player.createCommandSourceStack()
 			.withPermission(net.minecraft.server.permissions.PermissionSet.ALL_PERMISSIONS);
 		CommandSourceStack anyone = ops
 			.withPermission(net.minecraft.server.permissions.PermissionSet.NO_PERMISSIONS);
