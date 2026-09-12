@@ -168,7 +168,7 @@ public class ContentManager {
                 if (expectedAssetChunks > 0) {
                     long received = assetChunks.stream().filter(Objects::nonNull).count();
                     Pandorical.LOGGER.warn("Received {}/{} asset chunks before timeout", received, expectedAssetChunks);
-                    if (received > 0) unpackAssets();
+                    if (received > 0) unpackAssets(assetChunks, false);
                 }
                 forceFinalize();
             }
@@ -330,7 +330,7 @@ public class ContentManager {
         }
 
         if (expectedConfigAssetChunks > 0) {
-            unpackConfigAssets();
+            unpackAssets(configAssetChunks, true);
         }
 
         // No global reconnect fast-path here: every register method below is
@@ -436,16 +436,19 @@ public class ContentManager {
         return !climbable.isEmpty() && climbable.contains(state.getBlock());
     }
 
-    private static void unpackConfigAssets() {
+    /** Gunzip one path's asset chunks into the virtual pack; configPhase picks that path's log wording. */
+    private static void unpackAssets(List<byte[]> chunks, boolean configPhase) {
         try {
-            long totalSize = configAssetChunks.stream().filter(Objects::nonNull).mapToLong(c -> c.length).sum();
+            long totalSize = chunks.stream().filter(Objects::nonNull).mapToLong(c -> c.length).sum();
             if (totalSize > MAX_ASSET_BYTES) {
-                Pandorical.LOGGER.error("Config phase: asset data too large: {} bytes (max {})", totalSize, MAX_ASSET_BYTES);
+                Pandorical.LOGGER.error(configPhase
+                    ? "Config phase: asset data too large: {} bytes (max {})"
+                    : "Asset data too large: {} bytes (max {})", totalSize, MAX_ASSET_BYTES);
                 return;
             }
 
             ByteArrayOutputStream assembled = new ByteArrayOutputStream();
-            for (byte[] chunk : configAssetChunks) {
+            for (byte[] chunk : chunks) {
                 if (chunk != null) assembled.write(chunk);
             }
 
@@ -458,20 +461,26 @@ public class ContentManager {
                 while ((read = gzis.read(buf)) != -1) {
                     total += read;
                     if (total > MAX_ASSET_BYTES) {
-                        Pandorical.LOGGER.error("Config phase: decompressed data exceeds {}MB limit", MAX_ASSET_BYTES / 1024 / 1024);
+                        Pandorical.LOGGER.error(configPhase
+                            ? "Config phase: decompressed data exceeds {}MB limit"
+                            : "Decompressed asset data exceeds {}MB limit — aborting",
+                            MAX_ASSET_BYTES / 1024 / 1024);
                         return;
                     }
                     decompressedBaos.write(buf, 0, read);
                 }
             }
 
+            // Wire format: [pathUTF][dataLen][data] repeated
             DataInputStream dis = new DataInputStream(new ByteArrayInputStream(decompressedBaos.toByteArray()));
             int count = 0;
             while (dis.available() > 0) {
                 String path = dis.readUTF();
                 int len = dis.readInt();
                 if (len < 0 || len > MAX_SINGLE_ASSET) {
-                    Pandorical.LOGGER.error("Config phase: asset '{}' has invalid size: {} bytes", path, len);
+                    Pandorical.LOGGER.error(configPhase
+                        ? "Config phase: asset '{}' has invalid size: {} bytes"
+                        : "Asset '{}' has invalid size: {} bytes", path, len);
                     break;
                 }
                 byte[] data = new byte[len];
@@ -480,9 +489,13 @@ public class ContentManager {
                 count++;
             }
 
-            Pandorical.LOGGER.info("Config phase: unpacked {} assets", count);
+            Pandorical.LOGGER.info(configPhase
+                ? "Config phase: unpacked {} assets"
+                : "Unpacked {} assets from server", count);
         } catch (IOException e) {
-            Pandorical.LOGGER.error("Config phase: failed to unpack assets: {}", e.getMessage(), e);
+            Pandorical.LOGGER.error(configPhase
+                ? "Config phase: failed to unpack assets: {}"
+                : "Failed to unpack assets: {}", e.getMessage(), e);
         }
     }
 
@@ -499,58 +512,6 @@ public class ContentManager {
         if (expectedAssetChunks < 0) return false; // content packet hasn't arrived yet
         return assetChunks.size() == expectedAssetChunks
             && assetChunks.stream().noneMatch(Objects::isNull);
-    }
-
-    private static void unpackAssets() {
-        try {
-            long totalSize = assetChunks.stream().filter(Objects::nonNull).mapToLong(c -> c.length).sum();
-            if (totalSize > MAX_ASSET_BYTES) {
-                Pandorical.LOGGER.error("Asset data too large: {} bytes (max {})", totalSize, MAX_ASSET_BYTES);
-                return;
-            }
-
-            ByteArrayOutputStream assembled = new ByteArrayOutputStream();
-            for (byte[] chunk : assetChunks) {
-                if (chunk != null) assembled.write(chunk);
-            }
-
-            byte[] compressed = assembled.toByteArray();
-            ByteArrayOutputStream decompressedBaos = new ByteArrayOutputStream();
-            try (GZIPInputStream gzis = new GZIPInputStream(new ByteArrayInputStream(compressed))) {
-                byte[] buf = new byte[8192];
-                int read;
-                long total = 0;
-                while ((read = gzis.read(buf)) != -1) {
-                    total += read;
-                    if (total > MAX_ASSET_BYTES) {
-                        Pandorical.LOGGER.error("Decompressed asset data exceeds {}MB limit — aborting",
-                            MAX_ASSET_BYTES / 1024 / 1024);
-                        return;
-                    }
-                    decompressedBaos.write(buf, 0, read);
-                }
-            }
-
-            // Wire format: [pathUTF][dataLen][data] repeated
-            DataInputStream dis = new DataInputStream(new ByteArrayInputStream(decompressedBaos.toByteArray()));
-            int count = 0;
-            while (dis.available() > 0) {
-                String path = dis.readUTF();
-                int len = dis.readInt();
-                if (len < 0 || len > MAX_SINGLE_ASSET) {
-                    Pandorical.LOGGER.error("Asset '{}' has invalid size: {} bytes", path, len);
-                    break;
-                }
-                byte[] data = new byte[len];
-                dis.readFully(data);
-                virtualPack.addResource(path, data);
-                count++;
-            }
-
-            Pandorical.LOGGER.info("Unpacked {} assets from server", count);
-        } catch (IOException e) {
-            Pandorical.LOGGER.error("Failed to unpack assets: {}", e.getMessage(), e);
-        }
     }
 
     private static void tryFinalize() {
