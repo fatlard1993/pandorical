@@ -781,9 +781,22 @@ public class ContentManager {
     /**
      * Put the synced pack in front of the game and reload. {@code afterReload} runs once the
      * reload has finished, or at once when there was nothing to reload or it could not start:
-     * a caller waiting to acknowledge the server must hear back on every path.
+     * a caller waiting to acknowledge the server must hear back on every path, a throw included.
      */
     public static void injectResourcePack(Runnable afterReload) {
+        java.util.concurrent.atomic.AtomicBoolean ran = new java.util.concurrent.atomic.AtomicBoolean();
+        Runnable once = () -> {
+            if (ran.compareAndSet(false, true)) afterReload.run();
+        };
+        try {
+            injectAndReload(once);
+        } catch (RuntimeException e) {
+            Pandorical.LOGGER.error("Could not put the synced pack in place", e);
+            once.run();
+        }
+    }
+
+    private static void injectAndReload(Runnable afterReload) {
         if (!virtualPack.hasResources()) {
             Pandorical.LOGGER.warn("Virtual pack has no resources — skipping injection");
             afterReload.run();
