@@ -76,6 +76,35 @@ public final class ComponentType {
     public static final String DIAL_ACTION = "action";
     /** Dial: the key carrying the angle, in degrees, in every report. */
     public static final String DIAL_ANGLE = "angle";
+    /**
+     * A grid of palette-coloured cells painted by hand: press and drag to lay the current ink under
+     * a square brush, right-click to ask for the colour under the pointer. The client paints at
+     * once and reports what the hand did; the server applies the same report with
+     * {@link PixelCanvas#apply} and acknowledges it, so nothing waits on a round trip and the two
+     * copies stay the same. See {@link PixelCanvas} for the rule and the report's shape.
+     *
+     * <p>Cells are drawn square, as large as fit the bounds, centred in them.
+     */
+    public static final String PIXEL_CANVAS = "pixel_canvas";
+    /** Pixel canvas: columns and rows. */
+    public static final String PROP_CANVAS_COLUMNS = "columns";
+    public static final String PROP_CANVAS_ROWS = "rows";
+    /** Pixel canvas: comma-separated colours, #RRGGBB or #AARRGGBB, up to {@link PixelCanvas#MAX_PALETTE}; a cell is an index into it. */
+    public static final String PROP_CANVAS_PALETTE = "palette";
+    /** Pixel canvas: every cell, see {@link PixelCanvas#encode}. Authoritative: replaces the client's copy. */
+    public static final String PROP_CANVAS_PIXELS = "pixels";
+    /** Pixel canvas: the palette index a stroke lays down, or -1 for a canvas that cannot be painted. */
+    public static final String PROP_CANVAS_INK = "ink";
+    /** Pixel canvas: the brush's side, in cells. Default 1. */
+    public static final String PROP_CANVAS_BRUSH = "brush";
+    /** Pixel canvas: how much of each ink is left, see {@link PixelCanvas#encodeSupply}. Absent means unlimited. */
+    public static final String PROP_CANVAS_SUPPLY = "supply";
+    /**
+     * Pixel canvas: the last report the server has applied. The client folds every report up to
+     * it into its copy and replays the rest on top; pixels or supply sent in the same update are
+     * the state after it.
+     */
+    public static final String PROP_CANVAS_ACK = "ack";
 
     // --- Common prop keys ---
 

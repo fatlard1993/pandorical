@@ -156,7 +156,7 @@ in the demo.
 Screens and HUD overlays are composed from these component types:
 
 `panel` · `scroll_panel` · `text` · `button` · `text_input` · `sprite` · `item_slot` ·
-`item_icon` · `inventory_grid` · `map` · `radar` · `particle_burst` · `dial` ·
+`item_icon` · `inventory_grid` · `map` · `radar` · `particle_burst` · `dial` · `pixel_canvas` ·
 `player_face`
 
 `ScreenBuilder` and `HudBuilder` carry shorthand for the ones used most. The rest,
@@ -242,6 +242,43 @@ A window resize rebuilds the screen from its definitions with every update since
 replayed over them, so a swapped-in control stays swapped in. What a component keeps that
 no prop holds - the text typed into a field, strokes painted ahead of the server - is handed
 from the old component to its replacement through `PandoricalComponent#inherit`.
+
+### Painting by hand
+
+`pixel_canvas` is a grid of palette-coloured cells the player paints with the mouse: drag
+to lay the current ink under a square brush, right-click to report the colour under the
+pointer. The client paints the moment the hand moves and reports each stroke; the server
+applies the same stroke to its own copy and acknowledges it. Both ends run one rule,
+`PixelCanvas#apply`, over the same cells and the same supply of ink, so they agree without
+the cells being sent back. Send `pixels` again only when your copy moved some way the client
+could not have predicted: a stroke you refused, or a change from outside the canvas.
+
+```java
+screen.component(new ComponentBuilder("canvas", ComponentType.PIXEL_CANVAS)
+    .bounds(8, 8, 192, 192)
+    .prop(ComponentType.PROP_CANVAS_COLUMNS, "32")
+    .prop(ComponentType.PROP_CANVAS_ROWS, "32")
+    .prop(ComponentType.PROP_CANVAS_PALETTE, "#FFF7E9A3,#FF993333,#FF334CB2") // up to 256
+    .prop(ComponentType.PROP_CANVAS_PIXELS, PixelCanvas.encode(cells))
+    .prop(ComponentType.PROP_CANVAS_SUPPLY, PixelCanvas.encodeSupply(supply)) // omit for unlimited
+    .prop(ComponentType.PROP_CANVAS_INK, "1")
+    .prop(ComponentType.PROP_CANVAS_ACK, "0"));
+
+screens.onAction(SCREEN_TYPE, "canvas", (player, data) -> {
+    PixelCanvas.Stroke stroke = PixelCanvas.Stroke.fromAction(data);
+    if (stroke == null) return; // a pick: data.get(PixelCanvas.ACTION_PICK)
+    PixelCanvas.apply(cells, 32, 32, supply, stroke, changedIndex -> { /* redraw it */ });
+    screens.update(player, screenId, List.of(new ComponentUpdateBuilder("canvas")
+        .prop(ComponentType.PROP_CANVAS_ACK, String.valueOf(stroke.seq()))
+        .prop(ComponentType.PROP_CANVAS_SUPPLY, PixelCanvas.encodeSupply(supply)).build()));
+});
+```
+
+Cells are bytes, read unsigned, so a palette can have up to 256 colours; `PixelCanvas.encode` is their base64. The supply lists only the inks there is any of, as `index:amount` pairs.
+
+A stroke carries the ink and brush the client saw while making it, so a colour chosen a
+moment before the server heard about it still paints in that colour. Check them before
+applying: they came from the client. mc-paint's easel is the working example.
 
 ### Handlers
 
