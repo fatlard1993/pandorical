@@ -13,7 +13,8 @@ import net.fabricmc.loader.api.FabricLoader;
  * differently named jar and nothing else: no setting, no launcher arguments. Every line goes to
  * standard out, which is the log a launcher shows and a player can paste, and to
  * {@code logs/pandorical-trace.log}, written unbuffered so a process that dies mid-sentence still
- * leaves everything it had said.
+ * leaves everything it had said. The run before keeps its trail as
+ * {@code logs/pandorical-trace-previous.log}, so relaunching after a crash does not write over it.
  *
  * <p>The same trail doubles as the <b>load guard</b>, on every Windows client unless turned off:
  * everything the diagnostic jar does, but only while the game is loading - the first three minutes
@@ -191,6 +192,10 @@ public final class Diagnostics {
 			if (file == null) {
 				Path path = FabricLoader.getInstance().getGameDir().resolve("logs").resolve("pandorical-trace.log");
 				path.getParent().toFile().mkdirs();
+				if (java.nio.file.Files.exists(path)) {
+					java.nio.file.Files.move(path, path.resolveSibling("pandorical-trace-previous.log"),
+						java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+				}
 				file = new FileOutputStream(path.toFile(), false);
 			}
 			file.write((line + "\n").getBytes(StandardCharsets.UTF_8));
