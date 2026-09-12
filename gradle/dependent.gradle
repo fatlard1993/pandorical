@@ -1,0 +1,37 @@
+// Applied by every mod in the suite that compiles against Pandorical's API.
+//
+// Pandorical is a BUILD-TIME REQUIREMENT and a RUNTIME OPTION, and the two are easy to confuse.
+// A dependent names Pandorical types directly in method signatures and bodies, so javac needs the
+// jar. At runtime the classes that touch it sit behind FabricLoader.isModLoaded and are never
+// loaded without it, which is why the manifests only "suggest" pandorical and the mods genuinely
+// run standalone.
+//
+// Guarding the compileOnly on "is pandorical checked out" gets that backwards. It reads as though
+// the dependency were optional, and then the one person it was written for - somebody who cloned
+// a single repo on its own - gets a wall of "package justfatlard.pandorical does not exist"
+// instead of a sentence telling them what to do. The requirement is unconditional; say so here,
+// once, rather than in a block copied into every dependent.
+//
+// The version is read from what Pandorical declares rather than pinned per repo, because Gradle
+// never clears build/libs: after a version bump the old and new jars sit side by side, and a
+// hand-written name keeps compiling green against a jar an old build left behind.
+
+def pandoricalRoot = project.file("../pandorical")
+def pandoricalProperties = new File(pandoricalRoot, "gradle.properties")
+def pandoricalVersion = new Properties().with {
+	pandoricalProperties.withInputStream { load(it) }
+	getProperty("mod_version")?.trim()
+}
+def pandoricalJar = new File(pandoricalRoot, "build/libs/pandorical-${pandoricalVersion}.jar")
+
+if (!pandoricalJar.exists()) {
+	throw new GradleException(
+		"${project.name} compiles against Pandorical's API, and pandorical ${pandoricalVersion} is not built.\n" +
+		"  mc-build pandorical\n" +
+		"  (or: ./gradlew build -p ${pandoricalRoot.path})\n" +
+		"Pandorical stays optional at runtime; this is a build-time dependency only.")
+}
+
+dependencies {
+	compileOnly files(pandoricalJar)
+}
