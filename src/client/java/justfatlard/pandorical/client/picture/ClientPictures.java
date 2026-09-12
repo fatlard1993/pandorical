@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import justfatlard.pandorical.api.Picture;
 import justfatlard.pandorical.protocol.PicturesS2C;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext;
@@ -78,6 +79,11 @@ public final class ClientPictures {
         ClientPlayNetworking.registerGlobalReceiver(PicturesS2C.TYPE,
             (payload, context) -> context.client().execute(() -> apply(payload)));
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> client.execute(ClientPictures::clearAll));
+        // Whatever the server does or does not say when an anchor goes, its textures go with it
+        ClientEntityEvents.ENTITY_UNLOAD.register((entity, level) -> {
+            Shown shown = SHOWN.remove(entity.getId());
+            if (shown != null) shown.release();
+        });
         LevelRenderEvents.COLLECT_SUBMITS.register(ClientPictures::onCollectSubmits);
     }
 
