@@ -125,11 +125,11 @@ public class PandoricalContainerScreen extends AbstractContainerScreen<Pandorica
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent click, boolean handled) {
-        if (!handled && ScreenHelper.dispatchMouseClick(components, click.x(), click.y(), click.button())) {
+    public boolean mouseClicked(MouseButtonEvent click, boolean doubleClick) {
+        if (ScreenHelper.dispatchMouseClick(components, click.x(), click.y(), click.button())) {
             return true;
         }
-        return super.mouseClicked(click, handled);
+        return super.mouseClicked(click, doubleClick);
     }
 
     @Override

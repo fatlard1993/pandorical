@@ -78,13 +78,11 @@ public class PandoricalScreen extends Screen implements justfatlard.pandorical.a
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent click, boolean handled) {
-        if (handled) return super.mouseClicked(click, handled);
-
+    public boolean mouseClicked(MouseButtonEvent click, boolean doubleClick) {
         if (ScreenHelper.dispatchMouseClick(components, click.x(), click.y(), click.button())) {
             return true;
         }
-        return super.mouseClicked(click, handled);
+        return super.mouseClicked(click, doubleClick);
     }
 
     @Override
