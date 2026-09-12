@@ -1607,8 +1607,13 @@ public class ContentManager {
             } catch (IllegalStateException e) {
                 // "Tags already present before freezing" is the expected path on a
                 // re-freeze; frozen is set before the check, so this is not a failure.
-                Pandorical.LOGGER.debug("Registry {} kept its existing tag bindings: {}",
-                    registry.key(), e.getMessage());
+                // Freeze also throws for values left unbound, which is.
+                String message = String.valueOf(e.getMessage());
+                if (message.contains("Tags already present")) {
+                    Pandorical.LOGGER.debug("Registry {} kept its existing tag bindings: {}", registry.key(), message);
+                } else {
+                    Pandorical.LOGGER.warn("Registry {} did not freeze cleanly: {}", registry.key(), message);
+                }
             }
         }
     }
