@@ -1248,21 +1248,20 @@ public final class PandoricalApi {
 
     /** @hidden implementation of {@link KeybindApi}; pool model rationale in the interface javadoc. */
     public static final class KeybindApiImpl implements KeybindApi {
-        /** Must match the pool the client registers at startup. */
+        /** The pool the client registers at startup; the client reads its size and defaults from here. */
         public static final int MAX_SLOTS = 8;
-        // Key codes in the game's own InputConstants table (NOT GLFW: KEY_G is
-        // 10 on this snapshot generation, and 71 is scroll lock). Literals
-        // because InputConstants is a client-only class, absent on a dedicated
-        // server. Slot 0 defaults to G; 0 is the unbound/unknown code.
         /** What an entry in {@link #POOL_DEFAULT_KEYS} says when the slot starts unbound. */
         private static final int UNBOUND = 0;
 
-        // Slot 0 is the only one the client pre-binds; everything else waits to be bound by the
-        // player in the controls screen. KEY_G is 10 in the game's own table, not GLFW's.
-        // Two slots come pre-bound: token 10 is G, token 11 is B. A registration that names the
-        // token gets the slot; see chooseSlot for why the others do not.
-        private static final int[] POOL_DEFAULT_KEYS = {10, 11, UNBOUND, UNBOUND,
-                                                        UNBOUND, UNBOUND, UNBOUND, UNBOUND};
+        // Two slots come pre-bound. A registration that names a slot's key gets that slot; see
+        // chooseSlot for why the others do not.
+        private static final int[] POOL_DEFAULT_KEYS = {KeybindApi.letter('G'), KeybindApi.letter('B'),
+                                                        UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND};
+
+        /** The key a pool slot starts bound to, or 0 for none. */
+        public static int poolDefaultKey(int slot) {
+            return POOL_DEFAULT_KEYS[slot];
+        }
         private static final int MAX_PRESSES_PER_TICK = 8;
 
         private record Registration(String id, String displayName, KeybindHandler handler, int preferredKey) {}

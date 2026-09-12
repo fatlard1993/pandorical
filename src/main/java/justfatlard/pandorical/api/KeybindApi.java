@@ -8,7 +8,7 @@ import net.minecraft.server.level.ServerPlayer;
  *
  * <p>Pandorical clients register a fixed pool of rebindable keybinds at
  * normal client startup (category "Pandorical", slots "Pandorical Action
- * 1..8"; slot 1 defaults to G, the rest start unbound). This pool exists
+ * 1..8"; slot 1 defaults to G, slot 2 to B, the rest start unbound). This pool exists
  * because Minecraft's options system only accepts keybind registration during
  * client startup: a dynamically added KeyMapping would neither persist its
  * rebinds to options.txt nor survive Fabric's registration-before-options
@@ -34,11 +34,9 @@ public interface KeybindApi {
      *
      * @param id                  unique id for this keybind, namespaced, e.g. {@code "poopsmith:poop"}
      * @param preferredDefaultKey key code in the game's own InputConstants
-     *                            table, NOT a GLFW code (KEY_G is 10 on this
-     *                            snapshot generation; verify against the
-     *                            client jar when in doubt). Honored only when
-     *                            a free pool slot has that default, since
-     *                            pool defaults are fixed client-side
+     *                            table, NOT a GLFW code: use {@link #letter}.
+     *                            Claims a pre-bound slot only when it names
+     *                            that slot's default; 0 asks for no key
      * @param displayName         name shown in the controls screen on claimed slots
      * @param handler             called on the server thread for each validated press
      */
@@ -57,6 +55,16 @@ public interface KeybindApi {
      * @param id a keybind already passed to {@link #register}
      */
     default void bindByDefault(String id) {}
+
+    /**
+     * The key code for a letter, in the table {@link #register} takes. The game numbers keys by
+     * their USB usage, so A is 4 and B is 5, which is neither GLFW's nor ASCII's.
+     */
+    static int letter(char letter) {
+        char upper = Character.toUpperCase(letter);
+        if (upper < 'A' || upper > 'Z') throw new IllegalArgumentException("not a letter: " + letter);
+        return 4 + (upper - 'A');
+    }
 
     @FunctionalInterface
     interface KeybindHandler {

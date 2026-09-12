@@ -2,6 +2,8 @@ package justfatlard.pandorical.client.keybind;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import justfatlard.pandorical.Pandorical;
+import justfatlard.pandorical.api.KeybindApi;
+import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.protocol.KeyPressC2S;
 import justfatlard.pandorical.protocol.KeyReleaseC2S;
 import justfatlard.pandorical.protocol.KeybindBindingsC2S;
@@ -22,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * rebindable KeyMappings registered at normal client startup (the only time
  * the options system accepts them), whose meaning is assigned per server.
  *
- * <p>Slot 1 defaults to G, the rest start unbound; all live under the
+ * <p>Slot 1 defaults to G and slot 2 to B, the rest start unbound; all live under the
  * "Pandorical" controls category with shipped default names ("Pandorical
  * Action N") that a server's synced lang overrides for its claimed slots.
  * Presses are only forwarded for slots the current server declared, so
@@ -32,13 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class KeybindManager {
 	private KeybindManager() {}
 
-	/**
-	 * Must match KeybindApiImpl.MAX_SLOTS and its POOL_DEFAULT_KEYS. Key codes
-	 * are this snapshot's InputConstants table (NOT GLFW: KEY_G is 10 here,
-	 * 71 is scroll lock); 0 is the unbound/unknown keyboard code.
-	 */
-	private static final int MAX_SLOTS = 8;
-	private static final int[] POOL_DEFAULT_KEYS = {InputConstants.KEY_G, InputConstants.KEY_B, 0, 0, 0, 0, 0, 0};
+	private static final int MAX_SLOTS = PandoricalApi.KeybindApiImpl.MAX_SLOTS;
 	/** Whether each slot was down on the last tick, so the release edge can be reported. */
 	private static final boolean[] wasDown = new boolean[MAX_SLOTS];
 
@@ -49,11 +45,17 @@ public final class KeybindManager {
 
 	/** Register the pool. Call once from client mod init, never later. */
 	public static void init() {
+		// The server names keys by number and cannot see this table, so a snapshot that
+		// renumbered it would put every mod's default on the wrong key without a word.
+		if (KeybindApi.letter('G') != InputConstants.KEY_G || KeybindApi.letter('B') != InputConstants.KEY_B) {
+			Pandorical.LOGGER.error("InputConstants no longer numbers keys the way KeybindApi.letter does;"
+				+ " every keybind default will land on the wrong key");
+		}
 		KeyMapping.Category category = KeyMapping.Category.register(
 			Identifier.fromNamespaceAndPath(Pandorical.MOD_ID, "pandorical"));
 		for (int i = 0; i < MAX_SLOTS; i++) {
 			pool[i] = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-				"key.pandorical.action" + (i + 1), POOL_DEFAULT_KEYS[i], category));
+				"key.pandorical.action" + (i + 1), PandoricalApi.KeybindApiImpl.poolDefaultKey(i), category));
 		}
 	}
 
@@ -75,9 +77,10 @@ public final class KeybindManager {
 	/**
 	 * Put on the keys the server's keybinds asked to start on, where nobody has chosen one.
 	 *
-	 * <p>Once per keybind, ever: the id goes in a file here the first time it is seen, whether or
-	 * not its slot was free, so a key the player clears or moves afterwards is theirs and is never
-	 * put back. A slot the player had already bound keeps their key.
+	 * <p>Once per keybind and slot: {@code id@slot} goes in a file here the first time it is seen,
+	 * whether or not the slot was free, so a key the player clears or moves afterwards is theirs
+	 * and is never put back. A slot the player had already bound keeps their key. A keybind the
+	 * server moves to another slot is a new binding and gets its default once more.
 	 */
 	public static void applyDefaults(justfatlard.pandorical.protocol.KeybindDefaultsS2C payload) {
 		Set<String> applied = new java.util.LinkedHashSet<>();
@@ -96,7 +99,7 @@ public final class KeybindManager {
 		boolean remembered = false;
 		for (var entry : payload.entries()) {
 			if (entry.slot() < 0 || entry.slot() >= MAX_SLOTS || pool[entry.slot()] == null) continue;
-			if (!applied.add(entry.id())) continue;
+			if (!applied.add(entry.id() + "@" + entry.slot())) continue;
 			remembered = true;
 			if (!pool[entry.slot()].isUnbound()) continue;
 			pool[entry.slot()].setKey(InputConstants.Type.KEYBOARD.getOrCreate(entry.key()));

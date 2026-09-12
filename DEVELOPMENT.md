@@ -475,22 +475,20 @@ for the wooden doors and iron.
 
 ## Keybinds
 
-A keybind reports its press through `onPress`; a handler that needs the other edge, a
-handbrake or anything held, overrides `onRelease` too. Two pool slots come pre-bound: token
-10 is G, token 11 is B; name the token to claim the slot.
-
 Server-declared rebindable keys. Your mod claims a slot from a fixed client-side pool and
-ships zero client code.
+ships zero client code. A keybind reports its press through `onPress`; a handler that needs
+the other edge, a handbrake or anything held, overrides `onRelease` too.
 
 ```java
-// At mod init, before players connect. Key codes use the game's own InputConstants
-// table, not GLFW: 10 is KEY_G on this snapshot generation.
-PandoricalApi.keybinds().register("mymod:action", 10, "Do The Thing",
+// At mod init, before players connect. Key codes are the game's own table, which is
+// neither GLFW's nor ASCII's: KeybindApi.letter gives the code for a letter.
+PandoricalApi.keybinds().register("mymod:action", KeybindApi.letter('G'), "Do The Thing",
     player -> doTheThing(player));
 ```
 
-The preferred key is honored only if a free pool slot carries that default. Slot 1
-defaults to G; the rest start unbound. The display name appears in the client's controls
+Two slots come pre-bound: slot 1 to G, slot 2 to B. Naming one of those keys claims that slot
+if it is free; any other key gets an unbound slot, and `bindByDefault` puts the key on it once
+per client. The display name appears in the client's controls
 screen under category "Pandorical", and a rebind persists in `options.txt` like any other
 key. Presses arrive on the server thread, validated and rate-limited.
 
