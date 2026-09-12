@@ -6,6 +6,7 @@ import justfatlard.pandorical.api.ContentApi;
 import justfatlard.pandorical.api.ItemRegistration;
 import justfatlard.pandorical.protocol.SyncAssetsConfigS2C;
 import justfatlard.pandorical.protocol.SyncAssetsS2C;
+import justfatlard.pandorical.protocol.StatePropertySpec;
 import justfatlard.pandorical.protocol.SyncContentS2C;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
@@ -494,40 +495,7 @@ public class ContentRegistry implements ContentApi {
             List<Integer> stateIds = new java.util.ArrayList<>();
             List<String> stateProps = new java.util.ArrayList<>();
             for (var prop : block.getStateDefinition().getProperties()) {
-                // Anything that is not a boolean or an integer range is described by its value
-                // names, not by a count. An EnumProperty is the usual case, but a mod can define a
-                // Property of its own whose values read as words - and sending "i:101" for one of
-                // those would hand the client a property numbered 0..100 with the names thrown
-                // away, which is exactly the shape the client's NamedIntegerProperty exists to be
-                // rebuilt into. The names are the only part the blockstate JSON can match on.
-                String type = "e";
-                if (prop instanceof net.minecraft.world.level.block.state.properties.BooleanProperty) type = "b";
-                else if (prop instanceof net.minecraft.world.level.block.state.properties.IntegerProperty) type = "i";
-                // For enums, send the value names so the client can create matching properties
-                if ("e".equals(type)) {
-                    var names = new java.util.StringJoiner(",");
-                    try {
-                        var getNameMethod = net.minecraft.world.level.block.state.properties.Property.class
-                            .getMethod("getName", Comparable.class);
-                        for (var v : prop.getPossibleValues()) {
-                            names.add((String) getNameMethod.invoke(prop, v));
-                        }
-                    } catch (Exception ex) {
-                        for (var v : prop.getPossibleValues()) {
-                            names.add(v.toString().toLowerCase(java.util.Locale.ROOT));
-                        }
-                    }
-                    stateProps.add(prop.getName() + ":" + type + ":" + names.toString());
-                } else if ("i".equals(type)
-                        && prop instanceof net.minecraft.world.level.block.state.properties.IntegerProperty intProp) {
-                    // Send min:max, not just a count: flower_amount [1,4] as "flower_amount:i:4"
-                    // would create [0,3] on the client and fail to decode the value 4.
-                    int min = intProp.getPossibleValues().stream().mapToInt(Integer::intValue).min().getAsInt();
-                    int max = intProp.getPossibleValues().stream().mapToInt(Integer::intValue).max().getAsInt();
-                    stateProps.add(prop.getName() + ":" + type + ":" + min + ":" + max);
-                } else {
-                    stateProps.add(prop.getName() + ":" + type + ":" + prop.getPossibleValues().size());
-                }
+                stateProps.add(StatePropertySpec.encode(prop));
             }
             for (var state : block.getStateDefinition().getPossibleStates()) {
                 stateIds.add(net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY.getId(state));

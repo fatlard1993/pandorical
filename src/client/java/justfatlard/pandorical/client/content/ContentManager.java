@@ -918,47 +918,16 @@ public class ContentManager {
             Block baseBlock = baseId != null ? BuiltInRegistries.BLOCK.getValue(baseId) : null;
             List<net.minecraft.world.level.block.state.properties.Property<?>> stateProps = new java.util.ArrayList<>();
             for (String propSpec : entry.stateProperties()) {
-                // Wire format: "name:type:valuesOrCount" where type is b=boolean, i=integer,
-                // e=enum (comma-separated names); integers use "name:i:min:max" (split(":",3)
-                // leaves parts[2]="min:max"); legacy form is "name:valueCount".
-                String[] parts = propSpec.split(":", 3);
-                String propName = parts[0];
-                String propType = "i";
-                int valueCount = -1;
-                int intMin = 0;
-                String enumValues = null;
-                if (parts.length == 3) {
-                    propType = parts[1];
-                    if ("e".equals(propType)) {
-                        enumValues = parts[2];
-                        valueCount = parts[2].split(",").length;
-                    } else if ("i".equals(propType) && parts[2].contains(":")) {
-                        String[] minMax = parts[2].split(":", 2);
-                        try {
-                            intMin = Integer.parseInt(minMax[0]);
-                            int intMax = Integer.parseInt(minMax[1]);
-                            valueCount = intMax - intMin + 1;
-                        } catch (NumberFormatException ignored) {
-                            Pandorical.LOGGER.warn("[pandorical] Malformed state prop range '{}' for block '{}', defaulting to 0", parts[2], entry.id());
-                        }
-                    } else {
-                        try { valueCount = Integer.parseInt(parts[2]); } catch (NumberFormatException ignored) {
-                            Pandorical.LOGGER.warn("[pandorical] Malformed state prop range '{}' for block '{}', defaulting to 0", parts[2], entry.id());
-                        }
-                    }
-                } else if (parts.length == 2) {
-                    try { valueCount = Integer.parseInt(parts[1]); } catch (NumberFormatException ignored) {
-                        Pandorical.LOGGER.warn("[pandorical] Malformed state prop range '{}' for block '{}', defaulting to 0", parts[1], entry.id());
-                    }
-                }
-                var prop = DynamicBlock.resolveProperty(propName, baseBlock, valueCount, intMin, propType, enumValues);
+                StatePropertySpec spec = StatePropertySpec.parse(propSpec, entry.id());
+                var prop = DynamicBlock.resolveProperty(spec.name(), baseBlock, spec.valueCount(), spec.intMin(),
+                    spec.type(), spec.enumValues());
                 if (prop != null) {
                     stateProps.add(prop);
                 } else {
                     Pandorical.LOGGER.warn(configPhase
                         ? "Config phase: unknown state property '{}' (type={}, values={}) for block '{}'"
                         : "Unknown state property '{}' (type={}, values={}) for block '{}'",
-                        propName, propType, valueCount, entry.id());
+                        spec.name(), spec.type(), spec.valueCount(), entry.id());
                 }
             }
 
