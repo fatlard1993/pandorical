@@ -43,6 +43,12 @@ public class ScrollPanelComponent extends AbstractComponent {
         parseStyle();
     }
 
+    @Override
+    public void carryOverFrom(PandoricalComponent previous) {
+        ScrollPanelComponent old = (ScrollPanelComponent) previous;
+        scrollOffset = Math.clamp(old.scrollOffset, 0, Math.max(0, totalItems - visibleItems));
+    }
+
     private void parseStyle() {
         scrollOffset = parseInt("scroll_offset", 0);
         scrollStep = Math.max(1, parseInt("scroll_step", 1));

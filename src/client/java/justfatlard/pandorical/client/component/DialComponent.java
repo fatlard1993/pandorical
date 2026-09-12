@@ -79,6 +79,11 @@ public class DialComponent extends SpriteComponent {
     }
 
     @Override
+    public void carryOverFrom(PandoricalComponent previous) {
+        angle = Math.clamp(((DialComponent) previous).angle, -sweep / 2F, sweep / 2F);
+    }
+
+    @Override
     public void removed() {
         if (cursorHidden) SDLMouse.SDL_ShowCursor();
         cursorHidden = false;
