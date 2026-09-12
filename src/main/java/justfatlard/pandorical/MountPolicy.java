@@ -12,7 +12,6 @@ public final class MountPolicy {
 
 	public static boolean doubleRiders() { return doubleRiders; }
 
-	/** On, a mount keeps its own heading and turns with the strafe keys; the rider looks freely. */
 	public static boolean freeLook() { return freeLook; }
 
 	public static void set(boolean withDoubleRiders, boolean withFreeLook) {

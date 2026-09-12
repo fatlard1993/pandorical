@@ -16,13 +16,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * Where paired portals meet vanilla: the search for a portal to come out of answers with the
- * entry's partner when it has one, and a decided trip is remembered as a pair. See PortalPairing.
- *
- * <p>Only the search is replaced. Everything after it - the rectangle, the landing spot clear of
- * walls, the portal ticket, the sound - is vanilla's own, run on the portal it was handed.
- */
+/** Replaces only vanilla's exit search; the rest of the trip runs vanilla's code on the partner. */
 @Mixin(NetherPortalBlock.class)
 public abstract class NetherPortalPairingMixin {
 

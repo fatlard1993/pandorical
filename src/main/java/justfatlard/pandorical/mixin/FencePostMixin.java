@@ -14,7 +14,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** A fence marked as a post joins nothing, and nothing joins to it. */
 @Mixin(FenceBlock.class)
 public abstract class FencePostMixin {
 	@Inject(method = "updateShape", at = @At("RETURN"), cancellable = true)
@@ -26,7 +25,7 @@ public abstract class FencePostMixin {
 		cir.setReturnValue(cir.getReturnValue().setValue(FenceBlock.PROPERTY_BY_DIRECTION.get(direction), false));
 	}
 
-	/** Placed beside a post, a fence does not reach for it; only the neighbours are told of a placement, not the placed. */
+	/** Needed beside updateShape: a placement updates the neighbours, not the placed block. */
 	@Inject(method = "getStateForPlacement", at = @At("RETURN"), cancellable = true)
 	private void pandorical$placedBesidePosts(BlockPlaceContext context, CallbackInfoReturnable<BlockState> cir) {
 		BlockState state = cir.getReturnValue();

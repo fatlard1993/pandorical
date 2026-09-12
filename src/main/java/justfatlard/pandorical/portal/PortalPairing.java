@@ -25,14 +25,7 @@ import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 
-/**
- * Nether portals that remember each other. See {@link PortalApi}.
- *
- * <p>A portal is known by its anchor: the lowest, most north-westerly block of its sheet of purple,
- * found by walking the sheet, so every block of one portal answers to the same name however the
- * traveller entered it. Pairs are kept on the overworld with the world, both directions, and a pair
- * whose other end is no longer a portal is forgotten the first time a trip finds it so.
- */
+/** A portal is known by the anchor of its sheet, so every block of one portal names one pair. */
 public final class PortalPairing implements PortalApi {
 	public static final PortalPairing INSTANCE = new PortalPairing();
 
@@ -67,17 +60,13 @@ public final class PortalPairing implements PortalApi {
 		return chosen != null ? chosen : byDefault;
 	}
 
-	/** An op's choice, which from now on is the answer whatever any mod asked for. */
 	public static void choose(MinecraftServer server, boolean on) {
 		Pairs pairs = Pairs.get(server);
 		pairs.chosen = on;
 		pairs.setDirty();
 	}
 
-	/**
-	 * The portal to come out of, for a trip entering {@code entry} and arriving in {@code to}: the
-	 * entry's partner, if it has one there that is still a portal. Null leaves the trip to vanilla.
-	 */
+	/** Null leaves the trip to vanilla. */
 	public static BlockPos partnerFor(ServerLevel from, BlockPos entry, ServerLevel to) {
 		MinecraftServer server = from.getServer();
 		if (!enabled(server)) return null;
@@ -94,7 +83,6 @@ public final class PortalPairing implements PortalApi {
 		return partner.pos();
 	}
 
-	/** After a trip is decided: the portal it went in by and the one it comes out of are a pair now. */
 	public static void remember(ServerLevel from, BlockPos entry, TeleportTransition trip) {
 		if (trip == null || trip.newLevel() == null || trip.newLevel() == from) return;
 		MinecraftServer server = from.getServer();
@@ -118,10 +106,7 @@ public final class PortalPairing implements PortalApi {
 		return false;
 	}
 
-	/**
-	 * A portal block at or beside where a trip lands. Vanilla puts the traveller inside the
-	 * portal, nudged clear of walls, so the portal is always within a block or two of them.
-	 */
+	/** Vanilla lands a traveller inside the portal, nudged clear of walls: within two blocks. */
 	private static BlockPos portalNear(ServerLevel level, BlockPos landing) {
 		for (int r = 0; r <= 2; r++) {
 			for (BlockPos pos : BlockPos.betweenClosed(landing.offset(-r, -1, -r), landing.offset(r, 2, r))) {
@@ -131,7 +116,6 @@ public final class PortalPairing implements PortalApi {
 		return null;
 	}
 
-	/** The anchor of the portal sheet this block is part of, or null where there is no portal. */
 	static GlobalPos anchorOf(ServerLevel level, BlockPos inside) {
 		if (!level.getBlockState(inside).is(Blocks.NETHER_PORTAL)) return null;
 		Set<BlockPos> seen = new HashSet<>();
@@ -160,7 +144,6 @@ public final class PortalPairing implements PortalApi {
 		return a.getZ() < b.getZ();
 	}
 
-	/** The pairs, and an op's choice about pairing, kept with the world. */
 	static final class Pairs extends SavedData {
 		private record Link(GlobalPos from, GlobalPos to) {
 			static final Codec<Link> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -182,7 +165,7 @@ public final class PortalPairing implements PortalApi {
 			Identifier.fromNamespaceAndPath("pandorical", "portal_pairs"), Pairs::new, CODEC, DataFixTypes.LEVEL);
 
 		final Map<GlobalPos, GlobalPos> links = new HashMap<>();
-		/** Null until an op has chosen, and then their choice. */
+		/** Null until an op chooses. */
 		Boolean chosen;
 
 		static Pairs get(MinecraftServer server) {
@@ -190,10 +173,8 @@ public final class PortalPairing implements PortalApi {
 		}
 
 		/**
-		 * The first pairing stands. A portal already paired keeps its partner until one of the two
-		 * is broken; a trip into a paired portal from one that is not only remembers the way there.
-		 * So two portals that both led to one on the far side each keep going there, that one leads
-		 * back to whichever was paired first, and nobody else's trip can move where yours returns.
+		 * The first pairing stands until an end breaks. A trip into an already-paired portal only
+		 * records the way there, so nobody else's trip can move where yours returns.
 		 */
 		void link(GlobalPos a, GlobalPos b) {
 			if (links.containsKey(a)) return;

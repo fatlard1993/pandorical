@@ -16,18 +16,9 @@ import java.util.HashMap;
 import java.util.function.IntFunction;
 
 /**
- * Rails a player can stand on, when a server has asked for them.
- *
- * <p>Vanilla rails have no collision at all, which is fine while every rail sits on a block and
- * useless the moment a mod lets rails float: a bridge of rail is a bridge you fall through.
- * This gives a rail a floor - two pixels of deck for a flat one, a ramp of eight steps for a
- * sloped one - and gives it to players only. Carts, mobs and dropped items pass through rails
- * exactly as vanilla has them, so nothing about how a cart rides a rail changes.
- *
- * <p>The rule is the server's. A server-side mod switches it on through the content API; the
- * flag travels with the content sync, and the client applies the same shape, which is what
- * makes standing on a rail predict right. Off, this returns null everywhere and rails are
- * vanilla's.
+ * A floor on rails for players only, when a server asks for one; carts, mobs and items pass
+ * through as in vanilla. The flag travels with the content sync so the client predicts the floor
+ * the server enforces.
  */
 public final class RailCollision {
 	private RailCollision() {}
@@ -52,7 +43,7 @@ public final class RailCollision {
 		return solid;
 	}
 
-	/** The floor this rail offers whoever is asking, or null when it offers none. */
+	/** Null leaves vanilla's shape. */
 	public static VoxelShape shapeFor(BlockState state, CollisionContext context) {
 		if (!solid) return null;
 		if (!(context instanceof EntityCollisionContext entity) || !(entity.getEntity() instanceof Player)) {
@@ -63,15 +54,9 @@ public final class RailCollision {
 	}
 
 	/**
-	 * Whichever property of the state holds a rail shape; rails and their stand-ins name it
-	 * differently.
-	 *
-	 * <p>A stand-in for a rail whose {@code shape} offers a different set of values from
-	 * vanilla's - a crossing that is only ever straight, a junction with no slopes - is rebuilt on
-	 * the client with a property of names rather than of {@link RailShape}, so the class test
-	 * finds nothing there. Its names are still the shape names, so a property called
-	 * {@code shape} is read by name too. Without that the server floored the rail and the client
-	 * did not, and a player walking a crossing was put back up two pixels every tick.
+	 * A stand-in rail whose {@code shape} values differ from vanilla's is rebuilt on the client
+	 * with a property of names, not of {@link RailShape}, so {@code shape} is also read by name.
+	 * Otherwise the client and server floors disagree.
 	 */
 	private static RailShape railShapeOf(BlockState state) {
 		for (Property<?> property : state.getProperties()) {

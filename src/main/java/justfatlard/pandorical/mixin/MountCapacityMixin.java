@@ -8,14 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * How many people a mount will take.
- *
- * <p>On {@code Entity} because that is where vanilla decides it - one line saying a thing is full
- * once its passenger list is not empty - and a horse never overrode it. Narrowed back to horses
- * here rather than by choosing a target class, so nothing else in the game quietly gains a second
- * seat.
- */
+/** On {@code Entity}: horses inherit vanilla's {@code canAddPassenger} without overriding it. */
 @Mixin(Entity.class)
 public abstract class MountCapacityMixin {
 

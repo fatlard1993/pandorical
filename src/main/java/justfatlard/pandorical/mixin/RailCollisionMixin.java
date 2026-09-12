@@ -10,11 +10,6 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.spongepowered.asm.mixin.Mixin;
 
-/**
- * Vanilla's rails offer the floor {@link RailCollision} describes, on both sides. The server
- * holds a player up with it and the client predicts the same, which is the whole of why the
- * rule is synced rather than server-side alone.
- */
 @Mixin(BaseRailBlock.class)
 public abstract class RailCollisionMixin extends Block {
 	protected RailCollisionMixin(Properties properties) {

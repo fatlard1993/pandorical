@@ -27,14 +27,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.state.BlockState;
 
-/** Every structure spawned, and who is sent what as its anchor entity is tracked. */
 public final class StructureRegistry implements StructureApi {
 	public static final StructureRegistry INSTANCE = new StructureRegistry();
 
-	/**
-	 * Server-side state for one structure. Broadcast-scoped (not per-player): mutated in
-	 * place and re-broadcast to every current tracker of {@code anchorEntity} on every call.
-	 */
 	private static final class StructureState {
 		final Entity anchorEntity;
 		final Map<RelPos, BlockState> blocks;
@@ -65,13 +60,13 @@ public final class StructureRegistry implements StructureApi {
 		broadcastToTrackers(state.anchorEntity, packet);
 	}
 
-	/** @hidden A stopped server's structures belong to its world; the next world starts with none. */
+	/** @hidden */
 	public void clear() {
 		structures.clear();
 		pendingPoses.clear();
 	}
 
-	/** Structures whose pose changed since the tracker pass last sent it. */
+	/** Poses held for the tracker pass; see {@link #flushPoses}. */
 	private final Set<String> pendingPoses = ConcurrentHashMap.newKeySet();
 
 	@Override
@@ -79,19 +74,13 @@ public final class StructureRegistry implements StructureApi {
 		StructureState state = structures.get(structureId);
 		if (state == null) return;
 		state.pose = pose;
-		// Held until the game's own entity tracker runs, and sent from there: the deck and
-		// everything riding it then reach the client in one pass. Sent from here, mid-tick,
-		// the deck ran a full server tick ahead of the anchor, the cushions and the hull the
-		// tracker sends at the start of the next tick, and the pilot stood that tick off
-		// the helm and shook with it.
 		pendingPoses.add(structureId);
 	}
 
 	/**
-	 * Send every pose changed since the last pass, for structures anchored in this level.
-	 *
-	 * <p>Called at the head of {@code ChunkMap.tick()}, which is the pass that sends every
-	 * tracked entity's position. Both go out together, so both land in the same client tick.
+	 * Called at the head of {@code ChunkMap.tick()}, the pass that sends tracked entity positions,
+	 * so a structure's pose and the entities riding it land in the same client tick. A pose sent
+	 * mid-tick runs a tick ahead of its riders.
 	 */
 	public void flushPoses(ServerLevel level) {
 		if (pendingPoses.isEmpty()) return;
@@ -108,7 +97,7 @@ public final class StructureRegistry implements StructureApi {
 		}
 	}
 
-	/** A pose still waiting for the tracker pass goes now, ahead of an update that cannot wait with it. */
+	/** An update that cannot wait for the tracker pass sends the held pose first. */
 	private void sendPendingPose(String structureId, StructureState state) {
 		if (pendingPoses.remove(structureId)) sendPose(structureId, state);
 	}
@@ -160,7 +149,7 @@ public final class StructureRegistry implements StructureApi {
 		broadcastToTrackers(state.anchorEntity, new DespawnStructureS2C(structureId));
 	}
 
-	/** @hidden called from Pandorical's EntityTrackingEvents.START_TRACKING handler. */
+	/** @hidden */
 	public void handleStartTracking(Entity entity, ServerPlayer player) {
 		if (!PandoricalApi.hasCapability(player, Capabilities.STRUCTURES)) return;
 		for (Map.Entry<String, StructureState> entry : structures.entrySet()) {
@@ -170,7 +159,7 @@ public final class StructureRegistry implements StructureApi {
 		}
 	}
 
-	/** @hidden called from Pandorical's EntityTrackingEvents.STOP_TRACKING handler. */
+	/** @hidden */
 	public void handleStopTracking(Entity entity, ServerPlayer player) {
 		if (!PandoricalApi.isAvailable(player)) return;
 		for (Map.Entry<String, StructureState> entry : structures.entrySet()) {
