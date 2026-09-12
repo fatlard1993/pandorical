@@ -28,11 +28,6 @@ public final class Keepsakes implements KeepsakeApi {
 
 	private Keepsakes() {}
 
-	/** More than any mod should want to leave, and a stop against a game that answers with a novel. */
-	private static final int MOST_KEYS = 64;
-	private static final int LONGEST_KEY = 64;
-	private static final int LONGEST_VALUE = 256;
-
 	/** What each player's game handed back at login, by profile id. */
 	private final Map<UUID, Map<String, String>> received = new ConcurrentHashMap<>();
 
@@ -58,6 +53,12 @@ public final class Keepsakes implements KeepsakeApi {
 			if (serverId == null) serverId = UUID.randomUUID().toString();
 		}
 		return serverId;
+	}
+
+	/** A login starting under this name: nothing an earlier login's game handed back carries into this one. */
+	public void begin(ServerConfigurationPacketListenerImpl handler) {
+		var profile = handler.getOwner();
+		if (profile != null) received.remove(profile.id());
 	}
 
 	/** Whether this connection's game will answer the ask. */
@@ -94,14 +95,22 @@ public final class Keepsakes implements KeepsakeApi {
 	}
 
 	@Override
+	public boolean canKeep(ServerPlayer player) {
+		return ServerPlayNetworking.canSend(player, KeepsakeStoreS2C.TYPE);
+	}
+
+	@Override
 	public void put(ServerPlayer player, String key, String value) {
 		if (key.length() > LONGEST_KEY || value.length() > LONGEST_VALUE) {
 			throw new IllegalArgumentException("keepsake too long: " + key);
 		}
-		received.computeIfAbsent(player.getUUID(), k -> new ConcurrentHashMap<>()).put(key, value);
-		if (ServerPlayNetworking.canSend(player, KeepsakeStoreS2C.TYPE)) {
-			ServerPlayNetworking.send(player, new KeepsakeStoreS2C(serverId(), key, value));
+		if (value.isEmpty()) {
+			remove(player, key);
+			return;
 		}
+		if (!canKeep(player)) return;
+		received.computeIfAbsent(player.getUUID(), k -> new ConcurrentHashMap<>()).put(key, value);
+		ServerPlayNetworking.send(player, new KeepsakeStoreS2C(serverId(), key, value));
 	}
 
 	@Override

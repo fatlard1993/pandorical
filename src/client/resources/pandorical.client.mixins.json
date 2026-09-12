@@ -11,6 +11,7 @@
     "CameraMixin",
     "ChestRenderStateMixin",
     "ChestRendererMixin",
+    "ClientCommonListenerAccessor",
     "ClimbableSyncMixin",
     "ContainerHabitsMixin",
     "ContainerStackSizeMixin",

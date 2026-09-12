@@ -306,6 +306,7 @@ public class Pandorical implements ModInitializer {
                     justfatlard.pandorical.config.Keepsakes.INSTANCE.answered(handler, payload));
             });
         ServerConfigurationConnectionEvents.CONFIGURE.register((handler, server) -> {
+            justfatlard.pandorical.config.Keepsakes.INSTANCE.begin(handler);
             if (justfatlard.pandorical.config.Keepsakes.INSTANCE.askable(handler)) {
                 handler.addTask(new justfatlard.pandorical.config.Keepsakes.Task());
             }

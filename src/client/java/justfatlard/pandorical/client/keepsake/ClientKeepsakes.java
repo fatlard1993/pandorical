@@ -3,47 +3,93 @@ package justfatlard.pandorical.client.keepsake;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
+import java.util.HexFormat;
+import java.util.Locale;
 import java.util.Map;
 import justfatlard.pandorical.Pandorical;
+import justfatlard.pandorical.api.KeepsakeApi;
+import justfatlard.pandorical.client.mixin.ClientCommonListenerAccessor;
 import justfatlard.pandorical.protocol.KeepsakeStoreS2C;
 import justfatlard.pandorical.protocol.KeepsakesAskConfigS2C;
 import justfatlard.pandorical.protocol.KeepsakesConfigC2S;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.multiplayer.resolver.ServerAddress;
+import net.minecraft.network.Connection;
 
 /**
- * The game's half of the keepsakes: one small file per server, in this game's config folder,
- * named by the id the server gave itself. Only that server is ever shown what is in its file.
+ * The game's half of the keepsakes: one small file per server id and the address the player
+ * reached it at, in this game's config folder.
+ *
+ * <p>The id alone cannot be the key. A server hands its id to everybody who connects, so any
+ * server that has seen it could name it and be answered. The address is the player's own
+ * choice, which no other server can make for them.
  */
 public final class ClientKeepsakes {
 	private ClientKeepsakes() {}
 
 	private static final Gson GSON = new Gson();
 
+	/** The connection that asked, and whose file it was answered from; stores arrive on the same one or not at all. */
+	private record Asked(Connection connection, String serverId, String address) {}
+
+	private static volatile Asked asked;
+
 	public static void register() {
-		ClientConfigurationNetworking.registerGlobalReceiver(KeepsakesAskConfigS2C.TYPE, (payload, context) ->
-			context.responseSender().sendPacket(new KeepsakesConfigC2S(read(payload.serverId()))));
+		ClientConfigurationNetworking.registerGlobalReceiver(KeepsakesAskConfigS2C.TYPE, (payload, context) -> {
+			var listener = (ClientCommonListenerAccessor) context.packetListener();
+			Asked now = new Asked(listener.pandorical$connection(), payload.serverId(), addressOf(listener.pandorical$serverData()));
+			asked = now;
+			context.responseSender().sendPacket(new KeepsakesConfigC2S(read(now)));
+		});
 
 		ClientPlayNetworking.registerGlobalReceiver(KeepsakeStoreS2C.TYPE, (payload, context) -> {
-			Map<String, String> values = read(payload.serverId());
+			Asked now = asked;
+			if (now == null || now.connection() != context.player().connection.getConnection()) return;
+			if (!now.serverId().equals(payload.serverId())) return;
+			if (payload.key().length() > KeepsakeApi.LONGEST_KEY || payload.value().length() > KeepsakeApi.LONGEST_VALUE) return;
+
+			Map<String, String> values = read(now);
 			if (payload.value().isEmpty()) values.remove(payload.key());
-			else values.put(payload.key(), payload.value());
-			write(payload.serverId(), values);
+			else if (values.containsKey(payload.key()) || values.size() < KeepsakeApi.MOST_KEYS) values.put(payload.key(), payload.value());
+			else return;
+			write(now, values);
 		});
 	}
 
-	/** Null for anything that is not the shape of an id a server makes, which is also what keeps it a file name. */
-	private static Path fileFor(String serverId) {
-		if (serverId == null || !serverId.matches("[0-9a-f-]{36}")) return null;
-		return FabricLoader.getInstance().getConfigDir().resolve("pandorical").resolve("keepsakes").resolve(serverId + ".json");
+	/** Host and port as the player gave them; a world of their own has no address and shares one file. */
+	private static String addressOf(ServerData server) {
+		if (server == null) return "local";
+		ServerAddress address = ServerAddress.parseString(server.ip);
+		return address.getHost().toLowerCase(Locale.ROOT) + ":" + address.getPort();
 	}
 
-	private static Map<String, String> read(String serverId) {
-		Path file = fileFor(serverId);
+	/** Null for a server id that is not the shape of one a server makes, which is also what keeps it a file name. */
+	private static Path fileFor(Asked asked) {
+		if (asked.serverId() == null || !asked.serverId().matches("[0-9a-f-]{36}")) return null;
+		String name = asked.serverId() + "@" + addressHash(asked.address()) + ".json";
+		return FabricLoader.getInstance().getConfigDir().resolve("pandorical").resolve("keepsakes").resolve(name);
+	}
+
+	private static String addressHash(String address) {
+		try {
+			byte[] digest = MessageDigest.getInstance("SHA-256").digest(address.getBytes(StandardCharsets.UTF_8));
+			return HexFormat.of().formatHex(digest, 0, 8);
+		} catch (NoSuchAlgorithmException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
+	private static Map<String, String> read(Asked asked) {
+		Path file = fileFor(asked);
 		if (file == null || !Files.exists(file)) return new HashMap<>();
 		try {
 			Map<String, String> values = GSON.fromJson(Files.readString(file), new TypeToken<Map<String, String>>() {}.getType());
@@ -54,8 +100,8 @@ public final class ClientKeepsakes {
 		}
 	}
 
-	private static void write(String serverId, Map<String, String> values) {
-		Path file = fileFor(serverId);
+	private static void write(Asked asked, Map<String, String> values) {
+		Path file = fileFor(asked);
 		if (file == null) return;
 		try {
 			Files.createDirectories(file.getParent());
