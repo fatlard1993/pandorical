@@ -183,12 +183,21 @@ public class Pandorical implements ModInitializer {
             justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE,
             justfatlard.pandorical.protocol.InventoryButtonsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(BlockTintsConfigS2C.TYPE, BlockTintsConfigS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundConfiguration().register(
+            justfatlard.pandorical.protocol.KeepsakesAskConfigS2C.TYPE,
+            justfatlard.pandorical.protocol.KeepsakesAskConfigS2C.STREAM_CODEC);
         // C2S config
         PayloadTypeRegistry.serverboundConfiguration().register(ContentReadyConfigC2S.TYPE, ContentReadyConfigC2S.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundConfiguration().register(
+            justfatlard.pandorical.protocol.KeepsakesConfigC2S.TYPE,
+            justfatlard.pandorical.protocol.KeepsakesConfigC2S.STREAM_CODEC);
 
         // --- Play phase ---
         // S2C play
         PayloadTypeRegistry.clientboundPlay().register(HelloS2C.TYPE, HelloS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.KeepsakeStoreS2C.TYPE,
+            justfatlard.pandorical.protocol.KeepsakeStoreS2C.STREAM_CODEC);
         // Also in play, so a button that is a switch can change its face while somebody watches.
         PayloadTypeRegistry.clientboundPlay().register(
             justfatlard.pandorical.protocol.InventoryButtonsS2C.TYPE,
@@ -278,6 +287,19 @@ public class Pandorical implements ModInitializer {
      * Content sync happens here BEFORE Fabric's SynchronizeRegistriesTask.
      */
     private void registerConfigPhase() {
+        // Keepsakes: asked for at login, and the login waits for the answer.
+        ServerConfigurationNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.KeepsakesConfigC2S.TYPE, (payload, context) -> {
+                var handler = context.packetListener();
+                context.server().execute(() ->
+                    justfatlard.pandorical.config.Keepsakes.INSTANCE.answered(handler, payload));
+            });
+        ServerConfigurationConnectionEvents.CONFIGURE.register((handler, server) -> {
+            if (justfatlard.pandorical.config.Keepsakes.INSTANCE.askable(handler)) {
+                handler.addTask(new justfatlard.pandorical.config.Keepsakes.Task());
+            }
+        });
+
         // Server: handle client acknowledgment during config phase
         ServerConfigurationNetworking.registerGlobalReceiver(ContentReadyConfigC2S.TYPE, (payload, context) -> {
             var handler = context.packetListener();
@@ -534,6 +556,7 @@ public class Pandorical implements ModInitializer {
             // Otherwise the worn-skin table keeps a row per player who ever wore one, for the life
             // of the server, and hands every new arrival a wardrobe of people who are not here.
             PandoricalApi.SkinApiImpl.forget(handler.getPlayer().getUUID());
+            justfatlard.pandorical.config.Keepsakes.INSTANCE.forget(handler.getPlayer().getUUID());
         });
     }
 

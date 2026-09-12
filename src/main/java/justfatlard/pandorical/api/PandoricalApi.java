@@ -107,6 +107,9 @@ public final class PandoricalApi {
     public static ScreenApi screens() { return SCREENS; }
     /** Returns the HUD API for showing, updating, and hiding HUD overlays. */
     public static HudApi hud() { return HUD; }
+
+    /** Values left with a player's own game, and handed back when they join. */
+    public static KeepsakeApi keepsakes() { return justfatlard.pandorical.config.Keepsakes.INSTANCE; }
     /** Returns the content API for registering custom blocks, items, and assets. */
     public static ContentApi content() { return CONTENT; }
     /** Returns the camera API for adjusting camera distance and perspective for a player. */

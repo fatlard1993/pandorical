@@ -247,6 +247,8 @@ public class PandoricalClient implements ClientModInitializer {
             justfatlard.pandorical.protocol.BannerDecalsS2C.TYPE, (payload, context) ->
                 context.client().execute(() -> justfatlard.pandorical.client.decal.BannerDecalStore.apply(payload)));
 
+        justfatlard.pandorical.client.keepsake.ClientKeepsakes.register();
+
         ClientPlayNetworking.registerGlobalReceiver(HelloS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> {
                 if (payload.protocolVersion() != Pandorical.PROTOCOL_VERSION) {
