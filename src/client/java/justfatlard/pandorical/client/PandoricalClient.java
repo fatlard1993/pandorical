@@ -472,11 +472,17 @@ public class PandoricalClient implements ClientModInitializer {
      * play disconnect, and its leftovers would stall the next join.
      */
     private static void forgetConnection() {
-        pendingContainerDefs.clear();
+        // Filled on the network thread during configuration, so cleared here, before the next
+        // server's packets can arrive. Everything else is render-thread state.
         ContentManager.reset();
+        ClientInventorySlotRegistry.reset();
+        Minecraft.getInstance().execute(PandoricalClient::forgetRenderState);
+    }
+
+    private static void forgetRenderState() {
+        pendingContainerDefs.clear();
         CameraManager.onDisconnect();
         HudManager.clear();
-        ClientInventorySlotRegistry.reset();
         ClientEntityRendererRegistry.reset();
         StructureManager.clear();
         EntityOverlayStore.clear();
@@ -489,7 +495,6 @@ public class PandoricalClient implements ClientModInitializer {
         LeafCulling.onDisconnect();
         EntityAnimations.clearAll();
         MountPolicy.clear();
-        // Textures are released on the render thread; a connection starts on the network thread.
-        Minecraft.getInstance().execute(SkinOverrides::clearAll);
+        SkinOverrides.clearAll();
     }
 }
