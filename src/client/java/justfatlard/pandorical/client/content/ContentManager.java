@@ -44,13 +44,13 @@ import java.util.zip.GZIPInputStream;
  * content-ready, on the client thread: {@link #handleSyncContent} and {@link #handleSyncAssets}
  * collect the payloads, then {@link #forceFinalize} registers the content with
  * {@link StateIds#AT_REGISTRATION} unless the configuration phase already did, injects the pack,
- * and sends ContentReadyC2S without waiting for the reload. This path's asset chunks are unpacked
- * only when {@link #tick} finalizes after {@link #SYNC_TIMEOUT_MS}.
+ * unpacks whatever asset chunks arrived, and sends ContentReadyC2S without waiting for the reload;
+ * {@link #tick} finalizes with what there is after {@link #SYNC_TIMEOUT_MS}.
  *
  * <p><b>Shared</b>: {@link #registerContent} (blocks through {@link #registerBlock}, items
  * through {@link #registerItem}, the register*Stubs methods), run between unfreezing and
  * re-freezing {@link #SYNCED_REGISTRIES}; {@link #unpackAssets}; {@link #injectResourcePack},
- * whose block colours and creative-tab entries come from configuration-phase content only; the
+ * whose block colours and creative-tab entries come from whichever path registered the content; the
  * state-id fallbacks {@link #coverStateIdsWithFallback} and {@link #sweepUnmappedStateIds}; and
  * {@link #reset}, which clears both paths. Block state properties are read with
  * {@link StatePropertySpec}.
@@ -90,6 +90,7 @@ public class ContentManager {
         climbable.clear();
         interactive.clear();
         pendingConfigContent = null;
+        registeredContent = null;
         configAssetChunks.clear();
         expectedConfigAssetChunks = -1;
         configContentChunks.clear();
@@ -110,6 +111,8 @@ public class ContentManager {
 
     // Config-phase state (separate from play-phase to avoid mixing)
     private static volatile SyncContentConfigS2C pendingConfigContent = null;
+    /** The content this connection registered, by whichever path did it: what tints and creative tabs are built from. */
+    private static volatile SyncedContent registeredContent = null;
 
     /**
      * Content chunks seen so far, and how many are coming.
@@ -190,7 +193,6 @@ public class ContentManager {
                 if (expectedAssetChunks > 0) {
                     long received = assetChunks.stream().filter(Objects::nonNull).count();
                     Pandorical.LOGGER.warn("Received {}/{} asset chunks before timeout", received, expectedAssetChunks);
-                    if (received > 0) unpackAssets(assetChunks, false);
                 }
                 forceFinalize();
             }
@@ -564,6 +566,7 @@ public class ContentManager {
             Pandorical.LOGGER.debug("Play phase: skipping block/item/stub registration — already done in config phase");
         }
 
+        if (assetChunks.stream().anyMatch(Objects::nonNull)) unpackAssets(assetChunks, false);
         injectResourcePack();
 
         ClientPlayNetworking.send(new ContentReadyC2S());
@@ -574,6 +577,7 @@ public class ContentManager {
      * {@link #SYNCED_REGISTRIES} the caller has unfrozen. Returns how many stubs were registered.
      */
     private static int registerContent(SyncedContent content, StateIds stateIds) {
+        registeredContent = content;
         justfatlard.pandorical.rail.RailCollision.setSolid(content.solidRails());
         for (SyncContentS2C.BlockEntry entry : content.blocks()) {
             registerBlock(entry, stateIds);
@@ -733,7 +737,8 @@ public class ContentManager {
     }
 
     private static void registerCreativeTabItems() {
-        if (pendingConfigContent == null) return;
+        SyncedContent content = registeredContent;
+        if (content == null) return;
         try {
             List<Item> buildingBlocks = new java.util.ArrayList<>();
             List<Item> combat = new java.util.ArrayList<>();
@@ -742,7 +747,7 @@ public class ContentManager {
             List<Item> naturalBlocks = new java.util.ArrayList<>();
             List<Item> functional = new java.util.ArrayList<>();
 
-            for (SyncContentS2C.ItemEntry entry : pendingConfigContent.items()) {
+            for (SyncContentS2C.ItemEntry entry : content.items()) {
                 Identifier id = Identifier.tryParse(entry.id());
                 if (id == null) continue;
                 Item item = BuiltInRegistries.ITEM.getValue(id);
@@ -814,12 +819,13 @@ public class ContentManager {
      * tint on a block whose model has no tintindex faces is harmless.
      */
     private static void registerBlockColors(Minecraft client) {
-        if (pendingConfigContent == null) return;
+        SyncedContent content = registeredContent;
+        if (content == null) return;
 
         var blockColors = client.getBlockColors();
         int registered = 0;
 
-        for (SyncContentS2C.BlockEntry entry : pendingConfigContent.blocks()) {
+        for (SyncContentS2C.BlockEntry entry : content.blocks()) {
             try {
                 Identifier id = Identifier.tryParse(entry.id());
                 if (id == null) continue;
