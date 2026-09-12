@@ -177,13 +177,15 @@ public final class PortalPairing {
 		}
 
 		/**
-		 * Both ways round, and the newest trip wins: two portals that both led to one on the far
-		 * side each keep going there, and that one leads back to whichever was used last.
+		 * The first pairing stands. A portal already paired keeps its partner until one of the two
+		 * is broken; a trip into a paired portal from one that is not only remembers the way there.
+		 * So two portals that both led to one on the far side each keep going there, that one leads
+		 * back to whichever was paired first, and nobody else's trip can move where yours returns.
 		 */
 		void link(GlobalPos a, GlobalPos b) {
-			if (b.equals(links.get(a)) && a.equals(links.get(b))) return;
+			if (links.containsKey(a)) return;
 			links.put(a, b);
-			links.put(b, a);
+			links.putIfAbsent(b, a);
 			setDirty();
 		}
 

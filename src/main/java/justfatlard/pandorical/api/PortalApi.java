@@ -10,9 +10,11 @@ import net.minecraft.server.level.ServerLevel;
  * <p>Vanilla sends a portal's traveller to whichever portal on the far side is nearest to where
  * they would arrive, so two portals built close together in one world share one in the other, and
  * the way back from a trip can come out at a different portal from the one gone in by. Paired, a
- * portal remembers the portal its last traveller came out of, both ways round, and every trip
+ * portal remembers the portal its first traveller came out of, both ways round, and every trip
  * through either goes to the other while both stand. The first trip through a portal, or one whose
- * partner has been broken, finds its way as vanilla does, and that trip is what pairs it.
+ * partner has been broken, finds its way as vanilla does, and that trip is what pairs it. A trip
+ * that comes out of a portal already paired with another remembers the way there, one way only:
+ * the pair it arrived at is left as it was.
  *
  * <p>Off unless a mod asks for it, and ops can turn it either way from Pandorical's page of the mod
  * menu, which outranks what any mod asked for.
