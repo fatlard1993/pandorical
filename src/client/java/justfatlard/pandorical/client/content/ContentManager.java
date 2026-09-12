@@ -343,14 +343,7 @@ public class ContentManager {
         // entries, so Fabric's registry sync then rejected the join with
         // hundreds of unknown entries.
         {
-            unfreezeRegistry(BuiltInRegistries.BLOCK);
-            unfreezeRegistry(BuiltInRegistries.ITEM);
-            unfreezeRegistry(BuiltInRegistries.ENTITY_TYPE);
-            unfreezeRegistry(BuiltInRegistries.BLOCK_ENTITY_TYPE);
-            unfreezeRegistry(BuiltInRegistries.VILLAGER_PROFESSION);
-            unfreezeRegistry(BuiltInRegistries.POINT_OF_INTEREST_TYPE);
-            unfreezeRegistry(BuiltInRegistries.MENU);
-            unfreezeRegistry(BuiltInRegistries.RECIPE_BOOK_CATEGORY);
+            for (Registry<?> registry : SYNCED_REGISTRIES) unfreezeRegistry(registry);
 
             try {
                 justfatlard.pandorical.rail.RailCollision.setSolid(content.solidRails());
@@ -373,14 +366,7 @@ public class ContentManager {
                     content.blocks().size(), content.items().size(), stubCount);
             } finally {
                 try {
-                    freezeRegistry(BuiltInRegistries.BLOCK);
-                    freezeRegistry(BuiltInRegistries.ITEM);
-                    freezeRegistry(BuiltInRegistries.ENTITY_TYPE);
-                    freezeRegistry(BuiltInRegistries.BLOCK_ENTITY_TYPE);
-                    freezeRegistry(BuiltInRegistries.VILLAGER_PROFESSION);
-                    freezeRegistry(BuiltInRegistries.POINT_OF_INTEREST_TYPE);
-                    freezeRegistry(BuiltInRegistries.MENU);
-                    freezeRegistry(BuiltInRegistries.RECIPE_BOOK_CATEGORY);
+                    for (Registry<?> registry : SYNCED_REGISTRIES) freezeRegistry(registry);
                 } catch (Exception e) {
                     Pandorical.LOGGER.warn("Failed to re-freeze registries: {}", e.getMessage());
                 }
@@ -708,14 +694,7 @@ public class ContentManager {
         // If config-phase already registered blocks/items, skip registry work;
         // play-phase then only handles resource pack injection and non-registry features.
         if (!configPhaseSynced) {
-            unfreezeRegistry(BuiltInRegistries.BLOCK);
-            unfreezeRegistry(BuiltInRegistries.ITEM);
-            unfreezeRegistry(BuiltInRegistries.ENTITY_TYPE);
-            unfreezeRegistry(BuiltInRegistries.BLOCK_ENTITY_TYPE);
-            unfreezeRegistry(BuiltInRegistries.VILLAGER_PROFESSION);
-            unfreezeRegistry(BuiltInRegistries.POINT_OF_INTEREST_TYPE);
-            unfreezeRegistry(BuiltInRegistries.MENU);
-            unfreezeRegistry(BuiltInRegistries.RECIPE_BOOK_CATEGORY);
+            for (Registry<?> registry : SYNCED_REGISTRIES) unfreezeRegistry(registry);
 
             try {
                 justfatlard.pandorical.rail.RailCollision.setSolid(content.solidRails());
@@ -744,14 +723,7 @@ public class ContentManager {
                 // the case here. freezeRegistry now expects that throw, so leaving eight
                 // vanilla registries unfrozen for the rest of the session is no longer the
                 // price of getting past it.
-                freezeRegistry(BuiltInRegistries.BLOCK);
-                freezeRegistry(BuiltInRegistries.ITEM);
-                freezeRegistry(BuiltInRegistries.ENTITY_TYPE);
-                freezeRegistry(BuiltInRegistries.BLOCK_ENTITY_TYPE);
-                freezeRegistry(BuiltInRegistries.VILLAGER_PROFESSION);
-                freezeRegistry(BuiltInRegistries.POINT_OF_INTEREST_TYPE);
-                freezeRegistry(BuiltInRegistries.MENU);
-                freezeRegistry(BuiltInRegistries.RECIPE_BOOK_CATEGORY);
+                for (Registry<?> registry : SYNCED_REGISTRIES) freezeRegistry(registry);
             }
         } else {
             Pandorical.LOGGER.debug("Play phase: skipping block/item/stub registration — already done in config phase");
@@ -1565,6 +1537,17 @@ public class ContentManager {
         }
         return count;
     }
+
+    /** The registries a content sync writes into: unfrozen around it and re-frozen after, in this order. */
+    private static final List<Registry<?>> SYNCED_REGISTRIES = List.of(
+        BuiltInRegistries.BLOCK,
+        BuiltInRegistries.ITEM,
+        BuiltInRegistries.ENTITY_TYPE,
+        BuiltInRegistries.BLOCK_ENTITY_TYPE,
+        BuiltInRegistries.VILLAGER_PROFESSION,
+        BuiltInRegistries.POINT_OF_INTEREST_TYPE,
+        BuiltInRegistries.MENU,
+        BuiltInRegistries.RECIPE_BOOK_CATEGORY);
 
     private static void unfreezeRegistry(Registry<?> registry) {
         if (registry instanceof MappedRegistry<?> mapped) {
