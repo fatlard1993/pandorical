@@ -46,8 +46,39 @@ public class PandoricalClient implements ClientModInitializer {
     // Accessed only on the render thread (via client.execute), so no ConcurrentHashMap needed.
     private static final Map<String, OpenScreenS2C> pendingContainerDefs = new LinkedHashMap<>();
 
+    /**
+     * Startup pieces left out by {@code -Dpandorical.skip=a,b,...}: keybinds, contextmodels,
+     * suppressor, hud, structures, decals, or all. For finding which one a crash lives in on a
+     * machine nobody here can reach; nothing is left out without the property.
+     */
+    private static final java.util.Set<String> SKIP = java.util.Arrays.stream(
+            System.getProperty("pandorical.skip", "").split(","))
+        .map(String::trim).filter(s -> !s.isEmpty()).collect(java.util.stream.Collectors.toSet());
+
+    private static boolean skipped(String piece) {
+        justfatlard.pandorical.Diagnostics.mark("startup: " + piece);
+        boolean skip = SKIP.contains(piece) || SKIP.contains("all");
+        if (skip) Pandorical.LOGGER.warn("[pandorical] diagnostic: leaving out {}", piece);
+        return skip;
+    }
+
     @Override
     public void onInitializeClient() {
+        justfatlard.pandorical.client.diag.StackSampler.start();
+        justfatlard.pandorical.Diagnostics.mark("client init begins");
+        // The load guard (see Diagnostics): up from launch already, and raised again for every join,
+        // from the first packet of the configuration phase - where the synced pack loads - until
+        // the player has been in the world a while.
+        net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationConnectionEvents.INIT.register((handler, client) -> {
+            justfatlard.pandorical.Diagnostics.guardFor(justfatlard.pandorical.Diagnostics.JOIN_WINDOW_MILLIS);
+            justfatlard.pandorical.client.diag.StackSampler.start();
+        });
+        if (justfatlard.pandorical.Diagnostics.windowsClient()) {
+            justfatlard.pandorical.client.api.PandoricalClientApi.settings().group(Pandorical.MOD_ID, "Pandorical")
+                .toggle("loadGuard", "Load guard",
+                    "Loads a little slower on Windows, to dodge a crash some Windows players get while loading",
+                    justfatlard.pandorical.Diagnostics::guarding, justfatlard.pandorical.Diagnostics::setGuarding);
+        }
         // The block-shape hooks in common code ask about marks; this is the client's answer.
         justfatlard.pandorical.BlockMarkLookup.client = justfatlard.pandorical.client.renderer.ClientBlockMarks::has;
         justfatlard.pandorical.client.settings.ContainerHabits.register();
@@ -65,18 +96,20 @@ public class PandoricalClient implements ClientModInitializer {
 
         // Keybind pool must register during client init: the options system
         // does not accept KeyMappings added later (see KeybindApi javadoc)
-        justfatlard.pandorical.client.keybind.KeybindManager.init();
-        justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.RailDiagonals());
-        justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.FenceGateJoins());
-        justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.DoorBanks());
-        justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.TrapdoorBanks());
-        justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.DoorJambs());
-        justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.SlabHung());
-        justfatlard.pandorical.client.rail.ContextModels.init();
+        if (!skipped("keybinds")) justfatlard.pandorical.client.keybind.KeybindManager.init();
+        if (!skipped("contextmodels")) {
+            justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.RailDiagonals());
+            justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.FenceGateJoins());
+            justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.DoorBanks());
+            justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.TrapdoorBanks());
+            justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.DoorJambs());
+            justfatlard.pandorical.client.rail.ContextModels.register(new justfatlard.pandorical.client.rail.SlabHung());
+            justfatlard.pandorical.client.rail.ContextModels.init();
+        }
 
         // Same startup-time constraint as keybinds: Fabric's HUD element registry
         // is only writable during client init (see the suppressor's javadoc)
-        justfatlard.pandorical.client.hud.VanillaHudElementSuppressor.init();
+        if (!skipped("suppressor")) justfatlard.pandorical.client.hud.VanillaHudElementSuppressor.init();
 
         // Exact count for oversized stacks (whose slot label is abbreviated
         // by ItemCountRendererMixin), absorbed from stackz's client
@@ -94,9 +127,9 @@ public class PandoricalClient implements ClientModInitializer {
         registerConfigPhaseReceivers();
         registerClientHandlers();
 
-        HudRenderer.register();
-        StructureRenderer.register();
-        justfatlard.pandorical.client.decal.BannerDecalRenderer.register();
+        if (!skipped("hud")) HudRenderer.register();
+        if (!skipped("structures")) StructureRenderer.register();
+        if (!skipped("decals")) justfatlard.pandorical.client.decal.BannerDecalRenderer.register();
 
         // Tick content manager for sync timeout detection + show sync overlay
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
