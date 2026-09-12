@@ -458,11 +458,6 @@ public class PandoricalClient implements ClientModInitializer {
 
         // When entering play phase, inject resource pack if config-phase synced assets
         justfatlard.pandorical.client.settings.ServerSettingsButton.register();
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            justfatlard.pandorical.client.settings.ServerCapabilities.clear();
-            justfatlard.pandorical.client.settings.ViewportReporter.clear();
-            justfatlard.pandorical.client.renderer.ClientBlockMarks.clear();
-        });
 
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             if (ContentManager.wasConfigPhaseSynced()) {
@@ -477,49 +472,36 @@ public class PandoricalClient implements ClientModInitializer {
             }
         });
 
-        // Reset at the START of every new connection, not just on the previous one's
-        // DISCONNECT: a failure during the config->play handshake itself (e.g. Fabric's
-        // own registry-sync rejecting an unknown block) can end a connection without ever
-        // firing ClientPlayConnectionEvents.DISCONNECT, since that event is play-phase-only
-        // and this kind of failure happens before JOIN. Relying solely on cleanup-after-
-        // disconnect left ContentManager's static state (configPhaseSynced in particular)
-        // stuck from the failed attempt, silently no-op'ing every asset chunk on the next
-        // connection attempt and leaving the client stuck on "joining" with no error at all.
-        ClientConfigurationConnectionEvents.INIT.register((handler, client) -> {
-            pendingContainerDefs.clear();
-            ContentManager.reset();
-            CameraManager.onDisconnect();
-            HudManager.clear();
-            ClientInventorySlotRegistry.reset();
-            ClientEntityRendererRegistry.reset();
-            StructureManager.clear();
-            justfatlard.pandorical.client.renderer.EntityOverlayStore.clear();
-            justfatlard.pandorical.client.renderer.ChestOverlayStore.clear();
-            justfatlard.pandorical.client.keybind.KeybindManager.clear();
-            // Skins are textures, and a texture is released on the render thread only; this
-            // hook fires on the network thread, and the renderer refused every release with a
-            // wrong-thread warning per skin.
-            net.minecraft.client.Minecraft.getInstance().execute(
-                justfatlard.pandorical.client.skin.SkinOverrides::clearAll);
-            justfatlard.pandorical.client.render.LeafCulling.onDisconnect();
-            justfatlard.pandorical.client.animation.EntityAnimations.clearAll();
-            justfatlard.pandorical.MountPolicy.clear();
-            justfatlard.pandorical.client.hud.VanillaHudElementSuppressor.clear();
-        });
+        ClientConfigurationConnectionEvents.INIT.register((handler, client) -> forgetConnection());
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> forgetConnection());
+    }
 
-        // Disconnect cleanup
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            pendingContainerDefs.clear();
-            ContentManager.reset();
-            CameraManager.onDisconnect();
-            HudManager.clear();
-            ClientInventorySlotRegistry.reset();
-            ClientEntityRendererRegistry.reset();
-            StructureManager.clear();
-            justfatlard.pandorical.client.renderer.EntityOverlayStore.clear();
-            justfatlard.pandorical.client.renderer.ChestOverlayStore.clear();
-            justfatlard.pandorical.client.keybind.KeybindManager.clear();
-            justfatlard.pandorical.client.hud.VanillaHudElementSuppressor.clear();
-        });
+    /**
+     * Everything one server told this client, dropped. Run as a connection starts as well as when
+     * one ends: a connection that fails in the configuration phase (Fabric's registry sync
+     * refusing a block, say) ends without the play-phase disconnect ever firing, and what it left
+     * behind would stall the next join.
+     */
+    private static void forgetConnection() {
+        pendingContainerDefs.clear();
+        ContentManager.reset();
+        CameraManager.onDisconnect();
+        HudManager.clear();
+        ClientInventorySlotRegistry.reset();
+        ClientEntityRendererRegistry.reset();
+        StructureManager.clear();
+        justfatlard.pandorical.client.renderer.EntityOverlayStore.clear();
+        justfatlard.pandorical.client.renderer.ChestOverlayStore.clear();
+        justfatlard.pandorical.client.keybind.KeybindManager.clear();
+        justfatlard.pandorical.client.hud.VanillaHudElementSuppressor.clear();
+        justfatlard.pandorical.client.settings.ServerCapabilities.clear();
+        justfatlard.pandorical.client.settings.ViewportReporter.clear();
+        justfatlard.pandorical.client.renderer.ClientBlockMarks.clear();
+        justfatlard.pandorical.client.render.LeafCulling.onDisconnect();
+        justfatlard.pandorical.client.animation.EntityAnimations.clearAll();
+        justfatlard.pandorical.MountPolicy.clear();
+        // A texture is released on the render thread only, and the connection starts on the
+        // network thread.
+        net.minecraft.client.Minecraft.getInstance().execute(justfatlard.pandorical.client.skin.SkinOverrides::clearAll);
     }
 }
