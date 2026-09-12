@@ -10,25 +10,19 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.Minecraft;
 
 /**
- * Tells the server how big this window is, so the screens it builds can fill it.
- *
- * <p>Once after the hello, and again whenever the window has sat at a new size for a moment:
- * a drag of the corner resizes every frame, and a screen rebuilt every frame would be the mod
- * menu flickering through the drag. If the menu is open when the size settles, it is asked for
- * again, since the one showing was built for the old window.
+ * Reports the window size to the server after the hello, and after each resize settles: the mod
+ * menu is rebuilt for each report, and a drag resizes every frame.
  */
 @Environment(EnvType.CLIENT)
 public final class ViewportReporter {
     private ViewportReporter() {}
 
-    /** Ticks the window must hold a size before it is reported. */
     private static final int SETTLE_TICKS = 10;
 
     private static int sentWidth;
     private static int sentHeight;
     private static int settling;
 
-    /** After the hello: the size as it is now, with nothing to wait for. */
     public static void send(Minecraft client) {
         sentWidth = client.getWindow().getGuiScaledWidth();
         sentHeight = client.getWindow().getGuiScaledHeight();

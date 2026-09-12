@@ -26,19 +26,15 @@ import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.network.Connection;
 
 /**
- * The game's half of the keepsakes: one small file per server id and the address the player
- * reached it at, in this game's config folder.
- *
- * <p>The id alone cannot be the key. A server hands its id to everybody who connects, so any
- * server that has seen it could name it and be answered. The address is the player's own
- * choice, which no other server can make for them.
+ * One keepsake file per server id and address the player connected to. Not the id alone: any
+ * server that has seen an id could claim it, but not the player's address.
  */
 public final class ClientKeepsakes {
 	private ClientKeepsakes() {}
 
 	private static final Gson GSON = new Gson();
 
-	/** The connection that asked, and whose file it was answered from; stores arrive on the same one or not at all. */
+	/** Stores are accepted only on the connection that asked. */
 	private record Asked(Connection connection, String serverId, String address) {}
 
 	private static volatile Asked asked;
@@ -65,14 +61,14 @@ public final class ClientKeepsakes {
 		});
 	}
 
-	/** Host and port as the player gave them; a world of their own has no address and shares one file. */
+	/** Every local world shares one file. */
 	private static String addressOf(ServerData server) {
 		if (server == null) return "local";
 		ServerAddress address = ServerAddress.parseString(server.ip);
 		return address.getHost().toLowerCase(Locale.ROOT) + ":" + address.getPort();
 	}
 
-	/** Null for a server id that is not the shape of one a server makes, which is also what keeps it a file name. */
+	/** Null for an id not shaped like a server's; the check also keeps it a safe file name. */
 	private static Path fileFor(Asked asked) {
 		if (asked.serverId() == null || !asked.serverId().matches("[0-9a-f-]{36}")) return null;
 		String name = asked.serverId() + "@" + addressHash(asked.address()) + ".json";

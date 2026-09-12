@@ -7,13 +7,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 
-/**
- * The buttons this server asked for on the inventory screen.
- *
- * <p>Declared once during configuration and drawn by {@code InventoryScreenMixin}, the same way
- * the extra slots are. A server that never sends any leaves the screen exactly as vanilla drew
- * it.
- */
+/** Inventory screen buttons the server declared; drawn by {@code InventoryScreenMixin}. */
 @Environment(EnvType.CLIENT)
 public final class ClientInventoryButtons {
     private ClientInventoryButtons() {}
@@ -24,7 +18,6 @@ public final class ClientInventoryButtons {
         buttons = List.copyOf(declared);
     }
 
-    /** Dropped on disconnect: the next server's buttons are its own business. */
     public static void clear() {
         buttons = List.of();
     }
@@ -33,7 +26,6 @@ public final class ClientInventoryButtons {
         return buttons;
     }
 
-    /** Tell the server a button was pressed. */
     public static void press(InventoryButtonsS2C.Button button) {
         ClientPlayNetworking.send(new InventoryButtonC2S(button.namespace(), button.id()));
     }

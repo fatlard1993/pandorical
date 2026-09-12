@@ -12,13 +12,7 @@ import net.minecraft.client.gui.screens.options.OptionsScreen;
 import net.minecraft.network.chat.Component;
 import justfatlard.pandorical.api.Capabilities;
 
-/**
- * The way in from the pause menu and the options menu.
- *
- * <p>A button in the corner of both, shown only while connected to a server that has the mod
- * menu to offer, which asks the server for the screen. The server builds it, so the client knows
- * nothing about what is on it.
- */
+/** The mod menu button on the pause and options screens, while the server offers the menu. */
 @Environment(EnvType.CLIENT)
 public final class ServerSettingsButton {
     private ServerSettingsButton() {}

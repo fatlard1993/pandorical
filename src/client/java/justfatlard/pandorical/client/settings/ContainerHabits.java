@@ -6,10 +6,7 @@ import java.nio.file.Path;
 import java.util.Properties;
 import net.fabricmc.loader.api.FabricLoader;
 
-/**
- * The switch for the container habits (wheel to move a stack, drag to move a row), kept in the
- * client's own config so it survives whichever server the player is on.
- */
+/** The container habits switch, in the client's config so it holds across servers. */
 public final class ContainerHabits {
     private ContainerHabits() {}
 
@@ -27,7 +24,6 @@ public final class ContainerHabits {
         save();
     }
 
-    /** On Pandorical's own page of the settings, so a player who hates it can say so once. */
     public static void register() {
         ClientSettings.INSTANCE.group("pandorical", "Pandorical")
             .toggle(KEY, "Wheel and drag move items",
@@ -40,7 +36,6 @@ public final class ContainerHabits {
         try {
             if (Files.exists(FILE)) props.load(Files.newBufferedReader(FILE));
         } catch (IOException ignored) {
-            // A config that cannot be read is the default, not a crash.
         }
         return Boolean.parseBoolean(props.getProperty(KEY, "true"));
     }
@@ -53,7 +48,6 @@ public final class ContainerHabits {
             Files.createDirectories(FILE.getParent());
             props.store(Files.newBufferedWriter(FILE), "Pandorical client preferences");
         } catch (IOException ignored) {
-            // Nowhere to write it: the choice holds for the session.
         }
     }
 }

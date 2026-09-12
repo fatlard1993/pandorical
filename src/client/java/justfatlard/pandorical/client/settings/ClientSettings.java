@@ -37,7 +37,6 @@ public final class ClientSettings implements ClientSettingsApi {
         send();
     }
 
-    /** Everything declared, with current values, to the server. Nothing to say, nothing sent. */
     public void send() {
         if (groups.isEmpty() || !ClientPlayNetworking.canSend(ClientSettingsC2S.TYPE)) return;
         List<ClientSettingsC2S.Mod> mods = new ArrayList<>();
@@ -45,7 +44,6 @@ public final class ClientSettings implements ClientSettingsApi {
         ClientPlayNetworking.send(new ClientSettingsC2S(mods));
     }
 
-    /** The server relays a change made in the menu; the mod's own setter keeps it. */
     public void apply(ClientSettingS2C payload) {
         for (GroupImpl group : groups) {
             if (!group.modId.equals(payload.modId())) continue;

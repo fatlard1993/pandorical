@@ -3,7 +3,6 @@ package justfatlard.pandorical.client.settings;
 import java.util.List;
 import java.util.Set;
 
-/** What the server said it can do, for client code that adds a control only when there is something behind it. */
 public final class ServerCapabilities {
     private ServerCapabilities() {}
 

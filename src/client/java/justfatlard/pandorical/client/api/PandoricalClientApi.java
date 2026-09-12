@@ -2,7 +2,7 @@ package justfatlard.pandorical.client.api;
 
 import justfatlard.pandorical.client.settings.ClientSettings;
 
-/** What Pandorical offers a client-side mod: today, a place in the mod menu for its settings. */
+/** Pandorical's API for client-side mods. */
 public final class PandoricalClientApi {
     private PandoricalClientApi() {}
 
