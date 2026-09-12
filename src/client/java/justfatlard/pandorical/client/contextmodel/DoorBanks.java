@@ -41,7 +41,6 @@ public final class DoorBanks implements ContextModels.Provider {
 	private static final String SLIDING = "more-doors:sliding";
 	private static final int MAX_LEAVES = 64;
 
-	/** Every flag string the model generator writes, per half. */
 	private static final String[] LOWER_FLAGS = {"x", "h", "b", "bh", "r", "rh", "rb", "rbh",
 		"l", "lh", "lb", "lbh", "lr", "lrh", "lrb", "lrbh"};
 	private static final String[] UPPER_FLAGS = {"x", "t", "r", "rt", "l", "lt", "lr", "lrt"};

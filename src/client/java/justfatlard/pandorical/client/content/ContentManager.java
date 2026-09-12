@@ -131,7 +131,6 @@ public class ContentManager {
     private static volatile boolean configPhaseSynced = false;
 
     private static volatile SyncContentConfigS2C pendingConfigContent = null;
-    /** Set by whichever path registered; block tints and creative tabs are built from it. */
     private static volatile SyncedContent registeredContent = null;
 
     /** Nothing may be registered until every chunk lands, or Fabric's registry sync fails. */
@@ -382,7 +381,6 @@ public class ContentManager {
             ClientConfigurationNetworking.send(new ContentReadyConfigC2S());
             Pandorical.LOGGER.info("Config phase: sent ContentReadyConfigC2S acknowledgment");
         } catch (Exception e) {
-            // The connection can end while the reload runs.
             Pandorical.LOGGER.warn("Config phase: could not acknowledge content sync: {}", e.toString());
         }
     }
@@ -1405,7 +1403,6 @@ public class ContentManager {
         }
     }
 
-    /** Covers ids left unmapped by a path that failed before its per-block handling. */
     private static void sweepUnmappedStateIds(List<SyncContentS2C.BlockEntry> entries) {
         int holes = 0;
         String firstHoleBlock = null;

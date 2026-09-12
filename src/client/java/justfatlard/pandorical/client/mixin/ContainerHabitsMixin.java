@@ -37,7 +37,6 @@ public abstract class ContainerHabitsMixin {
 	/** mouseDragged fires every frame, so each slot is moved at most once per drag. */
 	private final Set<Integer> pandorical$swept = new HashSet<>();
 
-	/** Scroll up sends one item into the open container, scroll down into the player's own. */
 	@Inject(method = "mouseScrolled", at = @At("HEAD"), cancellable = true)
 	private void pandorical$wheelMoves(double mouseX, double mouseY, double scrollX, double scrollY,
 			CallbackInfoReturnable<Boolean> cir) {
