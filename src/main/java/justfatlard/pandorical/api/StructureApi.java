@@ -7,80 +7,48 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * API for server mods to display a moving, rotating cluster of blocks ("structure") to
- * Pandorical clients as one batch-rendered object, e.g. a ship a player can ride and steer.
+ * A moving, rotating cluster of blocks that Pandorical clients draw as one object, e.g. a ship.
  *
- * <p>Unlike {@link ScreenApi}/{@link HudApi}/{@link CameraApi}, which are per-player, structures
- * are broadcast objects: anchored to a real server {@link Entity} and sent automatically to
- * every player that tracks it (via Fabric's EntityTrackingEvents), so a single
- * {@link #spawn}/{@link #updatePose}/{@link #updateBlocks}/{@link #setVisible} call reaches
- * every current and future tracker. Callers never pass a {@code ServerPlayer}.
+ * <p>Broadcast off real entity tracking: a structure is anchored to a server {@link Entity}, and
+ * each call reaches every player tracking the anchor now or later. Callers never pass a player.
+ * Players without the {@code "structures"} capability are sent nothing.
  *
- * <p>{@code structureId} must be unique across the whole server (not scoped to a player or
- * the anchor entity): namespace it, e.g. {@code "bigboats:" + shipUuid}.
+ * <p>{@code structureId} is unique across the whole server, so namespace it, e.g.
+ * {@code "bigboats:" + shipUuid}. Calls naming an unknown id are no-ops.
  *
- * <p>All calls are no-ops for players whose client lacks the {@code "structures"} capability.
- *
- * <p>Pandorical does not track the anchor entity's lifecycle beyond tracking start/stop:
- * call {@link #despawn} when the anchor entity is permanently removed, or server-side
- * state leaks.
+ * <p>Pandorical does not watch the anchor's lifecycle: call {@link #despawn} when the anchor is
+ * removed for good, or the server-side state leaks.
  */
 public interface StructureApi {
     /**
-     * Register and broadcast a new structure anchored to {@code anchorEntity}.
-     * Sent immediately to every player currently tracking {@code anchorEntity}, and to any
-     * player who starts tracking it afterward.
+     * <b>The anchor cannot be a player who should see the structure.</b> A player is not among
+     * their own trackers, so that player never sees it, and nothing errors. Anchor to the boat,
+     * the mob, or a marker entity spawned for the purpose.
      *
-     * <p><b>The anchor cannot be a player who should see the structure.</b> A player is not
-     * among their own trackers, so anchoring to one produces a structure that exists
-     * server-side, broadcasts to everyone nearby, and is invisible to the one person it was
-     * built for. Nothing errors. Anchor to the entity the structure belongs to (the boat, the
-     * mob, a marker entity spawned for the purpose) and the owning player sees it like anyone
-     * else.
-     *
-     * @param anchorEntity the real server entity whose tracking radius drives visibility
-     * @param structureId  a server-wide unique id for this structure
-     * @param blocks       the blocks making up the structure, relative to the origin
-     * @param initialPose  the structure's initial world position and yaw
+     * @param anchorEntity the server entity whose tracking radius drives visibility
      */
     void spawn(Entity anchorEntity, String structureId, List<BlockEntry> blocks, StructurePose initialPose);
 
     /**
-     * Set a new world position/yaw for an existing structure. Clients interpolate towards
-     * this pose from the previously known one, so call this as often as the structure moves
-     * (e.g. once per server tick) for smooth motion.
+     * Clients interpolate from the last pose, so call this as often as the structure moves.
      *
-     * <p>The pose is sent at the start of the anchor level's next tick, with the entity
-     * positions, not from this call; call it again within the tick and only the last pose is
-     * sent. An {@link #updateBlocks} or {@link #setVisible} for the same structure sends a
-     * waiting pose first, so the calls reach clients in the order they were made.
-     * No-op if {@code structureId} is unknown.
+     * <p>Sent at the start of the anchor level's next tick, with the entity positions; only the
+     * last pose set within a tick is sent. An {@link #updateBlocks} or {@link #setVisible} for
+     * the same structure sends a waiting pose first, so clients see the calls in order.
      */
     void updatePose(String structureId, StructurePose pose);
 
     /**
-     * Apply incremental block changes. Pass an empty list/map for any dimension that
-     * isn't changing.
-     * No-op if {@code structureId} is unknown.
+     * Pass an empty list or map for what isn't changing.
      *
-     * @param added   new blocks to add (a {@link RelPos} already present is overwritten)
-     * @param removed relative positions to remove entirely
-     * @param changed relative positions whose {@link BlockState} changes (must already exist)
+     * @param added   a {@link RelPos} already present is overwritten
+     * @param changed positions that must already exist
      */
     void updateBlocks(String structureId, List<BlockEntry> added, List<RelPos> removed, Map<RelPos, BlockState> changed);
 
-    /**
-     * Show or hide a structure without despawning it, e.g. hide the virtual structure while
-     * a docked ship's real placed-world blocks are visible instead. Server-side block and
-     * pose state is retained while hidden.
-     * No-op if {@code structureId} is unknown.
-     */
+    /** Server-side blocks and pose are kept while hidden. */
     void setVisible(String structureId, boolean visible);
 
-    /**
-     * Permanently remove a structure and forget its server-side state. Broadcast to every
-     * current tracker of the anchor entity.
-     * No-op if {@code structureId} is unknown.
-     */
+    /** Remove the structure for every tracker and forget its server-side state. */
     void despawn(String structureId);
 }

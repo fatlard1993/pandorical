@@ -3,12 +3,11 @@ package justfatlard.pandorical.api;
 import java.util.Objects;
 
 /**
- * A picture to stand in the world: a grid of palette-coloured cells on a thin panel.
+ * A grid of palette-coloured cells on a thin panel.
  *
  * <p>Cells are palette indices, row-major from the top left, as a {@link PixelCanvas} holds
- * them, so a canvas being painted on a screen and the same canvas standing in the world are one
- * array. The front shows the cells; the back and the four edges are {@code backColor}, or not
- * drawn at all when its alpha is nought.
+ * them. The front shows the cells; the back and edges are {@code backColor}, not drawn at all
+ * when its alpha is 0.
  *
  * @param palette   ARGB colours, indexed by cell value
  * @param thickness of the panel, in blocks

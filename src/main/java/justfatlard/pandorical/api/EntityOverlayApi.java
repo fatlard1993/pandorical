@@ -4,39 +4,27 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 
 /**
- * API for server mods to overlay an extra texture on top of a living entity's
- * model for Pandorical clients, e.g. dressing a particular villager in gloves.
- * The overlay is rendered as an additional cutout layer using the entity's own
- * model, so the texture must follow the entity's texture layout (transparent
- * pixels are simply not drawn).
+ * An extra texture drawn over an entity's model, as a cutout layer on the entity's own model:
+ * the texture follows the entity's texture layout, and transparent pixels are not drawn. Only
+ * living entities and minecarts draw it.
  *
- * <p>Like {@link StructureApi}, overlays are broadcast objects keyed off real
- * entity tracking: one {@link #set} call reaches every player currently
- * tracking the entity and every player who starts tracking it later. Callers
- * never pass a {@code ServerPlayer}.
+ * <p>Broadcast off real entity tracking: one {@link #set} reaches every player tracking the
+ * entity now or later. Callers never pass a player. Players without the
+ * {@code "entity_overlays"} capability are sent nothing.
  *
- * <p>All sends are no-ops for players whose client lacks the
- * {@code "entity_overlays"} capability; vanilla clients are unaffected.
- *
- * <p>State is kept in memory keyed by entity UUID and dropped when the entity
- * unloads (despawn, death, or chunk unload). It does not persist: a mod whose
- * overlay should survive reloads must call {@link #set} again when its entity
- * loads, typically from a tick or load hook that re-reads its own persisted
- * flag.
+ * <p>Kept in memory by entity UUID and dropped when the entity unloads (despawn, death, chunk
+ * unload). Not persisted: to keep an overlay across reloads, call {@link #set} again when the
+ * entity loads.
  */
 public interface EntityOverlayApi {
-    // Living entities and minecarts honour the overlay; other renderers draw their own texture.
     /**
-     * Set (or replace) the overlay texture for an entity. Pushed immediately
-     * to all current trackers and automatically to future trackers.
+     * Set or replace an entity's overlay.
      *
-     * @param entity  the living entity to overlay
-     * @param texture full texture identifier including extension, following
-     *                the entity model's texture layout, e.g.
+     * @param texture full texture id including extension, e.g.
      *                {@code Identifier.fromNamespaceAndPath("mymod", "textures/entity/my_overlay.png")}
      */
     void set(Entity entity, Identifier texture);
 
-    /** Remove an entity's overlay and notify all current trackers. No-op if none set. */
+    /** No-op if none is set. */
     void clear(Entity entity);
 }
