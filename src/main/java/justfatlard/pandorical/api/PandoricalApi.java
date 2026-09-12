@@ -2,6 +2,7 @@ package justfatlard.pandorical.api;
 
 import justfatlard.pandorical.login.Keepsakes;
 import justfatlard.pandorical.content.ContentRegistry;
+import justfatlard.pandorical.drops.DropsPolicy;
 import justfatlard.pandorical.hud.HudRegistry;
 import justfatlard.pandorical.keybind.KeybindPool;
 import justfatlard.pandorical.picture.PictureRegistry;
@@ -53,6 +54,7 @@ public final class PandoricalApi {
     private static final PlayingAnimations ANIMATIONS = PlayingAnimations.INSTANCE;
     private static final DeclaredMountPolicy MOUNTS = DeclaredMountPolicy.INSTANCE;
     private static final PortalPairing PORTALS = PortalPairing.INSTANCE;
+    private static final DropsPolicy DROPS = DropsPolicy.INSTANCE;
     private static final PlayerInventoryApiImpl PLAYER_INVENTORY = new PlayerInventoryApiImpl();
     private static final BlockTints BLOCK_TINTS = BlockTints.INSTANCE;
     private static final StructureRegistry STRUCTURES = StructureRegistry.INSTANCE;
@@ -162,6 +164,9 @@ public final class PandoricalApi {
 
     /** Nether portals that go back the way they came. See {@link PortalApi}. */
     public static PortalApi portals() { return PORTALS; }
+
+    /** Dropped items and XP orbs that merge further and cost clients less. See {@link DropsApi}. */
+    public static DropsApi drops() { return DROPS; }
 
     /** Returns the picture API for pictures anchored to entities, painted and seen changing. */
     public static PictureApi pictures() { return PictureRegistry.INSTANCE; }
