@@ -16,11 +16,6 @@ import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.rail.RailCollision;
 import net.minecraft.world.phys.shapes.BooleanOp;
 
-/**
- * A block that dynamically creates its state definition from a list of property names.
- * Properties are cloned from a base block if available, or created as standard types.
- * Supports server-provided VoxelShapes for correct collision and selection.
- */
 public class DynamicBlock extends Block {
     private final List<Property<?>> dynamicProperties;
     private Map<BlockState, VoxelShape> outlineShapes;
@@ -33,7 +28,6 @@ public class DynamicBlock extends Block {
         this.registerDefaultState(defaultState);
     }
 
-    /** Apply deserialized shapes from server. Called after construction. */
     public void setShapes(Map<BlockState, VoxelShape> outline, Map<BlockState, VoxelShape> collision) {
         this.outlineShapes = outline;
         this.collisionShapes = collision;
@@ -50,7 +44,6 @@ public class DynamicBlock extends Block {
 
     @Override
     protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        // A stand-in for a rail is a rail: same floor for a player, when the server has asked.
         VoxelShape floor = RailCollision.shapeFor(state, context);
         if (floor != null) return floor;
         if (collisionShapes != null) {
@@ -62,13 +55,13 @@ public class DynamicBlock extends Block {
 
     @Override
     protected VoxelShape getOcclusionShape(BlockState state) {
-        // If the block has a non-full-cube outline shape, it shouldn't occlude adjacent faces.
+        // Only a full-cube outline occludes.
         if (outlineShapes != null) {
             VoxelShape shape = outlineShapes.get(state);
             if (shape != null && !Shapes.joinIsNotEmpty(Shapes.block(), shape, BooleanOp.NOT_SAME)) {
-                return shape; // Full cube: use normal occlusion
+                return shape;
             }
-            return Shapes.empty(); // Non-full: don't occlude
+            return Shapes.empty();
         }
         return super.getOcclusionShape(state);
     }
@@ -83,6 +76,7 @@ public class DynamicBlock extends Block {
         }
     }
 
+    /** createBlockStateDefinition runs inside the super constructor, before any field is set. */
     private static final ThreadLocal<List<Property<?>>> PENDING_PROPERTIES = new ThreadLocal<>();
 
     public static DynamicBlock create(Properties blockProps, List<Property<?>> stateProps) {
@@ -95,12 +89,8 @@ public class DynamicBlock extends Block {
     }
 
     /**
-     * The light the server declared for this state.
-     *
-     * <p>Called while the state is being built, before the block can list its states, so the
-     * state's place in the table is worked out from its values: the game lays states out as
-     * the cartesian product of the properties in name order, the last property varying fastest,
-     * and both sides sort property names the same way.
+     * Runs while states are built, before the block can list them, so the index is computed:
+     * states are the product of the properties in name order, the last varying fastest.
      */
     public static int lightFor(BlockState state, byte[] light) {
         int index = 0;
@@ -117,14 +107,8 @@ public class DynamicBlock extends Block {
         return index < light.length ? light[index] & 0xFF : 0;
     }
 
-    /**
-     * Deserialize shape data from server into per-state shape maps.
-     * Format per state: [numOutlineBoxes:byte][boxes...][numCollisionBoxes:byte][boxes...]
-     * Each box: [minX:float][minY:float][minZ:float][maxX:float][maxY:float][maxZ:float]
-     */
     public static void applyShapeData(Block block, byte[] shapeData) {
         if (shapeData == null || shapeData.length == 0) return;
-        // A vanilla-classed stand-in draws its shapes from its class; the table is for the rest.
         if (VanillaShapedBlocks.isOne(block)) return;
 
         var states = block.getStateDefinition().getPossibleStates();
@@ -148,34 +132,21 @@ public class DynamicBlock extends Block {
         } else if (block instanceof DynamicSlabBlock dsb) {
             dsb.setShapes(outlineMap, collisionMap);
         } else {
-            // Say so rather than drop them. A stand-in built as a stock Block or SlabBlock has
-            // nowhere to put these, and the block then wears vanilla geometry for the rest of
-            // the session while the server believes it sent the real thing.
             Pandorical.LOGGER.warn(
                 "Block {} is a {} and cannot hold server shapes — it keeps stand-in geometry",
                 block, block.getClass().getSimpleName());
             return;
         }
 
-        // BlockStateBase caches everything it derives from a block's shape — collision-full-block,
-        // occlusion, sturdy faces, light — when the state is built, which is before these shapes
-        // arrive. The cached guess then outranks the real shape forever: a sliced-top slab whose
-        // double state was guessed as a full cube reads as collision-full to the renderer, which
-        // moves the top face's light and ambient occlusion samples to the block above it and
-        // renders it flat and full-bright, unlike the vanilla block it stands in for.
+        // BlockStateBase caches what it derives from the shape (full-block collision, occlusion,
+        // sturdy faces, light) when the state is built, before these shapes arrived.
         for (BlockState state : states) state.initCache();
     }
 
     /**
-     * Whether the server's first state collides with anything at all.
-     *
-     * <p>Asked before the block is built, because collision is decided by a flag on
-     * {@code Properties} and not only by the shape. A stand-in copies its base block's
-     * properties, so a beanstalk standing in for bamboo inherited bamboo's collision and stayed
-     * solid to walk into no matter that the shape arriving alongside it was empty.
-     *
-     * <p>The first state speaks for the block: nothing in the suite collides in one state and
-     * passes through in another.
+     * Read before the block is built: collision is also a {@code Properties} flag, copied from the
+     * base block and fixed when the state cache is built during registration. The first state
+     * speaks for the block.
      */
     public static boolean declaresCollision(byte[] shapeData) {
         if (shapeData == null || shapeData.length == 0) return true;
@@ -186,13 +157,11 @@ public class DynamicBlock extends Block {
             dis.skipBytes(outlineBoxes * BYTES_PER_BOX);
             return (dis.readByte() & 0xFF) > 0;
         } catch (IOException e) {
-            // Unreadable means unknown, and solid is the safer unknown: a block you cannot walk
-            // into is a nuisance, one you fall through is a hole in the world.
+            // Unknown is solid: a block you fall through is worse than one you bump into.
             return true;
         }
     }
 
-    /** minX/minY/minZ/maxX/maxY/maxZ, four bytes each. */
     private static final int BYTES_PER_BOX = 24;
 
     private static VoxelShape readShape(DataInputStream dis) throws IOException {
@@ -213,39 +182,20 @@ public class DynamicBlock extends Block {
         return shape.optimize();
     }
 
-    // ========================================================================
-    // Property resolution (unchanged)
-    // ========================================================================
-
     public static Property<?> resolveProperty(String name, Block baseBlock, int valueCount, String propType) {
         return resolveProperty(name, baseBlock, valueCount, 0, propType, null);
     }
 
     /**
-     * Rebuild one state property from what the server put on the wire.
-     *
-     * <p>The wire wins. A same-named property on the declared base block, or the
-     * well-known vanilla property for that name, is only ever reused when it is
-     * genuinely equivalent to what the server described; otherwise the property is
-     * synthesized to the server's exact value set. Preferring the base block's
-     * version outright (the old behaviour) made declaring an intuitively-correct base
-     * block WORSE than declaring none: a slab of {@code torchflower_crop} carries
-     * ages 0-2 while vanilla's own crop carries 0-1, so the client built a 4-state
-     * block against a 6-state server block and the whole block had to be papered over
-     * with a fallback state. The same trap sat in the name table below, where e.g.
-     * {@code level} always resolved to the 0-15 vanilla property whatever range the
-     * server sent.
-     *
-     * <p>Equivalent candidates are still preferred over synthesized ones: they carry
-     * vanilla's own value names, which is what makes blockstate JSON variant strings
-     * match.
+     * A base-block or vanilla property is reused only when its value set matches the wire exactly,
+     * or the state count would differ from the server's. A match beats a synthesized property
+     * because its value names are what blockstate JSON variants use.
      */
     public static Property<?> resolveProperty(String name, Block baseBlock, int valueCount, int intMin, String propType, String enumValues) {
         List<String> wireEnumNames = ("e".equals(propType) && enumValues != null && !enumValues.isEmpty())
             ? List.of(enumValues.split(","))
             : null;
-        // Older wire forms can carry no usable value set at all; with nothing to check
-        // against, a candidate is still better than nothing.
+        // Older wire forms carry no value set; then any candidate is accepted.
         boolean wireDescribesValues = wireEnumNames != null || valueCount > 0 || "b".equals(propType);
 
         if (baseBlock != null) {
@@ -273,7 +223,6 @@ public class DynamicBlock extends Block {
         return null;
     }
 
-    /** True when {@code prop} carries exactly the value set the server described. */
     private static boolean matchesWire(Property<?> prop, String propType, int valueCount, int intMin,
                                        List<String> wireEnumNames) {
         List<?> values = prop.getPossibleValues();
@@ -309,9 +258,7 @@ public class DynamicBlock extends Block {
         }
     }
 
-    /** The well-known vanilla property for a property name, or null. */
     private static Property<?> vanillaPropertyByName(String name, int valueCount) {
-        // Value count disambiguates same-named variants
         if (name.equals("facing")) {
             if (valueCount == 6) return BlockStateProperties.FACING;
             return BlockStateProperties.HORIZONTAL_FACING;

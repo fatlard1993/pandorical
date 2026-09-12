@@ -15,12 +15,8 @@ import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Minimal client-side stand-in for server-only entity types registered with
- * the {@code "invisible"} renderer key (e.g. big-boats' ship anchor). It
- * carries only the base entity synched data, which matches any server entity
- * that extends Entity without defining extra tracked data; it exists so the
- * client has a real entity to position, track, and ride, while NoopRenderer
- * draws nothing.
+ * For the {@code "invisible"} renderer key. Its synched data is the base Entity's only, which
+ * matches a server entity that defines no tracked data of its own.
  */
 @Environment(EnvType.CLIENT)
 public class StubEntity extends Entity {
@@ -45,23 +41,14 @@ public class StubEntity extends Entity {
 	protected void addAdditionalSaveData(ValueOutput output) {
 	}
 
-	/**
-	 * The structure's own blend rather than vanilla's stepped one: a rider on big-boats' ship
-	 * anchor is drawn wherever the anchor is, and the anchor has to be drawn wherever the deck
-	 * is. Vanilla's blend sat a different distance behind the server's position than the
-	 * structure's did, and the pilot stood that difference off the helm.
-	 */
 	@Override
 	protected InterpolationHandler createInterpolationHandler() {
 		return new StructureInterpolationHandler(this);
 	}
 
 	/**
-	 * Riders sit exactly AT the anchor entity's position: the stub cannot
-	 * know the server entity's real dimensions or seat layout, so the
-	 * contract is that the server-side mod places its anchor at seat height.
-	 * The default (bounding-box-derived) attachment would perch riders on
-	 * top of the stub's arbitrary box instead.
+	 * Riders sit at the stub's position: its box is arbitrary, so the server-side mod places its
+	 * anchor at seat height.
 	 */
 	@Override
 	protected Vec3 getPassengerAttachmentPoint(Entity passenger, EntityDimensions dimensions, float scale) {

@@ -4,10 +4,6 @@ import net.minecraft.world.level.block.state.properties.Property;
 
 import java.util.*;
 
-/**
- * A property with integer values that serializes to custom string names.
- * Used to represent enum-like block state properties on the client.
- */
 public final class NamedIntegerProperty extends Property<Integer> {
     private final List<Integer> values;
     private final List<String> names;

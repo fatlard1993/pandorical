@@ -9,18 +9,8 @@ import net.minecraft.world.entity.PositionPath;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Moves an entity the way {@link StructureManager} moves a structure, so the two stay together.
- *
- * <p>An entity that rides on a structure - big-boats' ship anchor with the pilot on it, a cushion
- * with somebody sat on it - is positioned by the server every tick, and on the client both it and
- * the deck under it blend towards each new position rather than jumping. Vanilla's blends and the
- * structure's differ in how far behind the latest position they sit, and the difference is what
- * the rider sees: a pilot who stands a block off the helm at speed and slides across the deck in
- * every turn. Same blend, same lag, same place.
- *
- * <p>The rule: each new position starts a fresh blend from wherever the entity is now, and the
- * blend runs over {@link StructureManager#INTERPOLATION_TICKS} ticks. Predicted movement from
- * velocity is ignored: where the deck says a thing is, is where it is.
+ * Blends as {@link StructureManager} blends a structure, a fresh blend from the current position
+ * per update, so an entity riding one lags by the same amount as the deck under it.
  */
 public final class StructureInterpolationHandler implements InterpolationHandler {
 	private static final int TICKS = StructureManager.INTERPOLATION_TICKS;
@@ -50,8 +40,7 @@ public final class StructureInterpolationHandler implements InterpolationHandler
 		from = entity.position();
 		fromYaw = entity.getYRot();
 		fromPitch = entity.getXRot();
-		// A turn without a move carries no path: the game passes null and means stay where you
-		// are. Docking a boat sends exactly that, and reading the path crashed the client.
+		// A turn without a move passes a null path, meaning stay put.
 		to = path != null ? path.endPosition() : (to != null ? to : from);
 		toYaw = withRotation ? yaw : fromYaw;
 		toPitch = withRotation ? pitch : fromPitch;

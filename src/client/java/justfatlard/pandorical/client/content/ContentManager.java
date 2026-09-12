@@ -67,30 +67,22 @@ import net.minecraft.world.level.block.state.properties.Property;
 
 /**
  * Client-side content sync: registers the server's blocks, items and registry stubs, fills the
- * {@link VirtualResourcePack} with its assets, reloads resources and acknowledges the server.
- * Two paths do this.
+ * {@link VirtualResourcePack}, reloads resources and acknowledges the server. Two paths:
  *
  * <p><b>Configuration phase</b>, driven by the server's PandoricalSyncTask, on the network thread:
- * {@link #handleConfigSyncContent} and {@link #handleConfigSyncAssets} collect the chunks, then
- * {@link #forceFinalizeConfig} unpacks the assets, registers the content with
- * {@link StateIds#AT_JOIN}, reloads on the render thread if the virtual pack holds anything, and
- * sends ContentReadyConfigC2S once that is done ({@link #ackConfigReady}). At JOIN,
- * PandoricalClient calls {@link #remapBlockStateIds} to give the block states the server's ids.
+ * {@link #handleConfigSyncContent} and {@link #handleConfigSyncAssets} collect chunks, then
+ * {@link #forceFinalizeConfig} unpacks, registers with {@link StateIds#AT_JOIN}, reloads on the
+ * render thread if the pack holds anything, and acks once that is done ({@link #ackConfigReady}).
+ * At JOIN, PandoricalClient calls {@link #remapBlockStateIds}.
  *
- * <p><b>Play phase</b>, the fallback for a client the configuration phase did not make
+ * <p><b>Play phase</b>, the fallback when the configuration phase did not make the client
  * content-ready, on the client thread: {@link #handleSyncContent} and {@link #handleSyncAssets}
- * collect the payloads, then {@link #forceFinalize} registers the content with
- * {@link StateIds#AT_REGISTRATION} unless the configuration phase already did, injects the pack,
- * unpacks whatever asset chunks arrived, and sends ContentReadyC2S without waiting for the reload;
- * {@link #tick} finalizes with what there is after {@link #SYNC_TIMEOUT_MS}.
+ * collect, then {@link #forceFinalize} registers with {@link StateIds#AT_REGISTRATION} unless the
+ * configuration phase already did, injects the pack and acks without waiting for the reload.
+ * {@link #tick} finalizes with what arrived after {@link #SYNC_TIMEOUT_MS}.
  *
- * <p><b>Shared</b>: {@link #registerContent} (blocks through {@link #registerBlock}, items
- * through {@link #registerItem}, the register*Stubs methods), run between unfreezing and
- * re-freezing {@link #SYNCED_REGISTRIES}; {@link #unpackAssets}; {@link #injectResourcePack},
- * whose block colours and creative-tab entries come from whichever path registered the content; the
- * state-id fallbacks {@link #coverStateIdsWithFallback} and {@link #sweepUnmappedStateIds}; and
- * {@link #reset}, which clears both paths. Block state properties are read with
- * {@link StatePropertySpec}.
+ * <p>Both register through {@link #registerContent} between unfreezing and re-freezing
+ * {@link #SYNCED_REGISTRIES}. {@link #reset} clears both.
  */
 public class ContentManager {
     private static final VirtualResourcePack virtualPack = new VirtualResourcePack();
@@ -100,14 +92,11 @@ public class ContentManager {
     private static volatile boolean contentRegistered = false;
     private static long syncStartTime = 0;
 
-    // Blocks registered during the current sync, for reliable BlockItem creation.
-    // Registry lookups on unfrozen registries may not find recently registered entries.
+    // Lookups on an unfrozen registry may miss entries registered during this sync.
     private static final Map<Identifier, Block> registeredBlocks = new HashMap<>();
 
-    /** A server claiming more chunks than this is malformed or hostile, not verbose. */
     private static final int MAX_ASSET_CHUNKS = 8192;
 
-    /** A sanity bound on the content split, so a malformed total cannot make the client allocate. */
     private static final int MAX_CONTENT_CHUNKS = 512;
     private static final int MAX_ASSET_BYTES = 50 * 1024 * 1024;
     private static final int MAX_SINGLE_ASSET = 10 * 1024 * 1024;
@@ -133,32 +122,19 @@ public class ContentManager {
         configContentChunks.clear();
         expectedConfigContentChunks = -1;
 
-        // Clearing the map is not unloading the pack: whatever the last server sent stays baked
-        // into the atlases and the Language table until the next reload. That reload used to be
-        // forced here, on the disconnect itself, and it wedged: the loading screen sat at zero
-        // with every worker finished and nothing left to wait on, and the only way out was
-        // killing the game. Left to the next join instead, which reloads with the new server's
-        // pack and has never failed. The cost is cosmetic - a server's textures and strings
-        // follow the player to the title screen and into singleplayer until then.
+        // The last server's assets stay in the atlases and Language table until the next join
+        // reloads. Do not reload here: a reload on disconnect hangs the loading screen.
         virtualPack.clear();
     }
 
     private static volatile boolean syncing = false;
     private static volatile boolean configPhaseSynced = false;
 
-    // Config-phase state (separate from play-phase to avoid mixing)
     private static volatile SyncContentConfigS2C pendingConfigContent = null;
-    /** The content this connection registered, by whichever path did it: what tints and creative tabs are built from. */
+    /** Set by whichever path registered; block tints and creative tabs are built from it. */
     private static volatile SyncedContent registeredContent = null;
 
-    /**
-     * Content chunks seen so far, and how many are coming.
-     *
-     * <p>The blocks and items arrive across however many packets it took to stay under the size a
-     * single one may carry, so nothing may be registered until the last of them lands - a client
-     * that registered what it had at the first packet would be missing whatever followed, and would
-     * fail Fabric's registry sync with no sign that anything was still in flight.
-     */
+    /** Nothing may be registered until every chunk lands, or Fabric's registry sync fails. */
     private static final List<SyncContentConfigS2C> configContentChunks = new ArrayList<>();
     private static volatile int expectedConfigContentChunks = -1;
     private static final List<byte[]> configAssetChunks = new ArrayList<>();
@@ -201,10 +177,8 @@ public class ContentManager {
         expectedAssetChunks = payload.totalChunks();
         if (syncStartTime == 0) syncStartTime = System.currentTimeMillis();
 
-        // totalChunks is the sender's own number, so bounding chunkIndex by it bounds
-        // nothing: a peer that claims 400_000_001 chunks and sends index 400_000_000
-        // passes, and the fill loop below allocates that many slots. Bound both against
-        // a constant before either is trusted.
+        // totalChunks is the sender's claim too, so both are bounded by a constant before the
+        // fill loop allocates.
         if (payload.totalChunks() < 0 || payload.totalChunks() > MAX_ASSET_CHUNKS
                 || payload.chunkIndex() < 0 || payload.chunkIndex() >= payload.totalChunks()) {
             Pandorical.LOGGER.warn("Rejecting asset chunk {}/{} (max {})",
@@ -236,37 +210,21 @@ public class ContentManager {
         }
     }
 
-    // ==========================================================================
-    // Configuration-phase handlers
-    // ==========================================================================
-
     /**
-     * Give the stand-in the real block's mining feel, where the server bothered to say.
-     *
-     * <p>Everything else about a stand-in is cosmetic - it stands in front of you and the server
-     * decides what happens to it. Breaking is the exception: the client predicts the whole dig
-     * itself, off these two numbers, and the server never corrects it until the block is gone. A
-     * stand-in cloned from the wrong base therefore digs at the wrong speed for its entire
-     * duration, and the mismatch is visible against anything drawn from the server's own view of
-     * the same block.
-     *
-     * <p>Both are tri-state: a block that says nothing keeps whatever the base block had, which is
-     * nearly all of them.
+     * The client predicts the whole dig from these and the server does not correct it until the
+     * block breaks. A negative value keeps the base block's.
      */
     private static void applyMiningProperties(BlockBehaviour.Properties props,
             SyncContentS2C.BlockEntry entry) {
         if (entry.destroyTime() >= 0.0F) {
             props.destroyTime(entry.destroyTime());
         }
-        // Set through the field rather than the builder method, because the builder can only turn
-        // this on. Clearing it is the case that matters: a block deciding its drops per-part wants
-        // no tool requirement, while the base block it borrows its sound and feel from has one.
+        // The field, because the builder method can only turn this on.
         if (entry.requiresCorrectTool() >= 0) {
             props.requiresCorrectToolForDrops = entry.requiresCorrectTool() == 1;
         }
     }
 
-    /** Runs on the network thread, never the render thread. */
     public static void handleConfigSyncContent(SyncContentConfigS2C payload) {
         if (configPhaseSynced) {
             Pandorical.LOGGER.warn("Config phase: received content chunk after already synced — ignoring");
@@ -308,12 +266,7 @@ public class ContentManager {
             && configContentChunks.stream().noneMatch(Objects::isNull);
     }
 
-    /**
-     * Put the chunks back into one payload.
-     *
-     * <p>The registry-stub lists are identical on every chunk, so any of them will do; the blocks
-     * and items are the parts that were split and are concatenated in chunk order.
-     */
+    /** Only blocks and items are split across chunks; every chunk carries the same stub lists. */
     private static SyncContentConfigS2C joinConfigContent() {
         var blocks = new ArrayList<SyncContentS2C.BlockEntry>();
         var items = new ArrayList<SyncContentS2C.ItemEntry>();
@@ -331,7 +284,6 @@ public class ContentManager {
             first.poiTypes(), first.menuTypes(), first.recipeBookCategories(), first.solidRails());
     }
 
-    /** Runs on the network thread, never the render thread. */
     public static void handleConfigSyncAssets(SyncAssetsConfigS2C payload) {
         if (configPhaseSynced) {
             Pandorical.LOGGER.warn("Config phase: received asset chunk after already synced — ignoring");
@@ -372,12 +324,6 @@ public class ContentManager {
         forceFinalizeConfig();
     }
 
-    /**
-     * Finalize config-phase sync: register blocks/items, unpack assets, send ack.
-     * Runs on the network thread. Does not call addMapping; Fabric's
-     * SynchronizeRegistriesTask assigns registry IDs, and block state IDs are
-     * mapped later by {@link #remapBlockStateIds()}.
-     */
     private static synchronized void forceFinalizeConfig() {
         if (configPhaseSynced) return;
         configPhaseSynced = true;
@@ -394,15 +340,9 @@ public class ContentManager {
             unpackAssets(configAssetChunks, true);
         }
 
-        // No global reconnect fast-path here: every register method below is
-        // per-entry idempotent (an already-present id is reused/skipped, with
-        // shape data reapplied for blocks), which handles reconnects AND the
-        // case a former any-present short-circuit fatally mishandled: a mod
-        // installed on BOTH client and server (e.g. pinata) pre-registers its
-        // own entries at client startup, which made a first connection look
-        // like a reconnect and skipped registering every server-only mod's
-        // entries, so Fabric's registry sync then rejected the join with
-        // hundreds of unknown entries.
+        // No reconnect fast path: each register method is idempotent per entry, and a mod
+        // installed on both sides pre-registers its own entries, so "some present" does not
+        // mean "all present".
         {
             for (Registry<?> registry : SYNCED_REGISTRIES) unfreezeRegistry(registry);
 
@@ -420,13 +360,9 @@ public class ContentManager {
             }
         }
 
-        // The reload happens here, in the configuration phase, before there is a level - the
-        // moment vanilla reloads for a server resource pack. It used to wait for the play-phase
-        // join, which put a full resource reload on top of the level being created and the first
-        // chunks arriving, and that is the one condition some Windows OpenGL drivers do not
-        // survive (MC-311345: the game died with an access violation seconds after joining).
-        // The ack waits for the reload, so the server holds the login until the client can draw
-        // what it is about to be sent.
+        // Reload before a level exists, as vanilla does for a server resource pack: a reload
+        // during level creation crashes some Windows OpenGL drivers (MC-311345). The ack waits
+        // for it, so the server holds the login until then.
         if (virtualPack.hasResources()) {
             Minecraft.getInstance().execute(() -> injectResourcePack(ContentManager::ackConfigReady));
         } else {
@@ -434,56 +370,38 @@ public class ContentManager {
         }
     }
 
-    /** Whether the configuration phase already reloaded resources for this connection. */
     private static volatile boolean configReloadDone = false;
 
     public static boolean wasConfigReloadDone() {
         return configReloadDone;
     }
 
-    /** The ack lets the server complete PandoricalSyncTask. */
     private static void ackConfigReady() {
         configReloadDone = true;
         try {
             ClientConfigurationNetworking.send(new ContentReadyConfigC2S());
             Pandorical.LOGGER.info("Config phase: sent ContentReadyConfigC2S acknowledgment");
         } catch (Exception e) {
-            // The connection ended while the reload ran; there is nobody left to tell.
+            // The connection can end while the reload runs.
             Pandorical.LOGGER.warn("Config phase: could not acknowledge content sync: {}", e.toString());
         }
     }
 
-    /**
-     * Blocks the server says carry a player upward.
-     *
-     * <p>Held here rather than left to {@code #minecraft:climbable} because climbing is decided
-     * client-side, and these blocks enter the client's registry at connection time: depending on a
-     * tag would mean depending on tag membership surviving that. Cleared and refilled on every
-     * connection so a second server's answer never inherits the first's.
-     */
     private static final Set<Block> climbable =
         Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    /**
-     * Synced blocks whose right-click the server handles.
-     *
-     * <p>Kept per block rather than set on construction, because a reconnect reuses the block
-     * object from the previous session and never runs a constructor again.
-     */
+    /** A set, not a constructor flag: a reconnect reuses the previous session's block objects. */
     private static final Set<Block> interactive =
         Collections.newSetFromMap(new IdentityHashMap<>());
 
-    /** Whether this is a synced block whose right-click belongs to the server. */
     public static boolean isInteractive(BlockState state) {
         return !interactive.isEmpty() && interactive.contains(state.getBlock());
     }
 
-    /** Whether this is a synced block the server declared climbable. */
     public static boolean isClimbable(BlockState state) {
         return !climbable.isEmpty() && climbable.contains(state.getBlock());
     }
 
-    /** Gunzip one path's asset chunks into the virtual pack; configPhase picks that path's log wording. */
     private static void unpackAssets(List<byte[]> chunks, boolean configPhase) {
         try {
             long totalSize = chunks.stream().filter(Objects::nonNull).mapToLong(c -> c.length).sum();
@@ -518,7 +436,6 @@ public class ContentManager {
                 }
             }
 
-            // Wire format: [pathUTF][dataLen][data] repeated
             DataInputStream dis = new DataInputStream(new ByteArrayInputStream(decompressedBaos.toByteArray()));
             int count = 0;
             while (dis.available() > 0) {
@@ -550,13 +467,9 @@ public class ContentManager {
         return configPhaseSynced;
     }
 
-    // ==========================================================================
-    // Play-phase handlers (kept as fallback for non-registry content)
-    // ==========================================================================
-
     private static boolean allAssetsReceived() {
         if (expectedAssetChunks == 0) return true;
-        if (expectedAssetChunks < 0) return false; // content packet hasn't arrived yet
+        if (expectedAssetChunks < 0) return false;
         return assetChunks.size() == expectedAssetChunks
             && assetChunks.stream().noneMatch(Objects::isNull);
     }
@@ -579,8 +492,6 @@ public class ContentManager {
             return;
         }
 
-        // If config-phase already registered blocks/items, skip registry work;
-        // play-phase then only handles resource pack injection and non-registry features.
         if (!configPhaseSynced) {
             for (Registry<?> registry : SYNCED_REGISTRIES) unfreezeRegistry(registry);
 
@@ -592,11 +503,6 @@ public class ContentManager {
                 Pandorical.LOGGER.info("Play phase fallback: registered {} blocks, {} items, and {} stubs on client",
                     content.blocks().size(), content.items().size(), stubCount);
             } finally {
-                // Re-freeze, same as the config-phase path. This used to be skipped because
-                // freeze() rejects a registry whose tags are already bound, which is always
-                // the case here. freezeRegistry now expects that throw, so leaving eight
-                // vanilla registries unfrozen for the rest of the session is no longer the
-                // price of getting past it.
                 for (Registry<?> registry : SYNCED_REGISTRIES) freezeRegistry(registry);
             }
         } else {
@@ -609,10 +515,7 @@ public class ContentManager {
         ClientPlayNetworking.send(new ContentReadyC2S());
     }
 
-    /**
-     * Register one sync's rail setting, blocks, items and registry stubs, in that order, into the
-     * {@link #SYNCED_REGISTRIES} the caller has unfrozen. Returns how many stubs were registered.
-     */
+    /** The caller unfreezes {@link #SYNCED_REGISTRIES}. Returns how many stubs were registered. */
     private static int registerContent(SyncedContent content, StateIds stateIds) {
         registeredContent = content;
         RailCollision.setSolid(content.solidRails());
@@ -633,7 +536,6 @@ public class ContentManager {
         return stubCount;
     }
 
-    /** Called from both config-phase finalize (deferred) and play-phase finalize. */
     private static boolean packSourceInjected = false;
 
     public static void injectResourcePack() {
@@ -641,9 +543,8 @@ public class ContentManager {
     }
 
     /**
-     * Put the synced pack in front of the game and reload. {@code afterReload} runs once the
-     * reload has finished, or at once when there was nothing to reload or it could not start:
-     * a caller waiting to acknowledge the server must hear back on every path, a throw included.
+     * {@code afterReload} runs exactly once on every path, a throw included: after the reload,
+     * or at once when there is nothing to reload. A caller waiting to ack depends on it.
      */
     public static void injectResourcePack(Runnable afterReload) {
         AtomicBoolean ran = new AtomicBoolean();
@@ -675,10 +576,8 @@ public class ContentManager {
         var namespaces = virtualPack.getNamespaces(PackType.CLIENT_RESOURCES);
         Pandorical.LOGGER.info("Virtual pack contains {} namespaces: {}", namespaces.size(), namespaces);
 
-        // Registering a RepositorySource (rather than adding the pack once) keeps the
-        // virtual pack included in every future resource reload. Once per game, not per
-        // connection: the source reads the static pack, and another copy each join only made
-        // the repository list the same pack again.
+        // A RepositorySource keeps the pack in every later reload. Once per game: the source
+        // reads the static pack.
         try {
             var packRepo = client.getResourcePackRepository();
             if (packSourceInjected) {
@@ -731,9 +630,8 @@ public class ContentManager {
             return;
         }
 
-        // Both registrations must precede the reload: tint providers so tinted models
-        // render correctly, and creative tab items because tab contents are rebuilt
-        // during reload.
+        // Both before the reload: tints so tinted models render right, and tab items because
+        // tab contents are rebuilt during it.
         registerBlockColors(client);
         registerCreativeTabItems();
 
@@ -743,7 +641,6 @@ public class ContentManager {
             afterReload.run();
         });
         reload.thenRun(() -> {
-            // Force all chunks to re-render so they pick up the newly loaded block models.
             Minecraft mc = Minecraft.getInstance();
             if (mc != null && mc.levelRenderer != null && mc.level != null) {
                 mc.levelRenderer.invalidateCompiledGeometry(
@@ -830,7 +727,6 @@ public class ContentManager {
         }
     }
 
-    /** Each tab's synced items, replaced by every sync and read by the one listener its tab gets. */
     private static final Map<ResourceKey<CreativeModeTab>, List<Item>> tabItems =
         new ConcurrentHashMap<>();
 
@@ -849,12 +745,6 @@ public class ContentManager {
     }
 
 
-    /**
-     * Register block color providers for dynamically registered blocks: tint sources are
-     * copied from the base block so biome-sensitive colours (foliage, grass, water) are
-     * inherited; blocks with no base tints are left untinted. Registering a
-     * tint on a block whose model has no tintindex faces is harmless.
-     */
     private static void registerBlockColors(Minecraft client) {
         SyncedContent content = registeredContent;
         if (content == null) return;
@@ -870,8 +760,6 @@ public class ContentManager {
                 Block block = BuiltInRegistries.BLOCK.getValue(id);
                 if (block == null) continue;
 
-                // getTintSources() returns the sources registered for the base block's
-                // default state, so the biome behaviour matches exactly.
                 List<BlockTintSource> tintSources = null;
 
                 String baseBlockId = entry.baseBlockId();
@@ -888,20 +776,8 @@ public class ContentManager {
                     }
                 }
 
-                // A base block with no tint of its own gets no tint here either.
-                //
-                // This used to fall back to the grass tint, which meant every synced block whose
-                // base is untinted - stone, planks, wool, snow, which is nearly all of them - was
-                // registered as biome-tinted foliage. The block itself looked right, because tint
-                // only reaches model faces that ask for it with a tintindex and none of these do,
-                // so the bug hid for as long as nobody looked at the particles: break particles
-                // apply the block's colour whether the model asked for a tint or not. It surfaced
-                // on cloud-kingdoms' cloud, where grass-green dust off a pure white block is not
-                // something you can talk yourself out of seeing.
-                //
-                // Blocks that genuinely want a tint either name a base block that carries one, the
-                // way dirt-slab hands over the real vanilla source, or set it explicitly through
-                // BlockTintApi.
+                // No default tint: break particles take the block colour even where the model has
+                // no tintindex. A block wanting one names a tinted base or uses BlockTintApi.
                 if (tintSources == null) continue;
 
                 blockColors.register(tintSources, block);
@@ -914,17 +790,10 @@ public class ContentManager {
         Pandorical.LOGGER.info("Registered block color providers for {} blocks", registered);
     }
 
-    /**
-     * How {@link #registerBlock} gives a newly registered block's states their ids. Each sync path
-     * uses one, so it also decides which path's wording the block's log lines take.
-     */
+    /** Also picks which path's wording {@link #registerBlock} logs with. */
     private enum StateIds {
-        /**
-         * The config phase: left unassigned, for {@link #remapBlockStateIds()} to map to the
-         * server's ids at JOIN, after Fabric's registry sync.
-         */
+        /** Unassigned until {@link #remapBlockStateIds()} runs at JOIN, before chunks decode. */
         AT_JOIN,
-        /** The play-phase fallback: registered at the server's exact ids as the block is. */
         AT_REGISTRATION
     }
 
@@ -939,8 +808,6 @@ public class ContentManager {
                 return;
             }
 
-            // On reconnect the block survives from the previous session: track it and
-            // apply fresh shape data rather than re-registering.
             if (BuiltInRegistries.BLOCK.containsKey(id)) {
                 Block existing = BuiltInRegistries.BLOCK.getValue(id);
                 registeredBlocks.put(id, existing);
@@ -970,9 +837,6 @@ public class ContentManager {
                 props = BlockBehaviour.Properties.of();
             }
 
-            // Before the block exists, because vanilla settles collision from this flag when the
-            // state cache is built, and that happens during registration - long before the shapes
-            // arriving with this entry are ever applied.
             if (!DynamicBlock.declaresCollision(entry.shapeData())) props.noCollision();
 
             applyMiningProperties(props, entry);
@@ -996,8 +860,7 @@ public class ContentManager {
                 }
             }
 
-            // Light is fixed into each state as the block is built, so it has to be on the
-            // properties before createBlock, not applied after like the shapes are
+            // Light is fixed into each state as the block is built.
             byte[] light = entry.lightData();
             if (light != null && light.length > 0) {
                 props.lightLevel(state -> DynamicBlock.lightFor(state, light));
@@ -1011,22 +874,16 @@ public class ContentManager {
             DynamicBlock.applyShapeData(block, entry.shapeData());
 
             if (stateIds == StateIds.AT_JOIN) {
-                // Do NOT add states to BLOCK_STATE_REGISTRY here. They get the server's IDs
-                // in remapBlockStateIds(), which runs synchronously at JOIN time, before any
-                // chunks are decoded.
                 Pandorical.LOGGER.debug("Config phase: registered block {} (base: {}, class: {}, states: {})",
                     entry.id(), entry.baseBlockId(), block.getClass().getSimpleName(),
                     block.getStateDefinition().getPossibleStates().size());
             } else {
-                // Register block states at the exact IDs the server uses
                 var possibleStates = block.getStateDefinition().getPossibleStates();
                 if (entry.stateIds().size() == possibleStates.size()) {
                     for (int i = 0; i < possibleStates.size(); i++) {
                         Block.BLOCK_STATE_REGISTRY.addMapping(possibleStates.get(i), entry.stateIds().get(i));
                     }
                 } else {
-                    // Appending sequentially here (the old behaviour) overwrote other
-                    // custom blocks' server-assigned slots, see coverStateIdsWithFallback
                     coverStateIdsWithFallback(entry, block.defaultBlockState(),
                         "state count mismatch (server=" + entry.stateIds().size()
                             + ", client=" + possibleStates.size()
@@ -1045,12 +902,8 @@ public class ContentManager {
     }
 
     /**
-     * Make a synced item wearable, and give it something to be drawn as.
-     *
-     * <p>The slot on its own says only where it goes. Armour is drawn from an equipment asset,
-     * and a stand-in built without one leaves the renderer nothing to use: it falls back to
-     * laying the item's flat sprite on the wearer, which is a helmet standing upright on your
-     * head. The id travels beside the slot as "slot|asset".
+     * {@code spec} is "slot" or "slot|asset". Without an equipment asset the renderer lays the
+     * item's flat sprite on the wearer.
      */
     private static void applyEquippable(Item.Properties props, String spec) {
         if (spec.isEmpty()) return;
@@ -1080,14 +933,6 @@ public class ContentManager {
                 .build());
     }
 
-    /**
-     * Make a synced edible edible here too.
-     *
-     * <p>The stand-in is otherwise a bare item with no food component, and the two ends then
-     * disagree about what right-clicking it does: the server feeds the player, and the client
-     * plays no animation, no sound and shows no hand moving - the item just sits there while
-     * hunger silently refills. Rebuilt from the server's own numbers so there is nothing to drift.
-     */
     private static void applyFood(Item.Properties props, String spec) {
         if (spec.isEmpty()) return;
 
@@ -1111,18 +956,7 @@ public class ContentManager {
         }
     }
 
-    /**
-     * Rebuild a synced tool so the client mines the way the server does.
-     *
-     * <p>The stand-in is otherwise a bare item, which swings at hand speed: the server knows the
-     * axe is an axe and the client does not, and the whole dig is spent disagreeing. What arrives
-     * is the material's own numbers rather than a finished component, so the tool is rebuilt here
-     * through the same vanilla helpers the real item used - one implementation, no drift.
-     *
-     * <p>Anything older or unrecognised, including the plain "tool" this field used to carry,
-     * leaves the item as it was. That is the same nothing it did before, so a client that has not
-     * been updated is no worse off than it is today.
-     */
+    /** A spec without '|', such as an older server's plain "tool", leaves the item plain. */
     private static void applyTool(Item.Properties props, String spec) {
         if (spec.isEmpty() || !spec.contains("|")) return;
 
@@ -1203,28 +1037,19 @@ public class ContentManager {
         }
     }
 
-    /**
-     * Pick the Block subclass from the base block type or state property patterns:
-     * the right class (e.g. SlabBlock for slabs) provides collision shapes, placement,
-     * and interaction logic that a plain Block/DynamicBlock cannot.
-     */
     private static Block createBlock(BlockBehaviour.Properties props,
                                      List<Property<?>> stateProps,
                                      Block baseBlock, List<String> rawPropSpecs) {
-        // All dynamic blocks need noOcclusion: the shape isn't known at construction time
-        // (server-provided VoxelShapes arrive after), and without it MC assumes full-cube
-        // occlusion and incorrectly culls adjacent block faces.
+        // The server's shapes arrive after construction; without this vanilla assumes a full
+        // cube and culls neighbouring faces.
         props.noOcclusion();
 
-        // A door or trapdoor is vanilla's own class: it knows its shapes, and a table of them
-        // did not serve. Its states are the base block's, which is what the server has too.
         Block vanillaShaped = VanillaShapedBlocks.forBase(baseBlock, props);
         if (vanillaShaped != null) return vanillaShaped;
 
         boolean isSlab = baseBlock instanceof SlabBlock || isSlabFromProperties(rawPropSpecs);
 
         if (isSlab) {
-            // Filter out type and waterlogged; SlabBlock adds those itself
             List<Property<?>> extraProps = new ArrayList<>();
             for (var prop : stateProps) {
                 String name = prop.getName();
@@ -1233,21 +1058,14 @@ public class ContentManager {
                 }
             }
 
-            // A DynamicSlabBlock even with no extra properties. DynamicBlock#applyShapeData
-            // recognises the blocks that can take the server's shapes by type, so a stock
-            // SlabBlock here drops them without a word and keeps vanilla slab geometry.
+            // Even with no extra properties: DynamicBlock#applyShapeData only gives the server's
+            // shapes to its own types.
             return DynamicSlabBlock.create(props, extraProps);
         }
 
-        // Same reason a propertyless block is still a DynamicBlock: it is the type that can
-        // hold the shapes the server is about to send.
         return DynamicBlock.create(props, stateProps);
     }
 
-    /**
-     * Detect slab blocks from their state property specifications.
-     * Slabs have a "type" enum property with values "bottom", "top", "double".
-     */
     private static boolean isSlabFromProperties(List<String> rawPropSpecs) {
         for (String spec : rawPropSpecs) {
             if (spec.startsWith("type:e:") && spec.contains("bottom") && spec.contains("top") && spec.contains("double")) {
@@ -1257,11 +1075,7 @@ public class ContentManager {
         return false;
     }
 
-    // ==========================================================================
-    // Stub registration: each registers inert entries so Fabric's registry sync
-    // doesn't reject the server's IDs for registry types the client can't fully
-    // reconstruct. Each returns the number of entries registered.
-    // ==========================================================================
+    // Inert stubs, so Fabric's registry sync accepts ids the client cannot rebuild.
 
     @SuppressWarnings("unchecked")
     private static int registerEntityTypeStubs(List<String> ids) {
@@ -1278,17 +1092,9 @@ public class ContentManager {
                     continue;
                 }
                 ResourceKey<EntityType<?>> key = ResourceKey.create(Registries.ENTITY_TYPE, id);
-                // The factory runs at SPAWN TIME, long after EntityRenderersS2C
-                // delivered the renderer keys, so it can pick a client shape:
-                //   "thrown_item" -> a ThrowableItemProjectile-shaped stub, so
-                //     the server's item-stack sync lands and actually renders
-                //   "invisible"   -> a plain Entity stub (exists, rides,
-                //     tracks; NoopRenderer draws nothing)
-                //   no key        -> null, vanilla skips the spawn (an
-                //     unrenderable type must not reach the render dispatcher)
-                // A null-factory stub here (the old createNothing) meant NO
-                // synced entity ever existed client-side at all: every
-                // thrown_item projectile in the suite was invisible.
+                // Runs at spawn, after EntityRenderersS2C delivered the keys. With no key it
+                // returns null and vanilla skips the spawn: a type without a renderer must not
+                // reach the render dispatcher.
                 final String typeIdStr = idStr;
                 EntityType<?> stub = EntityType.Builder.of((type, level) -> {
                         String rendererKey = ClientEntityRendererRegistry.getRendererKey(typeIdStr);
@@ -1447,7 +1253,6 @@ public class ContentManager {
         return count;
     }
 
-    /** The registries a content sync writes into: unfrozen around it and re-frozen after, in this order. */
     private static final List<Registry<?>> SYNCED_REGISTRIES = List.of(
         BuiltInRegistries.BLOCK,
         BuiltInRegistries.ITEM,
@@ -1461,7 +1266,7 @@ public class ContentManager {
     private static void unfreezeRegistry(Registry<?> registry) {
         if (registry instanceof MappedRegistry<?> mapped) {
             mapped.frozen = false;
-            // Restore intrusive holder cache so new entries can be registered
+            // freeze() nulled this, and registerWithHolder needs it.
             try {
                 var field = MappedRegistry.class.getDeclaredField("unregisteredIntrusiveHolders");
                 field.setAccessible(true);
@@ -1475,31 +1280,17 @@ public class ContentManager {
     }
 
     /**
-     * Re-freeze a registry this class unfroze, without disturbing its tag bindings.
-     *
-     * <p>{@code MappedRegistry.freeze} sets {@code frozen} before it validates anything,
-     * then throws {@code "Tags already present before freezing"} if tags are bound. The
-     * registry is therefore frozen either way; the throw only skips the tag-refresh tail,
-     * which is the outcome we want. Re-binding is vanilla's job on its own reload, not ours.
-     *
-     * <p>This used to null {@code allTags} by reflection first. That never avoided the
-     * error it named: {@code freeze} reads {@code allTags.isBound()} unconditionally, so a
-     * null turned an IllegalStateException into a NullPointerException at the same
-     * instruction, and left the field null afterwards. On an integrated server the client
-     * shares one static {@code BuiltInRegistries} with the server it is connected to, so
-     * that null was the server's tag set: it then failed to serialize its own tags during
-     * SynchronizeRegistriesTask, the error was swallowed as a suppressed packet failure,
-     * and the player waited on "Loading terrain" forever. Catching the throw does the same
-     * job with no reflection and no window where the field is null.
+     * {@code MappedRegistry.freeze} sets {@code frozen} first, then throws "Tags already present
+     * before freezing" when tags are bound, so the registry is frozen either way. Do not null
+     * {@code allTags} to avoid the throw: an integrated server shares these registries, and its
+     * tag sync then fails.
      */
     private static void freezeRegistry(Registry<?> registry) {
         if (registry instanceof MappedRegistry<?> mapped) {
             try {
                 mapped.freeze();
             } catch (IllegalStateException e) {
-                // "Tags already present before freezing" is the expected path on a
-                // re-freeze; frozen is set before the check, so this is not a failure.
-                // Freeze also throws for values left unbound, which is.
+                // Freeze also throws for unbound values, which is a real failure.
                 String message = String.valueOf(e.getMessage());
                 if (message.contains("Tags already present")) {
                     Pandorical.LOGGER.debug("Registry {} kept its existing tag bindings: {}", registry.key(), message);
@@ -1519,11 +1310,7 @@ public class ContentManager {
         Registry.register(registry, id, entry);
     }
 
-    /**
-     * Remap block state IDs to the server's IDs, after Fabric's registry sync completes
-     * (play-phase JOIN). Block.BLOCK_STATE_REGISTRY is an IdMapper outside Fabric's
-     * registry sync, so config-phase IDs may differ from the server's.
-     */
+    /** {@code Block.BLOCK_STATE_REGISTRY} is outside Fabric's registry sync. */
     public static void remapBlockStateIds() {
         if (pendingConfigContent == null) return;
 
@@ -1554,7 +1341,6 @@ public class ContentManager {
 
                 for (int i = 0; i < possibleStates.size(); i++) {
                     int serverId = entry.stateIds().get(i);
-                    // addMapping, not add: states may not be in the registry yet
                     Block.BLOCK_STATE_REGISTRY.addMapping(possibleStates.get(i), serverId);
                     remapped++;
                 }
@@ -1574,18 +1360,9 @@ public class ContentManager {
     }
 
     /**
-     * Structural stand-in for a server block state the client could not rebuild.
-     *
-     * <p>Block state IDs normally line up without any help from us: Fabric's
-     * StateIdTracker appends every newly registered block's states to
-     * {@code Block.BLOCK_STATE_REGISTRY} in registration order, and both sides
-     * register the same blocks in the same order. They diverge exactly when a block's
-     * client-side state definition does not match the server's, which shifts that
-     * block and everything registered after it. Chunk section palettes resolve raw IDs
-     * through {@code IdMapper.byIdOrThrow}, so an ID with no mapping at all throws
-     * MissingPaletteEntryException while decoding the chunk. Stone rather than air:
-     * always present, solid, and it renders as the wrong block instead of opening
-     * holes in terrain.
+     * For server state ids the client could not rebuild: chunk palettes resolve ids through
+     * {@code IdMapper.byIdOrThrow}, so an unmapped id fails the chunk decode. Stone, not air, so
+     * the result is a wrong block rather than a hole.
      */
     private static BlockState fallbackState() {
         return Blocks.STONE.defaultBlockState();
@@ -1598,16 +1375,9 @@ public class ContentManager {
     }
 
     /**
-     * Point every server state ID of a block at a state that actually exists on this
-     * client, so nothing decodes to null. {@code stand} is the block's own default
-     * state when the block exists (right block, wrong variant); null falls back to
-     * {@link #fallbackState()}.
-     *
-     * <p>Never use {@code IdMapper.add} for this (the old fallback did): those states
-     * are already in the mapper, put there by Fabric's StateIdTracker when the block
-     * was registered, so appending them again at the high-water mark rewrites their
-     * reverse mapping to a bogus ID and parks a duplicate in a slot the server may
-     * have assigned to another block.
+     * A null {@code stand} means {@link #fallbackState()}. Never {@code IdMapper.add}: Fabric's
+     * StateIdTracker already added these states, so appending rewrites their reverse id and takes
+     * a slot the server may have given another block.
      */
     private static void coverStateIdsWithFallback(SyncContentS2C.BlockEntry entry, BlockState stand, String reason) {
         BlockState state = stand != null ? stand : fallbackState();
@@ -1624,14 +1394,8 @@ public class ContentManager {
     }
 
     /**
-     * Map {@code state} into slot {@code serverId} for decoding while leaving
-     * {@code getId(state)} alone.
-     *
-     * <p>addMapping writes both directions, so pointing a shared state (stone) at a
-     * foreign ID would also make the client encode stone as that ID. Re-asserting the
-     * state's original mapping afterwards restores the reverse direction; the forward
-     * slot written by the first call survives because the second call only rewrites
-     * its own slot. Order is load-bearing.
+     * addMapping writes both directions; re-asserting the original id afterwards restores
+     * {@code getId(state)} and leaves the new forward slot. The order matters.
      */
     private static void mapWithoutStealingReverseId(BlockState state, int serverId) {
         int originalId = Block.BLOCK_STATE_REGISTRY.getId(state);
@@ -1641,11 +1405,7 @@ public class ContentManager {
         }
     }
 
-    /**
-     * Last line of defence: after every registration path has run, any server state ID
-     * still resolving to null is filled with the fallback. Catches holes left by paths
-     * that failed before reaching the per-block handling above.
-     */
+    /** Covers ids left unmapped by a path that failed before its per-block handling. */
     private static void sweepUnmappedStateIds(List<SyncContentS2C.BlockEntry> entries) {
         int holes = 0;
         String firstHoleBlock = null;

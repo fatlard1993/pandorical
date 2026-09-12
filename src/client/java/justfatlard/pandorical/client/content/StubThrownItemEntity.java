@@ -9,13 +9,8 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 
 /**
- * Client-side stand-in for server-only entity types registered with the
- * {@code "thrown_item"} renderer key. Extending ThrowableItemProjectile gives
- * the stub the exact synched-data layout of any server entity that extends it
- * (the base entity data plus the projectile's item stack), so the server's
- * item sync lands in the right slot and ThrownItemRenderer draws the real
- * item. The default item only matters for the frames before the first data
- * sync arrives; AIR draws nothing rather than something wrong.
+ * For the {@code "thrown_item"} renderer key. Extending ThrowableItemProjectile gives it the
+ * synched-data layout of a server entity that does, so the item sync lands in the right slot.
  */
 @Environment(EnvType.CLIENT)
 public class StubThrownItemEntity extends ThrowableItemProjectile {

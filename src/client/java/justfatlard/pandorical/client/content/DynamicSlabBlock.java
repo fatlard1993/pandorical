@@ -12,13 +12,6 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 import java.util.*;
 
-/**
- * A slab block that supports additional dynamic state properties beyond
- * the standard TYPE and WATERLOGGED. Extends SlabBlock so it inherits
- * correct slab collision shapes, placement behavior, and rendering.
- *
- * Used for blocks like grass_slab (has snowy), farmland_slab (has moisture), etc.
- */
 public class DynamicSlabBlock extends SlabBlock {
     private final List<Property<?>> extraProperties;
     private Map<BlockState, VoxelShape> outlineShapes;
@@ -27,11 +20,8 @@ public class DynamicSlabBlock extends SlabBlock {
     private DynamicSlabBlock(Properties props, List<Property<?>> extraProperties) {
         super(props);
         this.extraProperties = extraProperties;
-        // No registerDefaultState here. SlabBlock's constructor has already pinned type=bottom
-        // and waterlogged=false; stateDefinition.any() would replace that with the first state
-        // in property order, and SlabType is declared TOP, BOTTOM, DOUBLE while a boolean
-        // property yields true first — so the default became a waterlogged top slab, which is
-        // the state client-side placement prediction reaches for.
+        // No registerDefaultState: SlabBlock pinned type=bottom, waterlogged=false, and
+        // stateDefinition.any() would be a waterlogged top slab, which placement prediction uses.
     }
 
     public void setShapes(Map<BlockState, VoxelShape> outline, Map<BlockState, VoxelShape> collision) {
@@ -59,9 +49,7 @@ public class DynamicSlabBlock extends SlabBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        // First add SlabBlock's own properties (TYPE, WATERLOGGED)
         super.createBlockStateDefinition(builder);
-        // Then add extra properties passed via thread-local
         List<Property<?>> extras = PENDING_EXTRA_PROPERTIES.get();
         if (extras != null) {
             for (Property<?> prop : extras) {
@@ -72,11 +60,7 @@ public class DynamicSlabBlock extends SlabBlock {
 
     private static final ThreadLocal<List<Property<?>>> PENDING_EXTRA_PROPERTIES = new ThreadLocal<>();
 
-    /**
-     * Create a DynamicSlabBlock with extra properties beyond TYPE and WATERLOGGED.
-     * The extra properties list should NOT include type or waterlogged; those are
-     * added by SlabBlock automatically.
-     */
+    /** {@code extraProperties} must not include type or waterlogged: SlabBlock adds those. */
     public static DynamicSlabBlock create(Properties blockProps, List<Property<?>> extraProperties) {
         PENDING_EXTRA_PROPERTIES.set(extraProperties);
         try {

@@ -17,22 +17,12 @@ import net.minecraft.server.packs.metadata.pack.PackMetadataSection;
 import net.minecraft.server.packs.repository.PackSource;
 import net.minecraft.util.InclusiveRange;
 
-/**
- * In-memory resource pack that serves assets synced from the server.
- * Injected into the client's resource manager to provide models/textures
- * for dynamically registered blocks and items.
- */
 public class VirtualResourcePack implements PackResources {
     private static final String PACK_ID = "pandorical_virtual";
 
-    // Concurrent: a resource reload lists this on a worker thread while a content sync, or a
-    // disconnect clearing it, writes on another. A plain map iterated then throws mid-reload.
+    // A reload lists this on a worker thread while a sync or disconnect writes it on another.
     private final Map<Identifier, byte[]> resources = new ConcurrentHashMap<>();
 
-    /**
-     * Add a resource. Path format: "assets/{namespace}/{type}/{name}"
-     * e.g., "assets/big-boats/models/block/helm.json"
-     */
     public void addResource(String path, byte[] data) {
         if (path.startsWith("assets/")) {
             String withoutPrefix = path.substring(7);
@@ -51,8 +41,6 @@ public class VirtualResourcePack implements PackResources {
     public boolean hasResources() {
         return !resources.isEmpty();
     }
-
-    /** Dump lang files in the pack for debugging. */
 
     public void clear() {
         resources.clear();
@@ -101,10 +89,8 @@ public class VirtualResourcePack implements PackResources {
     @SuppressWarnings("unchecked")
     @Override
     public <T> T getMetadataSection(MetadataSectionType<T> type) {
-        // Only return metadata for pack metadata section types
         try {
             var packMetaClass = PackMetadataSection.class;
-            // Check if the requested type matches any PackMetadataSection type
             boolean isPackMeta = false;
             for (var field : packMetaClass.getDeclaredFields()) {
                 if (MetadataSectionType.class.isAssignableFrom(field.getType())) {
@@ -127,7 +113,6 @@ public class VirtualResourcePack implements PackResources {
                 }
             }
         } catch (Exception e) {
-            // Fall through
         }
         return null;
     }
@@ -142,6 +127,5 @@ public class VirtualResourcePack implements PackResources {
 
     @Override
     public void close() {
-        // No-op; in-memory pack
     }
 }
