@@ -772,6 +772,8 @@ public class ContentManager {
     }
 
     /** Called from both config-phase finalize (deferred) and play-phase finalize. */
+    private static boolean packSourceInjected = false;
+
     public static void injectResourcePack() {
         injectResourcePack(() -> {});
     }
@@ -800,9 +802,14 @@ public class ContentManager {
         virtualPack.debugLangFiles();
 
         // Registering a RepositorySource (rather than adding the pack once) keeps the
-        // virtual pack included in every future resource reload.
+        // virtual pack included in every future resource reload. Once per game, not per
+        // connection: the source reads the static pack, and another copy each join only made
+        // the repository list the same pack again.
         try {
             var packRepo = client.getResourcePackRepository();
+            if (packSourceInjected) {
+                Pandorical.LOGGER.debug("Pandorical virtual pack source already registered");
+            } else {
             var sourcesField = net.minecraft.server.packs.repository.PackRepository.class.getDeclaredField("sources");
             sourcesField.setAccessible(true);
             @SuppressWarnings("unchecked")
@@ -839,9 +846,11 @@ public class ContentManager {
             var mutableSources = new java.util.LinkedHashSet<>(sources);
             mutableSources.add(pandoricalSource);
             sourcesField.set(packRepo, mutableSources);
+            packSourceInjected = true;
 
             Pandorical.LOGGER.info("Added Pandorical virtual pack source to PackRepository ({} sources total) — triggering reload",
                 mutableSources.size());
+            }
         } catch (Exception e) {
             Pandorical.LOGGER.error("Failed to add virtual pack source: {}", e.getMessage(), e);
             afterReload.run();
