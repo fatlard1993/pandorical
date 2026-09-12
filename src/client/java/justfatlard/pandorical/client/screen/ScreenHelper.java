@@ -32,6 +32,7 @@ public final class ScreenHelper {
         );
 
         component.init(absoluteDef, context);
+        component.placeIn(offsetX, offsetY);
         componentIndex.put(def.id(), component);
 
         for (ComponentDef childDef : def.children()) {

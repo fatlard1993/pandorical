@@ -120,9 +120,13 @@ public final class ComponentType {
     // the wire format unchanged (still Map<String,String>) and matches the existing convention of
     // encoding all numeric values as parseable strings (as color/int/float props already do).
 
-    /** Absolute new X position (pixels). Recognized by every component type. */
+    /**
+     * New X position (pixels), measured the way the component's own was when it was built: from its
+     * parent's corner, or the screen's or overlay's for one at the top. Its children move with it.
+     * Recognized by every component type.
+     */
     public static final String PROP_X = "x";
-    /** Absolute new Y position (pixels). Recognized by every component type. */
+    /** New Y position (pixels), measured as {@link #PROP_X} is. Recognized by every component type. */
     public static final String PROP_Y = "y";
     /** Absolute new width (pixels). Recognized by every component type. */
     public static final String PROP_WIDTH = "width";

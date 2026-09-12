@@ -22,7 +22,10 @@ public class ComponentUpdateBuilder {
         this.componentId = componentId;
     }
 
-    /** Move the component to an absolute new position. Client interpolates towards it smoothly. */
+    /**
+     * Move the component, measured as its position was when built: from its parent's corner, or the
+     * screen's. Its children move with it. Client interpolates towards it smoothly.
+     */
     public ComponentUpdateBuilder pos(int x, int y) {
         props.put(ComponentType.PROP_X, String.valueOf(x));
         props.put(ComponentType.PROP_Y, String.valueOf(y));

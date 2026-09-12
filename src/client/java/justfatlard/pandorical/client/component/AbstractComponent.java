@@ -44,7 +44,9 @@ public abstract class AbstractComponent implements PandoricalComponent {
     protected int interpolationTicks = INTERPOLATION_TICKS;
 
     protected String id;
+    /** Where it is, on the screen. The server's x and y are {@link #originX}, {@link #originY} from here. */
     protected int x, y, width, height;
+    private int originX, originY;
     protected Map<String, String> props = new HashMap<>();
     protected ComponentContext context;
     protected final List<PandoricalComponent> children = new ArrayList<>();
@@ -102,8 +104,10 @@ public abstract class AbstractComponent implements PandoricalComponent {
         // Geometry keys are recognized directly out of the shared string prop map rather than
         // requiring a separate typed wire field; see the design note on ComponentType's
         // PROP_X/PROP_Y/PROP_WIDTH/PROP_HEIGHT constants.
-        if (changedProps.containsKey(ComponentType.PROP_X)) this.x = parseInt(ComponentType.PROP_X, this.x);
-        if (changedProps.containsKey(ComponentType.PROP_Y)) this.y = parseInt(ComponentType.PROP_Y, this.y);
+        int wasX = x;
+        int wasY = y;
+        if (changedProps.containsKey(ComponentType.PROP_X)) this.x = originX + parseInt(ComponentType.PROP_X, this.x - originX);
+        if (changedProps.containsKey(ComponentType.PROP_Y)) this.y = originY + parseInt(ComponentType.PROP_Y, this.y - originY);
         if (changedProps.containsKey(ComponentType.PROP_WIDTH)) this.width = parseInt(ComponentType.PROP_WIDTH, this.width);
         if (changedProps.containsKey(ComponentType.PROP_HEIGHT)) this.height = parseInt(ComponentType.PROP_HEIGHT, this.height);
 
@@ -112,7 +116,35 @@ public abstract class AbstractComponent implements PandoricalComponent {
         this.previousGeom = before;
         this.targetGeom = currentGeometrySnapshot();
         this.geomTicksSinceUpdate = 0;
+        if (x != wasX || y != wasY) {
+            moved();
+            for (PandoricalComponent child : children) child.shiftOrigin(x - wasX, y - wasY);
+        }
     }
+
+    @Override
+    public void placeIn(int originX, int originY) {
+        this.originX = originX;
+        this.originY = originY;
+    }
+
+    /** Carried by a moving parent, blending the same way so the two travel together. */
+    @Override
+    public void shiftOrigin(int dx, int dy) {
+        GeometrySnapshot before = interpolatedGeometry(0f);
+        originX += dx;
+        originY += dy;
+        x += dx;
+        y += dy;
+        previousGeom = before;
+        targetGeom = currentGeometrySnapshot();
+        geomTicksSinceUpdate = 0;
+        moved();
+        for (PandoricalComponent child : children) child.shiftOrigin(dx, dy);
+    }
+
+    /** The position changed. For a component holding something placed where it was, such as a vanilla widget. */
+    protected void moved() {}
 
     private void parseGeometryStyle() {
         scale = parseFloat(ComponentType.PROP_SCALE, 1f);

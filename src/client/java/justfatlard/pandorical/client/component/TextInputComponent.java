@@ -70,6 +70,11 @@ public class TextInputComponent extends AbstractComponent {
     }
 
     @Override
+    protected void moved() {
+        if (editBox != null) editBox.setPosition(x, y);
+    }
+
+    @Override
     public void render(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         if (editBox != null) {
             // EditBox renders itself via extractRenderState

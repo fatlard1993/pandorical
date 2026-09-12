@@ -41,6 +41,16 @@ public interface PandoricalComponent {
 
     default boolean mouseScrolled(double mouseX, double mouseY, double amount) { return false; }
 
+    /**
+     * Where this component's x and y are measured from: its parent's corner, or the screen's for a
+     * component at the top. Told once, as it is built. A position the server sends later is measured
+     * from here too, the same as the one it was built with.
+     */
+    default void placeIn(int originX, int originY) {}
+
+    /** Its parent has moved: move with it, by as much, children and all. */
+    default void shiftOrigin(int dx, int dy) {}
+
     /** Apply partial property updates from the server. */
     void updateProps(Map<String, String> changedProps);
 

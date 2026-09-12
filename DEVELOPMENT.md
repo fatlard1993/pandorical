@@ -204,7 +204,9 @@ screens.openContainer(player, screen.build(), container, Set.of(0));
 ### Updating
 
 Updates address components by ID inside an already-open screen. `ComponentUpdateBuilder`
-builds them; the client interpolates geometry changes over the following ticks.
+builds them; the client interpolates geometry changes over the following ticks. A new position
+is measured the way the component's own was when it was built, from its parent's corner or the
+screen's, and a component that moves takes its children with it.
 
 ```java
 String screenId = PandoricalApi.getOpenScreenId(player.getUUID());
