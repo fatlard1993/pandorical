@@ -36,7 +36,7 @@ public record SyncContentS2C(
         String modelId,
         List<Integer> stateIds,
         byte[] shapeData,
-        /**
+        /*
          * Light given off, one byte per state in the block's own state order.
          *
          * <p>Light is the client's to compute, from its own copy of the block, and a stand-in
@@ -46,7 +46,7 @@ public record SyncContentS2C(
          * fixes its emission as it is built - and the stand-in's states are built from this.
          */
         byte[] lightData,
-        /**
+        /*
          * Whether this block carries players up it.
          *
          * <p>Climbing is decided by the client, off {@code #minecraft:climbable}, and a tag is a
@@ -55,14 +55,14 @@ public record SyncContentS2C(
          * connection time. Sending the fact outright costs a bit and needs no such agreement.
          */
         boolean climbable,
-        /**
+        /*
          * Whether a right-click on this block is the server's business.
          *
          * <p>Without it the client predicts a block placement against anything it has no
          * behaviour for, which is every synced block. See {@code BlockRegistration#interactive}.
          */
         boolean interactive,
-        /**
+        /*
          * How long this block takes to break, or a negative number to keep the base block's.
          *
          * <p>Sent because breaking is predicted on the client, off the stand-in's properties, while
@@ -72,7 +72,7 @@ public record SyncContentS2C(
          * with the player's own screen.
          */
         float destroyTime,
-        /**
+        /*
          * Whether the client should apply the wrong-tool penalty, or -1 to keep the base block's.
          *
          * <p>Its own field rather than part of the base block, because it is the larger of the two

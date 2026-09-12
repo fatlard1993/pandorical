@@ -175,17 +175,17 @@ public final class ComponentType {
     /** Absolute new height (pixels). Recognized by every component type. */
     public static final String PROP_HEIGHT = "height";
     /**
-     * Uniform scale multiplier (1.0 = no scaling), applied around the component's center.
-     * Parsed generically by every component type (needed so the shared render-time interpolation
-     * transform in ScreenHelper always has a valid value), but only officially supported/documented
-     * as a settable prop on: sprite, text.
-     */
-    /**
      * Ticks over which this component blends a changed value in. Defaults to a short
      * window that hides the gap between server updates; raise it when a change is
      * rare and meant to be watched rather than smoothed over.
      */
     public static final String PROP_INTERP_TICKS = "interp_ticks";
+    /**
+     * Uniform scale multiplier (1.0 = no scaling), applied around the component's center.
+     * Parsed generically by every component type (needed so the shared render-time interpolation
+     * transform in ScreenHelper always has a valid value), but only officially supported/documented
+     * as a settable prop on: sprite, text.
+     */
     public static final String PROP_SCALE = "scale";
     /**
      * Rotation in degrees, applied around the component's center.

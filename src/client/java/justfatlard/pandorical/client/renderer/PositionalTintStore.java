@@ -29,7 +29,6 @@ public final class PositionalTintStore {
 
 	private static final Map<Long, Integer> painted = new HashMap<>();
 
-	/** The tint source handed to every block a mod declared positional. */
 	/**
 	 * A source for one block type, answering the fallback wherever nothing has been painted.
 	 * Zero means no fallback, which is vanilla's untinted white.

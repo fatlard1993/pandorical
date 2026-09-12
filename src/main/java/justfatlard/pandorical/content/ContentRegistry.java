@@ -433,7 +433,6 @@ public class ContentRegistry implements ContentApi {
         }
     }
 
-    /** Used by both play-phase and config-phase sync. */
     /**
      * One-time note of how much of the content packet the block table is using.
      *

@@ -47,12 +47,6 @@ public class BlockRegistration {
     }
 
     /**
-     * Model resource location (e.g., "big-boats:block/helm").
-     *
-     * <p><b>Advisory only today.</b> Sent on the wire, not acted on by the client:
-     * appearance comes from the synced blockstate/model assets in your jar.
-     */
-    /**
      * Say that right-clicking this block does something, so the client stops guessing.
      *
      * <p>The client's copy of a synced block is a plain stand-in: it has none of the server
@@ -72,6 +66,12 @@ public class BlockRegistration {
 
     public boolean isInteractive() { return interactive; }
 
+    /**
+     * Model resource location (e.g., "big-boats:block/helm").
+     *
+     * <p><b>Advisory only today.</b> Sent on the wire, not acted on by the client:
+     * appearance comes from the synced blockstate/model assets in your jar.
+     */
     public BlockRegistration model(String modelId) {
         this.modelId = modelId;
         return this;

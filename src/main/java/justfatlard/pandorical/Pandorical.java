@@ -578,12 +578,6 @@ public class Pandorical implements ModInitializer {
     }
 
     /**
-     * Send all registered extra inventory slot groups during the configuration phase.
-     * This ensures {@code ClientInventorySlotRegistry} is populated BEFORE the client
-     * constructs {@code InventoryMenu} on play-phase entry, avoiding the
-     * {@code IndexOutOfBoundsException} caused by mismatched slot counts.
-     */
-    /**
      * Settle whether this client can be talked to before anything is said to it.
      *
      * <p>Three kinds of client arrive here. A vanilla one cannot receive the content sync at all,
@@ -630,6 +624,12 @@ public class Pandorical implements ModInitializer {
         return false;
     }
 
+    /**
+     * Send all registered extra inventory slot groups during the configuration phase.
+     * This ensures {@code ClientInventorySlotRegistry} is populated BEFORE the client
+     * constructs {@code InventoryMenu} on play-phase entry, avoiding the
+     * {@code IndexOutOfBoundsException} caused by mismatched slot counts.
+     */
     private static void sendConfigPhaseInventoryRegistrations(
             net.minecraft.server.network.ServerConfigurationPacketListenerImpl handler) {
         List<PlayerInventoryApi.SlotRegistration> regs = PandoricalApi.playerInventoryImpl().getRegistrations();

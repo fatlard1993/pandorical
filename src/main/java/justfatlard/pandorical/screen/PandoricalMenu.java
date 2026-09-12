@@ -83,9 +83,6 @@ public class PandoricalMenu extends AbstractContainerMenu {
         }
     }
 
-    /**
-     * Server constructor, called by Pandorical.createMenu().
-     */
     /** Whether this menu told its container it was opened, so it knows to say when it closes. */
     private boolean ranContainerLifecycle = false;
 

@@ -430,10 +430,6 @@ public class ContentManager {
     }
 
     /**
-     * Config-phase variant of registerBlock: leaves block state IDs unassigned so
-     * {@link #remapBlockStateIds()} can map them to the server's IDs at JOIN time.
-     */
-    /**
      * Blocks the server says carry a player upward.
      *
      * <p>Held here rather than left to {@code #minecraft:climbable} because climbing is decided
@@ -463,6 +459,10 @@ public class ContentManager {
         return !climbable.isEmpty() && climbable.contains(state.getBlock());
     }
 
+    /**
+     * Config-phase variant of registerBlock: leaves block state IDs unassigned so
+     * {@link #remapBlockStateIds()} can map them to the server's IDs at JOIN time.
+     */
     private static void registerBlockConfig(SyncContentS2C.BlockEntry entry) {
         try {
             Identifier id = Identifier.tryParse(entry.id());
@@ -1180,18 +1180,6 @@ public class ContentManager {
     }
 
     /**
-     * Rebuild a synced tool so the client mines the way the server does.
-     *
-     * <p>The stand-in is otherwise a bare item, which swings at hand speed: the server knows the
-     * axe is an axe and the client does not, and the whole dig is spent disagreeing. What arrives
-     * is the material's own numbers rather than a finished component, so the tool is rebuilt here
-     * through the same vanilla helpers the real item used - one implementation, no drift.
-     *
-     * <p>Anything older or unrecognised, including the plain "tool" this field used to carry,
-     * leaves the item as it was. That is the same nothing it did before, so a client that has not
-     * been updated is no worse off than it is today.
-     */
-    /**
      * Make a synced item wearable, and give it something to be drawn as.
      *
      * <p>The slot on its own says only where it goes. Armour is drawn from an equipment asset,
@@ -1258,6 +1246,18 @@ public class ContentManager {
         }
     }
 
+    /**
+     * Rebuild a synced tool so the client mines the way the server does.
+     *
+     * <p>The stand-in is otherwise a bare item, which swings at hand speed: the server knows the
+     * axe is an axe and the client does not, and the whole dig is spent disagreeing. What arrives
+     * is the material's own numbers rather than a finished component, so the tool is rebuilt here
+     * through the same vanilla helpers the real item used - one implementation, no drift.
+     *
+     * <p>Anything older or unrecognised, including the plain "tool" this field used to carry,
+     * leaves the item as it was. That is the same nothing it did before, so a client that has not
+     * been updated is no worse off than it is today.
+     */
     private static void applyTool(Item.Properties props, String spec) {
         if (spec.isEmpty() || !spec.contains("|")) return;
 

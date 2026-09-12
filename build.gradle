@@ -64,6 +64,8 @@ processResources {
 tasks.withType(JavaCompile).configureEach {
     it.options.encoding = "UTF-8"
     it.options.release = 25
+    // A doc comment that attaches to nothing is one an edit left behind.
+    it.options.compilerArgs << "-Xlint:dangling-doc-comments"
 }
 
 // Automated join testing: makes runClient connect straight to a server,

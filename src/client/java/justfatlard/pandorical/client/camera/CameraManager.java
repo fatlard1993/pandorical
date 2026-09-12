@@ -62,15 +62,15 @@ public class CameraManager {
         }
     }
 
-    /**
-     * Called by CameraMixin to get the overridden camera distance.
-     * Returns -1 if no override is active.
-     */
     /** How much the field of view is narrowed, 1.0 being not at all. */
     public static float getZoomFactor() {
         return zoomFactor;
     }
 
+    /**
+     * Called by CameraMixin to get the overridden camera distance.
+     * Returns -1 if no override is active.
+     */
     public static float getOverrideDistance() {
         return overrideDistance;
     }
