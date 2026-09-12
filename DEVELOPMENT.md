@@ -153,10 +153,10 @@ in the demo.
 
 ![Every component type on one screen](screenshot-components.png)
 
-Screens and HUD overlays are composed from eleven component types:
+Screens and HUD overlays are composed from these component types:
 
 `panel` · `scroll_panel` · `text` · `button` · `text_input` · `sprite` · `item_slot` ·
-`item_icon` · `inventory_grid` · `map` · `particle_burst` · `dial`
+`item_icon` · `inventory_grid` · `map` · `radar` · `particle_burst` · `dial`
 
 `ScreenBuilder` and `HudBuilder` carry shorthand for the ones used most. The rest,
 `text_input` and `item_slot` among them, are built with `ComponentBuilder` and passed to

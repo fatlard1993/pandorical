@@ -19,6 +19,24 @@ public final class ComponentType {
     public static final String SCROLL_PANEL = "scroll_panel";
     public static final String SPRITE = "sprite";
     public static final String MAP = "map";
+    /**
+     * What is moving about nearby, as dots on a disc that turns with the player: straight up is
+     * the way they are looking, the centre is where they stand. Drawn every frame from the
+     * client's own position and heading, so it keeps up with the camera; the server only says
+     * who is there. Each blip names its entity, and the client follows that entity while it can
+     * see it, falling back to the position that came with the blip when it cannot.
+     *
+     * <p>{@link #RADAR_BLIPS} is a list of {@code entityId,x,y,z,colour,size} separated by
+     * semicolons: colour an ARGB integer, size 1 to 3. {@link #RADAR_RANGE} is the disc's radius
+     * in blocks. {@link #RADAR_TARGET_X} and {@link #RADAR_TARGET_Z} mark one place to head for,
+     * drawn where it lies or on the rim when it is further than the range; leave them empty for
+     * none.
+     */
+    public static final String RADAR = "radar";
+    public static final String RADAR_BLIPS = "blips";
+    public static final String RADAR_RANGE = "range";
+    public static final String RADAR_TARGET_X = "target_x";
+    public static final String RADAR_TARGET_Z = "target_z";
     /** A small burst of particle-like sprites the client simulates locally (currently: orbit motion). */
     public static final String PARTICLE_BURST = "particle_burst";
     /**

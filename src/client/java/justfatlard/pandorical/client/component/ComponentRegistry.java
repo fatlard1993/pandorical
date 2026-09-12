@@ -41,6 +41,7 @@ public final class ComponentRegistry {
         register(ComponentType.SCROLL_PANEL, ScrollPanelComponent::new);
         register(ComponentType.SPRITE, SpriteComponent::new);
         register(ComponentType.MAP, MapComponent::new);
+        register(ComponentType.RADAR, RadarComponent::new);
         register(ComponentType.PARTICLE_BURST, ParticleBurstComponent::new);
         register(ComponentType.DIAL, DialComponent::new);
     }
