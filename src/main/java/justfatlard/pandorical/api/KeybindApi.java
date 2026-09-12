@@ -3,54 +3,34 @@ package justfatlard.pandorical.api;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * API for server mods to receive keybind presses from Pandorical clients
- * without shipping any client code of their own.
+ * Key presses from Pandorical clients, with no client code of your own.
  *
- * <p>Pandorical clients register a fixed pool of rebindable keybinds at
- * normal client startup (category "Pandorical", slots "Pandorical Action
- * 1..8"; slot 1 defaults to G, slot 2 to B, the rest start unbound). This pool exists
- * because Minecraft's options system only accepts keybind registration during
- * client startup: a dynamically added KeyMapping would neither persist its
- * rebinds to options.txt nor survive Fabric's registration-before-options
- * guard. Server mods therefore claim pool slots instead of registering real
- * per-mod keys.
+ * <p>Clients register a fixed pool of eight rebindable keybinds at startup, the only time
+ * Minecraft accepts them: category "Pandorical", "Pandorical Action 1..8", slot 1 on G, slot 2
+ * on B, the rest unbound. {@link #register} claims a slot and names it, so the controls screen
+ * shows the server's name on it.
  *
- * <p>{@link #register} claims a slot (preferring one whose pool default
- * matches {@code preferredDefaultKey}, else the lowest free slot) and names
- * it: the display name is shipped to clients as a lang entry in the synced
- * pandorical asset pack, so the controls screen shows the server's name on
- * the claimed slot. Presses arrive as a generic slot index and are dispatched
- * to the registered handler on the server thread.
- *
- * <p>Register during server-side mod initialisation, before any players
- * connect (same constraint as content registration): declarations and lang
- * are pushed per player at handshake time. Clients without the
- * {@code "keybinds"} capability (older Pandorical, vanilla) never receive or
- * send any of this.
+ * <p>Register during server-side mod initialisation, before any player connects: declarations
+ * are pushed at the handshake. Clients without the {@code "keybinds"} capability send nothing.
  */
 public interface KeybindApi {
     /**
-     * Claim a pooled keybind slot.
+     * Claims the slot whose default is {@code preferredDefaultKey}, else the lowest free one.
      *
      * @param id                  unique id for this keybind, namespaced, e.g. {@code "poopsmith:poop"}
      * @param preferredDefaultKey key code in the game's own InputConstants
      *                            table, NOT a GLFW code: use {@link #letter}.
-     *                            Claims a pre-bound slot only when it names
-     *                            that slot's default; 0 asks for no key
+     *                            0 asks for no key
      * @param displayName         name shown in the controls screen on claimed slots
      * @param handler             called on the server thread for each validated press
      */
     void register(String id, int preferredDefaultKey, String displayName, KeybindHandler handler);
 
     /**
-     * Bind a registered keybind to its {@code preferredDefaultKey} on clients, even though no pool
-     * slot starts on that key: once, on each client whose slot for it is still unbound when it
-     * joins. The client remembers doing it by this id, so clearing or moving the key afterwards
-     * sticks, and a key the player had already put on that slot is left alone.
-     *
-     * <p>For a key a player should not have to find and bind before the feature is any use to
-     * them. Pick one nothing in vanilla uses; the pool's own two defaults are G and B. A client
-     * from before this binds nothing and the key starts unbound, as every key used to.
+     * Bind a registered keybind to its {@code preferredDefaultKey} even though no pool slot starts
+     * on that key: once, on each client whose slot for it is unbound when it joins. The client
+     * remembers by id, so a player's later change sticks. Pick a key vanilla does not use. Older
+     * clients bind nothing.
      *
      * @param id a keybind already passed to {@link #register}
      */
@@ -71,11 +51,8 @@ public interface KeybindApi {
         void onPress(ServerPlayer player);
 
         /**
-         * The key came back up. A press is the default unit because most actions are one; a
-         * handbrake or a push-to-talk is the exception, and it needs both edges. The client
-         * reports the release only for a slot the server claimed, and a release with no press
-         * before it (a key held across the join) is delivered too, so a handler should treat it
-         * as "not held now" rather than as the end of something it saw start.
+         * The key came back up. A release with no press before it (a key held across the join)
+         * is delivered too, so read it as "not held now".
          */
         default void onRelease(ServerPlayer player) {}
     }

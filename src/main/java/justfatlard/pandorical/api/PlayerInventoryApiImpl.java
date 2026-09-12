@@ -17,56 +17,25 @@ import java.util.function.Consumer;
 import justfatlard.pandorical.protocol.InventoryButtonsS2C;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 
-/**
- * Server-side implementation of {@link PlayerInventoryApi}.
- *
- * <p>Extra slot contents are stored on the player via a Fabric data attachment that is
- * persisted automatically by Fabric (it serialises the codec on player save/load).
- */
 public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
-
-    // --- Static slot registry (populated during mod init, read-only after that) ---
 
     private final List<SlotRegistration> registrations = new ArrayList<>();
 
-    // Map: namespace string → list of change-listeners
     private final Map<String, List<BiConsumer<ServerPlayer, SlotChangeEvent>>> listeners =
         new HashMap<>();
 
-    // --- Fabric attachment: Map<namespace-string, List<ItemStack>> per player ---
-
-    /**
-     * Codec for {@code Map<String, List<ItemStack>>}.
-     * Each namespace maps to an ordered list of ItemStack (one per registered slot).
-     */
     private static final Codec<Map<String, List<ItemStack>>> SLOTS_CODEC =
         Codec.unboundedMap(
             Codec.STRING,
             ItemStack.OPTIONAL_CODEC.listOf()
         );
 
-    /**
-     * Carried across a death, which the default for a persistent attachment is not.
-     *
-     * <p>A respawn builds a new player rather than loading the old one, so without this the
-     * extra slots were simply gone - and gone silently, because a mod keeping its own mirror of
-     * a slot (map-plus-plus does) copies the mirror across and then disagrees with the empty
-     * store behind it. An equipped map went on driving the minimap while the slot that held it
-     * read empty.
-     *
-     * <p>Emptying these on death, where that is what should happen, is the business of whatever
-     * takes the items: dead-heads clears them into the head it leaves behind, and what is copied
-     * across is then correctly nothing.
-     */
     public static final AttachmentType<Map<String, List<ItemStack>>> EXTRA_SLOTS =
         AttachmentRegistry.<Map<String, List<ItemStack>>>builder()
             .persistent(SLOTS_CODEC)
             .copyOnDeath()
             .buildAndRegister(Identifier.fromNamespaceAndPath(Pandorical.MOD_ID, "extra_slots"));
 
-    // --- PlayerInventoryApi implementation ---
-
-    /** Buttons mods have asked for on the inventory screen, in registration order. */
     private final List<InventoryButtonsS2C.Button> buttons =
         new ArrayList<>();
 
@@ -86,12 +55,6 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
         buttonHandlers.put(namespace + "/" + id, handler);
     }
 
-    /**
-     * Where this namespace's slot sits in the inventory menu, or -1 if it is not registered.
-     *
-     * <p>The inverse of the walk {@link #fireSlotChangeListeners} does: extras follow vanilla's
-     * own 46, in registration order, each group as long as it declared itself.
-     */
     private int menuSlotOf(Identifier namespace, int slotIndex) {
         int offset = 0;
         for (SlotRegistration reg : registrations) {
@@ -104,7 +67,6 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
         return -1;
     }
 
-    /** Faces a player has been shown instead of the registered one, keyed namespace/id. */
     private final Map<UUID, Map<String, String>> glyphs =
         new ConcurrentHashMap<>();
 
@@ -121,12 +83,10 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
             new InventoryButtonsS2C(buttonsFor(player.getUUID())));
     }
 
-    /** Everything registered, for the packet sent during configuration. */
     public List<InventoryButtonsS2C.Button> declaredButtons() {
         return List.copyOf(buttons);
     }
 
-    /** The same buttons, wearing whatever faces this player has been switched to. */
     public List<InventoryButtonsS2C.Button> buttonsFor(UUID player) {
         Map<String, String> mine = glyphs.get(player);
         if (mine == null || mine.isEmpty()) return declaredButtons();
@@ -143,12 +103,10 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
         return List.copyOf(shown);
     }
 
-    /** Dropped on disconnect: whoever set them will set them again on the next join. */
     public void forgetButtonGlyphs(UUID player) {
         glyphs.remove(player);
     }
 
-    /** Route a press back to whoever asked for the button. */
     public void handleButton(ServerPlayer player, String namespace, String id) {
         var handler = buttonHandlers.get(namespace + "/" + id);
         if (handler == null) return;
@@ -162,22 +120,15 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
 
     @Override
     public void registerSlots(Identifier namespace, List<SlotEntry> slots) {
-        // Defensive copy so callers cannot mutate after registration.
         registrations.add(new SlotRegistration(namespace, List.copyOf(slots)));
         Pandorical.LOGGER.info("[pandorical] Registered {} extra inventory slot(s) for namespace '{}'",
             slots.size(), namespace);
     }
 
     /**
-     * Re-reads the persisted attachment into the live inventory menu.
-     *
-     * <p>The menu copies the attachment out when the {@code ServerPlayer} is constructed -
-     * which is before the player's saved data has loaded, so on a fresh join the copy is
-     * always empty. The attachment catches up when the NBT loads, but nothing pushed it
-     * back into the menu, and the client faithfully mirrored the stale empty copy: the
-     * minimap (fed from mod-side state) showed an equipped map in a slot the player could
-     * see was empty. Called on JOIN, after the load, writing through the menu slot so the
-     * change listeners fire and {@code broadcastChanges} carries it to the client.
+     * The menu copies the attachment when the {@code ServerPlayer} is constructed, before saved
+     * data loads, so on a fresh join its copy is empty. Call on JOIN, after the load; it writes
+     * through the menu slots so listeners fire and {@code broadcastChanges} reaches the client.
      */
     public void syncMenuFromAttachment(ServerPlayer player) {
         Map<String, List<ItemStack>> map = player.getAttached(EXTRA_SLOTS);
@@ -212,15 +163,8 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
 
     @Override
     public void setSlot(ServerPlayer player, Identifier namespace, int slotIndex, ItemStack stack) {
-        // Through the open menu where there is one, because the menu does not read this store -
-        // it copies out of it when it is built and its slots answer from that copy ever after.
-        // Writing the store alone left the two disagreeing: broadcastChanges asks each slot
-        // whether it has changed, the slot answered from the stale copy and said no, and nothing
-        // was sent. A death compass handed to the compass slot drove the minimap from a square
-        // the player could see was empty, until a relog rebuilt the menu and it appeared.
-        //
-        // The menu's own container writes back here and fires the listeners on the way, so this
-        // is the same path a player dragging an item into the slot takes.
+        // Through the menu where there is one: its slots answer from a copy taken when it was
+        // built, and its container writes back to the attachment and fires the listeners.
         int menuSlot = menuSlotOf(namespace, slotIndex);
         if (menuSlot >= 0 && player.inventoryMenu != null && menuSlot < player.inventoryMenu.slots.size()) {
             player.inventoryMenu.getSlot(menuSlot).set(stack == null ? ItemStack.EMPTY : stack);
@@ -231,7 +175,6 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
         Map<String, List<ItemStack>> map = getMutableSlots(player);
         String key = namespace.toString();
         List<ItemStack> list = map.computeIfAbsent(key, k -> {
-            // Size from registration
             int size = registrations.stream()
                 .filter(r -> r.namespace().equals(namespace))
                 .mapToInt(r -> r.slots().size())
@@ -239,14 +182,11 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
                 .orElse(slotIndex + 1);
             return new ArrayList<>(Collections.nCopies(size, ItemStack.EMPTY));
         });
-        // Grow if needed (edge case: called before registration size known)
         while (list.size() <= slotIndex) list.add(ItemStack.EMPTY);
         list.set(slotIndex, stack == null ? ItemStack.EMPTY : stack);
 
-        // Re-attach the (potentially mutated) map
         player.setAttached(EXTRA_SLOTS, map);
 
-        // Sync via vanilla container mechanism
         player.inventoryMenu.broadcastChanges();
     
         notifyListeners(player, namespace, slotIndex, stack);
@@ -257,24 +197,15 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
         listeners.computeIfAbsent(namespace.toString(), k -> new CopyOnWriteArrayList<>()).add(handler);
     }
 
-    // --- Package-private helpers used by the InventoryMenuMixin ---
-
     @Override
     public List<SlotRegistration> registeredSlots() {
         return getRegistrations();
     }
 
-    /** All registrations, in order. Called by the server-side mixin. */
     public List<SlotRegistration> getRegistrations() {
         return Collections.unmodifiableList(registrations);
     }
 
-    /**
-     * Tell this namespace's listeners what a slot now holds.
-     *
-     * <p>Guarded against a listener that writes back into the slot it was told about: without
-     * that, a mirror kept in step by one of these would answer its own notification for ever.
-     */
     private void notifyListeners(ServerPlayer player, Identifier namespace, int slotIndex,
             ItemStack newStack) {
         String key = namespace.toString();
@@ -299,18 +230,11 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
         }
     }
 
-    /** Slots a notification is already in flight for. See {@link #notifyListeners}. */
+    /** Slots a notification is in flight for, so a listener writing back does not recurse. */
     private final Set<String> notifying =
         Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-    /**
-     * Called by the server-side mixin after a slot click has been processed.
-     * Reads the current contents from the player's attachment and fires listeners
-     * for any namespace whose slots are included in the menu.
-     */
     public void fireSlotChangeListeners(ServerPlayer player, int menuSlotIndex, ItemStack newStack) {
-        // Determine which namespace + local slot this menu index corresponds to.
-        // The slots start at vanilla's 46 (result + craft + armor + inv + hotbar + shield).
         int extra = menuSlotIndex - VANILLA_INVENTORY_MENU_SLOT_COUNT;
         if (extra < 0) return;
 
@@ -338,20 +262,13 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
         }
     }
 
-    /**
-     * Vanilla InventoryMenu slot count before our extra slots.
-     * result(1) + craft(4) + armor(4) + main-inv(27) + hotbar(9) + shield(1) = 46
-     */
+    /** Result 1, craft 4, armor 4, main 27, hotbar 9, shield 1; the extra slots follow. */
     public static final int VANILLA_INVENTORY_MENU_SLOT_COUNT = 46;
 
-    /**
-     * Ensure the player has a mutable slots map and return it.
-     * The returned map is owned by this call: mutate it and then re-attach.
-     */
+    /** A mutable copy: changes reach the player only when re-attached. */
     public Map<String, List<ItemStack>> getMutableSlots(ServerPlayer player) {
         Map<String, List<ItemStack>> existing = player.getAttached(EXTRA_SLOTS);
         if (existing == null) return new HashMap<>();
-        // Return a mutable copy (the attachment may return an unmodifiable view)
         Map<String, List<ItemStack>> mutable = new HashMap<>();
         for (var e : existing.entrySet()) {
             mutable.put(e.getKey(), new ArrayList<>(e.getValue()));
@@ -359,10 +276,6 @@ public final class PlayerInventoryApiImpl implements PlayerInventoryApi {
         return mutable;
     }
 
-    /**
-     * Ensure the player's attachment has correctly-sized lists for every registration.
-     * Called from the server-side mixin after adding slots so the backing store is ready.
-     */
     public void ensureSlotLists(ServerPlayer player) {
         Map<String, List<ItemStack>> map = getMutableSlots(player);
         boolean changed = false;
