@@ -28,9 +28,6 @@ public class MapComponent extends AbstractComponent {
     // Vanilla's in-hand map background spans (-7,-7)..(135,135) around the 128px map.
     private static final float BORDER_TOTAL_MAP_PX = 7.0f;
 
-    /** Vanilla's decoration scale, applied in screen space rather than map space. */
-    private static final float MARKER_HALF_PX = 4.0f;
-
     /** Vanilla stores decoration facing in sixteenths of a turn. */
     private static final float DEGREES_PER_ROT_STEP = 360.0f / 16.0f;
 
@@ -137,9 +134,14 @@ public class MapComponent extends AbstractComponent {
         graphics.blit(RenderPipelines.GUI_TEXTURED, CHECKERBOARD_TEXTURE,
             x, y, 0.0F, 0.0F, footprint, footprint, footprint, footprint);
 
-        // Decorations are drawn below in screen space, so graphics.map() must not draw them too.
+        // The map's own markers stay for vanilla to draw, as it draws a held map's: an explorer
+        // map's X, a banner, a compass mark. Only the player-type ones go, since this draws the
+        // wearer's own marker itself below; they are the ones not drawn on a frame either.
         List<MapRenderState.MapDecorationRenderState> decorations = new ArrayList<>(renderState.decorations);
         renderState.decorations.clear();
+        for (MapRenderState.MapDecorationRenderState dec : decorations) {
+            if (dec.renderOnFrame && dec.atlasSprite != null) renderState.decorations.add(dec);
+        }
 
         graphics.enableScissor(mapX, mapY, mapX + mapSize, mapY + mapSize);
 
@@ -166,6 +168,21 @@ public class MapComponent extends AbstractComponent {
         self.renderOnFrame = true;
         renderState.decorations.add(self);
 
+        // Where the compass points, as a marker of the same kind. Off the map the server has
+        // moved the point to the border along its bearing, and it turns to face outward there.
+        boolean hasCompassTarget = compass && !Double.isNaN(compassTargetX) && !Double.isNaN(compassTargetZ);
+        if (hasCompassTarget) {
+            MapRenderState.MapDecorationRenderState target = new MapRenderState.MapDecorationRenderState();
+            target.atlasSprite = mapSprite(mc, compassOffMap ? "target_x" : "target_point");
+            target.x = compassDecX;
+            target.y = compassDecY;
+            float turn = compassOffMap ? (float) Math.toDegrees(Math.atan2(
+                compassTargetX - mapData.centerX, -(compassTargetZ - mapData.centerZ))) : 0f;
+            target.rot = (byte) Math.floorMod(Math.round(turn / DEGREES_PER_ROT_STEP), 16);
+            target.renderOnFrame = true;
+            renderState.decorations.add(target);
+        }
+
         Matrix3x2fStack pose = graphics.pose();
         pose.pushMatrix();
         pose.translate(originX, originY);
@@ -189,30 +206,6 @@ public class MapComponent extends AbstractComponent {
             }
         }
 
-        // renderOnFrame=false marks the player-type decorations, which vanilla skips in a GUI too.
-        for (MapRenderState.MapDecorationRenderState dec : decorations) {
-            if (!dec.renderOnFrame || dec.atlasSprite == null) continue;
-
-            float sx = originX + (dec.x / 2.0f + 64f) * zoomScale;
-            float sy = originY + (dec.y / 2.0f + 64f) * zoomScale;
-            if (sx < mapX || sx >= mapX + mapSize || sy < mapY || sy >= mapY + mapSize) continue;
-
-            drawMarker(graphics, dec.atlasSprite, sx, sy, dec.rot * DEGREES_PER_ROT_STEP);
-        }
-
-        boolean hasCompassTarget = compass && !Double.isNaN(compassTargetX) && !Double.isNaN(compassTargetZ);
-        if (hasCompassTarget) {
-            float cpx = originX + (compassDecX / 2.0f + 64f) * zoomScale;
-            float cpy = originY + (compassDecY / 2.0f + 64f) * zoomScale;
-            if (cpx >= mapX && cpx < mapX + mapSize && cpy >= mapY && cpy < mapY + mapSize) {
-                // Off the map the server has moved the point to the border along its bearing;
-                // the marker turns to face outward there.
-                float turn = compassOffMap ? (float) Math.toDegrees(Math.atan2(
-                    compassTargetX - mapData.centerX, -(compassTargetZ - mapData.centerZ))) : 0f;
-                drawMarker(graphics, mapSprite(mc, compassOffMap ? "target_x" : "target_point"),
-                    cpx, cpy, turn);
-            }
-        }
 
         if (compass && needleTexture != null && hasCompassTarget) {
             int size = Math.max(8, mapSize / 5);
@@ -259,24 +252,6 @@ public class MapComponent extends AbstractComponent {
             ? y + footprint + (spare - mc.font.lineHeight) / 2
             : mapY + mapSize - mc.font.lineHeight - 1;
         graphics.text(mc.font, coords, textX, textY, 0xFFFFFFFF, true);
-    }
-
-    /**
-     * The transform and quad of {@code GuiGraphicsExtractor.map}, in screen pixels. The V flip is
-     * in the UVs, not the quad: the GUI culls a quad wound the other way.
-     */
-    private static void drawMarker(GuiGraphicsExtractor graphics, TextureAtlasSprite sprite,
-                                    float cx, float cy, float rotDegrees) {
-        Matrix3x2fStack pose = graphics.pose();
-        pose.pushMatrix();
-        pose.translate(cx, cy);
-        pose.rotate((float) Math.toRadians(rotDegrees));
-        pose.scale(MARKER_HALF_PX, MARKER_HALF_PX);
-        pose.translate(-0.125f, 0.125f);
-        // x0, x1, y0, y1: this overload takes its corners an axis at a time.
-        graphics.blit(sprite.atlasLocation(), -1, 1, -1, 1,
-            sprite.getU0(), sprite.getU1(), sprite.getV1(), sprite.getV0());
-        pose.popMatrix();
     }
 
     /** A player: a diamond, since a locator bar colour can match a mob category's colour. */

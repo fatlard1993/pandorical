@@ -3,6 +3,7 @@ package justfatlard.pandorical.client.structure;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.protocol.DespawnStructureS2C;
 import justfatlard.pandorical.protocol.SetStructureVisibleS2C;
+import justfatlard.pandorical.protocol.SetStructureWalkableS2C;
 import justfatlard.pandorical.protocol.SpawnStructureS2C;
 import justfatlard.pandorical.protocol.StructureBlockEntry;
 import justfatlard.pandorical.protocol.StructureRelPos;
@@ -17,7 +18,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Client structures. Each server pose is blended in over {@link #INTERPOLATION_TICKS} ticks, and
- * a frame is drawn between the last two ticked poses like an entity. Riders blend by the same
+ * a frame is drawn between the last two ticked poses like an entity. Ticked at the start of the
+ * client tick, before entities, so a player carried by a deck ({@link StructureDecks}) moves by
+ * the same step the deck is drawn moving. Riders blend by the same
  * rule ({@code StructureInterpolationHandler}) so they are drawn where the deck is.
  */
 public final class StructureManager {
@@ -57,12 +60,20 @@ public final class StructureManager {
         for (StructureBlockEntry entry : payload.changed()) {
             structure.blocks.put(new RelPosKey(entry.x(), entry.y(), entry.z()), entry.state());
         }
+        structure.boundsStale = true;
     }
 
     public static void handleSetVisible(SetStructureVisibleS2C payload) {
         ClientStructure structure = structures.get(payload.structureId());
         if (structure == null) return;
+        if (structure.visible && !payload.visible()) StructureDecks.hidden(structure);
         structure.visible = payload.visible();
+    }
+
+    public static void handleSetWalkable(SetStructureWalkableS2C payload) {
+        ClientStructure structure = structures.get(payload.structureId());
+        if (structure == null) return;
+        structure.walkable = payload.walkable();
     }
 
     public static void handleDespawn(DespawnStructureS2C payload) {
@@ -91,6 +102,13 @@ public final class StructureManager {
     public static final class ClientStructure {
         public final Map<RelPosKey, BlockState> blocks;
         public boolean visible;
+        public boolean walkable;
+
+        /** Ticks a hidden walkable structure stays solid; see {@link StructureDecks#hidden}. */
+        int solidTicks;
+
+        private boolean boundsStale = true;
+        private int minX, minY, minZ, maxX, maxY, maxZ;
 
         private StructurePoseSnapshot previousPose;
         private StructurePoseSnapshot targetPose;
@@ -118,6 +136,42 @@ public final class StructureManager {
             lastTick = thisTick;
             if (ticksSinceUpdate < INTERPOLATION_TICKS) ticksSinceUpdate++;
             thisTick = blended(ticksSinceUpdate / (float) INTERPOLATION_TICKS);
+            if (solidTicks > 0) solidTicks--;
+        }
+
+        /** The pose drawn at the end of the previous tick. */
+        public StructurePoseSnapshot lastTick() {
+            return lastTick;
+        }
+
+        /** The pose drawn at the end of this tick. */
+        public StructurePoseSnapshot thisTick() {
+            return thisTick;
+        }
+
+        /** Stop blending and stand at the newest pose the server sent. */
+        void settle() {
+            previousPose = targetPose;
+            lastTick = targetPose;
+            thisTick = targetPose;
+            ticksSinceUpdate = INTERPOLATION_TICKS;
+        }
+
+        /** Whether any block lies in these relative bounds, inclusive. */
+        boolean mayHold(int x0, int y0, int z0, int x1, int y1, int z1) {
+            if (boundsStale) recomputeBounds();
+            return x1 >= minX && x0 <= maxX && y1 >= minY && y0 <= maxY && z1 >= minZ && z0 <= maxZ;
+        }
+
+        private void recomputeBounds() {
+            minX = minY = minZ = Integer.MAX_VALUE;
+            maxX = maxY = maxZ = Integer.MIN_VALUE;
+            for (RelPosKey key : blocks.keySet()) {
+                minX = Math.min(minX, key.x()); maxX = Math.max(maxX, key.x());
+                minY = Math.min(minY, key.y()); maxY = Math.max(maxY, key.y());
+                minZ = Math.min(minZ, key.z()); maxZ = Math.max(maxZ, key.z());
+            }
+            boundsStale = false;
         }
 
         public StructurePoseSnapshot interpolated(float partialTick) {

@@ -8,6 +8,7 @@ import justfatlard.pandorical.api.StructureApi;
 import justfatlard.pandorical.api.StructurePose;
 import justfatlard.pandorical.protocol.DespawnStructureS2C;
 import justfatlard.pandorical.protocol.SetStructureVisibleS2C;
+import justfatlard.pandorical.protocol.SetStructureWalkableS2C;
 import justfatlard.pandorical.protocol.SpawnStructureS2C;
 import justfatlard.pandorical.protocol.StructureBlockEntry;
 import justfatlard.pandorical.protocol.StructureRelPos;
@@ -36,6 +37,7 @@ public final class StructureRegistry implements StructureApi {
 		final Map<RelPos, BlockState> blocks;
 		StructurePose pose;
 		boolean visible;
+		boolean walkable;
 
 		StructureState(Entity anchorEntity, Map<RelPos, BlockState> blocks, StructurePose pose, boolean visible) {
 			this.anchorEntity = anchorEntity;
@@ -142,6 +144,20 @@ public final class StructureRegistry implements StructureApi {
 	}
 
 	@Override
+	public void setWalkable(String structureId, boolean walkable) {
+		StructureState state = structures.get(structureId);
+		if (state == null || state.walkable == walkable) return;
+		state.walkable = walkable;
+
+		SetStructureWalkableS2C packet = new SetStructureWalkableS2C(structureId, walkable);
+		for (ServerPlayer player : PlayerLookup.tracking(state.anchorEntity)) {
+			if (PandoricalApi.hasCapability(player, Capabilities.WALKABLE_STRUCTURES)) {
+				ServerPlayNetworking.send(player, packet);
+			}
+		}
+	}
+
+	@Override
 	public void despawn(String structureId) {
 		StructureState state = structures.remove(structureId);
 		if (state == null) return;
@@ -156,6 +172,9 @@ public final class StructureRegistry implements StructureApi {
 		for (Map.Entry<String, StructureState> entry : structures.entrySet()) {
 			if (entry.getValue().anchorEntity == entity) {
 				ServerPlayNetworking.send(player, buildSpawnPacket(entry.getKey(), entry.getValue()));
+				if (entry.getValue().walkable && PandoricalApi.hasCapability(player, Capabilities.WALKABLE_STRUCTURES)) {
+					ServerPlayNetworking.send(player, new SetStructureWalkableS2C(entry.getKey(), true));
+				}
 			}
 		}
 	}

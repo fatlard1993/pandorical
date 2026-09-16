@@ -19,6 +19,8 @@ public final class Capabilities {
     public static final String RENDER_POLICY = "render_policy";
     public static final String ANIMATIONS = "animations";
     public static final String MOUNT_POLICY = "mount_policy";
+    /** The client stands on and is carried by structures marked walkable. */
+    public static final String WALKABLE_STRUCTURES = "walkable_structures";
 
     /** The server has a mods menu to open. */
     public static final String SETTINGS = "settings";
@@ -27,9 +29,10 @@ public final class Capabilities {
 
     /** What a Pandorical client of this version declares. */
     public static final List<String> CLIENT = List.of(SCREENS, CONTENT, HUD, CAMERA, STRUCTURES, ENTITY_OVERLAYS,
-        CHEST_OVERLAYS, KEYBINDS, HUD_ELEMENTS, SKINS, RENDER_POLICY, ANIMATIONS, MOUNT_POLICY);
+        CHEST_OVERLAYS, KEYBINDS, HUD_ELEMENTS, SKINS, RENDER_POLICY, ANIMATIONS, MOUNT_POLICY, WALKABLE_STRUCTURES);
 
     /** What a Pandorical server of this version announces. */
     public static final List<String> SERVER = List.of(SCREENS, CONTENT, CAMERA, HUD, STRUCTURES, ENTITY_OVERLAYS,
-        CHEST_OVERLAYS, KEYBINDS, HUD_ELEMENTS, SKINS, RENDER_POLICY, ANIMATIONS, MOUNT_POLICY, SETTINGS, BLOCK_MARKS);
+        CHEST_OVERLAYS, KEYBINDS, HUD_ELEMENTS, SKINS, RENDER_POLICY, ANIMATIONS, MOUNT_POLICY, SETTINGS, BLOCK_MARKS,
+        WALKABLE_STRUCTURES);
 }

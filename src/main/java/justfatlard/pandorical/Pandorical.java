@@ -11,6 +11,7 @@ import justfatlard.pandorical.drops.DropsPolicy;
 import justfatlard.pandorical.login.ConfigPatience;
 import justfatlard.pandorical.login.Keepsakes;
 import justfatlard.pandorical.login.PandoricalSyncTask;
+import justfatlard.pandorical.maprelief.MapReliefRegistry;
 import justfatlard.pandorical.mixin.ServerCommonConnectionAccessor;
 import justfatlard.pandorical.picture.PictureRegistry;
 import justfatlard.pandorical.portal.PortalPairing;
@@ -29,6 +30,7 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityLevelChangeEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
+import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -204,6 +206,7 @@ public class Pandorical implements ModInitializer {
 
         PayloadTypeRegistry.clientboundPlay().register(HelloS2C.TYPE, HelloS2C.STREAM_CODEC);
         PictureRegistry.register();
+        MapReliefRegistry.register();
         PayloadTypeRegistry.clientboundPlay().register(
             KeepsakeStoreS2C.TYPE,
             KeepsakeStoreS2C.STREAM_CODEC);
@@ -255,6 +258,7 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(UpdateStructurePoseS2C.TYPE, UpdateStructurePoseS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(UpdateStructureBlocksS2C.TYPE, UpdateStructureBlocksS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SetStructureVisibleS2C.TYPE, SetStructureVisibleS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(SetStructureWalkableS2C.TYPE, SetStructureWalkableS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(DespawnStructureS2C.TYPE, DespawnStructureS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(EntityOverlayS2C.TYPE, EntityOverlayS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
@@ -530,9 +534,11 @@ public class Pandorical implements ModInitializer {
             PandoricalApi.playerInventoryImpl().syncMenuFromAttachment(player);
         });
 
-        // Likewise on respawn: the new player's menu is built before restoreFrom copies the
-        // attachment over.
-        ServerPlayerEvents.AFTER_RESPAWN.register(
+        // Likewise on respawn: the new player's menu is built before Fabric copies the attachment
+        // over, which it does from an AFTER_RESPAWN listener in the default phase.
+        ServerPlayerEvents.AFTER_RESPAWN.addPhaseOrdering(
+            Event.DEFAULT_PHASE, PlayerInventoryApi.RESPAWN_PHASE);
+        ServerPlayerEvents.AFTER_RESPAWN.register(PlayerInventoryApi.RESPAWN_PHASE,
             (oldPlayer, newPlayer, alive) ->
                 PandoricalApi.playerInventoryImpl().syncMenuFromAttachment(newPlayer));
 

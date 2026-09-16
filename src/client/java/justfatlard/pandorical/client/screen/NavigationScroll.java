@@ -4,8 +4,9 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 
 /**
- * A pad driver sends its scroll through {@link #around}, so the wheel-over-slot item move in
- * {@code ContainerHabitsMixin} stands aside and the list underneath scrolls.
+ * A pad driver sends its scroll through {@link #around}, marking it as navigation rather than a
+ * wheel. Nothing in Pandorical treats the two differently any more; kept for the drivers that
+ * call it.
  */
 @Environment(EnvType.CLIENT)
 public final class NavigationScroll {

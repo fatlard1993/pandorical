@@ -114,7 +114,7 @@ if (screenId == null) return;
 if (!PandoricalApi.isAvailable(player)) return;
 
 // Per-capability guard, for anything a client might lack
-if (!PandoricalApi.hasCapability(player, "hud_elements")) return;
+if (!PandoricalApi.hasCapability(player, Capabilities.HUD_ELEMENTS)) return;
 ```
 
 `isAvailable(player)` and `hasCapability(...)` return false until the client's capability
@@ -362,7 +362,7 @@ hud.restoreVanillaElements(player, "mymod");
 Suppression is keyed by the requesting mod, so two mods hiding different elements do not
 clobber each other, and an element stays hidden while any of them still wants it hidden.
 Chat, the player list, the sleep overlay and the demo timer are deliberately not
-suppressible.
+suppressible, nor are the spectator menu and tooltip while the player is spectating.
 
 Clients lacking the `hud_elements` capability keep drawing vanilla's version. An overlay
 meant to *replace* a vanilla element needs a layout that still works alongside it, or
@@ -482,23 +482,28 @@ the extra models it wants (found by scanning, so nothing is loaded that nobody s
 picks one at render time. Six ship today.
 
 **Rail diagonals.** A run of alternating curved rails is drawn as the straight diagonal it stands for. The
-client swaps a curve's model for a chord when both of its connected neighbours are the
-complementary curve; the chord models come from whichever mod ships the rail, named
-`<block>_diagonal_<se|sw|nw|ne>` beside its block models (`<block>_on_diagonal_...` for a
-powered state). A rail without them keeps its bend. Any block with a `shape` property of
+client swaps a curve's model for a chord when a connected neighbour is the same bend turned half
+round; two curves making a U-turn keep their bends. The chord models come from whichever mod
+ships the rail, named `<block>_diagonal_<se|sw|nw|ne>` beside its block models
+(`<block>_on_diagonal_...` for a powered state). Where a run meets a straight the two share one
+bend: the run's last chord takes `<block>_diagonal_<se|sw|nw|ne>_<n|e|s|w>`, eased toward the
+straight beyond that face, and the straight takes `<block>_diagonal_end_<ne|nw>`, modelled for a
+diagonal arriving through its south face and turned for the others. A rail without them keeps its bend. Any block with a `shape` property of
 `RailShape` is a rail here, so a server-defined stand-in qualifies as readily as vanilla's.
 Minecart Mania ships chords for vanilla's four rails and its own.
 
-**Joined fence gates.** A gate with the same gate beside it on its line takes a joined model,
-named `<gate>[_wall][_open]_join_<left|right|both>_<facing>`, the facing baked in because a
-model picked here has no blockstate rotation. More Doors ships them for every vanilla gate.
+**Joined fence gates.** A gate with the same gate beside it on its line, or below it, takes a
+joined model, named `<gate>[_wall][_open]_join_<left|right|both|none>[_stacked]_<facing>`
+(`none` for a gate joined only below), the facing baked in because a model picked here has no
+blockstate rotation. More Doors ships them for every vanilla gate.
 A lone gate marked `BlockMarkApi.GATE_HINGE_LEFT` or `GATE_HINGE_RIGHT` opens as one leaf,
 `<gate>[_wall]_open_swing_<left|right>[_stacked]_<facing>`.
 
 **Door banks.** Doors of one kind hung on the same side and filling a rectangle are drawn as
 one door: frame round the outside, sheet across the inside, one handle. Each leaf takes
-`<door>_mega_<lower|upper>_<hinge>[_open]_<flags>`, the flags naming which frame pieces it
-keeps. More Doors ships them.
+`<door>_mega_<bottom|top>_<hinge>[_open]_<flags>`, the flags naming which frame pieces it
+keeps. A leaf marked `BlockMarkApi.DOOR_DETACHED` is left out of any bank, and leaves marked
+`DOOR_SLIDING` bank only with each other. More Doors ships them.
 
 **Trapdoor banks.** Trapdoors of one kind lying in one plane and filling a rectangle are one
 hatch or shutter, each tile taking `<trapdoor>_mega_<bottom|top|open>_<flags>`. More Doors
@@ -574,8 +579,16 @@ appear; it only answers "what is this screen for", through
 `PandoricalContainerScreen#getRecipeStation()`, which is what a book needs before it can offer
 anything. smart-recipe-book puts a button on any screen that declares one.
 
-Browsing only. Filling a grid goes through `ServerboundPlaceRecipePacket`, which the server
-answers for menus carrying a recipe book, and a Pandorical menu does not.
+Filling the grid is the station's own job. Vanilla's `ServerboundPlaceRecipePacket` is answered
+only for menus carrying a recipe book, and a Pandorical menu does not, so a book asks instead with
+a screen action on `ScreenApi.PLACE_RECIPE_COMPONENT`; Pandorical resolves the recipe and hands
+it to the handler registered for the screen type, which places the ingredients itself:
+
+```java
+screens.onPlaceRecipe(SCREEN_TYPE, (player, recipe, useMaxItems) -> { /* check it is yours, fill the grid */ });
+```
+
+A station with no handler ignores the request.
 
 ## Banner decals
 
@@ -583,8 +596,8 @@ answers for menus carrying a recipe book, and a Pandorical menu does not.
 per position, drawn by the client with vanilla's own pattern sprites through the banner's
 flag model laid on its back. No base colour is drawn: the block's own texture is the ground,
 which is what makes a patterned bed read as a bed. A decal is described from its anchor block
-(`toHead`, `lift`, `fromHead`, `length`, `width`) and cleared by sending the position with no
-layers. Clients skip a decal whose chunk is not loaded or whose block is gone. Vanilla clients
+(`toHead`, `lift`, `fromHead`, `length`, `width`), sent with `send(player, decals)`, and cleared
+with `clear(player, positions)`, which sends each position with no layers. Clients skip a decal whose chunk is not loaded or whose block is gone. Vanilla clients
 see nothing; a mod keeping an item display as their fallback marks the displayed item's custom
 data with `BannerDecalApi.HIDDEN_ITEM_KEY` and Pandorical clients leave that display undrawn.
 
@@ -656,7 +669,10 @@ trap that nothing reports:
 answers a press, and `setButtonGlyph` changes what one player sees on one button - which
 is how a button that is a switch says which way it is set. `registeredSlots` walks every
 slot group, for the mods that have to empty the whole extra inventory rather than one
-slot they already know the name of.
+slot they already know the name of. A slot written on respawn must be written from an
+`AFTER_RESPAWN` listener in a phase after `PlayerInventoryApi.RESPAWN_PHASE`: Fabric carries the
+extra slots across from the default phase, and anything written before that is overwritten with
+the dead player's copy.
 
 ## For client-side mods
 

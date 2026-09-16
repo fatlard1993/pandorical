@@ -5,6 +5,7 @@ import justfatlard.pandorical.drops.DropsPolicy;
 import justfatlard.pandorical.hud.HudRegistry;
 import justfatlard.pandorical.keybind.KeybindPool;
 import justfatlard.pandorical.login.Keepsakes;
+import justfatlard.pandorical.maprelief.MapReliefRegistry;
 import justfatlard.pandorical.picture.PictureRegistry;
 import justfatlard.pandorical.portal.PortalPairing;
 import justfatlard.pandorical.push.BannerDecals;
@@ -130,6 +131,8 @@ public final class PandoricalApi {
     public static PortalApi portals() { return PORTALS; }
 
     public static DropsApi drops() { return DROPS; }
+
+    public static MapReliefApi mapReliefs() { return MapReliefRegistry.INSTANCE; }
 
     public static PictureApi pictures() { return PictureRegistry.INSTANCE; }
 

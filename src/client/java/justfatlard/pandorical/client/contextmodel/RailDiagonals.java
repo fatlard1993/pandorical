@@ -22,9 +22,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Draws a run of alternating curves as a straight diagonal. A curve with a joined curve on either
- * side draws the chord between its connected faces; a lone curve between straights keeps its
- * bend. Where a run meets a straight they share one bend: the straight draws its half, and the
+ * Draws a run of alternating curves as a straight diagonal. A curve joined on either side by its
+ * own bend turned half round draws the chord between its connected faces; a lone curve between
+ * straights keeps its bend, and so do two curves making a U-turn. Where a run meets a straight they share one bend: the straight draws its half, and the
  * run's last chord draws the rest.
  *
  * <p>Models, beside the block's own, with {@code _on} before {@code _diagonal} when powered:
@@ -117,8 +117,8 @@ public final class RailDiagonals implements ContextModels.Provider {
 
 		if (SUFFIX.containsKey(shape)) {
 			Direction[] sides = connected(shape);
-			boolean first = joinedCurve(level, pos, sides[0]);
-			boolean second = joinedCurve(level, pos, sides[1]);
+			boolean first = stepsOn(level, pos, shape, sides[0]);
+			boolean second = stepsOn(level, pos, shape, sides[1]);
 			if (!first && !second) return null;
 			if (first != second) {
 				Direction open = first ? sides[1] : sides[0];
@@ -155,17 +155,30 @@ public final class RailDiagonals implements ContextModels.Provider {
 
 	private static boolean stepped(BlockAndTintGetter level, BlockPos pos, RailShape shape) {
 		for (Direction side : connected(shape)) {
-			if (joinedCurve(level, pos, side)) return true;
+			if (stepsOn(level, pos, shape, side)) return true;
 		}
 		return false;
 	}
 
-	private static boolean joinedCurve(BlockAndTintGetter level, BlockPos pos, Direction side) {
+	/**
+	 * Whether the rail beyond {@code side} is the next step of a diagonal: the same bend turned
+	 * half round, which joins this one and carries on the way it was going. A curve that joins
+	 * and bends back the way this one came is a U-turn, and both keep their bends.
+	 */
+	private static boolean stepsOn(BlockAndTintGetter level, BlockPos pos, RailShape curve, Direction side) {
 		BlockState neighbour = level.getBlockState(pos.relative(side));
 		Property<RailShape> theirs = shapeProperty(neighbour.getBlock());
-		if (theirs == null) return false;
-		RailShape near = neighbour.getValue(theirs);
-		return SUFFIX.containsKey(near) && joins(near, side.getOpposite());
+		return theirs != null && neighbour.getValue(theirs) == turnedHalfRound(curve);
+	}
+
+	private static RailShape turnedHalfRound(RailShape curve) {
+		return switch (curve) {
+			case SOUTH_EAST -> RailShape.NORTH_WEST;
+			case SOUTH_WEST -> RailShape.NORTH_EAST;
+			case NORTH_WEST -> RailShape.SOUTH_EAST;
+			case NORTH_EAST -> RailShape.SOUTH_WEST;
+			default -> null;
+		};
 	}
 
 	private static boolean straightAlong(BlockState neighbour, Direction through) {

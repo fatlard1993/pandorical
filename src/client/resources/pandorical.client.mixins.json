@@ -6,6 +6,7 @@
   "mixins": [],
   "client": [
     "AbstractMinecartRendererMixin",
+    "ActionMenuKeyMixin",
     "BannerRendererInvoker",
     "BlockAnimateTintMixin",
     "CameraMixin",
@@ -24,6 +25,9 @@
     "InventoryMenuClientMixin",
     "InventoryScreenMixin",
     "ItemCountRendererMixin",
+    "ItemFrameReliefMixin",
+    "ItemFrameRenderStateMixin",
+    "KeyMappingAccessor",
     "LanguageHintMixin",
     "LeafCullingMixin",
     "LivingEntityRendererMixin",
@@ -35,9 +39,12 @@
     "PlayerSkinRenderCacheMixin",
     "PlayerTabOverlayAccessor",
     "ProjectionFovMixin",
+    "ReliefCullingMixin",
     "SectionCompilerMixin",
     "SingleQuadParticleAccessor",
-    "StackValidationMixin"
+    "StackValidationMixin",
+    "StructureDeckCarryMixin",
+    "StructureDeckCollisionMixin"
   ],
   "injectors": {
     "defaultRequire": 1

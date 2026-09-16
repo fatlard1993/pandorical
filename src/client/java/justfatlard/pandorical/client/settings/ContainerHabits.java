@@ -27,8 +27,8 @@ public final class ContainerHabits {
 
     public static void register() {
         ClientSettings.INSTANCE.group("pandorical", "Pandorical")
-            .toggle(KEY, "Wheel and drag move items",
-                "Scroll over a stack to move one item across; drag with an empty hand to move every stack you cross",
+            .toggle(KEY, "Drag moves items",
+                "Drag with an empty hand to move every stack you cross: left moves each stack, right one item from each",
                 ContainerHabits::enabled, ContainerHabits::set);
     }
 

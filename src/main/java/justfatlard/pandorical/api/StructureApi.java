@@ -49,6 +49,19 @@ public interface StructureApi {
     /** Server-side blocks and pose are kept while hidden. */
     void setVisible(String structureId, boolean visible);
 
+    /**
+     * Make a structure something to stand on: solid to the local player of a client with the
+     * {@code "walkable_structures"} capability, which also carries them with it while they stand
+     * on it or jump from it. Hidden structures are neither.
+     *
+     * <p>Done on the client because it cannot be done from the server: a player's position is
+     * the client's, and anything the server does to move them arrives on the network's schedule
+     * rather than the frame's, so a player carried from the server lags and jitters against the
+     * deck they can see. The server should leave such a player's position alone while they are
+     * aboard, and anything it keeps solid for other clients must not be solid to them.
+     */
+    void setWalkable(String structureId, boolean walkable);
+
     /** Remove the structure for every tracker and forget its server-side state. */
     void despawn(String structureId);
 }

@@ -20,6 +20,13 @@ import java.util.function.Predicate;
 public interface PlayerInventoryApi {
 
     /**
+     * The {@code ServerPlayerEvents.AFTER_RESPAWN} phase from which the reborn player's slots are
+     * current. Fabric carries the attachment across from a listener in the default phase, so a
+     * slot written before that is overwritten with the dead player's: write in a phase after this.
+     */
+    Identifier RESPAWN_PHASE = Identifier.fromNamespaceAndPath("pandorical", "extra_slots");
+
+    /**
      * @param slotIndex        unique index within this namespace's slot group (0-based)
      * @param screenX          x pixel position on the vanilla inventory screen (176x166 coordinate space)
      * @param screenY          y pixel position on the vanilla inventory screen

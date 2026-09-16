@@ -8,11 +8,15 @@
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			"justfatlard.pandorical.gametest.GateContent"
+			"justfatlard.pandorical.gametest.GateContent",
+			"justfatlard.pandorical.gametest.ActionMenuProbe"
 		],
 		"fabric-client-gametest": [
 			"justfatlard.pandorical.gametest.LaunchGate",
-			"justfatlard.pandorical.gametest.DropsFixes"
+			"justfatlard.pandorical.gametest.DropsFixes",
+			"justfatlard.pandorical.gametest.WalkableDecks",
+			"justfatlard.pandorical.gametest.PortalPairs",
+			"justfatlard.pandorical.gametest.ActionMenusWork"
 		]
 	},
 	"depends": {

@@ -19,7 +19,9 @@ download.
   and no download prompt.
 - **Rebindable keys** the server defines. They appear in your normal controls screen
   under "Pandorical", and rebind like any other key.
-- **Moving structures**, like a ship built out of blocks that sails as one piece.
+- **Moving structures**, like a ship built out of blocks that sails as one piece. One the
+  server marks walkable is solid underfoot and carries you with it, so you can stand and
+  walk on a ship's deck while it sails and turns.
 - **Camera control**, when a server wants to pull the view back.
 - **Cosmetic overlays** on particular mobs or chests, so you can tell one from another.
 - **One block at one place a different colour**, so two of the same block in two places can
@@ -36,9 +38,11 @@ added to a world. Everything you see through it comes from a mod on the server.
 - **Playing on a server that uses it**: yes, and you will usually be told. Without it,
   a mod built on Pandorical either degrades quietly (an item shows a raw name instead of
   a proper one) or refuses outright, telling you in chat that Pandorical is required.
-- **Playing on a vanilla or unrelated server**: it does nothing. The handshake never
-  happens and nothing draws. The one trace it leaves is eight rebindable "Pandorical
-  Action" rows in your controls screen, which sit there unused until a server names them.
+- **Playing on a vanilla or unrelated server**: the handshake never happens and nothing
+  draws. What it leaves is eight rebindable "Pandorical Action" rows in your controls screen,
+  which sit there unused until a server names them, and one habit in every container
+  screen: dragging with an empty hand moves every stack you cross. `container_habits=false`
+  in `config/pandorical-client.properties` turns it off.
 - **Running a server**: install it on the server too, alongside whichever mods depend on
   it. It is the one mod in this suite that belongs on both sides.
 
@@ -51,18 +55,58 @@ in this suite ships its README beside its licence. `/pandorical mods` opens the 
 lists the mods as text on a vanilla client. The screen is built to the size of the window it
 will show in, so a readme gets the room the window has. The readme is rendered by block: titles
 with a rule beneath, list items hanging off their markers, code in an inset with its spacing
-kept, quotes with a bar down their side, tables as a list of their rows.
+kept, quotes with a bar down their side, tables as a list of their rows. A mod that added commands
+has a **Commands** tab listing every form of each with its arguments, the ones only an op may
+run under their own heading; a mod that claimed keys has a **Keys** tab showing what each is
+bound to now, where pressing its button and then a key rebinds it, and Escape clears it.
 
 A mod's settings sit in sections by whose they are: **Your settings**, kept on this server for
 the player alone; **Your client's settings**, kept by the player's own game wherever they play;
 and **Server settings**, one value for everyone, which only an op is shown. `/pandorical
 settings` opens the menu on a mod with settings, or lists them as text on a vanilla client,
-where `/pandorical settings <mod> <key> <value>` changes them.
+where `/pandorical settings <mod> <key> <value>` changes them; `/pandorical settings list`
+lists them as text anywhere. Anyone can run these, but a server setting is listed only to ops
+and refused to anyone else. A switch takes `on` or `off`.
+
+Pandorical's own page has four server settings, each leaving the game as vanilla has it until
+an op changes it or a mod on the server asks otherwise: `pairNetherPortals` (off), so each
+nether portal remembers the one its first traveller came out of, both ways round, and a trip
+home comes out where it went in;
+`clumpExperience` (off), so XP orbs of any value merge into one that a touch takes whole, left
+out when Clumps is installed; `itemMergeRadius` (5, in tenths of a block, vanilla's reach, up to
+40), how far apart dropped stacks merge, never through a block, left out when Get It Together,
+Drops! is installed; and `itemTrackingRange` (0, meaning vanilla's 96 blocks), how far off
+players are sent dropped items and orbs. Vanilla clients see only the bigger orbs. Its client
+settings are the container habits above (on), and on Windows a load guard (on): for the first
+three minutes after launch and the first ninety seconds of each join it keeps the JVM's own log
+and samples its threads, which stopped a native crash some Windows players hit while loading.
+It is kept in `config/pandorical/load-guard.properties` as `enabled`.
+
+### Action menus
+
+Also on Pandorical's page, under your client's settings: **Action menus**, whose **Edit...**
+opens an editor for your own grids of buttons. Give a menu a name and a key; fill it with
+buttons, each with an icon (any item, found by searching or taken from your hand), a label shown
+when you point at it, and what it does: **run a command**, as if you had typed it, with your own
+permissions; **press a key**, any key in the controls screen, other mods' keys included; or **open
+another menu**, so menus can be pages of one another, and a page needs no key of its own. Press
+the menu's key with nothing else open and the grid comes up in the middle of the screen; click a
+button to do it. Escape goes back a page, and the key you opened with puts them all away. A key that opens something of
+the game's own when pressed leaves the menu shut rather than covering it.
+
+The menus are your client's, not the server's: kept on your machine in
+`config/pandorical-action-menus.json`, one set per account, so they come with you to every server
+you play on from that machine and two players sharing one keep their own.
 
 ## Installation
 
 Fabric, plus Fabric API. Drop the jar in `mods/` on the client, and in `mods/` on the
 server if you run one.
+
+For a crash nobody can reproduce, rename the jar so its name contains `diagnostic`. It then
+writes `logs/pandorical-trace.log` (each startup step and mixin applied, and where the game's
+threads are) and has the JVM keep `logs/pandorical-jvm.log`; the run before is kept as
+`pandorical-trace-previous.log`.
 
 ![A Pandorical server drawing to the client](screenshot.png)
 

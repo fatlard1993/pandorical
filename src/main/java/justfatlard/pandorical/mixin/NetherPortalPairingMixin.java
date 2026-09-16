@@ -29,6 +29,7 @@ public abstract class NetherPortalPairingMixin {
 		if (entity.level() instanceof ServerLevel from) {
 			BlockPos partner = PortalPairing.partnerFor(from, entry, newLevel);
 			if (partner != null) return Optional.of(partner);
+			return PortalPairing.searchingFor(from, entry, () -> original.call(forcer, approximateExit, toNether, border));
 		}
 		return original.call(forcer, approximateExit, toNether, border);
 	}

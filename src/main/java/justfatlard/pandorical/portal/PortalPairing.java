@@ -67,6 +67,60 @@ public final class PortalPairing implements PortalApi {
 		pairs.setDirty();
 	}
 
+	/**
+	 * The unpaired portal whose exit vanilla is searching for right now, or null. Set only around
+	 * that search, on the server thread, for {@link #isTaken}.
+	 */
+	private static GlobalPos seeking;
+
+	/**
+	 * Runs vanilla's exit search for a portal with no partner, passing over every portal already
+	 * paired with another. Vanilla's nearest-portal rule would otherwise send a new portal built
+	 * near an old one out of the old one's partner, and the way back from there is the old one's:
+	 * two portals near each other crossing wires. With every portal in reach taken, the search
+	 * finds nothing and vanilla builds this one a partner of its own.
+	 */
+	public static <T> T searchingFor(ServerLevel from, BlockPos entry, java.util.function.Supplier<T> search) {
+		GlobalPos source = enabled(from.getServer()) ? anchorOf(from, entry) : null;
+		if (source == null || isKept(from, source.pos())) return search.get();
+		GlobalPos outer = seeking;
+		seeking = source;
+		try {
+			return search.get();
+		} finally {
+			seeking = outer;
+		}
+	}
+
+	/** Whether vanilla's search, run by {@link #searchingFor}, should pass over this portal block. */
+	public static boolean isTaken(ServerLevel level, BlockPos candidate, Map<BlockPos, Boolean> judged) {
+		GlobalPos source = seeking;
+		if (source == null) return false;
+		Boolean known = judged.get(candidate);
+		if (known != null) return known;
+
+		Set<BlockPos> sheet = sheetOf(level, candidate);
+		boolean taken = sheet.isEmpty() || isTakenSheet(level, GlobalPos.of(level.dimension(), cornerOf(sheet)), source);
+		for (BlockPos pos : sheet) judged.put(pos, taken);
+		judged.put(candidate.immutable(), taken);
+		return taken;
+	}
+
+	private static boolean isTakenSheet(ServerLevel level, GlobalPos anchor, GlobalPos source) {
+		if (isKept(level, anchor.pos())) return true;
+		Pairs pairs = Pairs.get(level.getServer());
+		GlobalPos partner = pairs.links.get(anchor);
+		if (partner == null || partner.equals(source)) return false;
+		ServerLevel partnerLevel = level.getServer().getLevel(partner.dimension());
+		// A partner out of sight is taken as still standing; one found broken frees this one.
+		if (partnerLevel != null && partnerLevel.hasChunkAt(partner.pos())
+				&& !partnerLevel.getBlockState(partner.pos()).is(Blocks.NETHER_PORTAL)) {
+			pairs.unlink(anchor, partner);
+			return false;
+		}
+		return true;
+	}
+
 	/** Null leaves the trip to vanilla. */
 	public static BlockPos partnerFor(ServerLevel from, BlockPos entry, ServerLevel to) {
 		MinecraftServer server = from.getServer();
@@ -79,6 +133,14 @@ public final class PortalPairing implements PortalApi {
 		if (partner == null || !partner.dimension().equals(to.dimension())) return null;
 		if (!to.getBlockState(partner.pos()).is(Blocks.NETHER_PORTAL) || isKept(to, partner.pos())) {
 			pairs.unlink(source, partner);
+			return null;
+		}
+		// Recorded before exits already paired were passed over: this portal shares another pair's
+		// partner, whose way back is not here. It is let go, and the search finds or builds its own.
+		GlobalPos back = pairs.links.get(partner);
+		if (back != null && !back.equals(source)) {
+			pairs.links.remove(source);
+			pairs.setDirty();
 			return null;
 		}
 		return partner.pos();
@@ -118,16 +180,20 @@ public final class PortalPairing implements PortalApi {
 	}
 
 	static GlobalPos anchorOf(ServerLevel level, BlockPos inside) {
-		if (!level.getBlockState(inside).is(Blocks.NETHER_PORTAL)) return null;
+		Set<BlockPos> sheet = sheetOf(level, inside);
+		return sheet.isEmpty() ? null : GlobalPos.of(level.dimension(), cornerOf(sheet));
+	}
+
+	/** Every block of the portal sheet this block is part of; empty if it is not a portal. */
+	private static Set<BlockPos> sheetOf(ServerLevel level, BlockPos inside) {
+		if (!level.getBlockState(inside).is(Blocks.NETHER_PORTAL)) return Set.of();
 		Set<BlockPos> seen = new HashSet<>();
 		ArrayDeque<BlockPos> next = new ArrayDeque<>();
 		BlockPos start = inside.immutable();
 		seen.add(start);
 		next.add(start);
-		BlockPos corner = start;
 		while (!next.isEmpty() && seen.size() <= MOST_BLOCKS) {
 			BlockPos pos = next.poll();
-			if (before(pos, corner)) corner = pos;
 			for (Direction direction : Direction.values()) {
 				BlockPos beside = pos.relative(direction);
 				if (seen.contains(beside) || !level.hasChunkAt(beside)) continue;
@@ -136,7 +202,15 @@ public final class PortalPairing implements PortalApi {
 				next.add(beside);
 			}
 		}
-		return GlobalPos.of(level.dimension(), corner);
+		return seen;
+	}
+
+	private static BlockPos cornerOf(Set<BlockPos> sheet) {
+		BlockPos corner = null;
+		for (BlockPos pos : sheet) {
+			if (corner == null || before(pos, corner)) corner = pos;
+		}
+		return corner;
 	}
 
 	private static boolean before(BlockPos a, BlockPos b) {
