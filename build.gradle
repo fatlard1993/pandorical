@@ -32,6 +32,14 @@ dependencies {
 }
 
 // src/gametest: runClientGameTest launches a client that applies every mixin, joins a world
+// The game window is 854x480 unless it is told otherwise, and a screenshot taken larger than the
+// window leaves the HUD and any open screen laid out for the small one: the hotbar ends up a
+// postage stamp in the top left corner. Size the window to the picture instead, and run under an
+// xvfb screen at least as big: xvfb-run -a -s "-screen 0 2048x1152x24" ./gradlew runClientGameTest
+tasks.matching { it.name == "runClientGameTest" }.configureEach {
+	args("--width", "1920", "--height", "1080")
+}
+
 // and opens a screen. It opens a window: run it under xvfb-run, which Loom adds itself when CI is set.
 fabricApi {
     configureTests {
