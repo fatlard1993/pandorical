@@ -1,5 +1,6 @@
 package justfatlard.pandorical.screen;
 
+import justfatlard.pandorical.api.Viewport;
 import justfatlard.pandorical.protocol.ViewportC2S;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -7,15 +8,16 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** {@link #LEAST}, the smallest window vanilla allows at any GUI scale, stands until the client says. */
-public record Viewport(int width, int height) {
-    public static final Viewport LEAST = new Viewport(320, 240);
+/** What each client has said its window is; {@link Viewport#LEAST} stands until one says. */
+public final class Viewports {
+    private Viewports() {}
 
     private static final Map<UUID, Viewport> byPlayer = new ConcurrentHashMap<>();
 
     public static void declare(ServerPlayer player, ViewportC2S payload) {
         byPlayer.put(player.getUUID(), new Viewport(
-            Math.max(LEAST.width, payload.width()), Math.max(LEAST.height, payload.height())));
+            Math.max(Viewport.LEAST.width(), payload.width()),
+            Math.max(Viewport.LEAST.height(), payload.height())));
     }
 
     public static void forget(ServerPlayer player) {
@@ -23,6 +25,6 @@ public record Viewport(int width, int height) {
     }
 
     public static Viewport of(ServerPlayer player) {
-        return byPlayer.getOrDefault(player.getUUID(), LEAST);
+        return byPlayer.getOrDefault(player.getUUID(), Viewport.LEAST);
     }
 }

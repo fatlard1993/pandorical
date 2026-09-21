@@ -1,0 +1,34 @@
+# The bytes protocol v15 puts on the wire, one fixed sample per frozen channel.
+#
+# Every client in players' hands reads exactly these shapes, and a reader that finds bytes left
+# over is disconnected, so a line that changes here is a change that would kick everybody. Do not
+# edit a line to make the test pass: give the new shape its own channel name instead. This file is
+# rewritten only when PROTOCOL_VERSION is raised, which is the version that turns old clients away
+# outright.
+#
+# Not every channel is here yet. ProtocolFrozen finds the ones that are missing and names them in
+# NOT_YET_FROZEN, so what is uncovered is counted rather than assumed; a channel added from now on
+# fails the test until it is recorded here or listed there.
+action_menus 01086d796d6f643a6d31044d656e750e6b65792e6b6579626f6172642e6a010f6d696e6563726166743a73746f6e6504486f6d6504686f6d6500
+add_to_menu 04686f6d65
+camera_hint 0b706572737065637469766501046d6f64651174686972645f706572736f6e5f6261636b
+chest_overlay 01206d696e6563726166743a656e746974792f63686573742f6368726973746d61730200000000000000010000000000000002
+client_mod_files 01056d796d6f64064d79204d6f6403312e30096d796d6f642e6a617201
+client_mod_toggle 096d796d6f642e6a6172
+close_screen 086d796d6f643a7331
+content_ready 
+entity_overlay 071e6d796d6f643a74657874757265732f656e746974792f676c6f772e706e67
+hello_c2s 0f020773637265656e7303687564
+hello_s2c 0f020773637265656e7303687564
+hide_hud 086d796d6f643a6831
+key_press 03
+keybind_declarations 03000102
+keybind_defaults 0100086d796d6f643a6b3141
+keybind_rebind 03
+not_understood 0e636f6d706f6e656e745f74797065166d796d6f643a6e6f745f696e76656e7465645f796574
+open_screen 086d796d6f643a73310a6d796d6f643a74797065b001a60101055469746c6501046c696e650474657874050607080104746578740666726f7a656e010262670570616e656c010203040106626f7264657207626576656c6564000000
+requirement 0f0f0631352e302e30
+screen_action 086d796d6f643a7331026f6b05636c69636b010576616c75650131
+show_hud 086d796d6f643a683108746f705f6c656674040501046c696e650474657874050607080104746578740666726f7a656e010262670570616e656c010203040106626f7264657207626576656c656400
+update_hud 086d796d6f643a683101046c696e65010474657874076368616e676564
+update_screen 086d796d6f643a733101046c696e65010474657874076368616e676564

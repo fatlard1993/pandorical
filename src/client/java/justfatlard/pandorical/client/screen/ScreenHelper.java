@@ -1,5 +1,6 @@
 package justfatlard.pandorical.client.screen;
 
+import justfatlard.pandorical.api.ComponentType;
 import justfatlard.pandorical.api.NavigableScreen;
 import justfatlard.pandorical.client.component.*;
 import justfatlard.pandorical.protocol.ComponentDef;
@@ -21,7 +22,7 @@ public final class ScreenHelper {
             ComponentDef def, ComponentContext context,
             int offsetX, int offsetY,
             Map<String, PandoricalComponent> componentIndex) {
-        PandoricalComponent component = ComponentRegistry.create(def.type());
+        PandoricalComponent component = ComponentRegistry.create(def.type(), def.props().get(ComponentType.PROP_FALLBACK));
 
         ComponentDef absoluteDef = new ComponentDef(
             def.id(), def.type(),

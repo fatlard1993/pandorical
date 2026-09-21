@@ -28,10 +28,10 @@ public interface BlockMarkApi {
     String GATE_HINGE_RIGHT = "moredoor:gate_right";
 
     /** A door leaf cut loose from the leaves beside it: drawn as its own door, not part of a bank. */
-    String DOOR_DETACHED = "more-doors:detached";
+    String DOOR_DETACHED = "moredoor:detached";
 
     /** A door leaf that slides: drawn without a knob. */
-    String DOOR_SLIDING = "more-doors:sliding";
+    String DOOR_SLIDING = "moredoor:sliding";
 
     /** Name a mark of your own {@code yourmod:thing}. */
     void mark(ServerLevel level, BlockPos pos, String mark);

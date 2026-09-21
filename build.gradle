@@ -36,22 +36,9 @@ dependencies {
 // window leaves the HUD and any open screen laid out for the small one: the hotbar ends up a
 // postage stamp in the top left corner. Size the window to the picture instead, and run under an
 // xvfb screen at least as big: xvfb-run -a -s "-screen 0 2048x1152x24" ./gradlew runClientGameTest
-tasks.matching { it.name == "runClientGameTest" }.configureEach {
-	args("--width", "1920", "--height", "1080")
-}
-
-// and opens a screen. It opens a window: run it under xvfb-run, which Loom adds itself when CI is set.
-fabricApi {
-    configureTests {
-        createSourceSet = true
-        modId = "pandorical-gametest"
-        enableGameTests = false
-        enableClientGameTests = true
-        eula = true
-    }
-}
-// So an API change that breaks the gate fails the build, not the next launch.
-tasks.named('check') { dependsOn 'gametestClasses' }
+// and opens a screen. It opens a window: run it under xvfb-run, which Loom adds itself when CI is
+// set. The setup itself is shared with every other mod in the suite; see the file for the levels.
+apply from: file("gametest.gradle")
 
 // Fabric tests these predicates against the loader's *normalized* game version,
 // not Mojang's id: 26.3-snapshot-10 is compared as 26.3-alpha.10. So a floor of
@@ -114,6 +101,10 @@ jar {
     // Always written, so its time says when it was last built: dependent.gradle refuses a jar
     // older than the source, and Gradle judges up-to-date by content, not by time.
     outputs.upToDateWhen { false }
+    // Smoke lives in src/main because the twenty-nine mods that build against this one consume
+    // its main output, and that is the only source set they see. Players consume the jar, and a
+    // test harness is no use to them: it goes no further than the classes directory.
+    exclude 'justfatlard/pandorical/gametest/**' 
     from("LICENSE") {
         rename { "${it}_${project.base.archivesName.get()}" }
     }
@@ -122,6 +113,23 @@ jar {
         rename { "README_${project.base.archivesName.get()}.md" }
     }
 }
+
+// The gametest harness, in a jar of its own.
+//
+// Smoke lives in src/main because the mods that build against this one compile against its jar,
+// and that jar is the one players install: a test harness in it is dead weight on every client.
+// So it is cut from that jar and published beside it, and gametest.gradle puts this on the test
+// classpath of every mod in the suite. Nobody's build file changes.
+tasks.register('testSupportJar', Jar) {
+    archiveClassifier = 'testsupport'
+    from sourceSets.main.output
+    include 'justfatlard/pandorical/gametest/**'
+    // Same reasoning as the main jar: dependent.gradle compares times, and Gradle judges
+    // up-to-date by content.
+    outputs.upToDateWhen { false }
+}
+tasks.named('build') { dependsOn 'testSupportJar' }
+tasks.named('assemble') { dependsOn 'testSupportJar' }
 
 tasks.register('syncClient', Copy) {
     dependsOn build

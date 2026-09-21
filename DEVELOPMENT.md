@@ -39,12 +39,24 @@ dependencies {
 ```json
 // fabric.mod.json
 "depends": {
-    "pandorical": ">=1.3.9"
+    "pandorical": ">=15.0.0"
 }
 ```
 
 Set the floor to the first version with every API the mod calls. `"*"` loads against any
 Pandorical and fails at the first call to something it does not have.
+
+**The major version is the protocol, and the protocol is the gate.** Pandorical 15 serves every
+client speaking protocol 15 or above and turns the rest away with a message naming the version to
+install. A new word is a new channel, which an older client never registers and so never receives,
+and a changed payload is a new channel beside the old one; neither refuses anybody, so neither
+moves the major. It moves when a channel already in players' hands is dropped, which is the one
+change that makes an existing client useless. So a floor of `>=15.0.0` says what it means: this mod
+needs a Pandorical that still speaks 15.
+
+The minor version carries new words, and the patch fixes. A mod calling an API added in 15.4 sets
+`>=15.4.0`; one that only needs the basics can sit at `>=15.0.0` and keep working across the whole
+15 line.
 
 **A mod that only uses Pandorical when it is there** compiles against the built jar and applies
 `gradle/dependent.gradle`, which finds the jar by the version Pandorical declares and refuses one
@@ -79,12 +91,18 @@ before anything else.
 
 `screens` · `content` · `camera` · `hud` · `structures` · `entity_overlays` ·
 `chest_overlays` · `keybinds` · `hud_elements` · `skins` · `render_policy` ·
-`animations` · `mount_policy`
+`animations` · `mount_policy` · `walkable_structures`
 
 Pass the constant, `hasCapability(player, Capabilities.SCREENS)`, and a typo is a compile
 error. `hasCapability(player, "blockTints")` returns false forever, because `blockTints` is an
-API surface, not a capability. Player inventory slots, block tints, and built-in entity
-renderers have no capability string and are not guarded that way.
+API surface, not a capability. Player inventory slots and buttons, block tints, block marks,
+banner decals, pictures, map reliefs, action menus, keepsakes, and built-in entity renderers have
+no capability string and are not guarded that way; each is sent only to a client that registered
+its channel, which Fabric answers with `ServerPlayNetworking.canSend`.
+
+`Capabilities.Server.SETTINGS` and `Capabilities.Server.BLOCK_MARKS` are a server's announcements
+about itself, for its clients to read. They are not client capabilities, so
+`hasCapability(player, ...)` is false for them for every player, and says so in the log.
 
 **Chest overlay ids keep their atlas prefix.** `minecraft:christmas` is not a sprite;
 `minecraft:entity/chest/christmas` is. The wrong one draws magenta and logs nothing. See
@@ -106,6 +124,56 @@ A handler does not receive the ID. Get it from the player:
 String screenId = PandoricalApi.getOpenScreenId(player.getUUID());
 if (screenId == null) return;
 ```
+
+## Older clients
+
+The whole point of this mod is that your mod ships without anybody reinstalling anything, so the
+client in a player's hands is always older than the server it joins. What that client does with a
+word it has never heard is therefore part of the contract, not an accident.
+
+**A client below the gate is turned away, by name.** It leaves during configuration with "This
+server needs Pandorical *version*", rather than dying on the first payload it cannot read.
+
+**A client above the gate takes what it knows and skips the rest.** An unknown component type
+draws nothing and its children draw as usual; set `ComponentType.PROP_FALLBACK` to name a type an
+older client does have, and it draws that instead:
+
+```java
+new ComponentBuilder("dial", ComponentType.DIAL)
+    .prop(ComponentType.PROP_FALLBACK, ComponentType.PANEL)
+```
+
+The same holds elsewhere: an unknown camera hint, perspective, animation target, chest overlay op,
+tint type, tool kind or HUD element is skipped and logged once, never guessed at. A spec with more
+fields than the client expects keeps the fields it knows.
+
+**Ask the channel, not the version.** `ServerPlayNetworking.canSend(player, SomePayload.TYPE)` is
+the only answer that cannot be wrong: a client registers a channel exactly when it has the code
+that reads it. A capability string can be older than the feature it appears to cover, which is how
+keybind rebinding once offered a button that did nothing.
+
+**The server trims rather than kicks.** An encode failure disconnects the player it was aimed at,
+so an overlong label or mark is shortened and logged once, naming the value. Check your own lengths
+if the exact string matters.
+
+**The client tells you what it could not do.** Your mod runs where you can see it and draws where
+you cannot, so a word an older client lacks would otherwise be a feature that is absent,
+with the only explanation sitting in a log on someone else's machine. Instead the client reports it
+back, Pandorical writes it to the server log naming the player and the word, and you can listen:
+
+```java
+PandoricalApi.onNotUnderstood((player, kind, value) -> {
+    if (NotUnderstood.COMPONENT_TYPE.equals(kind)) showThePlainScreenTo(player);
+});
+```
+
+Each client reports each distinct word once per session, so it is a signal, not a stream. A client
+older than reporting itself says nothing, so silence means "no news", never "understood".
+
+**Growing a word without stranding anybody.** A new word is a new channel: a client that lacks it
+never registers it, so `canSend` is false and nothing is sent. A changed word is a new channel
+beside the old one, named `..._v2`, with the old one kept and the server picking the newest the
+client can take. Nothing about either refuses a player, which is why neither moves the protocol.
 
 ## Guards and timing
 
@@ -495,7 +563,7 @@ Minecart Mania ships chords for vanilla's four rails and its own.
 **Joined fence gates.** A gate with the same gate beside it on its line, or below it, takes a
 joined model, named `<gate>[_wall][_open]_join_<left|right|both|none>[_stacked]_<facing>`
 (`none` for a gate joined only below), the facing baked in because a model picked here has no
-blockstate rotation. More Doors ships them for every vanilla gate.
+blockstate rotation. Moredoor ships them for every vanilla gate.
 A lone gate marked `BlockMarkApi.GATE_HINGE_LEFT` or `GATE_HINGE_RIGHT` opens as one leaf,
 `<gate>[_wall]_open_swing_<left|right>[_stacked]_<facing>`.
 
@@ -503,15 +571,15 @@ A lone gate marked `BlockMarkApi.GATE_HINGE_LEFT` or `GATE_HINGE_RIGHT` opens as
 one door: frame round the outside, sheet across the inside, one handle. Each leaf takes
 `<door>_mega_<bottom|top>_<hinge>[_open]_<flags>`, the flags naming which frame pieces it
 keeps. A leaf marked `BlockMarkApi.DOOR_DETACHED` is left out of any bank, and leaves marked
-`DOOR_SLIDING` bank only with each other. More Doors ships them.
+`DOOR_SLIDING` bank only with each other. Moredoor ships them.
 
 **Trapdoor banks.** Trapdoors of one kind lying in one plane and filling a rectangle are one
-hatch or shutter, each tile taking `<trapdoor>_mega_<bottom|top|open>_<flags>`. More Doors
+hatch or shutter, each tile taking `<trapdoor>_mega_<bottom|top|open>_<flags>`. Moredoor
 ships them.
 
 **Door jambs.** A door with a fence connecting on its left or right takes a model with a
 post where the fence arm arrives and rails across to the panel, named
-`<door>_<lower|upper>_<hinge>[_open]_jamb_<left|right|both>_<facing>`. More Doors ships them
+`<door>_<lower|upper>_<hinge>[_open]_jamb_<left|right|both>_<facing>`. Moredoor ships them
 for the wooden doors and iron.
 
 **Hung from a slab.** A ceiling-mounted block under a top slab would float half a block below
@@ -537,8 +605,181 @@ per client. The display name appears in the client's controls
 screen under category "Pandorical", and a rebind persists in `options.txt` like any other
 key. Presses arrive on the server thread, validated and rate-limited.
 
-The pool is fixed at 8 slots because the options system only accepts keybind registration
-during client startup. Unclaimed slots are inert and send nothing.
+The pool is fixed at 16 slots (`KeybindPool.MAX_SLOTS`) because the options system only accepts
+keybind registration during client startup. Unclaimed slots are inert and send nothing. A client
+older than the current pool reports how many slots it carries, and the server says in its log
+which claim falls off the end rather than binding a key nobody can press.
+
+## Action menus
+
+A grid of buttons the player opens with one key. Your mod suggests a menu, or suggests single
+buttons for menus the player builds themselves; the client owns both, and everything a server
+offers is rebuilt from scratch on every join.
+
+```java
+// At mod init. A button either runs a command or presses one of your keybinds.
+PandoricalApi.actionMenus().suggestMenu("mymod:arena", "Arena", List.of(
+    ActionMenuApi.Button.runs("minecraft:iron_sword", "Queue", "arena queue"),
+    ActionMenuApi.Button.presses("minecraft:feather", "Leap", "mymod:action")));
+
+// Or offer one button for the player to put wherever they like.
+PandoricalApi.actionMenus().suggestButton(
+    ActionMenuApi.Button.runs("minecraft:paper", "Home", "home"));
+```
+
+A suggested menu is the server's: the player can give it a key but cannot edit it, and it is gone
+the moment they leave. A suggested button is an offer - it shows up in the editor's **Add what
+this server offers...** list and only becomes real if the player picks it.
+
+Do not suggest a key. The field exists, but a key the game already uses is refused on the client,
+and the player reaching the menu through the one key that opens all of them is the design. Anything
+a player does constantly already has a key; action menus are for the useful and less common.
+
+The mods screen puts an **Add** button beside every command your mod lists that takes no arguments,
+so anything reachable by `CommandHelpApi` is one press from being a button. A command whose usage
+has a slot in it - `<name>`, `[page]`, `(here|there)` - gets no button, because a button sends one
+fixed string and leaves nowhere to type the rest.
+
+An older client never registers the channel, so it is sent nothing and shows no Add button. There
+is no version to check and nothing to update.
+
+## Notices
+
+A question put to one player, waiting in a tray rather than scrolling past in chat. **This is not
+a toast**: it is for something that needs an answer, and it stays until it gets one or runs out.
+
+```java
+// id, kind, icon, what it says, the choices, and how many seconds it waits.
+PandoricalApi.notices().offer(player, new NoticeApi.Notice(
+    tradeId, "mymod:trade", "minecraft:emerald",
+    who + " wants to trade with you",
+    List.of(new NoticeApi.Choice("accept", "minecraft:lime_dye", "Accept"),
+        new NoticeApi.Choice("decline", "minecraft:barrier", "Decline")),
+    60));
+
+// Answered gives you the choice id; expired means it left without one.
+PandoricalApi.notices().onChoice("mymod:trade", (who, id, choice) -> settle(who, id, choice));
+PandoricalApi.notices().onExpiry("mymod:trade", (who, id) -> cancel(who, id));
+```
+
+Register `onExpiry` if a notice going unanswered means anything to your mod. A notice leaves
+without an answer three ways - it runs out of time, it is pushed out by newer ones once a player
+has more than eight waiting, or the player logs off - and all three call that handler. Without it
+your mod waits for a reply that is not coming.
+
+Offering the same kind and id twice replaces the first rather than adding a second, so an impatient
+caller cannot fill somebody's tray.
+
+## What changed since last time
+
+A player who was away comes back to a server that moved on without them, and nothing ever says so.
+Declare what a version of your mod changed, and they are told on the way in.
+
+Ship a `pandorical.changelog.json` in your resources. **No code, and no dependency on Pandorical**
+- a mod gets this by having the file:
+
+```json
+{
+  "overview": ["Amethyst doors you can lock to everyone but the people you build with."],
+  "versions": {
+    "1.3.0": ["Growing a shared geode now asks everyone in the cluster."],
+    "1.2.0": ["Geodes can be shared with the people you build with."]
+  }
+}
+```
+
+`overview` is the brief, `versions` is the changelog, and either may be one string or a list of
+them. The file is read once, after every mod has initialised.
+
+Declaring in code does the same and wins where both exist, for anything worked out at runtime:
+
+```java
+// At mod init. Order does not matter.
+PandoricalApi.changelog()
+    .note("amethyst-door", "1.3.0", "Growing a shared geode now asks everyone in the cluster.");
+```
+
+Write it for the player, not for the commit log. *"Geodes you share now ask everyone before
+growing"* is worth reading; *"refactor GeodeCommands, bump deps"* is not.
+
+Pandorical works out which mods a player has not seen by comparing what is running now against what
+was running the last time they joined, kept per player in the world save. A player away for three
+releases is shown all three notes, oldest first. Versions are compared as versions, so a note is
+never shown to somebody who was already here for it; where a version will not parse as one, only
+the note for the version actually running is shown.
+
+**A mod that declares nothing is still reported**, as the two versions it moved between. That is the
+fallback rather than the feature: a version number tells a player something changed and nothing
+about what, which is better than silence and worse than a sentence.
+
+Nothing is shown to a player joining for the first time - there is no "since" for them, and forty
+mods introducing themselves is not a welcome. Nothing is shown when nothing has changed, either.
+
+It arrives as a notice, so it waits in the tray rather than scrolling past in chat, and answering it
+opens a screen grouping the changes into what is new, what changed and what is gone.
+
+The same notes are also a **Changes** tab on the mod's own page in `/pandorical mods`, newest first,
+with the running version marked. The notice is a moment and is gone once answered; the tab is the
+copy that stays, for anyone who dismissed it or joined after it.
+
+## The brief
+
+What your mod is, for somebody meeting this server for the first time. One pass over everything
+running, offered once, ending with a way into the mods screen for whoever wants more.
+
+The same `pandorical.changelog.json` carries it, under `overview`, so a mod declares both in one
+file and writes no code:
+
+```json
+{ "overview": ["Amethyst doors you can lock to everyone but the people you build with."] }
+```
+
+Or in code, which wins where both exist:
+
+```java
+PandoricalApi.brief().overview("amethyst-door",
+    "Amethyst doors you can lock to everyone but the people you build with.");
+```
+
+One or two lines. This is the paragraph before the readme, not the readme: a player who wants the
+rest is one press from it at the end of the brief, and a mod that explains everything here is
+explaining it to somebody with no idea yet which parts they will care about.
+
+**Saying nothing is fine.** A mod with no overview is described by the summary already in its own
+`fabric.mod.json`, so the brief is never a list of names with gaps in it. Declaring one replaces
+that summary for a mod that would rather say it in its own words. A mod with neither is left out
+rather than listed blank.
+
+It arrives as a notice, so it waits rather than taking somebody's first minute, and it is offered
+once per player ever - `/pandorical brief` brings it back for anyone who turned it down or wants
+another look - marked as offered when it is put to them, not when they read it, so turning
+it down is not an invitation to ask again tomorrow.
+
+Mods are listed in the same order the mods screen uses, which is alphabetical by name. There is no
+way to rank them, deliberately: a new player has no idea yet what matters to them, so an order
+claiming to know is guessing.
+
+## Gating play
+
+A mod that holds a player short of play - a pen at the spawn until a password is said, a rules
+screen, anything they are kept behind - should say so, and everything Pandorical would put to a
+newcomer waits.
+
+```java
+// At mod init.
+PandoricalApi.heldWhile(Gate::isWaiting);
+```
+
+The brief, what changed since last time, and the action menus are held back for as long as any
+registered test says this player is held, and delivered the moment none of them do. Held back, not
+dropped: the same arrival a second late.
+
+Two reasons it matters. A player being asked for a password does not need a bell, a tray badge and
+a list of forty mods over the one instruction they are trying to read. And that list is the whole
+inventory of the server, which is not a thing to hand to somebody who has not answered yet.
+
+`onPlayerReady` is a different moment - it means the client has finished its handshake, not that
+the player is free to play. A mod can want both.
 
 ## Navigable screens
 

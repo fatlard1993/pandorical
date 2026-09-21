@@ -83,6 +83,8 @@ public final class PositionalTintStore {
 
 	public static void clear() {
 		painted.clear();
+		// The blocks tracked came from one server's tint groups and mean nothing on the next.
+		positional.clear();
 	}
 
 	private static void redraw(BlockPos pos) {

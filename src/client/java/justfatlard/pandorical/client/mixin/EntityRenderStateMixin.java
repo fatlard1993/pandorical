@@ -15,6 +15,9 @@ public class EntityRenderStateMixin implements OverlayTextureHolder,
 	@Unique
 	private EntityAnimations.Active pandorical$animation;
 
+	@Unique
+	private long pandorical$animationElapsed;
+
 	@Override
 	public void pandorical$setAnimation(
 			EntityAnimations.Active animation) {
@@ -24,6 +27,16 @@ public class EntityRenderStateMixin implements OverlayTextureHolder,
 	@Override
 	public EntityAnimations.Active pandorical$getAnimation() {
 		return this.pandorical$animation;
+	}
+
+	@Override
+	public void pandorical$setAnimationElapsed(long millis) {
+		this.pandorical$animationElapsed = millis;
+	}
+
+	@Override
+	public long pandorical$getAnimationElapsed() {
+		return this.pandorical$animationElapsed;
 	}
 	@Unique
 	private Identifier pandorical$overlayTexture;

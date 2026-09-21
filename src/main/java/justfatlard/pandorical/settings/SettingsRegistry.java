@@ -6,11 +6,14 @@ import justfatlard.pandorical.api.ComponentType;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.ScreenBuilder;
 import justfatlard.pandorical.api.SettingsApi;
+import justfatlard.pandorical.api.Viewport;
 import justfatlard.pandorical.keybind.KeybindPool;
+import justfatlard.pandorical.protocol.ClientSettingS2C;
 import justfatlard.pandorical.protocol.ComponentDef;
 import justfatlard.pandorical.protocol.ComponentUpdate;
-import justfatlard.pandorical.screen.Viewport;
+import justfatlard.pandorical.screen.Viewports;
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permissions;
 
@@ -33,6 +36,26 @@ public final class SettingsRegistry implements SettingsApi {
 
     /** Declaration order is section order. */
     public enum Kind { PLAYER, CLIENT, SERVER }
+
+    /**
+     * Whether this player's client can take a command onto a menu. Asked of the channel that
+     * carries it rather than of a capability or a version: the client that can receive it is the
+     * one that registered this receiver, and an older one leaves the button off its screen rather
+     * than showing one that does nothing.
+     */
+    private static boolean canAddToMenus(ServerPlayer player) {
+        return ServerPlayNetworking.canSend(player, justfatlard.pandorical.protocol.AddToMenuS2C.TYPE);
+    }
+
+    /**
+     * Whether a usage line leaves the player somewhere to type. A button sends one fixed string,
+     * so a slot of any shape - {@code <required>}, {@code [optional]}, {@code (one|other)} - or an
+     * arrow to another command means there is nothing a button could send.
+     */
+    private static boolean takesArguments(String usage) {
+        return usage.contains("<") || usage.contains("[")
+            || usage.contains("(") || usage.contains("\u2192");
+    }
 
     private static final int LIST_X = 8;
     private static final int LIST_Y = 20;
@@ -186,12 +209,29 @@ public final class SettingsRegistry implements SettingsApi {
     }
 
     public void open(ServerPlayer player, String selectedId, String tab) {
-        Layout at = Layout.fit(Viewport.of(player));
+        Layout at = Layout.fit(Viewports.of(player));
+        // The server's first, then the player's own, then the ones they have switched off: three
+        // different answers to "where is this running", and a single sorted list said none of them.
         List<ModCatalog.ModInfo> mods = new ArrayList<>(ModCatalog.all());
-        for (ModCatalog.ModInfo mine : ClientMods.of(player)) {
-            if (mods.stream().noneMatch(mod -> mod.id().equals(mine.id()))) mods.add(mine);
-        }
         mods.sort(Comparator.comparing(mod -> mod.name().toLowerCase()));
+        int serverCount = mods.size();
+
+        List<ModCatalog.ModInfo> onClient = new ArrayList<>();
+        for (ModCatalog.ModInfo mine : ClientMods.of(player)) {
+            if (mods.stream().noneMatch(mod -> mod.id().equals(mine.id()))) onClient.add(mine);
+        }
+        onClient.sort(Comparator.comparing(mod -> mod.name().toLowerCase()));
+        mods.addAll(onClient);
+        int clientCount = onClient.size();
+
+        List<ModCatalog.ModInfo> off = new ArrayList<>();
+        for (var entry : ClientMods.filesOf(player)) {
+            if (entry.enabled()) continue;
+            off.add(new ModCatalog.ModInfo(entry.id(), entry.name(), entry.version(),
+                "", "Switched off on your client.", List.of()));
+        }
+        off.sort(Comparator.comparing(mod -> mod.name().toLowerCase()));
+        mods.addAll(off);
         ModCatalog.ModInfo selected = null;
         if (selectedId != null) {
             for (ModCatalog.ModInfo mod : mods) {
@@ -210,6 +250,9 @@ public final class SettingsRegistry implements SettingsApi {
             if (!groupsFor(selected.id(), player).isEmpty()) tabs.add("settings");
             if (!ModCommands.of(selected.id(), player).isEmpty()) tabs.add("commands");
             if (!PandoricalApi.keybindsImpl().claimsOf(selected.id()).isEmpty()) tabs.add("keybinds");
+            if (justfatlard.pandorical.changelog.Changelog.INSTANCE.hasNotes(selected.id())) {
+                tabs.add("changes");
+            }
         }
         String at_tab = tab != null && tabs.contains(tab) ? tab
             : tabs.contains("settings") ? "settings" : "readme";
@@ -224,42 +267,58 @@ public final class SettingsRegistry implements SettingsApi {
         List<ComponentDef> names = new ArrayList<>();
         int buttonW = at.listW - 8;
         int y = 0;
+        int index = -1;
         for (ModCatalog.ModInfo mod : mods) {
-            boolean lit = selected != null && mod.id().equals(selected.id());
-            int count = 0;
-            boolean ops = false;
-            for (GroupImpl group : groupsFor(mod.id(), player)) {
-                count += group.shown(player).size();
-                ops |= group.server;
+            index++;
+            // A heading before the first of each kind, so the three groups read as three groups
+            // without every row having to repeat which one it is in.
+            String heading = index == 0 ? "On this server"
+                : index == serverCount && clientCount > 0 ? "On your client"
+                : index == serverCount + clientCount ? "Switched off" : null;
+            if (heading != null) {
+                names.add(new ComponentBuilder("head:" + index, ComponentType.TEXT)
+                    .bounds(0, y + 4, buttonW, LINE)
+                    .prop(ComponentType.PROP_TEXT, heading)
+                    .prop(ComponentType.PROP_COLOR, HINT_COLOR).build());
+                y += LINE + 4;
             }
-            String digits = String.valueOf(count);
-            int badgeW = count > 0 ? 8 + digits.length() * 6 : 0;
+            boolean lit = selected != null && mod.id().equals(selected.id());
+            // Counted apart, because they are not the same thing to the person reading them:
+            // yours are settings you can change, and the ops ones are settings you may only be
+            // able to look at. One badge summing both said a mod had six things for you when two
+            // of them were, and coloured all six as though none were.
+            int yours = 0;
+            int theirs = 0;
+            for (GroupImpl group : groupsFor(mod.id(), player)) {
+                int shown = group.shown(player).size();
+                if (group.server) theirs += shown; else yours += shown;
+            }
+            int badgesW = badgeWidth(yours) + badgeWidth(theirs);
+            if (yours > 0 && theirs > 0) badgesW += 2;
             names.add(new ComponentBuilder("mod:" + mod.id(), ComponentType.BUTTON)
-                .bounds(0, y, count > 0 ? buttonW - badgeW - 4 : buttonW, 20)
+                .bounds(0, y, badgesW > 0 ? buttonW - badgesW - 4 : buttonW, 20)
                 .prop(ComponentType.PROP_LABEL, mod.name())
                 .prop(ComponentType.PROP_STYLE, lit ? "pressed" : "default").build());
-            if (count > 0) {
-                int badgeX = buttonW - badgeW;
-                names.add(new ComponentBuilder("badge:" + mod.id(), ComponentType.SPRITE)
-                    .bounds(badgeX, y + 5, badgeW, 10)
-                    .prop(ComponentType.PROP_COLOR, ops ? OPS_BADGE_COLOR : BADGE_COLOR).build());
-                names.add(new ComponentBuilder("count:" + mod.id(), ComponentType.TEXT)
-                    .bounds(badgeX, y + 6, badgeW, 10)
-                    .prop(ComponentType.PROP_TEXT, digits)
-                    .prop(ComponentType.PROP_ALIGN, "center")
-                    .prop(ComponentType.PROP_SHADOW, "false")
-                    .prop(ComponentType.PROP_COLOR, BADGE_TEXT_COLOR).build());
-            }
+            // Ops on the outside, yours nearer the name: the one you can act on sits closer.
+            int opsX = buttonW - badgeWidth(theirs);
+            badge(names, "ops:" + mod.id(), opsX, y, theirs, OPS_BADGE_COLOR);
+            int yoursX = (theirs > 0 ? opsX - 2 : buttonW) - badgeWidth(yours);
+            badge(names, "own:" + mod.id(), yoursX, y, yours, BADGE_COLOR);
             y += LIST_ROW;
         }
+        // Measured, not counted. The panel scrolls in rows, and the three group headings are not
+        // rows: telling it there were only as many rows as mods left the last heading's worth of
+        // height below the floor, and what sat there was the end of "Switched off" - the mods
+        // somebody opened this screen to turn back on.
+        int contentRows = (y + LIST_ROW - 1) / LIST_ROW;
         int visible = at.listH / LIST_ROW;
-        int offset = Math.max(0, Math.min(listScroll.getOrDefault(player.getUUID(), 0), mods.size() - visible));
+        int offset = Math.max(0, Math.min(listScroll.getOrDefault(player.getUUID(), 0), contentRows - visible));
         screen.scrollPanel("mods", LIST_X, LIST_Y, at.listW, at.listH, Map.of(
             "item_height", String.valueOf(LIST_ROW),
             "visible_items", String.valueOf(visible),
-            "total_items", String.valueOf(mods.size()),
+            "total_items", String.valueOf(contentRows),
             "scroll_offset", String.valueOf(offset),
-            "show_scrollbar", String.valueOf(mods.size() * LIST_ROW > at.listH)), names);
+            "show_scrollbar", String.valueOf(y > at.listH)), names);
 
         if (selected != null) {
             screen.component(new ComponentBuilder("name", ComponentType.TEXT)
@@ -279,11 +338,24 @@ public final class SettingsRegistry implements SettingsApi {
                     ComponentType.PROP_STYLE, name.equals(at_tab) ? "pressed" : "default"));
             }
 
+            // A mod of the player's own can be switched off, and one they have switched off can be
+            // put back. Never a server mod: that jar is not on their machine and not theirs.
+            String file = fileOf(player, selected.id());
+            if (file != null) {
+                boolean on = !file.endsWith(".disabled");
+                screen.button("modfile:" + file, at.paneX + at.paneW - 66, TABS_Y - 24, 66, 20, Map.of(
+                    ComponentType.PROP_LABEL, on ? "Disable" : "Enable",
+                    ComponentType.PROP_TOOLTIP, on
+                        ? "Rename its jar to .disabled. Takes effect when you restart."
+                        : "Put its jar back. Takes effect when you restart."));
+            }
+
             List<ComponentDef> about = new ArrayList<>();
             int height = switch (at_tab) {
                 case "settings" -> settingsPane(player, selected, about, at);
                 case "commands" -> commandsPane(player, selected, about, at);
                 case "keybinds" -> keybindsPane(player, selected, about, at);
+                case "changes" -> changesPane(selected, about, at);
                 default -> readmePane(selected, about, at);
             };
             int lines = (height + LINE - 1) / LINE;
@@ -360,18 +432,71 @@ public final class SettingsRegistry implements SettingsApi {
             }
             y += 2;
             for (ModCommands.Entry entry : section) {
-                List<String> lines = Glyphs.wrap(entry.usage(), at.proseW() - INDENT);
+                boolean fixed = !takesArguments(entry.usage()) && (!ops || op);
+                int textWidth = at.proseW() - (fixed ? ADD_W + GUTTER : 0);
+                List<String> lines = Glyphs.wrap(entry.usage(), textWidth - INDENT);
                 for (int i = 0; i < lines.size(); i++) {
                     out.add(new ComponentBuilder("cmd:" + n++, ComponentType.TEXT)
-                        .bounds(i == 0 ? 0 : INDENT, y, at.proseW(), LINE)
+                        .bounds(i == 0 ? 0 : INDENT, y, textWidth, LINE)
                         .prop(ComponentType.PROP_TEXT, lines.get(i))
                         .prop(ComponentType.PROP_COLOR, CODE_COLOR).build());
+                    if (i == 0 && fixed && canAddToMenus(player)) {
+                        out.add(new ComponentBuilder("addcmd:" + entry.usage(), ComponentType.BUTTON)
+                            .bounds(at.proseW() - ADD_W, y - 3, ADD_W, LINE + 5)
+                            .prop(ComponentType.PROP_LABEL, "Add")
+                            .prop(ComponentType.PROP_TOOLTIP, "Put this on one of your action menus")
+                            .build());
+                    }
                     y += LINE;
+                }
+                if (!entry.description().isEmpty()) {
+                    for (String line : Glyphs.wrap(entry.description(), at.proseW() - INDENT)) {
+                        out.add(prose("cmddesc:" + n++, y, line, HINT_COLOR, at, INDENT));
+                        y += LINE;
+                    }
+                    y += 2;
                 }
             }
             y += 6;
         }
         return y;
+    }
+
+    /** Room for the "Add" button beside a command that can be one. */
+    private static final int ADD_W = 34;
+
+    /** Whether this file is one the player's own client named, and so one it may be asked about. */
+    private static boolean reportedByClient(ServerPlayer player, String file) {
+        for (var entry : ClientMods.filesOf(player)) {
+            if (entry.file().equals(file)) return true;
+        }
+        return false;
+    }
+
+    /** This player's own jar for a mod, or null where the mod is the server's rather than theirs. */
+    private static String fileOf(ServerPlayer player, String modId) {
+        for (var entry : ClientMods.filesOf(player)) {
+            if (entry.id().equals(modId)) return entry.file();
+        }
+        return null;
+    }
+
+    private static int badgeWidth(int count) {
+        return count > 0 ? 8 + String.valueOf(count).length() * 6 : 0;
+    }
+
+    private static void badge(List<ComponentDef> out, String id, int x, int y, int count, String colour) {
+        if (count <= 0) return;
+        int w = badgeWidth(count);
+        out.add(new ComponentBuilder("badge:" + id, ComponentType.SPRITE)
+            .bounds(x, y + 5, w, 10)
+            .prop(ComponentType.PROP_COLOR, colour).build());
+        out.add(new ComponentBuilder("count:" + id, ComponentType.TEXT)
+            .bounds(x, y + 6, w, 10)
+            .prop(ComponentType.PROP_TEXT, String.valueOf(count))
+            .prop(ComponentType.PROP_ALIGN, "center")
+            .prop(ComponentType.PROP_SHADOW, "false")
+            .prop(ComponentType.PROP_COLOR, BADGE_TEXT_COLOR).build());
     }
 
     private int keybindsPane(ServerPlayer player, ModCatalog.ModInfo mod, List<ComponentDef> out, Layout at) {
@@ -383,9 +508,12 @@ public final class SettingsRegistry implements SettingsApi {
         }
         int y = 2;
         int n = 0;
-        boolean listening = PandoricalApi.hasCapability(player, Capabilities.KEYBINDS);
+        boolean listening = KeybindPool.canRebind(player);
         if (!listening) {
-            for (String line : Glyphs.wrap("Your client does not carry keybinds; these do nothing here.", at.proseW())) {
+            String why = PandoricalApi.hasCapability(player, Capabilities.KEYBINDS)
+                ? "Your client is too old to rebind these here; update Pandorical to change them."
+                : "Your client does not carry keybinds; these do nothing here.";
+            for (String line : Glyphs.wrap(why, at.proseW())) {
                 out.add(prose("keyhint:" + n++, y, line, HINT_COLOR, at));
                 y += LINE;
             }
@@ -440,6 +568,36 @@ public final class SettingsRegistry implements SettingsApi {
             y += 6;
         }
         return y;
+    }
+
+    /**
+     * What this mod has changed, newest first.
+     *
+     * <p>The same notes a returning player is shown on the way in, kept somewhere they can be read
+     * on purpose. The arrival notice is a moment and is gone once answered; this is the copy that
+     * stays, for somebody who dismissed it, joined after it, or just wants to know what a mod has
+     * been doing lately.
+     */
+    private int changesPane(ModCatalog.ModInfo mod, List<ComponentDef> out, Layout at) {
+        Readme readme = new Readme(out, at);
+        String running = mod.version();
+        for (var released : justfatlard.pandorical.changelog.Changelog.INSTANCE.releases(mod.id())) {
+            if (readme.n >= MOST_LINES) {
+                readme.text(0, readme.y, "\u2026", HINT_COLOR, at.proseW());
+                readme.y += LINE;
+                break;
+            }
+            // The one running is worth marking: a player reading this wants to know which of these
+            // they already have.
+            readme.heading(2, released.version().equals(running)
+                ? released.version() + "  (running here)" : released.version());
+            for (String line : released.lines()) readme.paragraph(line, LABEL_COLOR, 0);
+        }
+        if (out.isEmpty()) {
+            readme.text(0, 2, "This mod has not written anything down yet.", HINT_COLOR, at.proseW());
+            readme.y = LINE + 2;
+        }
+        return Math.max(readme.y, 1);
     }
 
     private int readmePane(ModCatalog.ModInfo mod, List<ComponentDef> out, Layout at) {
@@ -572,8 +730,13 @@ public final class SettingsRegistry implements SettingsApi {
     }
 
     private static ComponentDef prose(String id, int y, String text, String color, Layout at) {
+        return prose(id, y, text, color, at, 0);
+    }
+
+    /** @param indent how far in from the left, for a line that belongs under another */
+    private static ComponentDef prose(String id, int y, String text, String color, Layout at, int indent) {
         return new ComponentBuilder(id, ComponentType.TEXT)
-            .bounds(0, y, at.proseW(), LINE)
+            .bounds(indent, y, at.proseW() - indent, LINE)
             .prop(ComponentType.PROP_TEXT, text)
             .prop(ComponentType.PROP_COLOR, color).build();
     }
@@ -588,6 +751,24 @@ public final class SettingsRegistry implements SettingsApi {
                 } catch (NumberFormatException ignored) {
                 }
             }
+            return;
+        }
+        if (componentId.startsWith("modfile:")) {
+            String file = componentId.substring("modfile:".length());
+            // Checked against what this client actually reported, so the screen cannot be talked
+            // into naming a file the player never told us about.
+            if (!reportedByClient(player, file)) return;
+            ServerPlayNetworking.send(player,
+                new justfatlard.pandorical.protocol.ClientModToggleS2C(file));
+            return;
+        }
+        if (componentId.startsWith("addcmd:")) {
+            if (!canAddToMenus(player)) return;
+            // The client owns action menus, so it is the client that asks which one and adds it.
+            String command = componentId.substring("addcmd:".length()).trim();
+            if (command.startsWith("/")) command = command.substring(1);
+            ServerPlayNetworking.send(player,
+                new justfatlard.pandorical.protocol.AddToMenuS2C(command));
             return;
         }
         int colon = componentId.indexOf(':');

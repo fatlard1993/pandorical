@@ -1,6 +1,8 @@
 package justfatlard.pandorical.client.hud;
 
 import justfatlard.pandorical.Pandorical;
+import justfatlard.pandorical.api.NotUnderstood;
+import justfatlard.pandorical.client.ClientNotices;
 import justfatlard.pandorical.client.component.ComponentContext;
 import justfatlard.pandorical.client.component.PandoricalComponent;
 import justfatlard.pandorical.client.screen.ScreenHelper;
@@ -44,6 +46,11 @@ public final class HudManager {
 			payload.offsetX(), payload.offsetY(),
 			roots, componentIndex
 		);
+
+		// Checked here rather than while drawing: an unknown anchor lands top left every frame.
+		if (!HudRenderer.knowsAnchor(payload.anchor())) {
+			ClientNotices.report(NotUnderstood.HUD_ANCHOR, payload.anchor());
+		}
 
 		HudOverlay replaced = activeOverlays.put(payload.overlayId(), overlay);
 		if (replaced != null) removed(replaced);

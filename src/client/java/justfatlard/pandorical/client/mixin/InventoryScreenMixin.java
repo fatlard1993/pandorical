@@ -13,6 +13,7 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.inventory.InventoryMenu;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -43,6 +44,15 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
     private static final int SLOT_BORDER_LIGHT = 0xFFFFFFFF;
     private static final int SLOT_INNER        = 0xFF8B8B8B;
 
+    /**
+     * A texture id from the server, or null if it is not one. Drawing happens every frame and
+     * {@code Identifier.parse} throws on a bad id, which would take the client down over a typo.
+     */
+    @Unique
+    private static Identifier pandorical$id(String value) {
+        return value == null || value.isEmpty() ? null : Identifier.tryParse(value);
+    }
+
     /** HEAD, so vanilla draws the slot items on top of these backgrounds. */
     @Inject(method = "extractRenderState", at = @At("HEAD"))
     private void pandorical$drawExtraSlotBackgrounds(GuiGraphicsExtractor graphics,
@@ -60,9 +70,9 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
                 graphics.fill(bx - 1,  ay,      bx,      by,      SLOT_BORDER_LIGHT);
                 graphics.fill(ax + 1,  ay + 1,  bx - 1,  by - 1,  SLOT_INNER);
 
-                String sprite = pos.backgroundSprite();
-                if (sprite != null && !sprite.isEmpty()) {
-                    graphics.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.parse(sprite), ax, ay, 18, 18);
+                Identifier sprite = pandorical$id(pos.backgroundSprite());
+                if (sprite != null) {
+                    graphics.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, ax, ay, 18, 18);
                 }
             }
         }
@@ -88,9 +98,12 @@ public abstract class InventoryScreenMixin extends AbstractContainerScreen<Inven
             // A face is a sprite id or a character to draw; only a sprite id contains a colon.
             String face = button.glyph();
             if (face.indexOf(':') >= 0) {
-                graphics.blitSprite(RenderPipelines.GUI_TEXTURED, Identifier.parse(face),
-                    bx + 1, by + 1, size - 2, size - 2);
-                continue;
+                Identifier id = pandorical$id(face);
+                // A glyph like "12:30" has a colon and is not an id; drawing must not throw.
+                if (id != null) {
+                    graphics.blitSprite(RenderPipelines.GUI_TEXTURED, id, bx + 1, by + 1, size - 2, size - 2);
+                    continue;
+                }
             }
             int gx = bx + (size - font.width(face)) / 2;
             int gy = by + (size - font.lineHeight) / 2 + 1;

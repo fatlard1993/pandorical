@@ -22,9 +22,22 @@ public final class SettingsCommand {
     private SettingsCommand() {}
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher, SettingsRegistry settings) {
+        PandoricalApi.commandHelp().describe("/pandorical mods",
+            "Every mod on this server: what it is for, what it lets you change, and what it adds.");
+        PandoricalApi.commandHelp().describe("/pandorical brief",
+            "What every mod on this server is, in a line each. Shown once when you first join.");
+        PandoricalApi.commandHelp().describe("/pandorical settings",
+            "Your settings, for every mod that has any.");
+        PandoricalApi.commandHelp().describe("/pandorical settings list",
+            "The same as a list of lines, for a client that cannot draw the screen.");
+        PandoricalApi.commandHelp().describe("/pandorical settings <mod> <key> <value>",
+            "Change one setting by name, without the screen.");
+
         dispatcher.register(Commands.literal("pandorical")
             .then(Commands.literal("mods")
                 .executes(context -> mods(context.getSource())))
+            .then(Commands.literal("brief")
+                .executes(context -> brief(context.getSource())))
             .then(Commands.literal("settings")
                 .executes(context -> open(context.getSource(), settings))
                 .then(Commands.literal("list").executes(context -> list(context.getSource(), settings)))
@@ -44,6 +57,16 @@ public final class SettingsCommand {
             return list(source, settings);
         }
         PandoricalApi.settings().open(player);
+        return 1;
+    }
+
+    private static int brief(CommandSourceStack source) throws CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+        if (!PandoricalApi.hasCapability(player, Capabilities.SCREENS)) {
+            source.sendSuccess(() -> text("pandorical.settings.no_client"), false);
+            return 0;
+        }
+        justfatlard.pandorical.brief.Brief.show(player);
         return 1;
     }
 

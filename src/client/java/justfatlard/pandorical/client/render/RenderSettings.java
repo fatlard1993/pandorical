@@ -26,7 +26,7 @@ public final class RenderSettings {
 			}
 			if (instance == null) {
 				instance = new RenderSettings();
-				Files.writeString(path, GSON.toJson(instance));
+				justfatlard.pandorical.ConfigFiles.write(path, GSON.toJson(instance));
 			}
 		} catch (Exception e) {
 			Pandorical.LOGGER.warn("Could not read {} - using defaults", FILE_NAME, e);

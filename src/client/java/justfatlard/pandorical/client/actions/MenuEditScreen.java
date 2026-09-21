@@ -33,6 +33,9 @@ final class MenuEditScreen extends Screen {
 		name.setMaxLength(40);
 		name.setValue(menu.name);
 		name.setResponder(v -> menu.name = v.isBlank() ? "Actions" : v);
+		// The server's menus are named by the server, and renaming one would last until the next
+		// join and no longer.
+		name.setEditable(!menu.builtin);
 		addRenderableWidget(name);
 
 		keyButton = addRenderableWidget(Button.builder(keyLabel(), b -> {
@@ -40,8 +43,9 @@ final class MenuEditScreen extends Screen {
 			b.setMessage(Component.literal("> press a key, Escape for none <"));
 		}).bounds(left + 154, 36, 146, 20).build());
 
-		// The buttons, in the grid the menu will open in, and one more square to add another.
-		int count = menu.buttons.size() + 1;
+		// The buttons, in the grid the menu will open in, and one more square to add another -
+		// except on the server's own, where there is nothing to add and nothing to edit.
+		int count = menu.builtin ? menu.buttons.size() : menu.buttons.size() + 1;
 		int cols = ActionMenuScreen.columns(count);
 		int step = IconButton.SIZE + GAP;
 		int gridLeft = (width - (cols * step - GAP)) / 2;
@@ -52,12 +56,24 @@ final class MenuEditScreen extends Screen {
 				ActionMenus.Entry entry = menu.buttons.get(i);
 				int index = i;
 				String shown = entry.label.isEmpty() ? "(no label)" : entry.label;
-				addRenderableWidget(new IconButton(x, y, IconButton.iconOf(entry.icon), Component.literal(shown),
+				IconButton icon = addRenderableWidget(new IconButton(x, y, IconButton.iconOf(entry.icon),
+					Component.literal(shown),
 					b -> minecraft.gui.setScreen(new ButtonEditScreen(this, menu, index))));
+				if (menu.builtin) icon.active = false;
 			} else {
 				addRenderableWidget(new IconButton(x, y, new ItemStack(Items.WRITABLE_BOOK), Component.literal("Add a button"),
 					b -> minecraft.gui.setScreen(new ButtonEditScreen(this, menu, -1))));
 			}
+		}
+
+		// Beside adding one by hand: the ones the mods here have already named and chosen an icon
+		// for. Hidden when this server promotes nothing, rather than opening on an empty list.
+		if (!menu.builtin && !ActionMenus.promoted().isEmpty()) {
+			addRenderableWidget(Button.builder(Component.literal("Add what this server offers..."),
+				b -> minecraft.gui.setScreen(new PromotedPickerScreen(this, added -> {
+					menu.buttons.add(added);
+					ActionMenus.save();
+				}))).bounds(width / 2 - 110, height - 56, 220, 20).build());
 		}
 
 		addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose())
@@ -72,13 +88,28 @@ final class MenuEditScreen extends Screen {
 	public boolean keyPressed(KeyEvent event) {
 		if (awaitingKey) {
 			awaitingKey = false;
-			menu.key = event.key() == InputConstants.KEY_ESCAPE ? "" : InputConstants.getKey(event).getName();
-			ActionMenus.save();
+			String chosen = event.key() == InputConstants.KEY_ESCAPE
+				? "" : InputConstants.getKey(event).getName();
+			// Taken by another menu, the first one wins and this one never opens, with the editor
+			// still reading "Opens with" over a key that does nothing. Refused instead, and said.
+			ActionMenus.Menu taken = chosen.isEmpty() ? null : ActionMenus.usingKey(chosen, menu);
+			if (taken != null) {
+				clash = Component.literal("\"" + taken.name + "\" already opens with "
+					+ MenuListScreen.keyName(chosen).getString());
+				return true;
+			}
+			clash = null;
+			menu.key = chosen;
+			// A built-in is rebuilt every join, so its key is kept apart from the menu itself.
+			if (menu.builtin) ActionMenus.rememberBuiltinKey(menu); else ActionMenus.save();
 			keyButton.setMessage(keyLabel());
 			return true;
 		}
 		return super.keyPressed(event);
 	}
+
+	/** Why the last key was refused, shown under the button until another is chosen. */
+	private Component clash;
 
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
@@ -86,6 +117,7 @@ final class MenuEditScreen extends Screen {
 		graphics.centeredText(font, title, width / 2, 16, 0xFFFFFFFF);
 		graphics.centeredText(font, Component.literal("Click a button to change it; the book adds one."),
 			width / 2, 64, 0xFFA0A0A0);
+		if (clash != null) graphics.centeredText(font, clash, width / 2, 76, 0xFFFF7070);
 	}
 
 	@Override

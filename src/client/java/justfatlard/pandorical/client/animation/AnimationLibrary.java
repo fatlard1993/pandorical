@@ -5,6 +5,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import justfatlard.pandorical.Pandorical;
+import justfatlard.pandorical.api.NotUnderstood;
+import justfatlard.pandorical.client.ClientNotices;
 import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
 import net.minecraft.client.animation.AnimationChannel;
 import net.minecraft.client.animation.AnimationDefinition;
@@ -114,8 +116,14 @@ public final class AnimationLibrary implements SimpleSynchronousResourceReloadLi
 		AnimationChannel.Target target = switch (targetName) {
 			case "position" -> AnimationChannel.Targets.POSITION;
 			case "scale" -> AnimationChannel.Targets.SCALE;
-			default -> AnimationChannel.Targets.ROTATION;
+			case "rotation" -> AnimationChannel.Targets.ROTATION;
+			// Turning an unknown target into a rotation moved the part the wrong way, silently.
+			default -> null;
 		};
+		if (target == null) {
+			ClientNotices.report(NotUnderstood.ANIMATION_TARGET, targetName);
+			return null;
+		}
 		boolean rotation = target == AnimationChannel.Targets.ROTATION;
 
 		JsonArray frames = json.getAsJsonArray("keyframes");

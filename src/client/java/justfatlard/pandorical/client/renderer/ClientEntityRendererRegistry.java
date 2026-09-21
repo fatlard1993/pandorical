@@ -1,6 +1,8 @@
 package justfatlard.pandorical.client.renderer;
 
 import justfatlard.pandorical.Pandorical;
+import justfatlard.pandorical.api.NotUnderstood;
+import justfatlard.pandorical.client.ClientNotices;
 import justfatlard.pandorical.api.EntityRendererRegistry;
 import justfatlard.pandorical.protocol.EntityRenderersS2C;
 import net.fabricmc.api.EnvType;
@@ -72,8 +74,7 @@ public final class ClientEntityRendererRegistry {
             EntityType<?> entityType = BuiltInRegistries.ENTITY_TYPE.getValue(id);
             EntityRendererProvider<?> providerFactory = resolveProvider(rendererKey);
             if (providerFactory == null) {
-                Pandorical.LOGGER.warn("[pandorical] Unknown renderer key '{}' for entity type '{}' — skipping",
-                    rendererKey, typeId);
+                ClientNotices.report(NotUnderstood.RENDERER_KEY, rendererKey);
                 continue;
             }
 

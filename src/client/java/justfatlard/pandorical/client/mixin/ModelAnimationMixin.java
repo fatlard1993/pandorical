@@ -35,6 +35,6 @@ public abstract class ModelAnimationMixin {
 		KeyframeAnimation animation = EntityAnimations.baked(model.root(), active.animation());
 		if (animation == null) return;
 
-		animation.apply(System.currentTimeMillis() - active.startedAt(), 1.0F);
+		animation.apply(holder.pandorical$getAnimationElapsed(), 1.0F);
 	}
 }

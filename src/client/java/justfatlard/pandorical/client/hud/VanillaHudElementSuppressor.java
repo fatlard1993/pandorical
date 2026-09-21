@@ -1,6 +1,8 @@
 package justfatlard.pandorical.client.hud;
 
 import justfatlard.pandorical.Pandorical;
+import justfatlard.pandorical.api.NotUnderstood;
+import justfatlard.pandorical.client.ClientNotices;
 import justfatlard.pandorical.protocol.SetVanillaHudElementsS2C;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
@@ -61,12 +63,8 @@ public final class VanillaHudElementSuppressor {
         suppressed.clear();
         for (String raw : payload.hiddenElements()) {
             Identifier id = Identifier.tryParse(raw);
-            if (id == null) {
-                Pandorical.LOGGER.warn("Server asked to hide unparseable HUD element id '{}'", raw);
-                continue;
-            }
-            if (!SUPPRESSIBLE.contains(id)) {
-                Pandorical.LOGGER.warn("Server asked to hide HUD element '{}', which Pandorical does not allow hiding", raw);
+            if (id == null || !SUPPRESSIBLE.contains(id)) {
+                ClientNotices.report(NotUnderstood.HUD_ELEMENT, raw);
                 continue;
             }
             suppressed.add(id);

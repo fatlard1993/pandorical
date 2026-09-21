@@ -1,6 +1,8 @@
 package justfatlard.pandorical.client.renderer;
 
 import justfatlard.pandorical.Pandorical;
+import justfatlard.pandorical.api.NotUnderstood;
+import justfatlard.pandorical.client.ClientNotices;
 import justfatlard.pandorical.protocol.ChestOverlayS2C;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -18,6 +20,12 @@ public final class ChestOverlayStore {
 	private static final Map<Long, Identifier> overlays = new ConcurrentHashMap<>();
 
 	public static void handle(ChestOverlayS2C payload) {
+		if (payload.op() != ChestOverlayS2C.OP_REPLACE && payload.op() != ChestOverlayS2C.OP_ADD
+				&& payload.op() != ChestOverlayS2C.OP_REMOVE) {
+			// Treating an unknown op as "add" drew overlays the server never asked for.
+			ClientNotices.report(NotUnderstood.CHEST_OP, String.valueOf(payload.op()));
+			return;
+		}
 		if (payload.op() == ChestOverlayS2C.OP_REMOVE) {
 			for (long packed : payload.positions()) overlays.remove(packed);
 			return;

@@ -5,8 +5,8 @@ import net.minecraft.server.level.ServerPlayer;
 /**
  * Key presses from Pandorical clients, with no client code of your own.
  *
- * <p>Clients register a fixed pool of eight rebindable keybinds at startup, the only time
- * Minecraft accepts them: category "Pandorical", "Pandorical Action 1..8", slot 1 on G, slot 2
+ * <p>Clients register a fixed pool of sixteen rebindable keybinds at startup, the only time
+ * Minecraft accepts them: category "Pandorical", "Pandorical Action 1..16", slot 1 on G, slot 2
  * on B, the rest unbound. {@link #register} claims a slot and names it, so the controls screen
  * shows the server's name on it.
  *

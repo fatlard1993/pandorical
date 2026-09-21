@@ -46,6 +46,14 @@ public final class HudRenderer {
 		}
 	}
 
+	/** The anchors {@link #resolveX} and {@link #resolveY} lay out; anything else sits top left. */
+	private static final java.util.Set<String> ANCHORS = java.util.Set.of(
+		"top_left", "top_right", "top_center", "center", "bottom_left", "bottom_right", "bottom_center");
+
+	public static boolean knowsAnchor(String anchor) {
+		return anchor == null || anchor.isEmpty() || ANCHORS.contains(anchor);
+	}
+
 	/** The player list covers the top centre whenever vanilla shows it. */
 	private static boolean yieldsToTabList(HudOverlay overlay) {
 		return "top_center".equals(overlay.anchor);

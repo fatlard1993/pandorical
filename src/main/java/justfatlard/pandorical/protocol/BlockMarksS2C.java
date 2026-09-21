@@ -13,6 +13,11 @@ public record BlockMarksS2C(Identifier dimension, List<Entry> entries) implement
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "block_marks"));
 
     public record Entry(long pos, String mark, boolean on) {
+        /** A trimmed mark matches nothing on the client; an overlong one would kick them. */
+        public Entry {
+            mark = Wire.fit(mark, 64, "a block mark");
+        }
+
         public static final StreamCodec<ByteBuf, Entry> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.VAR_LONG, Entry::pos,
             ByteBufCodecs.stringUtf8(64), Entry::mark,

@@ -42,7 +42,7 @@ public final class Keepsakes implements KeepsakeApi {
 			}
 			serverId = UUID.randomUUID().toString();
 			Files.createDirectories(file.getParent());
-			Files.writeString(file, serverId + "\n");
+			justfatlard.pandorical.ConfigFiles.write(file, serverId + "\n");
 		} catch (IOException e) {
 			Pandorical.LOGGER.warn("[pandorical] could not keep the server id at {}: {}", file, e.getMessage());
 			if (serverId == null) serverId = UUID.randomUUID().toString();

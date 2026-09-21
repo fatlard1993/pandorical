@@ -40,7 +40,12 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extend
 		((OverlayTextureHolder) state).pandorical$setOverlayTexture(
 			EntityOverlayStore.get(entity.getId()));
 
-		((AnimationHolder) state).pandorical$setAnimation(
-			EntityAnimations.playing(entity.getId()));
+		EntityAnimations.Active animation = EntityAnimations.playing(entity.getId());
+		AnimationHolder holder = (AnimationHolder) state;
+		holder.pandorical$setAnimation(animation);
+		// One reading of the clock for the whole entity: every model posed from this state has to
+		// land on the same instant, or two of them drift apart by however long the frame took.
+		holder.pandorical$setAnimationElapsed(
+			animation == null ? 0L : System.currentTimeMillis() - animation.startedAt());
 	}
 }

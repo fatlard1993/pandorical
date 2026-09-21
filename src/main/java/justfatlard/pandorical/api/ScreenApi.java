@@ -81,6 +81,12 @@ public interface ScreenApi {
         void placeRecipe(ServerPlayer player, RecipeHolder<?> recipe, boolean useMaxItems);
     }
 
+    /**
+     * The player's window, in the scaled pixels a screen is laid out in, so a screen can be built
+     * to fit it rather than to a guess. {@link Viewport#LEAST} until their client reports one.
+     */
+    Viewport viewport(ServerPlayer player);
+
     /** When the container menu goes, by close or disconnect: return items to the player here. */
     void onContainerRemoved(String screenType, Consumer<ServerPlayer> handler);
 

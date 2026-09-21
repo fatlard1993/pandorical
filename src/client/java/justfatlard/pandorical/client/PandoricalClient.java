@@ -5,6 +5,7 @@ import justfatlard.pandorical.Diagnostics;
 import justfatlard.pandorical.MountPolicy;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.Capabilities;
+import justfatlard.pandorical.api.NotUnderstood;
 import justfatlard.pandorical.client.animation.AnimationLibrary;
 import justfatlard.pandorical.client.animation.EntityAnimations;
 import justfatlard.pandorical.client.api.PandoricalClientApi;
@@ -28,6 +29,7 @@ import justfatlard.pandorical.client.inventory.ClientInventoryButtons;
 import justfatlard.pandorical.client.inventory.ClientInventorySlotRegistry;
 import justfatlard.pandorical.client.keepsake.ClientKeepsakes;
 import justfatlard.pandorical.client.keybind.KeybindManager;
+import justfatlard.pandorical.client.mixin.ClientCommonListenerAccessor;
 import justfatlard.pandorical.client.maprelief.ClientMapReliefs;
 import justfatlard.pandorical.client.picture.ClientPictures;
 import justfatlard.pandorical.client.render.LeafCulling;
@@ -238,8 +240,12 @@ public class PandoricalClient implements ClientModInitializer {
         ClientConfigurationNetworking.registerGlobalReceiver(
             RequirementS2C.TYPE, (payload, context) -> {
                 if (Pandorical.PROTOCOL_VERSION < payload.minimumProtocol()) {
+                    // Saying so beats the decode error that arrives a packet later and names nothing.
                     Pandorical.LOGGER.warn("Server needs Pandorical {} (protocol v{}); this client speaks v{}",
                         payload.serverModVersion(), payload.minimumProtocol(), Pandorical.PROTOCOL_VERSION);
+                    var connection = ((ClientCommonListenerAccessor) context.packetListener()).pandorical$connection();
+                    context.client().execute(() -> connection.disconnect(Component.translatable(
+                        "pandorical.too_old", payload.serverModVersion())));
                 } else {
                     Pandorical.LOGGER.debug("Server runs Pandorical {} — protocol v{}, minimum v{}",
                         payload.serverModVersion(), payload.protocolVersion(), payload.minimumProtocol());
@@ -263,7 +269,7 @@ public class PandoricalClient implements ClientModInitializer {
             case "constant"  -> BlockTintSources.constant(entry.constantColor());
             case "positional"-> PositionalTintStore.source(entry.constantColor());
             default -> {
-                Pandorical.LOGGER.warn("Unknown block tint type '{}' — skipping", entry.tintType());
+                ClientNotices.report(NotUnderstood.TINT_TYPE, entry.tintType());
                 yield null;
             }
         };
@@ -308,6 +314,10 @@ public class PandoricalClient implements ClientModInitializer {
                 ServerCapabilities.set(payload.capabilities());
                 ClientPlayNetworking.send(new HelloC2S(Pandorical.PROTOCOL_VERSION, CLIENT_CAPABILITIES));
                 ClientSettings.INSTANCE.send();
+                // Anything the configuration phase could not read has been waiting to be sent.
+                ClientNotices.flush();
+                // What is in the mods folder, including the jars the loader skipped.
+                justfatlard.pandorical.client.settings.ClientModFiles.report();
                 ViewportReporter.send(context.client());
             });
         });
@@ -450,6 +460,11 @@ public class PandoricalClient implements ClientModInitializer {
             context.client().execute(() ->
                 KeybindManager.handleDeclarations(payload));
         });
+        ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.ActionMenusS2C.TYPE, (payload, context) -> {
+                context.client().execute(() ->
+                    justfatlard.pandorical.client.actions.ActionMenus.offered(payload.menus()));
+            });
         ClientPlayNetworking.registerGlobalReceiver(KeybindDefaultsS2C.TYPE, (payload, context) -> {
             context.client().execute(() ->
                 KeybindManager.applyDefaults(payload));
@@ -458,6 +473,8 @@ public class PandoricalClient implements ClientModInitializer {
         ServerSettingsButton.register();
 
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            // There is nobody to tell when the file is read at startup, so it is said here.
+            justfatlard.pandorical.client.actions.ActionMenus.sayIfDamaged();
             if (ContentManager.wasConfigPhaseSynced()) {
                 // Synchronously, before any chunk is decoded.
                 Pandorical.LOGGER.info("Play phase joined — remapping block state IDs synchronously");
@@ -468,6 +485,18 @@ public class PandoricalClient implements ClientModInitializer {
                 }
             }
         });
+
+        ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.AddToMenuS2C.TYPE, (payload, context) -> {
+                context.client().execute(() ->
+                    justfatlard.pandorical.client.actions.ActionMenus.addToMenu(payload.command()));
+            });
+
+        ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.ClientModToggleS2C.TYPE, (payload, context) -> {
+                context.client().execute(() ->
+                    justfatlard.pandorical.client.settings.ClientModFiles.ask(payload.file()));
+            });
 
         ClientConfigurationConnectionEvents.INIT.register((handler, client) -> forgetConnection());
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> forgetConnection());
@@ -481,11 +510,15 @@ public class PandoricalClient implements ClientModInitializer {
         // Filled on the network thread during configuration, so cleared here, before the next
         // server's packets can arrive. Everything else is render-thread state.
         ContentManager.reset();
+        ClientNotices.forgetConnection();
+        justfatlard.pandorical.client.settings.ClientModFiles.forget();
         ClientInventorySlotRegistry.reset();
         Minecraft.getInstance().execute(PandoricalClient::forgetRenderState);
     }
 
     private static void forgetRenderState() {
+        // What the last server promoted is no use on the next one: its commands may not exist.
+        justfatlard.pandorical.client.actions.ActionMenus.forgetPromoted();
         pendingContainerDefs.clear();
         CameraManager.onDisconnect();
         HudManager.clear();
@@ -498,6 +531,11 @@ public class PandoricalClient implements ClientModInitializer {
         ServerCapabilities.clear();
         ViewportReporter.clear();
         ClientBlockMarks.clear();
+        // Server state, and no use on the next one: left behind, it showed through as another
+        // server's buttons, decals and painted blocks.
+        ClientInventoryButtons.clear();
+        BannerDecalStore.clear();
+        PositionalTintStore.clear();
         LeafCulling.onDisconnect();
         EntityAnimations.clearAll();
         MountPolicy.clear();

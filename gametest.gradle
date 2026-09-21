@@ -1,0 +1,101 @@
+// The gametest setup every mod in the suite shares, applied with one line:
+//
+//     apply from: file("../pandorical/gametest.gradle")
+//
+// Kept here rather than copied into sixty-eight build files, so the window size, the run levels
+// and the check wiring are one decision instead of sixty-eight that drift.
+//
+// Two levels, chosen with -Ptest.level:
+//
+//     ./gradlew runClientGameTest                    smoke: does this mod load and reach a world
+//     ./gradlew runClientGameTest -Ptest.level=full  full:  everything, including screens and clicks
+//
+// The level reaches the test through a system property, because the test runs in the game's own
+// process and not in Gradle's.
+
+// Only for the mod being built. Pandorical is a subproject of twenty-nine others, and without this
+// guard every one of them grew a :pandorical:runClientGameTest task that ran Pandorical's own tests
+// on a classpath that has no Pandorical on it: NoClassDefFoundError on its own API.
+if (project == rootProject) {
+
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = "${project.name}-gametest"
+		enableGameTests = false
+		enableClientGameTests = true
+		eula = true
+	}
+}
+
+// Pandorical's gametest harness, for every mod but Pandorical itself, which already has the
+// classes in its own output. It ships in a jar of its own because the harness is cut from the one
+// players install; see build.gradle. Named by the version it declares and never by glob order,
+// because Gradle leaves old jars in build/libs and the alphabetical one is the stale one.
+// Asked of the directory rather than the project's name: a checkout called anything else is
+// still Pandorical, and a name test sends it looking for a sibling of itself.
+def pandoricalRoot = file("../pandorical")
+if (sourceSets.findByName('gametest') != null && pandoricalRoot.exists()
+		&& pandoricalRoot.canonicalFile != projectDir.canonicalFile) {
+	def pandoricalVersion = new Properties().with {
+		new File(pandoricalRoot, "gradle.properties").withInputStream { load(it) }
+		getProperty("mod_version")?.trim()
+	}
+	def supportJar = new File(pandoricalRoot, "build/libs/pandorical-${pandoricalVersion}-testsupport.jar")
+
+	// Named whether or not it is there yet. Asking first is the wrong way round: on a tree where
+	// it has not been built - a fresh clone, or the first build after this harness arrived - the
+	// answer is no, so the harness went missing from the classpath AND the dependency that would
+	// have built it went undeclared with it. What that looks like is a band of mods failing with
+	// "package justfatlard.pandorical.gametest does not exist" while the ones configured after
+	// some other mod's build happened to produce the jar pass, which reads as flakiness.
+	dependencies { add("gametestCompileOnly", files(supportJar)) }
+	sourceSets.named('gametest') { runtimeClasspath += files(supportJar) }
+
+	// Where Pandorical is a subproject of this build, Gradle sees that file as another task's
+	// output and refuses to guess the order; naming the task that writes it is the whole fix. By
+	// path rather than by task object, because the task only exists once ':pandorical' has been
+	// evaluated and this runs before that: a path is looked up when the graph is built, a task is
+	// looked up now and is not there yet.
+	if (rootProject.findProject(':pandorical') != null) {
+		tasks.matching { it.name in ['compileGametestJava', 'runClientGameTest'] }
+			.configureEach { dependsOn ':pandorical:testSupportJar' }
+	}
+}
+
+// A client gametest drives the client, so it compiles against the client source set. Loom does not
+// wire that up, and the tests only ever compiled because the last build had left classes in the
+// output directory: a directory that happens to hold classes is not a dependency. After a clean,
+// compileGametestJava ran first and could not find one client class.
+if (sourceSets.findByName('client') != null) {
+	sourceSets.named('gametest') {
+		compileClasspath += sourceSets.client.output
+		runtimeClasspath += sourceSets.client.output
+	}
+}
+
+// The window is 854x480 unless it is told otherwise, and a screenshot taken larger than the window
+// leaves the HUD laid out for the small one: the hotbar ends up a postage stamp in the corner.
+tasks.matching { it.name == "runClientGameTest" }.configureEach {
+	// The client output directory is on the run classpath, but nothing said it had to hold anything
+	// first: from a clean tree the game launched against an empty one and died looking for the mod's
+	// own entrypoint. It only ever passed because a build had happened to run before it.
+	if (sourceSets.findByName('client') != null) dependsOn 'clientClasses'
+	args("--width", "1920", "--height", "1080")
+	systemProperty("pandorical.test.level", project.findProperty("test.level") ?: "smoke")
+}
+
+// Compiling the tests, which is what catches an API change the tests no longer match: a renamed
+// method fails here rather than at the next launch. It does not run them - a client gametest
+// starts a real Minecraft and takes minutes, and `check` is on the path of every build of all
+// forty mods. Running them is `runClientGameTest`, and it is a deliberate act.
+tasks.named('check') { dependsOn 'gametestClasses' }
+
+// Runs them, under the screen size they need, for when you mean it: ./gradlew verify
+tasks.register('verify') {
+	group = 'verification'
+	description = 'Compiles and runs this mod\'s client gametests'
+	dependsOn 'check', 'runClientGameTest'
+}
+
+}

@@ -52,8 +52,7 @@ public final class KeybindManager {
 			Pandorical.LOGGER.error("InputConstants no longer numbers keys the way KeybindApi.letter does;"
 				+ " every keybind default will land on the wrong key");
 		}
-		KeyMapping.Category category = KeyMapping.Category.register(
-			Identifier.fromNamespaceAndPath(Pandorical.MOD_ID, "pandorical"));
+		KeyMapping.Category category = category();
 		for (int i = 0; i < MAX_SLOTS; i++) {
 			pool[i] = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 				"key.pandorical.action" + (i + 1), KeybindPool.poolDefaultKey(i), category));
@@ -161,6 +160,22 @@ public final class KeybindManager {
 	 * Null out of range. For non-keyboard input: {@link #tick} reads {@code consumeClick}, so a
 	 * click made on the mapping reaches the server like a key press.
 	 */
+	private static KeyMapping.Category category;
+
+	/**
+	 * The one "Pandorical" heading in the controls screen.
+	 *
+	 * <p>Registered once and handed out, because registering a category twice throws and more than
+	 * one thing here wants keys under it - the pool, and the key that opens the action menus.
+	 */
+	public static synchronized KeyMapping.Category category() {
+		if (category == null) {
+			category = KeyMapping.Category.register(
+				Identifier.fromNamespaceAndPath(Pandorical.MOD_ID, "pandorical"));
+		}
+		return category;
+	}
+
 	public static KeyMapping poolMapping(int slot) {
 		return slot >= 0 && slot < MAX_SLOTS ? pool[slot] : null;
 	}

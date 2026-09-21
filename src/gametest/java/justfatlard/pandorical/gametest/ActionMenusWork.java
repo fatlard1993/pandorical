@@ -113,7 +113,9 @@ public final class ActionMenusWork implements FabricClientGameTest {
 
 			// Through the editor as a player goes: the menu, its first button, a new icon, and a
 			// key instead of a command.
-			clickWidget(context, 0);
+			// By name, not by row: the server offers menus of its own now, and they sort above
+			// the player's, so the first row has not been this test's menu since.
+			clickLabelled(context, "Test menu");
 			context.waitTicks(2);
 			check(screenName(context).endsWith("MenuEditScreen"), "the menu row opened " + screenName(context));
 			clickWidget(context, 2);
@@ -165,6 +167,22 @@ public final class ActionMenusWork implements FabricClientGameTest {
 	private static String screenName(ClientGameTestContext context) {
 		return context.computeOnClient(client -> client.gui.screen() == null ? "none"
 			: client.gui.screen().getClass().getSimpleName());
+	}
+
+	/** A click on the widget whose label starts with this, whatever row it has ended up in. */
+	private static void clickLabelled(ClientGameTestContext context, String label) {
+		int index = context.computeOnClient(client -> {
+			var children = client.gui.screen().children();
+			for (int i = 0; i < children.size(); i++) {
+				if (children.get(i) instanceof AbstractWidget widget
+						&& widget.getMessage().getString().startsWith(label)) {
+					return i;
+				}
+			}
+			return -1;
+		});
+		if (index < 0) throw new AssertionError("no widget labelled " + label);
+		clickWidget(context, index);
 	}
 
 	/** A click in the middle of the screen's n-th widget, as the mouse would make it. */

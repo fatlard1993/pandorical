@@ -21,7 +21,7 @@ import justfatlard.pandorical.push.DeclaredRenderPolicy;
 import justfatlard.pandorical.push.PlayingAnimations;
 import justfatlard.pandorical.push.SkinOverrides;
 import justfatlard.pandorical.screen.PandoricalMenu;
-import justfatlard.pandorical.screen.Viewport;
+import justfatlard.pandorical.screen.Viewports;
 import justfatlard.pandorical.settings.ClientMods;
 import justfatlard.pandorical.settings.ModCommands;
 import justfatlard.pandorical.settings.SettingsCommand;
@@ -71,14 +71,17 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Pandorical implements ModInitializer {
     public static final String MOD_ID = "pandorical";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-    /** Bumped by any change to the shape of a payload; an older reader cannot skip a new field. */
-    public static final int PROTOCOL_VERSION = 15;
-
     /**
-     * The oldest client protocol this server accepts. Raise it when an existing payload changes
-     * shape; a new payload type an older client never asks for does not need it.
+     * The gate, and this mod's major version: a server of protocol N serves every client of N or
+     * above and turns the rest away with a message. One number, because there is nothing for a
+     * second one to say. A new feature is a new channel, which an older client never registers and
+     * so never receives, and a changed payload is a new channel beside the old one; neither refuses
+     * anybody, so neither moves this.
+     *
+     * <p>Raise it only to drop a channel already in players' hands, which is the one change that
+     * makes an existing client useless, and raise the major version in the same breath.
      */
-    public static final int MINIMUM_PROTOCOL = 11;
+    public static final int PROTOCOL_VERSION = 15;
 
     public static String modVersion() {
         return FabricLoader.getInstance()
@@ -88,6 +91,11 @@ public class Pandorical implements ModInitializer {
     }
 
     public static final List<String> SERVER_CAPABILITIES = Capabilities.SERVER;
+
+    /** Enough to show a pattern, few enough that a client cannot fill the log with them. */
+    private static final int NOT_UNDERSTOOD_PER_PLAYER = 64;
+
+    private static final Map<UUID, Set<String>> notUnderstood = new ConcurrentHashMap<>();
 
     /**
      * Players whose config-phase sync completed; JOIN consumes the entry. A stale id from a
@@ -270,10 +278,25 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(
             KeybindRebindS2C.TYPE,
             KeybindRebindS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.ActionMenusS2C.TYPE,
+            justfatlard.pandorical.protocol.ActionMenusS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.ClientModToggleS2C.TYPE,
+            justfatlard.pandorical.protocol.ClientModToggleS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.AddToMenuS2C.TYPE,
+            justfatlard.pandorical.protocol.AddToMenuS2C.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(
+            justfatlard.pandorical.protocol.ClientModFilesC2S.TYPE,
+            justfatlard.pandorical.protocol.ClientModFilesC2S.STREAM_CODEC);
 
         PayloadTypeRegistry.serverboundPlay().register(HelloC2S.TYPE, HelloC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(ScreenActionC2S.TYPE, ScreenActionC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(ContentReadyC2S.TYPE, ContentReadyC2S.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(
+            justfatlard.pandorical.protocol.NotUnderstoodC2S.TYPE,
+            justfatlard.pandorical.protocol.NotUnderstoodC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(KeyPressC2S.TYPE, KeyPressC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(
             KeybindBindingsC2S.TYPE,
@@ -348,6 +371,14 @@ public class Pandorical implements ModInitializer {
             ConfigPatience.forget(handler);
         });
         ServerTickEvents.END_SERVER_TICK.register(server -> ConfigPatience.expire());
+        ServerTickEvents.END_SERVER_TICK.register(justfatlard.pandorical.notice.Notices::tick);
+        ServerTickEvents.END_SERVER_TICK.register(Arrivals::tick);
+        justfatlard.pandorical.notice.Notices.register();
+        justfatlard.pandorical.changelog.Changelog.register();
+        justfatlard.pandorical.brief.Brief.register();
+        // Pandorical's own overview and news are in pandorical.changelog.json beside the other
+        // mods' - the same file, read the same way. A feature whose author reaches past it for
+        // something more convenient is a feature nobody else should be asked to use.
 
         ServerConfigurationConnectionEvents.BEFORE_CONFIGURE.register((handler, server) -> {
             if (!agreeOnVersion(handler)) return;
@@ -409,9 +440,13 @@ public class Pandorical implements ModInitializer {
             context.server().execute(() -> {
                 var player = context.player();
 
-                if (payload.protocolVersion() != PROTOCOL_VERSION) {
-                    LOGGER.warn("Player {} has Pandorical protocol v{} (server is v{}) — features may not work correctly",
+                if (payload.protocolVersion() < PROTOCOL_VERSION) {
+                    // The client refuses itself during configuration; this catches one that did not.
+                    LOGGER.warn("Player {} speaks Pandorical protocol v{}, older than this server's v{}",
                         player.getName().getString(), payload.protocolVersion(), PROTOCOL_VERSION);
+                    player.connection.disconnect(Component.literal(
+                        "This server needs Pandorical " + modVersion() + " or newer."));
+                    return;
                 }
 
                 PandoricalApi.registerPlayerCapabilities(
@@ -436,10 +471,17 @@ public class Pandorical implements ModInitializer {
                 // entities so far has to be replayed.
                 PandoricalApi.entityOverlaysImpl().handlePlayerReady(player);
                 PandoricalApi.keybindsImpl().handlePlayerReady(player);
+
                 SkinOverrides.sendAllTo(player);
                 DeclaredRenderPolicy.sendTo(player);
                 PlayingAnimations.sendAllTo(player);
                 DeclaredMountPolicy.sendTo(player);
+
+                // Last, and after the mods have finished announcing themselves: what these have
+                // to say is about all of them. Held back if something is gating play - see
+                // Arrivals - so the menus and the brief do not land on somebody still at a
+                // password prompt.
+                Arrivals.arrived(player);
 
                 PandoricalApi.firePlayerReady(player);
             });
@@ -483,13 +525,35 @@ public class Pandorical implements ModInitializer {
                     ClientMods.declare(context.player(), payload));
             });
         ServerPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.ClientModFilesC2S.TYPE, (payload, context) -> {
+                context.server().execute(() ->
+                    ClientMods.declareFiles(context.player(), payload));
+            });
+        ServerPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.NotUnderstoodC2S.TYPE, (payload, context) -> {
+                context.server().execute(() -> {
+                    var player = context.player();
+                    // A report is a courtesy from the client, so it is capped like any other thing
+                    // a client can say as often as it likes.
+                    Set<String> said = notUnderstood.computeIfAbsent(player.getUUID(),
+                        uuid -> ConcurrentHashMap.newKeySet());
+                    if (said.size() >= NOT_UNDERSTOOD_PER_PLAYER
+                            || !said.add(payload.kind() + '\u0000' + payload.value())) {
+                        return;
+                    }
+                    PandoricalApi.reportNotUnderstood(player, payload.kind(), payload.value());
+                });
+            });
+
+        ServerPlayNetworking.registerGlobalReceiver(
             ViewportC2S.TYPE, (payload, context) -> {
                 context.server().execute(() ->
-                    Viewport.declare(context.player(), payload));
+                    Viewports.declare(context.player(), payload));
             });
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             ClientMods.forget(handler.player);
-            Viewport.forget(handler.player);
+            Viewports.forget(handler.player);
+            notUnderstood.remove(handler.player.getUUID());
         });
 
         PandoricalApi.settingsImpl().init();
@@ -547,6 +611,9 @@ public class Pandorical implements ModInitializer {
             SkinOverrides.forget(handler.getPlayer().getUUID());
             Keepsakes.INSTANCE.forget(handler.getPlayer().getUUID());
             PandoricalApi.settingsImpl().forget(handler.getPlayer().getUUID());
+            justfatlard.pandorical.notice.Notices.forget(handler.getPlayer());
+            justfatlard.pandorical.changelog.Changelog.forget(handler.getPlayer());
+            Arrivals.forget(handler.getPlayer());
         });
     }
 
@@ -564,7 +631,7 @@ public class Pandorical implements ModInitializer {
                 RequirementS2C.TYPE)) {
             ServerConfigurationNetworking.send(handler,
                 new RequirementS2C(
-                    PROTOCOL_VERSION, MINIMUM_PROTOCOL, modVersion()));
+                    PROTOCOL_VERSION, PROTOCOL_VERSION, modVersion()));
             return true;
         }
 

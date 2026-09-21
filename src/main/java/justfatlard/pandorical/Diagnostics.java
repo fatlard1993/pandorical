@@ -60,7 +60,7 @@ public final class Diagnostics {
 		guard = WINDOWS_CLIENT && on;
 		try {
 			Files.createDirectories(GUARD_SETTING.getParent());
-			Files.writeString(GUARD_SETTING, "# Windows only: see Diagnostics in Pandorical\nenabled=" + on + "\n");
+			ConfigFiles.write(GUARD_SETTING, "# Windows only: see Diagnostics in Pandorical\nenabled=" + on + "\n");
 		} catch (IOException ignored) {
 		}
 	}

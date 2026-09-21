@@ -22,11 +22,23 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public final class KeybindPool implements KeybindApi {
 	public static final KeybindPool INSTANCE = new KeybindPool();
 
-	public static final int MAX_SLOTS = 8;
+	/**
+	 * Sixteen, which is as many as the protocol carries: the bindings a client reports back are a
+	 * list capped at sixteen by its own codec, so a seventeenth slot could be claimed and never
+	 * heard about. It was eight, and seven of them were spoken for.
+	 */
+	public static final int MAX_SLOTS = 16;
 	private static final int UNBOUND = 0;
 
+	/**
+	 * Only the first two arrive bound. Everything past them is unbound on purpose: a pool that
+	 * shipped sixteen pre-bound keys would take sixteen keys off the player whether any mod wanted
+	 * them or not, and a mod that wants a particular key asks for it through
+	 * {@link KeybindApi#bindByDefault}.
+	 */
 	private static final int[] POOL_DEFAULT_KEYS = {KeybindApi.letter('G'), KeybindApi.letter('B'),
-		UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND};
+		UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND,
+		UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND};
 
 	public static int poolDefaultKey(int slot) {
 		return POOL_DEFAULT_KEYS[slot];
@@ -147,16 +159,47 @@ public final class KeybindPool implements KeybindApi {
 
 	/** @hidden */
 	public void handleBindings(ServerPlayer player, List<String> keys) {
+		warnIfClientPoolIsShort(player, keys.size());
 		List<String> now = List.copyOf(keys);
 		List<String> before = bindings.put(player.getUUID(), now);
 		boolean changed = !now.equals(before);
 		for (BindingsListener listener : bindingsListeners) listener.bindingsReported(player, changed);
 	}
 
+	/**
+	 * A client older than the pool it is talking to reports fewer slots than it is being asked
+	 * about, and the keybinds past its end never fire. That is a silently absent feature,
+	 * which is the worst kind, so it is said out loud - once per player, because the client reports
+	 * its bindings again every time they change.
+	 */
+	private final Set<UUID> warnedShortPool = ConcurrentHashMap.newKeySet();
+
+	private void warnIfClientPoolIsShort(ServerPlayer player, int reportedSlots) {
+		int highestClaimed = -1;
+		for (int slot : bySlot.keySet()) highestClaimed = Math.max(highestClaimed, slot);
+		if (reportedSlots > highestClaimed || !warnedShortPool.add(player.getUUID())) return;
+
+		Registration lost = bySlot.get(highestClaimed);
+		Pandorical.LOGGER.warn(
+			"{}'s client has {} keybind slots but this server claims up to {} ({}): keybinds above"
+			+ " its pool will never fire. Update Pandorical on that client.",
+			player.getName().getString(), reportedSlots, highestClaimed + 1,
+			lost == null ? "unknown" : lost.id());
+	}
+
 	/** Ask this player's client to bind the next key it sees to this slot. */
 	public void requestRebind(ServerPlayer player, int slot) {
-		if (!PandoricalApi.hasCapability(player, Capabilities.KEYBINDS)) return;
+		if (!canRebind(player)) return;
 		ServerPlayNetworking.send(player, new KeybindRebindS2C(slot));
+	}
+
+	/**
+	 * Whether this player's client can be asked to rebind. The capability predates the channel, so
+	 * a client from before rebinding declares one and cannot receive the other.
+	 */
+	public static boolean canRebind(ServerPlayer player) {
+		return PandoricalApi.hasCapability(player, Capabilities.KEYBINDS)
+			&& ServerPlayNetworking.canSend(player, KeybindRebindS2C.TYPE);
 	}
 
 	/** @hidden */
@@ -224,5 +267,6 @@ public final class KeybindPool implements KeybindApi {
 	public void removePlayer(UUID playerUuid) {
 		bindings.remove(playerUuid);
 		pressCounters.remove(playerUuid);
+		warnedShortPool.remove(playerUuid);
 	}
 }

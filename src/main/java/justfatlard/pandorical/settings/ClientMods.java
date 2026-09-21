@@ -23,6 +23,8 @@ public final class ClientMods {
     private ClientMods() {}
 
     private static final Map<UUID, List<ClientSettingsC2S.Mod>> byPlayer = new ConcurrentHashMap<>();
+    private static final Map<UUID, List<justfatlard.pandorical.protocol.ClientModFilesC2S.Entry>> filesByPlayer =
+        new ConcurrentHashMap<>();
     private static final Map<UUID, Map<String, String>> values = new ConcurrentHashMap<>();
 
     /** A registered setting lasts the server's life, so what clients may add to it is capped. */
@@ -32,6 +34,16 @@ public final class ClientMods {
     private static final Pattern MOD_ID = Pattern.compile("[a-z][a-z0-9_-]{1,63}");
     private static final Pattern KEY = Pattern.compile("[A-Za-z0-9_.-]{1,64}");
     private static final AtomicInteger registered = new AtomicInteger();
+
+    /** The jars in this player's mods folder, switched on and off, or empty if they never said. */
+    public static List<justfatlard.pandorical.protocol.ClientModFilesC2S.Entry> filesOf(ServerPlayer player) {
+        return filesByPlayer.getOrDefault(player.getUUID(), List.of());
+    }
+
+    public static void declareFiles(ServerPlayer player,
+            justfatlard.pandorical.protocol.ClientModFilesC2S payload) {
+        filesByPlayer.put(player.getUUID(), List.copyOf(payload.entries()));
+    }
 
     public static void declare(ServerPlayer player, ClientSettingsC2S payload) {
         List<ClientSettingsC2S.Mod> mods = payload.mods().stream()
@@ -61,6 +73,7 @@ public final class ClientMods {
     public static void forget(ServerPlayer player) {
         byPlayer.remove(player.getUUID());
         values.remove(player.getUUID());
+        filesByPlayer.remove(player.getUUID());
     }
 
     public static List<ModCatalog.ModInfo> of(ServerPlayer player) {

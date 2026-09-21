@@ -19,6 +19,7 @@ import justfatlard.pandorical.push.EntityOverlays;
 import justfatlard.pandorical.push.PlayingAnimations;
 import justfatlard.pandorical.push.SkinOverrides;
 import justfatlard.pandorical.screen.ScreenRegistry;
+import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.settings.SettingsRegistry;
 import justfatlard.pandorical.structure.StructureRegistry;
 import net.minecraft.server.level.ServerPlayer;
@@ -84,15 +85,60 @@ public final class PandoricalApi {
      * not in {@link Capabilities#CLIENT}, a misspelt one included.
      */
     public static boolean hasCapability(ServerPlayer player, String capability) {
+        if (Capabilities.isServerOnly(capability)) {
+            // Always false, and silently so until now: a guard written this way never opens.
+            if (warnedServerOnly.add(capability)) {
+                Pandorical.LOGGER.warn("hasCapability(player, \"{}\") is false for every player: that string is"
+                    + " what a server announces about itself, not something a client declares.", capability);
+            }
+            return false;
+        }
         Set<String> caps = playerCapabilities.get(player.getUUID());
         return caps != null && caps.contains(capability);
     }
+
+    private static final Set<String> warnedServerOnly = ConcurrentHashMap.newKeySet();
 
     /** Whether the client has loaded synced content, or has none to load. */
     public static boolean isContentReady(ServerPlayer player) {
         if (!isAvailable(player)) return false;
         if (!CONTENT.hasContent()) return true;
         return contentReadyPlayers.contains(player.getUUID());
+    }
+
+    /**
+     * Say when a player is not free to play yet, so that what can wait, waits.
+     *
+     * <p>For a mod that gates play: a pen at the spawn until a password is said, a rules screen,
+     * anything a player is held behind. Pandorical's own arrival offers - the brief, what changed
+     * since last time, the action menus - are held back for as long as any registered test says
+     * this player is held, and delivered the moment none of them do.
+     *
+     * <p>{@link #onPlayerReady} is a different moment: it means the client has finished its
+     * handshake, not that the player is free. A mod can want both.
+     *
+     * <pre>{@code
+     * PandoricalApi.heldWhile(Gate::isWaiting);
+     * }</pre>
+     */
+    public static void heldWhile(java.util.function.Predicate<ServerPlayer> held) {
+        if (held != null) heldTests.add(held);
+    }
+
+    private static final List<java.util.function.Predicate<ServerPlayer>> heldTests =
+        new CopyOnWriteArrayList<>();
+
+    /** Whether anything is holding this player short of play. */
+    public static boolean isHeld(ServerPlayer player) {
+        for (var test : heldTests) {
+            try {
+                if (test.test(player)) return true;
+            } catch (RuntimeException e) {
+                // A mod's own test throwing is not a reason to strand a player at the gate.
+                Pandorical.LOGGER.warn("[pandorical] a held-while test threw; treating as free", e);
+            }
+        }
+        return false;
     }
 
     /**
@@ -103,6 +149,41 @@ public final class PandoricalApi {
     public static void onPlayerReady(Consumer<ServerPlayer> listener) {
         playerReadyListeners.add(listener);
     }
+
+    /**
+     * Told when a player's client reports a word it could not act on: see {@link NotUnderstood}.
+     * Pandorical logs every report anyway; this is for a mod that wants to do something about it.
+     */
+    public static void onNotUnderstood(NotUnderstood.Listener listener) {
+        notUnderstoodListeners.add(listener);
+    }
+
+    /**
+     * Both of these come off the wire, so both are flattened before they reach a log line: a
+     * value with newlines in it can otherwise write whole entries of its own, and an operator
+     * reading the console has no way to tell those from the server's.
+     */
+    private static String forLog(String value) {
+        if (value == null) return "null";
+        String flat = value.replaceAll("[\\p{Cntrl}]", "?");
+        return flat.length() <= 96 ? flat : flat.substring(0, 96) + "...";
+    }
+
+    /** @hidden */
+    public static void reportNotUnderstood(ServerPlayer player, String kind, String value) {
+        Pandorical.LOGGER.warn("{}'s client could not act on {} \"{}\": that feature is absent for them."
+            + " Their Pandorical is older than this server, or the value is wrong.",
+            player.getName().getString(), forLog(kind), forLog(value));
+        for (NotUnderstood.Listener listener : notUnderstoodListeners) {
+            try {
+                listener.accept(player, kind, value);
+            } catch (Exception e) {
+                Pandorical.LOGGER.error("A not-understood listener threw", e);
+            }
+        }
+    }
+
+    private static final List<NotUnderstood.Listener> notUnderstoodListeners = new CopyOnWriteArrayList<>();
 
     public static ContentApi content() { return CONTENT; }
 
@@ -159,6 +240,30 @@ public final class PandoricalApi {
     public static PlayerInventoryApi playerInventory() { return PLAYER_INVENTORY; }
 
     public static KeybindApi keybinds() { return KEYBINDS; }
+
+    public static CommandHelpApi commandHelp() {
+        return (command, description) ->
+            justfatlard.pandorical.settings.ModCommands.describe(command, description);
+    }
+
+    public static ActionMenuApi actionMenus() {
+        return justfatlard.pandorical.actions.ActionMenuRegistry.INSTANCE;
+    }
+
+    /** Questions put to a player out of the way of the chat they are talking in. */
+    public static NoticeApi notices() {
+        return justfatlard.pandorical.notice.Notices.INSTANCE;
+    }
+
+    /** What your mod changed, for the player who was not here when it changed. */
+    public static ChangelogApi changelog() {
+        return justfatlard.pandorical.changelog.Changelog.INSTANCE;
+    }
+
+    /** What your mod is, for somebody meeting this server for the first time. */
+    public static BriefApi brief() {
+        return justfatlard.pandorical.brief.Brief.INSTANCE;
+    }
 
     public static SettingsApi settings() { return SETTINGS; }
 

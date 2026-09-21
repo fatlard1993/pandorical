@@ -1,5 +1,6 @@
 {
   "key.category.pandorical.pandorical": "Pandorical",
+  "key.pandorical.menus": "Open action menus",
   "key.pandorical.action1": "Pandorical Action 1",
   "key.pandorical.action2": "Pandorical Action 2",
   "key.pandorical.action3": "Pandorical Action 3",
@@ -8,6 +9,14 @@
   "key.pandorical.action6": "Pandorical Action 6",
   "key.pandorical.action7": "Pandorical Action 7",
   "key.pandorical.action8": "Pandorical Action 8",
+  "key.pandorical.action9": "Pandorical Action 9",
+  "key.pandorical.action10": "Pandorical Action 10",
+  "key.pandorical.action11": "Pandorical Action 11",
+  "key.pandorical.action12": "Pandorical Action 12",
+  "key.pandorical.action13": "Pandorical Action 13",
+  "key.pandorical.action14": "Pandorical Action 14",
+  "key.pandorical.action15": "Pandorical Action 15",
+  "key.pandorical.action16": "Pandorical Action 16",
   "pandorical.settings.title": "Server Settings",
   "pandorical.settings.close": "Done",
   "pandorical.settings.on": "On",
@@ -26,5 +35,13 @@
   "pandorical.mods.readme": "Readme",
   "pandorical.mods.settings": "Settings",
   "pandorical.mods.commands": "Commands",
-  "pandorical.mods.keybinds": "Keys"
+  "pandorical.mods.changes": "Changes",
+  "pandorical.mods.keybinds": "Keys",
+  "pandorical.too_old": "This server needs Pandorical %s or newer. Yours is older; update it and join again.",
+  "pandorical.mods.disable_title": "Switch this mod off?",
+  "pandorical.mods.disable_message": "This server is asking to switch %s off in your mods folder. It stays on your disk, renamed, and you can switch it back on from this screen. Nothing changes until you restart the game.",
+  "pandorical.mods.disable_yes": "Disable it",
+  "pandorical.mods.enable_title": "Switch this mod on?",
+  "pandorical.mods.enable_message": "This server is asking to switch %s back on in your mods folder. Nothing changes until you restart the game.",
+  "pandorical.mods.enable_yes": "Enable it"
 }

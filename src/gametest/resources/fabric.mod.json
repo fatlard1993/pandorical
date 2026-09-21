@@ -13,10 +13,18 @@
 		],
 		"fabric-client-gametest": [
 			"justfatlard.pandorical.gametest.LaunchGate",
+			"justfatlard.pandorical.gametest.NoticesAnswer",
 			"justfatlard.pandorical.gametest.DropsFixes",
 			"justfatlard.pandorical.gametest.WalkableDecks",
 			"justfatlard.pandorical.gametest.PortalPairs",
-			"justfatlard.pandorical.gametest.ActionMenusWork"
+			"justfatlard.pandorical.gametest.ActionMenusWork",
+			"justfatlard.pandorical.gametest.ActionMenusSeeded",
+			"justfatlard.pandorical.gametest.OlderClients",
+			"justfatlard.pandorical.gametest.ProtocolFrozen",
+			"justfatlard.pandorical.gametest.KeybindsNamed",
+			"justfatlard.pandorical.gametest.WhatsNew",
+			"justfatlard.pandorical.gametest.BriefOffered",
+			"justfatlard.pandorical.gametest.HeldAtTheGate"
 		]
 	},
 	"depends": {

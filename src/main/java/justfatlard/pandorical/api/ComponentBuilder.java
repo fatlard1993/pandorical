@@ -44,6 +44,17 @@ public class ComponentBuilder {
         return this;
     }
 
+    /**
+     * A colour, written the way the client reads one. {@code prop(key, 0xFFFF0000)} would send
+     * "-65536", which is read as hex and comes out as some other colour without a word said.
+     *
+     * @param argb 0xAARRGGBB; an alpha of 0 draws nothing, so opaque is 0xFF000000 upwards
+     */
+    public ComponentBuilder color(String key, int argb) {
+        return prop(key, String.format("#%08X", argb));
+    }
+
+    /** Not for colours: see {@link #color}, which the client can read back as one. */
     public ComponentBuilder prop(String key, int value) {
         return prop(key, String.valueOf(value));
     }

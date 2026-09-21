@@ -102,7 +102,7 @@ public final class ClientKeepsakes {
 		if (file == null) return;
 		try {
 			Files.createDirectories(file.getParent());
-			Files.writeString(file, GSON.toJson(values));
+			justfatlard.pandorical.ConfigFiles.write(file, GSON.toJson(values));
 		} catch (IOException e) {
 			Pandorical.LOGGER.warn("[pandorical] could not write {}: {}", file, e.getMessage());
 		}

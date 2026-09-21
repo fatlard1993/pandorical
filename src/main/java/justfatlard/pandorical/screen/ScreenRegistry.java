@@ -5,6 +5,7 @@ import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.PandoricalMenuProvider;
 import justfatlard.pandorical.api.ScreenApi;
+import justfatlard.pandorical.api.Viewport;
 import justfatlard.pandorical.protocol.CloseScreenS2C;
 import justfatlard.pandorical.protocol.ComponentUpdate;
 import justfatlard.pandorical.protocol.OpenScreenS2C;
@@ -201,6 +202,24 @@ public final class ScreenRegistry implements ScreenApi {
 		containerRemovedHandlers.put(screenType, handler);
 	}
 
+	@Override
+	public Viewport viewport(ServerPlayer player) {
+		return Viewports.of(player);
+	}
+
+	/**
+	 * A string from a client, made safe to put in a log line.
+	 *
+	 * <p>The console is read by a person deciding what happened, and a value with newlines in it
+	 * can write whole lines of its own: a player able to type their own "issued server command"
+	 * entry can make the log say anything. Line breaks out, length capped, one line stays one line.
+	 */
+	private static String forLog(String value) {
+		if (value == null) return "null";
+		String flat = value.replaceAll("[\\p{Cntrl}]", "?");
+		return flat.length() <= 96 ? flat : flat.substring(0, 96) + "...";
+	}
+
 	public void handleAction(ServerPlayer player, ScreenActionC2S action) {
 		String screenType = getPlayerScreenType(player.getUUID());
 		if (screenType == null) return;
@@ -209,7 +228,7 @@ public final class ScreenRegistry implements ScreenApi {
 		if (expectedScreenId != null && !expectedScreenId.equals(action.screenId())) {
 			Pandorical.LOGGER.warn(
 				"Player {} sent action for screen '{}' but has screen '{}' open — ignoring",
-				player.getName().getString(), action.screenId(), expectedScreenId);
+				player.getName().getString(), forLog(action.screenId()), expectedScreenId);
 			return;
 		}
 

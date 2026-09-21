@@ -72,6 +72,16 @@ public final class ModCatalog {
             || id.startsWith("fabric-") || id.equals("fabric") || id.startsWith("fabric_");
     }
 
+    /** A mod's readme, flattened, for a client reporting its own. */
+    public static List<Line> readmeOf(ModContainer container) {
+        return readme(container);
+    }
+
+    /** Ids that are the loader's plumbing rather than somebody's mod. */
+    public static boolean isPlumbing(String id) {
+        return plumbing(id);
+    }
+
     private static List<Line> readme(ModContainer container) {
         for (Path root : container.getRootPaths()) {
             try (Stream<Path> files = Files.list(root)) {

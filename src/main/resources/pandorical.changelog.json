@@ -1,0 +1,13 @@
+{
+	"overview": [
+		"The screens, menus and keys the other mods here use to talk to you.",
+		"Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
+	],
+	"versions": {
+		"15.0.0": [
+			"Action menus: grids of buttons on one key. Press J, or set your own.",
+			"The mods screen lists what you are running and can switch your own mods off.",
+			"Notices: questions from mods wait in a tray on N instead of scrolling past in chat."
+		]
+	}
+}

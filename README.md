@@ -39,7 +39,7 @@ added to a world. Everything you see through it comes from a mod on the server.
   a mod built on Pandorical either degrades quietly (an item shows a raw name instead of
   a proper one) or refuses outright, telling you in chat that Pandorical is required.
 - **Playing on a vanilla or unrelated server**: the handshake never happens and nothing
-  draws. What it leaves is eight rebindable "Pandorical Action" rows in your controls screen,
+  draws. What it leaves is sixteen rebindable "Pandorical Action" rows in your controls screen,
   which sit there unused until a server names them, and one habit in every container
   screen: dragging with an empty hand moves every stack you cross. `container_habits=false`
   in `config/pandorical-client.properties` turns it off.
@@ -82,6 +82,33 @@ three minutes after launch and the first ninety seconds of each join it keeps th
 and samples its threads, which stopped a native crash some Windows players hit while loading.
 It is kept in `config/pandorical/load-guard.properties` as `enabled`.
 
+### The mods screen
+
+`/pandorical mods` lists everything you are running, in three groups: **on this server**, **on your
+client**, and **switched off**. A server mod is the server's business and is shown for reference; a
+mod of your own carries a **Disable** button, and one you have switched off carries **Enable**.
+
+Switching off renames the jar to `.disabled`, which is the only thing the loader understands - it
+takes what it finds at startup and there is no unloading afterwards - so nothing changes until you
+restart, and the message says so. A disabled jar is invisible to the loader, so its name and version
+are read out of the jar itself; a mod you switch off does not vanish from the screen that switched
+it off.
+
+For that screen to list anything, your client tells the server which mods you have: their names and
+versions, and the names of the jar files, including the ones you have switched off. Nothing is sent
+from inside the files. A server can ask you to switch one off or back on, but it cannot do it
+itself: the question is always yours to answer, it always names the file, and Pandorical's own jar
+is not on offer - switching that off would take away the screen that switches it back.
+
+### What is running here
+
+The first time you join a server running Pandorical, a notice offers you **the brief**: every mod
+on the server in a line each, saying what it is rather than what changed in it. It waits in your
+tray rather than taking your first minute, and at the end it offers the mods screen for anything
+you want to read properly.
+
+It is offered once. `/pandorical brief` brings it back whenever you want it.
+
 ### Action menus
 
 Also on Pandorical's page, under your client's settings: **Action menus**, whose **Edit...**
@@ -94,9 +121,43 @@ the menu's key with nothing else open and the grid comes up in the middle of the
 button to do it. Escape goes back a page, and the key you opened with puts them all away. A key that opens something of
 the game's own when pressed leaves the menu shut rather than covering it.
 
-The menus are your client's, not the server's: kept on your machine in
+**One key opens all of them.** **J** by default, **d-pad up** on a controller, and rebindable as
+"Open action menus" in the controls screen like any other key. It opens **Menus**, a menu whose
+buttons are the other menus, each wearing the first thing on it. A menu you reach for constantly
+can still have a key of its own; this is so the rest do not each need one.
+
+**You do not have to start from nothing.** Some menus are the server's, and they are there the
+moment you join: **Game**, for corners of the vanilla game worth reaching for, **Server**, for what
+the mods here have put forward, and one more for each mod with enough to fill a grid of its own -
+Emotes, or Arena.
+
+What is on them is chosen, not swept up. An action menu is for the useful but less common: the
+thing you would otherwise have to remember a command for. Anything you do constantly - your
+inventory, chat, petting an animal - is already faster on the key it is bound to, so it is not
+here. A menu that mirrored the controls screen would only be a slower controls screen.
+
+These are rebuilt from the server every time you join, so they are never out of date: a mod that
+adds a button has added it for everybody, and a mod that goes away takes its buttons with it. That
+also means they are not yours to edit. The one thing about them that is yours is the key you open
+them with, which is remembered for you in `config/pandorical/action-menu-keys.json`.
+
+**Anything you read about, you can keep.** Every mod's page in the mods screen has a **Commands**
+tab listing what it offers, and beside each command that needs no arguments there is an **Add**
+button: press it and you are asked which of your menus it should go on, or offered a new one. A
+command the mod also promotes arrives with the name and icon that mod chose for it; anything else
+arrives as itself, ready to rename. Commands taking a `<placeholder>` have no Add button, because a
+button sends one fixed string and gives nobody anywhere to type the rest.
+
+**To make one of your own, take what you like from theirs.** The editor's **Add what this server
+offers...** lists every promoted button, grouped by where it came from, so building your own grid
+is a few clicks rather than typing commands and hunting items to stand for them. What is on offer
+is whatever the server you are on promotes, and it is forgotten when you leave.
+
+**Your own** menus are your client's, not the server's: kept on your machine in
 `config/pandorical-action-menus.json`, one set per account, so they come with you to every server
-you play on from that machine and two players sharing one keep their own.
+you play on from that machine and two players sharing one keep their own. The server's menus are
+not in that file at all, and the only part of them that is yours - the key each one opens with -
+is kept beside it in `config/pandorical/action-menu-keys.json`.
 
 ## Installation
 

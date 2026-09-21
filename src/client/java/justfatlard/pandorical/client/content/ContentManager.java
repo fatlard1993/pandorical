@@ -935,7 +935,8 @@ public class ContentManager {
         if (spec.isEmpty()) return;
 
         String[] p = spec.split("\\|");
-        if (p.length != 4) {
+        // Fewer fields is unreadable; more is a newer server saying more than this client asked for.
+        if (p.length < 4) {
             Pandorical.LOGGER.warn("Unreadable food spec '{}' — leaving the item inedible", spec);
             return;
         }
@@ -959,7 +960,7 @@ public class ContentManager {
         if (spec.isEmpty() || !spec.contains("|")) return;
 
         String[] p = spec.split("\\|");
-        if (p.length != 9) {
+        if (p.length < 9) {
             Pandorical.LOGGER.warn("Unreadable tool spec '{}' — leaving the item plain", spec);
             return;
         }
@@ -981,7 +982,8 @@ public class ContentManager {
                 case "shovel"  -> props.shovel(material, damage, speed);
                 case "hoe"     -> props.hoe(material, damage, speed);
                 case "sword"   -> props.sword(material, damage, speed);
-                default -> Pandorical.LOGGER.warn("Unknown tool kind '{}' — leaving the item plain", p[0]);
+                default -> justfatlard.pandorical.client.ClientNotices.report(
+                    justfatlard.pandorical.api.NotUnderstood.TOOL_KIND, p[0]);
             }
         } catch (RuntimeException e) {
             Pandorical.LOGGER.warn("Could not rebuild tool from '{}': {}", spec, e.toString());

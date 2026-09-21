@@ -1,0 +1,7 @@
+{
+  "overview": "A fixture mod that exists to be launched, clicked and asserted against.",
+  "versions": {
+    "1.0.0": ["The first one, so there is something to have changed since."],
+    "1.1.0": ["Notes read out of a file, with no code in the mod that ships it."]
+  }
+}

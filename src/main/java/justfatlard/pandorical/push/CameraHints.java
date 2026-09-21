@@ -24,8 +24,9 @@ public final class CameraHints implements CameraApi {
 	@Override
 	public void setPerspective(ServerPlayer player, String perspective) {
 		if (!PandoricalApi.hasCapability(player, Capabilities.CAMERA)) return;
+		// Empty says "hand it back": Map.of would throw on a null, and the javadoc promises null works.
 		ServerPlayNetworking.send(player, new CameraHintS2C("perspective",
-			Map.of("mode", perspective)));
+			Map.of("mode", perspective == null ? "" : perspective)));
 	}
 
 	@Override

@@ -94,6 +94,13 @@ public final class ComponentType {
 
     // --- Common prop keys ---
 
+    /**
+     * The type to draw instead on a client that does not know this component's type, such as
+     * {@code "panel"} under a new widget. Without one, an unknown component draws nothing and its
+     * children draw as usual. Used by: every type
+     */
+    public static final String PROP_FALLBACK = "fallback";
+
     /** Background color. Accepts #RRGGBB or #AARRGGBB. Used by: panel, scroll_panel, sprite */
     public static final String PROP_BACKGROUND = "background";
     /**

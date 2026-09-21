@@ -18,6 +18,7 @@
     "ContainerStackSizeMixin",
     "CushionInterpolationMixin",
     "CustomDataAccessor",
+    "DeathScreenDelayMixin",
     "EntityRenderStateMixin",
     "HiddenDisplayMixin",
     "InteractiveSyncMixin",

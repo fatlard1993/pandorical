@@ -1,7 +1,8 @@
 package justfatlard.pandorical.client.component;
 
-import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.ComponentType;
+import justfatlard.pandorical.api.NotUnderstood;
+import justfatlard.pandorical.client.ClientNotices;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -16,14 +17,13 @@ public final class ComponentRegistry {
         FACTORIES.put(type, factory);
     }
 
-    public static PandoricalComponent create(String type) {
+    /** {@code fallback} is the server's {@link ComponentType#PROP_FALLBACK}, or null. */
+    public static PandoricalComponent create(String type, String fallback) {
         Supplier<PandoricalComponent> factory = FACTORIES.get(type);
-        if (factory == null) {
-            Pandorical.LOGGER.warn("Unknown component type '{}' — rendering as empty panel. " +
-                "Check spelling or ensure the component is registered.", type);
-            return new PanelComponent();
-        }
-        return factory.get();
+        if (factory != null) return factory.get();
+        Supplier<PandoricalComponent> instead = fallback == null ? null : FACTORIES.get(fallback);
+        ClientNotices.report(NotUnderstood.COMPONENT_TYPE, type);
+        return instead != null ? instead.get() : new UnknownComponent();
     }
 
     public static void registerDefaults() {

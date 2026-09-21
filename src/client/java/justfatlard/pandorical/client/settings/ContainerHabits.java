@@ -1,17 +1,9 @@
 package justfatlard.pandorical.client.settings;
 
-import net.fabricmc.loader.api.FabricLoader;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Properties;
-
 /** The container habits switch, in the client's config so it holds across servers. */
 public final class ContainerHabits {
     private ContainerHabits() {}
 
-    private static final Path FILE = FabricLoader.getInstance().getConfigDir().resolve("pandorical-client.properties");
     private static final String KEY = "container_habits";
     private static Boolean enabled;
 
@@ -33,22 +25,10 @@ public final class ContainerHabits {
     }
 
     private static boolean load() {
-        Properties props = new Properties();
-        try {
-            if (Files.exists(FILE)) props.load(Files.newBufferedReader(FILE));
-        } catch (IOException ignored) {
-        }
-        return Boolean.parseBoolean(props.getProperty(KEY, "true"));
+        return ClientPrefs.getBoolean(KEY, true);
     }
 
     private static void save() {
-        Properties props = new Properties();
-        try {
-            if (Files.exists(FILE)) props.load(Files.newBufferedReader(FILE));
-            props.setProperty(KEY, Boolean.toString(enabled));
-            Files.createDirectories(FILE.getParent());
-            props.store(Files.newBufferedWriter(FILE), "Pandorical client preferences");
-        } catch (IOException ignored) {
-        }
+        ClientPrefs.set(KEY, enabled);
     }
 }

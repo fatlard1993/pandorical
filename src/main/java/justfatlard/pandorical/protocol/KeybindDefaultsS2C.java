@@ -13,6 +13,10 @@ import java.util.List;
  * player who clears it keeps it clear. A separate payload, so an older client is not sent it.
  */
 public record KeybindDefaultsS2C(List<Entry> entries) implements CustomPacketPayload {
+    /** Held to what a shipped client reads; the codec above accepts more from a later server. */
+    public KeybindDefaultsS2C {
+        entries = Wire.fit(entries, 16, "keybind defaults");
+    }
 
     public record Entry(int slot, String id, int key) {
         public static final StreamCodec<ByteBuf, Entry> STREAM_CODEC = StreamCodec.composite(
@@ -27,7 +31,7 @@ public record KeybindDefaultsS2C(List<Entry> entries) implements CustomPacketPay
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "keybind_defaults"));
 
     public static final StreamCodec<ByteBuf, KeybindDefaultsS2C> STREAM_CODEC = StreamCodec.composite(
-        Entry.STREAM_CODEC.apply(ByteBufCodecs.list(16)), KeybindDefaultsS2C::entries,
+        Entry.STREAM_CODEC.apply(ByteBufCodecs.list(256)), KeybindDefaultsS2C::entries,
         KeybindDefaultsS2C::new
     );
 

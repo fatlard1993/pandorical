@@ -27,7 +27,40 @@ import java.util.Set;
 public final class ModCommands {
 	private ModCommands() {}
 
-	public record Entry(String usage, boolean ops) {}
+	/** @param description one line about what it is for, or empty when nobody has said. */
+	public record Entry(String usage, boolean ops, String description) {}
+
+	/**
+	 * What each command is for, as its mod described it.
+	 *
+	 * <p>Kept here rather than on the nodes because Brigadier has nowhere to put it, and looked up
+	 * by longest match so a mod can describe {@code /pvp} once and have every subcommand it did
+	 * not get to say something rather than nothing.
+	 */
+	private static final Map<String, String> DESCRIPTIONS = new LinkedHashMap<>();
+
+	public static synchronized void describe(String command, String description) {
+		if (command == null || description == null || description.isBlank()) return;
+		String key = command.startsWith("/") ? command : "/" + command;
+		DESCRIPTIONS.put(key.trim(), description.trim());
+	}
+
+	/** The line for this usage: its own, else the longest described command it starts with. */
+	static synchronized String describedFor(String usage) {
+		String best = "";
+		int longest = -1;
+		for (Map.Entry<String, String> described : DESCRIPTIONS.entrySet()) {
+			String key = described.getKey();
+			boolean matches = usage.equals(key)
+				|| (usage.startsWith(key) && usage.length() > key.length()
+					&& usage.charAt(key.length()) == ' ');
+			if (matches && key.length() > longest) {
+				longest = key.length();
+				best = described.getValue();
+			}
+		}
+		return best;
+	}
 
 	private static final int MAX_DEPTH = 6;
 	private static final int MAX_ENTRIES = 60;
@@ -70,10 +103,11 @@ public final class ModCommands {
 		if (depth > MAX_DEPTH || out.size() >= MAX_ENTRIES) return;
 		boolean gated = opsSoFar || !node.canUse(anyone);
 		String here = prefix.isEmpty() ? node.getUsageText() : prefix + " " + node.getUsageText();
-		if (node.getCommand() != null) out.add(new Entry("/" + here, gated));
+		if (node.getCommand() != null) out.add(new Entry("/" + here, gated, describedFor("/" + here)));
 		CommandNode<CommandSourceStack> redirect = node.getRedirect();
 		if (redirect != null) {
-			out.add(new Entry("/" + here + " → /" + redirect.getName(), gated));
+			out.add(new Entry("/" + here + " → /" + redirect.getName(), gated,
+				describedFor("/" + here)));
 			return;
 		}
 		for (CommandNode<CommandSourceStack> child : node.getChildren()) {
