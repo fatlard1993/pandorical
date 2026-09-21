@@ -1,13 +1,19 @@
 {
-	"overview": [
-		"The screens, menus and keys the other mods here use to talk to you.",
-		"Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
-	],
-	"versions": {
-		"15.0.0": [
-			"Action menus: grids of buttons on one key. Press J, or set your own.",
-			"The mods screen lists what you are running and can switch your own mods off.",
-			"Notices: questions from mods wait in a tray on N instead of scrolling past in chat."
-		]
-	}
+  "overview": [
+    "The screens, menus and keys the other mods here use to talk to you.",
+    "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
+  ],
+  "versions": {
+    "15.1.0": [
+      "Notices: a mod can put a question to a player in a tray of its own — a teleport request, an invitation, an offer to trade — instead of in the chat everybody is talking in.",
+      "The death screen's buttons now arm on the clock as well as on ticks, so a client that has stopped ticking can still respawn instead of sitting on a dead screen.",
+      "A horse turns the way you press. Left was turning it right, and it turned at a boat's pace; it now answers at a horse's.",
+      "A block the client builds from the server's description starts with its flags off, so a grass slab no longer flashes white for a frame as it is placed."
+    ],
+    "15.0.0": [
+      "Action menus: grids of buttons on one key. Press J, or set your own.",
+      "The mods screen lists what you are running and can switch your own mods off.",
+      "Notices: questions from mods wait in a tray on N instead of scrolling past in chat."
+    ]
+  }
 }

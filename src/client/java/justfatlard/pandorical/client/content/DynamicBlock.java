@@ -14,6 +14,7 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 import java.io.*;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import java.util.*;
 
 public class DynamicBlock extends Block {
@@ -24,7 +25,26 @@ public class DynamicBlock extends Block {
     public DynamicBlock(Properties props, List<Property<?>> properties) {
         super(props);
         this.dynamicProperties = properties;
+
+        // Every flag off, rather than whatever stateDefinition.any() lands on.
+        //
+        // any() takes the first value of each property, and BooleanProperty lists its values
+        // List.of(true, false) - so a stand-in defaulted to snowy, waterlogged, powered, lit and
+        // open all at once. The server's real state arrives a tick later and corrects it, so the
+        // only thing this is ever seen as is a single wrong frame at the moment of placing: the
+        // client predicts with the default, and a grass slab flashed white because snowy=true
+        // picks the snow model, which is a white texture with no tint on it.
+        //
+        // DynamicSlabBlock met this first and answered it by leaving SlabBlock's own default
+        // alone; this is the same answer for a block that has no vanilla class to inherit one
+        // from. False is the right guess: it is what virtually every vanilla block defaults
+        // these flags to, and a flag that starts off looks right until the truth arrives.
         BlockState defaultState = this.stateDefinition.any();
+        for (Property<?> property : properties) {
+            if (property instanceof BooleanProperty flag) {
+                defaultState = defaultState.setValue(flag, false);
+            }
+        }
         this.registerDefaultState(defaultState);
     }
 
