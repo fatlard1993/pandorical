@@ -35,6 +35,12 @@ import java.util.Optional;
  * }
  * }</pre>
  *
+ * <p>One line per change, and a line is a sentence. The reader is a player who has just logged in
+ * and wants to know whether anything they care about moved; they are not reading a commit message
+ * and they did not ask why. "Horses turn the way you press" is the note. Why they used to turn the
+ * other way belongs in the commit that fixed it, where somebody looking for it will actually be.
+ * A note past about a hundred characters is almost always a note with its reasoning still attached.
+ *
  * <p>Read once, after every mod has initialised, and only where nothing was declared in code:
  * {@link justfatlard.pandorical.api.ChangelogApi} and {@link justfatlard.pandorical.api.BriefApi}
  * win, so a mod that computes a note at runtime is not overruled by a stale file beside it.

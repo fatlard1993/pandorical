@@ -118,10 +118,21 @@ public final class WhatsNew implements FabricClientGameTest {
 					onThePage.set("both declared versions should be listed, got " + released.size());
 					return;
 				}
-				if (!released.get(0).version().equals(version)
-						|| !released.get(1).version().equals("0.9.0")) {
-					onThePage.set("releases were not newest first: "
-						+ released.stream().map(Changelog.Released::version).toList());
+				// Both declared versions are here, newest at the top, and 0.9.0 below whatever
+				// else the mod has shipped since.
+				//
+				// By position, this used to be: index 0 the current version and index 1 exactly
+				// "0.9.0". That held only while this test's own two notes were the whole list, so
+				// the first real release note added to Pandorical put a third entry between them
+				// and failed a test about ordering with a list that was correctly ordered. What
+				// the test means is "newest first", so that is what it now asks.
+				List<String> versions = released.stream().map(Changelog.Released::version).toList();
+				if (!versions.get(0).equals(version)) {
+					onThePage.set("the newest release was not at the top: " + versions);
+				} else if (versions.indexOf("0.9.0") < 0) {
+					onThePage.set("the older declared version was not listed: " + versions);
+				} else if (versions.indexOf("0.9.0") != versions.size() - 1) {
+					onThePage.set("the oldest release was not at the bottom: " + versions);
 				}
 			});
 			check(onThePage.get() == null, onThePage.get());

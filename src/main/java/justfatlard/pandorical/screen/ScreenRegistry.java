@@ -155,12 +155,25 @@ public final class ScreenRegistry implements ScreenApi {
 		ServerPlayNetworking.send(player, new UpdateScreenS2C(screenId, updates));
 	}
 
+	/**
+	 * Close a screen, named either by its id or by its type.
+	 *
+	 * <p>Both are taken because the type is what callers reach for and nothing stopped them. A
+	 * ScreenBuilder is constructed from a type and gives itself a random id unless one is set, so
+	 * {@code close(player, TYPE)} named a screen that did not exist: the tracking check compared a
+	 * type against a uuid and failed, and the packet carried an id the open screen did not have,
+	 * so the client kept it open. It failed silently and it looked exactly like a dead button -
+	 * four screens across two mods were written this way, which makes it the API's fault and not
+	 * theirs.
+	 */
 	@Override
-	public void close(ServerPlayer player, String screenId) {
+	public void close(ServerPlayer player, String screenIdOrType) {
 		if (!PandoricalApi.isAvailable(player)) return;
 		// A screen opened since must keep its tracking.
-		String currentId = getPlayerScreenId(player.getUUID());
-		if (screenId.equals(currentId)) {
+		ScreenContext current = playerScreens.get(player.getUUID());
+		boolean mine = current != null
+			&& (screenIdOrType.equals(current.screenId()) || screenIdOrType.equals(current.screenType()));
+		if (mine) {
 			// Close the server-side menu too, or its removed-callback never runs and its items
 			// are stranded. removed() clears the tracking.
 			if (player.containerMenu instanceof PandoricalMenu) {
@@ -169,7 +182,8 @@ public final class ScreenRegistry implements ScreenApi {
 				clearPlayerScreen(player.getUUID());
 			}
 		}
-		ServerPlayNetworking.send(player, new CloseScreenS2C(screenId));
+		// The id the client knows it by, which is the only thing it will match against.
+		ServerPlayNetworking.send(player, new CloseScreenS2C(mine ? current.screenId() : screenIdOrType));
 	}
 
 	@Override

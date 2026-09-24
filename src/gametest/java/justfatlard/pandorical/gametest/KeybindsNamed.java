@@ -23,6 +23,8 @@ public final class KeybindsNamed implements FabricClientGameTest {
 
 	/** Pandorical's own keybind, registered on every server, so this test needs no fixture mod. */
 	private static final String NOTICES_KEYBIND = "pandorical:notices";
+	/** The slot pre-bound to N, which this keybind asks for by name. */
+	private static final int NOTICES_SLOT = 2;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -36,6 +38,16 @@ public final class KeybindsNamed implements FabricClientGameTest {
 			});
 			int slot = found.get();
 			check(slot >= 0, "the notices keybind claimed no slot, so there is nothing to name");
+
+			// And always the same slot. Slot 2 is pre-bound to N, and a pre-bound slot only goes
+			// to the registration that asks for its key, so this one cannot drift the way it used
+			// to: it sat in slot 4 on the family server and slot 2 on a client, purely by how many
+			// other mods had registered first. The slot is the identity a client stores its
+			// binding against, so a slot that moves is a key the player cannot keep - and it is
+			// what couch-controls maps the d-pad by, so it is the controller button too.
+			check(slot == NOTICES_SLOT,
+				"the notices keybind landed in slot " + slot + ", not " + NOTICES_SLOT + "; its key"
+					+ " and its d-pad button both move with it, so neither stays put for anybody");
 
 			String key = "key.pandorical.action" + (slot + 1);
 			String shown = context.computeOnClient(client -> Language.getInstance().getOrDefault(key));

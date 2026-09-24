@@ -2,6 +2,7 @@ package justfatlard.pandorical.changelog;
 
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.ScreenApi;
+import justfatlard.pandorical.settings.Glyphs;
 import justfatlard.pandorical.api.ScreenBuilder;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -32,10 +33,18 @@ final class WhatsNewScreen {
 	private static final int LINE = 10;
 	private static final int ROW = 14;
 	private static final int ICON = 16;
+	/** How far a note is indented under its mod name. */
+	private static final int NOTE_INSET = 6;
 
-	private static final String HEADING_COLOR = "#FFD8A0";
-	private static final String NOTE_COLOR = "#C8C8C8";
-	private static final String VERSION_COLOR = "#80B8FF";
+	// Eight digits, alpha first, like every other colour here. And on a dark frame, because the
+	// notes were light grey on the light grey a bare panel draws: the headings and the version
+	// numbers were tinted enough to read, and the actual words of what changed were grey on grey.
+	// A "what's new" screen nobody can read the "what" of is the same as not writing one.
+	private static final String FRAME_BACKGROUND = "#F0101010";
+	private static final String FRAME_BORDER = "#FF4A4A4A";
+	private static final String HEADING_COLOR = "#FFFFD8A0";
+	private static final String NOTE_COLOR = "#FFD8D8D8";
+	private static final String VERSION_COLOR = "#FF80B8FF";
 
 	static void register() {
 		PandoricalApi.screens().onActionFallback(TYPE, (player, data) -> {
@@ -49,18 +58,21 @@ final class WhatsNewScreen {
 		List<Changelog.Change> changes = Changelog.INSTANCE.pendingFor(player);
 
 		ScreenBuilder screen = new ScreenBuilder(TYPE).size(WIDTH, HEIGHT).title("Since you were away");
-		screen.panel("frame", 0, 0, WIDTH, HEIGHT, Map.of());
+		screen.panel("frame", 0, 0, WIDTH, HEIGHT, Map.of(
+			justfatlard.pandorical.api.ComponentType.PROP_BACKGROUND, FRAME_BACKGROUND,
+			justfatlard.pandorical.api.ComponentType.PROP_BORDER, "flat",
+			justfatlard.pandorical.api.ComponentType.PROP_BORDER_COLOR, FRAME_BORDER));
 
+		int inner = WIDTH - PAD * 2;
 		List<Row> rows = new ArrayList<>();
-		add(rows, changes, Changelog.Kind.ADDED, "New here");
-		add(rows, changes, Changelog.Kind.UPDATED, "Changed");
-		add(rows, changes, Changelog.Kind.REMOVED, "No longer here");
+		add(rows, changes, Changelog.Kind.ADDED, "New here", inner);
+		add(rows, changes, Changelog.Kind.UPDATED, "Changed", inner);
+		add(rows, changes, Changelog.Kind.REMOVED, "No longer here", inner);
 
 		if (rows.isEmpty()) {
 			screen.text("none", PAD, PAD, "Nothing has changed since your last visit.");
 		}
 
-		int inner = WIDTH - PAD * 2;
 		int height = 0;
 		for (Row row : rows) height += row.height();
 
@@ -89,11 +101,11 @@ final class WhatsNewScreen {
 	}
 
 	private static void add(List<Row> rows, List<Changelog.Change> changes,
-			Changelog.Kind kind, String heading) {
+			Changelog.Kind kind, String heading, int width) {
 		List<Changelog.Change> mine = changes.stream().filter(c -> c.kind() == kind).toList();
 		if (mine.isEmpty()) return;
 		rows.add(new Heading(heading));
-		for (Changelog.Change change : mine) rows.add(new Entry(change));
+		for (Changelog.Change change : mine) rows.add(Entry.of(change, width));
 	}
 
 	private interface Row {
@@ -114,10 +126,23 @@ final class WhatsNewScreen {
 		}
 	}
 
-	private record Entry(Changelog.Change change) implements Row {
+	/**
+	 * @param wrapped the note's lines broken to the width they are drawn in, worked out once so
+	 *     {@link #height()} and {@link #draw} cannot disagree about how tall the entry is. They
+	 *     were drawn unwrapped, one component per note, each clipped at the panel edge - so every
+	 *     note read as its first few words and a hard stop.
+	 */
+	private record Entry(Changelog.Change change, List<String> wrapped) implements Row {
+		static Entry of(Changelog.Change change, int width) {
+			List<String> wrapped = new ArrayList<>();
+			for (String line : change.lines()) wrapped.addAll(Glyphs.wrap(line, width - NOTE_INSET));
+			if (wrapped.isEmpty()) wrapped.add("");
+			return new Entry(change, wrapped);
+		}
+
 		@Override
 		public int height() {
-			return ROW + Math.max(1, change.lines().size()) * LINE + 2;
+			return ROW + Math.max(1, wrapped.size()) * LINE + 2;
 		}
 
 		@Override
@@ -135,10 +160,10 @@ final class WhatsNewScreen {
 
 			int at = y + LINE * 2;
 			int i = 0;
-			for (String line : change.lines()) {
+			for (String line : wrapped) {
 				out.add(new justfatlard.pandorical.api.ComponentBuilder("note" + n + "_" + i++,
 						justfatlard.pandorical.api.ComponentType.TEXT)
-					.bounds(6, at, width - 6, LINE)
+					.bounds(NOTE_INSET, at, width - NOTE_INSET, LINE)
 					.prop(justfatlard.pandorical.api.ComponentType.PROP_TEXT, line)
 					.prop(justfatlard.pandorical.api.ComponentType.PROP_COLOR, NOTE_COLOR).build());
 				at += LINE;

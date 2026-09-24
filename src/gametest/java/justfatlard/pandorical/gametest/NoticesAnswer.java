@@ -63,6 +63,13 @@ public final class NoticesAnswer implements FabricClientGameTest {
 				}
 			});
 
+			// The corner badge, photographed before the tray covers it. This is the half that was
+			// wrong and that no assertion here would have caught: it was drawn by a call that
+			// positions without sizing, so it clipped against the screen edge to a white sliver.
+			// The notice had landed, the count was right, and every check below passed while what
+			// the player actually saw was a stray mark in the corner.
+			context.takeScreenshot("notices-badge");
+
 			session.onServer(server -> PandoricalApi.notices().open(session.player()));
 			session.waitTicks(5);
 			if (!screenName(context).endsWith("PandoricalScreen")) {
@@ -81,6 +88,57 @@ public final class NoticesAnswer implements FabricClientGameTest {
 					throw new AssertionError("answering did not spend the notice");
 				}
 			});
+
+			// And the way out. This is the one that was broken in play and green in here for
+			// weeks: every other check above asks the server what it thinks, and the server
+			// thought it had closed the screen. It had sent a close for an id the client had
+			// never been given - a ScreenBuilder names itself by type and takes a random id, and
+			// the close asked for by type matched neither - so the tray stayed open and the
+			// button looked dead. Nothing throws when that happens; the screen just sits there.
+			// So this asks the client what is actually on screen, which is the only witness that
+			// would have noticed.
+			session.onServer(server -> PandoricalApi.notices().offer(session.player(),
+				new NoticeApi.Notice("ask-2", KIND, "minecraft:ender_pearl", "Still here?",
+					List.of(new NoticeApi.Choice("yes", "minecraft:lime_dye", "Accept")), 0)));
+			session.onServer(server -> PandoricalApi.notices().open(session.player()));
+			session.waitTicks(5);
+			if (!screenName(context).endsWith("PandoricalScreen")) {
+				throw new AssertionError("the tray did not open for the close test: " + screenName(context));
+			}
+
+			clickComponent(context, "close");
+			session.waitTicks(5);
+			if (screenName(context).endsWith("PandoricalScreen")) {
+				throw new AssertionError("the tray is still open after its own close button was pressed");
+			}
+
+			// A tray with something actually in it, for the picture. One notice with one choice
+			// is the easiest case and the least like what a player sees, so it is the one layout
+			// worth not judging the screen by: two questions, two answers each, a summary long
+			// enough to wrap and a clock running on one of them.
+			session.onServer(server -> {
+				PandoricalApi.notices().offer(session.player(), new NoticeApi.Notice(
+					"look-1", KIND, "minecraft:ender_pearl",
+					"Fatlard asks to teleport to you, from somewhere in the nether",
+					List.of(new NoticeApi.Choice("yes", "minecraft:lime_dye", "Bring them"),
+						new NoticeApi.Choice("no", "minecraft:barrier", "Leave them")), 30));
+				PandoricalApi.notices().offer(session.player(), new NoticeApi.Notice(
+					"look-2", KIND, "minecraft:writable_book", "The village has post for you",
+					List.of(new NoticeApi.Choice("read", "minecraft:paper", "Read it"),
+						new NoticeApi.Choice("later", "minecraft:barrier", "Later")), 0));
+				PandoricalApi.notices().open(session.player());
+			});
+			session.waitTicks(5);
+			context.takeScreenshot("notices-tray-full");
+
+			// And the badge as a returning player sees it. The one photographed at the top of
+			// this test is the first-time badge, with the key on it; by now this player has
+			// opened the tray several times, so the hint has done its job and the badge is a
+			// bell and a number. Both are photographed because the difference between them is
+			// the whole feature, and neither would fail a check if it silently became the other.
+			session.onServer(server -> PandoricalApi.screens().close(session.player(), "pandorical:notices"));
+			session.waitTicks(5);
+			context.takeScreenshot("notices-badge-known");
 		});
 	}
 

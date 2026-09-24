@@ -31,13 +31,26 @@ public final class KeybindPool implements KeybindApi {
 	private static final int UNBOUND = 0;
 
 	/**
-	 * Only the first two arrive bound. Everything past them is unbound on purpose: a pool that
-	 * shipped sixteen pre-bound keys would take sixteen keys off the player whether any mod wanted
-	 * them or not, and a mod that wants a particular key asks for it through
-	 * {@link KeybindApi#bindByDefault}.
+	 * The key each slot starts on.
+	 *
+	 * <p>Only the first three arrive bound. Everything past them is unbound on purpose: a pool
+	 * that shipped sixteen pre-bound keys would take sixteen keys off the player whether any mod
+	 * wanted them or not, and a mod that wants a particular key asks for it through
+	 * {@link KeybindApi#bindByDefault}. The UNBOUND slots are handed out in order to whoever asks
+	 * for no key in particular.
+	 *
+	 * <p>Slot 2 is N, for the notice tray. Pandorical's own, and pre-bound rather than left to the
+	 * free pool on purpose: a pre-bound slot only ever goes to the registration that asks for its
+	 * key, so the tray lands in the same slot on every server whatever else is installed and
+	 * whatever order it loads in. It had been taking a free slot, which moved - slot 4 on the
+	 * family server, slot 2 on a client - and a keybind whose slot moves is one whose key the
+	 * player cannot keep, because the slot is the identity the binding is stored against.
+	 *
+	 * <p>It also earns the tray a controller button: couch-controls maps the first three pool
+	 * indices to the d-pad, so a fixed slot 2 is a fixed d-pad right.
 	 */
 	private static final int[] POOL_DEFAULT_KEYS = {KeybindApi.letter('G'), KeybindApi.letter('B'),
-		UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND,
+		KeybindApi.letter('N'), UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND,
 		UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND, UNBOUND};
 
 	public static int poolDefaultKey(int slot) {

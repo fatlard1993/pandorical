@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>A new player is told nothing about forty mods and finds them by walking into them, which works
  * for a block that looks interesting and not at all for a command or a rule. This is the overview,
- * offered once, and it ends by pointing at the mods screen for anyone who wants the rest.
+ * offered until it has been read, and it ends by pointing at the mods screen for the rest.
  *
  * <p>Offered rather than opened. Somebody's first minute on a server is theirs, and a screen that
  * takes it without asking is worse than no orientation at all: it waits in the tray like any other
@@ -37,8 +37,17 @@ public final class Brief implements BriefApi {
 	/** The kind a notice is filed under. */
 	public static final String KIND = "pandorical:brief";
 
-	/** Remembers that this player has been offered it, so it is offered once and not every join. */
-	private static final String BRIEFED = "pandorical:briefed";
+	/**
+	 * Remembers that this player has read it, so it is offered until seen and not forever.
+	 *
+	 * <p>A different key from the {@code pandorical:briefed} this used to write, because it means
+	 * a different thing: that one was set when the brief was offered, this one when it is read.
+	 * Reusing it would have left everybody already carrying it skipped forever - which is exactly
+	 * the players this change is for, since under the old rule being offered it once and never
+	 * opening it was indistinguishable from having read it. The old key is simply left alone;
+	 * anybody who genuinely read the brief is asked once more, which is one click.
+	 */
+	private static final String BRIEFED = "pandorical:brief_read";
 
 	private final Map<String, List<String>> overviews = new ConcurrentHashMap<>();
 
@@ -98,16 +107,21 @@ public final class Brief implements BriefApi {
 		return out;
 	}
 
-	/** Whether this player has already been offered it. */
+	/** Whether this player has already read it. */
 	private static boolean briefed(ServerPlayer player, MinecraftServer server) {
 		return PlayerSettings.get(server).get(player.getUUID(), BRIEFED) != null;
 	}
 
 	/**
-	 * Put it to the player, once ever.
+	 * Put it to the player, on every join until they have actually read it.
 	 *
-	 * <p>Marked as offered at the same moment, not when they read it: somebody who turns it down is
-	 * not asked again every time they log in, which is how a welcome becomes a nuisance.
+	 * <p>It used to be marked the moment it was offered, so a player who was busy the minute they
+	 * arrived, or who logged out before opening the tray, had used up the only offer they would
+	 * ever get. That is the wrong way round for an orientation: a notice nobody opened has not
+	 * done anything, and the cost of asking again is one line in a tray.
+	 *
+	 * <p>So it is marked when the screen is opened, and "not now" means not now. Reading it once
+	 * ends it for good, which is a single click for anybody who does not want to be asked again.
 	 *
 	 * <p>Worded for anybody rather than for a newcomer, because the two cannot be told apart here.
 	 * On the first server to run this, every player is unbriefed, including the ones who have been
@@ -122,7 +136,6 @@ public final class Brief implements BriefApi {
 		List<Entry> entries = INSTANCE.entries();
 		if (entries.isEmpty()) return;
 
-		PlayerSettings.get(server).put(player.getUUID(), BRIEFED, "1");
 		PandoricalApi.notices().offer(player, new NoticeApi.Notice(
 			"brief", KIND, "minecraft:map",
 			"A quick look at the " + entries.size() + " mods running here",
@@ -132,14 +145,15 @@ public final class Brief implements BriefApi {
 	}
 
 	/**
-	 * Show it on purpose, whenever somebody asks.
+	 * Show it, and count it as read.
 	 *
-	 * <p>The offer is marked as made when it is put to the player rather than when they read it,
-	 * so that a "not now" is not asked again every login. Without a way back, that same choice
-	 * also meant never - and the one screen that says what a server is would be the one thing on
-	 * it a player could permanently lose by being busy the minute they arrived.
+	 * <p>The one place the brief is marked off, so opening it from the notice and opening it from
+	 * {@code /pandorical brief} settle the same thing. Anything that opens the screen without
+	 * coming through here would leave a player being asked forever.
 	 */
 	public static void show(ServerPlayer player) {
+		MinecraftServer server = player.level().getServer();
+		if (server != null) PlayerSettings.get(server).put(player.getUUID(), BRIEFED, "1");
 		BriefScreen.open(player);
 	}
 
@@ -147,11 +161,11 @@ public final class Brief implements BriefApi {
 	public static void register() {
 		PandoricalApi.notices().onChoice(KIND, (player, noticeId, choiceId) -> {
 			if ("read".equals(choiceId)) {
-				BriefScreen.open(player);
+				show(player);
 			} else {
-				// Turned down, and this is the only moment they will be offered it, so the way
-				// back goes with the refusal. Said because they just pressed a button, not
-				// announced at somebody who was trying to play.
+				// Turned down, which is not the same as done with: they will be asked again next
+				// time they join. Said because they just pressed a button, not announced at
+				// somebody who was trying to play.
 				player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
 					"It is at /pandorical brief whenever you want it."));
 			}

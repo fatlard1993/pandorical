@@ -120,8 +120,12 @@ public final class KeybindManager {
 			KeyMapping.resetMapping();
 			Minecraft client = Minecraft.getInstance();
 			if (client != null && client.options != null) client.options.save();
-			sendBindings();
 		}
+		// Always, not only when something changed. The server asks this client what its keys are
+		// so it can name them back to the player, and a client that already had the right key
+		// changes nothing here - which used to mean it never answered, and the server went on
+		// believing the slot was empty.
+		sendBindings();
 	}
 
 	public static void sendBindings() {

@@ -4,11 +4,44 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.8.0": [
+      "The welcome is offered until you have actually read it, not just until it has been shown once.",
+      "Anyone who was busy when it first arrived gets it again on their next login."
+    ],
+    "15.7.0": [
+      "The notice badge shows what is waiting, not just a bell."
+    ],
+    "15.6.0": [
+      "The notice badge shrinks once you have opened the tray. The key is on it the first time only."
+    ],
+    "15.5.0": [
+      "The notice tray is laid out properly: summaries wrap, answers line up, and the clock shows."
+    ],
+    "15.4.0": [
+      "Buttons that close a screen work again.",
+      "What changed since you were away wraps instead of running off the panel.",
+      "The notice badge names your key correctly."
+    ],
+    "15.3.1": [
+      "What changed since you were away is readable. It was grey on grey.",
+      "The notice badge sits above the hotbar instead of under it."
+    ],
+    "15.3.0": [
+      "The notice badge moved to the bottom right, out of the crowded corner.",
+      "The notice tray reads as a list of questions, and has a way out."
+    ],
+    "15.2.0": [
+      "The notice tray opens on N, or the d-pad's right on a controller.",
+      "The badge in the corner is readable and names its key."
+    ],
+    "15.1.1": [
+      "Fixed the notice badge drawing as a sliver in the corner."
+    ],
     "15.1.0": [
-      "Notices: a mod can put a question to a player in a tray of its own — a teleport request, an invitation, an offer to trade — instead of in the chat everybody is talking in.",
-      "The death screen's buttons now arm on the clock as well as on ticks, so a client that has stopped ticking can still respawn instead of sitting on a dead screen.",
-      "A horse turns the way you press. Left was turning it right, and it turned at a boat's pace; it now answers at a horse's.",
-      "A block the client builds from the server's description starts with its flags off, so a grass slab no longer flashes white for a frame as it is placed."
+      "Notices: a mod can put a question to you in a tray of its own instead of in chat.",
+      "The death screen's buttons work on a client that has stopped ticking.",
+      "Horses turn the way you press, at a horse's pace.",
+      "Grass slabs no longer flash white as they are placed."
     ],
     "15.0.0": [
       "Action menus: grids of buttons on one key. Press J, or set your own.",

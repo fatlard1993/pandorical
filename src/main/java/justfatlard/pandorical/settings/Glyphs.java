@@ -7,8 +7,11 @@ import java.util.List;
 /**
  * Default-font text widths, as near as a server can tell. A resource pack's font can differ, so
  * callers keep a few pixels spare.
+ *
+ * <p>Kept in {@code settings} because that is where it was first needed; nothing about it is
+ * settings-specific, so anything in the mod may use it rather than measure a string its own way.
  */
-final class Glyphs {
+public final class Glyphs {
     private Glyphs() {}
 
     private static final String ELLIPSIS = "...";
@@ -24,18 +27,18 @@ final class Glyphs {
         for (char c : "@~".toCharArray()) ASCII[c] = 7;
     }
 
-    static int width(char c) {
+    public static int width(char c) {
         return c < 128 ? ASCII[c] : OTHER;
     }
 
-    static int width(CharSequence text) {
+    public static int width(CharSequence text) {
         int total = 0;
         for (int i = 0; i < text.length(); i++) total += width(text.charAt(i));
         return total;
     }
 
     /** A word wider than {@code px} is broken. */
-    static List<String> wrap(String text, int px) {
+    public static List<String> wrap(String text, int px) {
         List<String> lines = new ArrayList<>();
         StringBuilder line = new StringBuilder();
         for (String word : text.split("\\s+")) {
@@ -75,7 +78,7 @@ final class Glyphs {
         return pieces;
     }
 
-    static String clip(String text, int px) {
+    public static String clip(String text, int px) {
         if (width(text) <= px) return text;
         int room = px - width(ELLIPSIS);
         int end = 0;

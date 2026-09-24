@@ -9,29 +9,33 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 
 /**
- * The brief reaches a player once, says what each mod is, and does not ask twice.
+ * The brief reaches a player, says what each mod is, and keeps asking until they have read it.
  *
- * <p>The once is the part worth pinning. Offering it again costs nothing visible the first time it
- * regresses - a notice in a tray - and turns a welcome into something a regular dismisses on every
- * login until they stop reading notices at all.
+ * <p>Both halves are worth pinning, and they pull against each other. It used to be marked off the
+ * moment it was offered, so anybody busy in their first minute - or who logged out before opening
+ * the tray - had spent the only offer they would ever get, silently. Now it is marked when the
+ * screen opens. The regression in the other direction is just as quiet: mark it nowhere and a
+ * regular is asked on every login forever, which is how they stop reading notices at all.
  */
 public final class BriefOffered implements FabricClientGameTest {
 
-	private static final String BRIEFED = "pandorical:briefed";
+	/** The "has read it" key, not the old "was offered it" one it replaced. */
+	private static final String BRIEFED = "pandorical:brief_read";
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
 		Smoke.run(context, "pandorical", session -> {
 			AtomicReference<String> complaint = new AtomicReference<>();
 
-			// The join already ran it, so this player has been briefed and told about it.
+			// The join already ran it, so a notice is waiting - and the player is not marked yet,
+			// because they have not opened anything.
 			session.onServer(server -> {
-				if (PlayerSettings.get(server).get(session.player().getUUID(), BRIEFED) == null) {
-					complaint.set("joining did not mark the player as briefed");
-					return;
-				}
 				if (PandoricalApi.notices().waiting(session.player()) < 1) {
 					complaint.set("no notice reached the player on their first visit");
+					return;
+				}
+				if (PlayerSettings.get(server).get(session.player().getUUID(), BRIEFED) != null) {
+					complaint.set("being offered the brief counted as reading it");
 				}
 			});
 			check(complaint.get() == null, complaint.get());
@@ -58,7 +62,7 @@ public final class BriefOffered implements FabricClientGameTest {
 			});
 			check(complaint.get() == null, complaint.get());
 
-			// Asked again, it holds its tongue.
+			// Unread, it comes back.
 			//
 			// Put away first, and that is the whole point of doing it this way: offering the same
 			// kind and id twice replaces the notice rather than stacking a second one, so a tray
@@ -70,19 +74,37 @@ public final class BriefOffered implements FabricClientGameTest {
 
 			session.onServer(server -> Brief.offerTo(session.player()));
 			session.waitTicks(5);
-			int after = count(session);
-			check(after == cleared,
-				"the brief came back after being put away: the tray went from " + cleared
-					+ " to " + after + ", so a briefed player would be asked again every join");
+			int again = count(session);
+			check(again > cleared,
+				"the brief did not come back for a player who never read it: the tray stayed at "
+					+ cleared + ", so being busy on arrival loses it for good");
 
-			// ...but it is still theirs to open. Offered once and openable forever are different
-			// promises, and the flag that keeps the first one would quietly break the second.
+			// Reading it is what ends it. The screen opens...
 			session.onServer(server -> Brief.show(session.player()));
 			session.waitTicks(5);
 			String screen = context.computeOnClient(client -> client.gui.screen() == null ? "none"
 				: client.gui.screen().getClass().getSimpleName());
 			check(screen.endsWith("PandoricalScreen"),
-				"a player who has been briefed could not open it again: screen was " + screen);
+				"the brief would not open: screen was " + screen);
+
+			// ...and now it is marked off and stops asking.
+			session.onServer(server -> {
+				if (PlayerSettings.get(server).get(session.player().getUUID(), BRIEFED) == null) {
+					complaint.set("reading the brief did not mark it as read");
+				}
+			});
+			check(complaint.get() == null, complaint.get());
+
+			session.onServer(server ->
+				PandoricalApi.notices().withdrawAll(session.player(), Brief.KIND));
+			session.waitTicks(2);
+			int emptied = count(session);
+			session.onServer(server -> Brief.offerTo(session.player()));
+			session.waitTicks(5);
+			int settled = count(session);
+			check(settled == emptied,
+				"the brief came back after being read: the tray went from " + emptied + " to "
+					+ settled + ", so a regular would be asked on every login forever");
 		});
 	}
 
