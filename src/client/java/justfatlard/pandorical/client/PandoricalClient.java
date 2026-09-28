@@ -313,6 +313,8 @@ public class PandoricalClient implements ClientModInitializer {
                     payload.protocolVersion(), payload.capabilities());
                 ServerCapabilities.set(payload.capabilities());
                 ClientPlayNetworking.send(new HelloC2S(Pandorical.PROTOCOL_VERSION, CLIENT_CAPABILITIES));
+                // Pictures before settings: the server leaves room for one as it registers.
+                ClientSettings.INSTANCE.sendShapes();
                 ClientSettings.INSTANCE.send();
                 // Anything the configuration phase could not read has been waiting to be sent.
                 ClientNotices.flush();

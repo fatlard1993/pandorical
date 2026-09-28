@@ -3,6 +3,8 @@ package justfatlard.pandorical.gametest;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import justfatlard.pandorical.api.NoticeApi;
+import net.minecraft.locale.Language;
+import justfatlard.pandorical.client.hint.InputHints;
 import justfatlard.pandorical.api.PandoricalApi;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -70,12 +72,57 @@ public final class NoticesAnswer implements FabricClientGameTest {
 			// the player actually saw was a stray mark in the corner.
 			context.takeScreenshot("notices-badge");
 
+			// Before the tray is opened, which is the only moment the badge carries the key hint.
+			// No pad in a gametest, so the driver is stood in for by a one-word names function.
+			context.runOnClient(client -> InputHints.controller(word -> "notices".equals(word) ? "D-pad right" : null));
+			session.waitTicks(2);
+			// A component works its text out once, when it is made, so the badge needs rebuilding.
+			// True in play too: a pad picked up mid-session reads the key until the next notice.
+			session.onServer(server -> PandoricalApi.notices().offer(session.player(),
+				new NoticeApi.Notice("pad-1", KIND, "minecraft:ender_pearl", "Somebody wants a lift",
+					List.of(new NoticeApi.Choice("yes", "minecraft:lime_dye", "Accept")), 0)));
+			session.waitTicks(5);
+			String padLine = context.computeOnClient(client ->
+				Language.getInstance().getOrDefault("pandorical.notices.open", "?"));
+			if (!padLine.contains("D-pad right")) {
+				throw new AssertionError("a pad was told to press a key: the hint read \"" + padLine + "\"");
+			}
+			context.takeScreenshot("notices-badge-pad");
+
+			// Keyboard back, and the extra notice withdrawn: what follows counts what is waiting.
+			session.onServer(server ->
+				PandoricalApi.notices().withdraw(session.player(), KIND, "pad-1"));
+			context.runOnClient(client -> InputHints.keyboard());
+			String keyLine = context.computeOnClient(client ->
+				Language.getInstance().getOrDefault("pandorical.notices.open", "?"));
+			if (keyLine.contains("D-pad")) {
+				throw new AssertionError("the keyboard kept the pad's words: " + keyLine);
+			}
+
 			session.onServer(server -> PandoricalApi.notices().open(session.player()));
 			session.waitTicks(5);
 			if (!screenName(context).endsWith("PandoricalScreen")) {
 				throw new AssertionError("the tray did not open: " + screenName(context));
 			}
 			context.takeScreenshot("notices-tray");
+
+			// Nothing was answered, so the tray still holds them; the badge has no news left.
+			// Asked of the client: the server thinking it sent a hide is not the badge being gone.
+			if (badgeShowing(context)) {
+				throw new AssertionError("the badge is still lit after the tray was opened");
+			}
+
+			// A new question brings it back.
+			session.onServer(server -> PandoricalApi.notices().offer(session.player(),
+				new NoticeApi.Notice("news-1", KIND, "minecraft:bell", "Something new",
+					List.of(new NoticeApi.Choice("ok", "minecraft:lime_dye", "Fine")), 0)));
+			session.waitTicks(5);
+			if (!badgeShowing(context)) {
+				throw new AssertionError("a notice arrived and the badge stayed dark");
+			}
+			session.onServer(server ->
+				PandoricalApi.notices().withdraw(session.player(), KIND, "news-1"));
+			session.waitTicks(2);
 
 			clickComponent(context, "b0_0");
 			session.waitTicks(5);
@@ -139,7 +186,15 @@ public final class NoticesAnswer implements FabricClientGameTest {
 			session.onServer(server -> PandoricalApi.screens().close(session.player(), "pandorical:notices"));
 			session.waitTicks(5);
 			context.takeScreenshot("notices-badge-known");
+
 		});
+	}
+
+	/** Asked of the client that draws it, not of the server that sent it. */
+	private static boolean badgeShowing(ClientGameTestContext context) {
+		return context.computeOnClient(client ->
+			justfatlard.pandorical.client.hud.HudManager.getActiveOverlays()
+				.containsKey("pandorical:notices_badge"));
 	}
 
 	private static String screenName(ClientGameTestContext context) {

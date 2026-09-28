@@ -20,6 +20,16 @@ public interface ClientSettingsApi {
         Group choice(String key, String label, String description, Map<String, String> options,
                 Supplier<String> get, Consumer<String> set);
 
+        /**
+         * A choice whose options are shapes, with the picture for each drawn beside the control.
+         *
+         * <p>{@code previews} maps option id to a full resource path with its extension. A server
+         * too old to have asked for them ignores them and draws the names alone, so declaring
+         * them costs nothing on one.
+         */
+        Group choice(String key, String label, String description, Map<String, String> options,
+                Map<String, String> previews, Supplier<String> get, Consumer<String> set);
+
         Group number(String key, String label, String description, int min, int max, int step,
                 Supplier<Integer> get, Consumer<Integer> set);
     }

@@ -74,6 +74,39 @@ public final class ClientMods {
         byPlayer.remove(player.getUUID());
         values.remove(player.getUUID());
         filesByPlayer.remove(player.getUUID());
+        previews.remove(player.getUUID());
+    }
+
+    /**
+     * A picture per option, for settings whose choices are shapes; keyed "mod:key:value".
+     *
+     * <p>Kept for the server rather than per player, because a setting is registered once for
+     * everybody and its layout has to be decided then. Two players on different builds of the
+     * same mod would share whichever arrived last, which costs a wrong picture beside a right
+     * name; threading a player through the registration to avoid that buys very little.
+     */
+    private static final Map<String, String> previews = new ConcurrentHashMap<>();
+
+    public static void declarePreviews(ServerPlayer player,
+            justfatlard.pandorical.protocol.SettingPreviewsC2S payload) {
+        for (var entry : payload.entries()) {
+            if (!MOD_ID.matcher(entry.modId()).matches() || !KEY.matcher(entry.key()).matches()) continue;
+            previews.put(entry.modId() + ":" + entry.key() + ":" + entry.value(), entry.texture());
+        }
+    }
+
+    /** The picture for one option, or null where no client has sent one. */
+    private static String previewOf(String modId, String key, String value) {
+        return value == null ? null : previews.get(modId + ":" + key + ":" + value);
+    }
+
+    /** Whether this setting has pictures at all, which decides whether it is given room for one. */
+    private static boolean hasPreviews(String modId, String key) {
+        String start = modId + ":" + key + ":";
+        for (String each : previews.keySet()) {
+            if (each.startsWith(start)) return true;
+        }
+        return false;
     }
 
     public static List<ModCatalog.ModInfo> of(ServerPlayer player) {
@@ -99,7 +132,9 @@ public final class ClientMods {
                 .describe(blank(setting.description()))
                 .backedBy(p -> parse(stored(p, id, setting.value()), setting.min()),
                     (p, v) -> push(p, mod.id(), setting.key(), id, String.valueOf(v)));
-            default -> group.choice(setting.key(), setting.label(), setting.options(), setting.value())
+            default -> group.choice(setting.key(), setting.label(), setting.options(), setting.value(),
+                    hasPreviews(mod.id(), setting.key())
+                        ? value -> previewOf(mod.id(), setting.key(), value) : null)
                 .describe(blank(setting.description()))
                 .backedBy(p -> stored(p, id, setting.value()),
                     (p, v) -> push(p, mod.id(), setting.key(), id, v));

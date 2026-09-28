@@ -66,6 +66,8 @@ public final class SettingsRegistry implements SettingsApi {
     private static final int LINE = 10;
     private static final int ROW = 24;
     private static final int CONTROL_W = 84;
+    /** The square a choice's shape preview is drawn in, at the left end of its control. */
+    private static final int PREVIEW = 16;
     private static final int INDENT = 8;
     private static final int MOST_LINES = 800;
     private static final String HEADING_COLOR = "#303030";
@@ -210,19 +212,21 @@ public final class SettingsRegistry implements SettingsApi {
 
     public void open(ServerPlayer player, String selectedId, String tab) {
         Layout at = Layout.fit(Viewports.of(player));
-        // The server's first, then the player's own, then the ones they have switched off: three
-        // different answers to "where is this running", and a single sorted list said none of them.
-        List<ModCatalog.ModInfo> mods = new ArrayList<>(ModCatalog.all());
-        mods.sort(Comparator.comparing(mod -> mod.name().toLowerCase()));
-        int serverCount = mods.size();
+        // Three lists, not one: the player's own first, because a hundred server mods push
+        // anything below them off the screen.
+        List<ModCatalog.ModInfo> onServer = new ArrayList<>(ModCatalog.all());
+        onServer.sort(Comparator.comparing(mod -> mod.name().toLowerCase()));
 
         List<ModCatalog.ModInfo> onClient = new ArrayList<>();
         for (ModCatalog.ModInfo mine : ClientMods.of(player)) {
-            if (mods.stream().noneMatch(mod -> mod.id().equals(mine.id()))) onClient.add(mine);
+            if (onServer.stream().noneMatch(mod -> mod.id().equals(mine.id()))) onClient.add(mine);
         }
         onClient.sort(Comparator.comparing(mod -> mod.name().toLowerCase()));
-        mods.addAll(onClient);
+
+        List<ModCatalog.ModInfo> mods = new ArrayList<>(onClient);
+        mods.addAll(onServer);
         int clientCount = onClient.size();
+        int serverCount = onServer.size();
 
         List<ModCatalog.ModInfo> off = new ArrayList<>();
         for (var entry : ClientMods.filesOf(player)) {
@@ -272,9 +276,9 @@ public final class SettingsRegistry implements SettingsApi {
             index++;
             // A heading before the first of each kind, so the three groups read as three groups
             // without every row having to repeat which one it is in.
-            String heading = index == 0 ? "On this server"
-                : index == serverCount && clientCount > 0 ? "On your client"
-                : index == serverCount + clientCount ? "Switched off" : null;
+            String heading = index == 0 && clientCount > 0 ? "Only on your client"
+                : index == clientCount ? "On this server"
+                : index == clientCount + serverCount ? "Switched off" : null;
             if (heading != null) {
                 names.add(new ComponentBuilder("head:" + index, ComponentType.TEXT)
                     .bounds(0, y + 4, buttonW, LINE)
@@ -816,7 +820,7 @@ public final class SettingsRegistry implements SettingsApi {
         if (!setting.visible(player)) return;
 
         switch (verb) {
-            case "set" -> setting.cycle(player, 1);
+            case "set" -> setting.cycle(player, rightClicked(data) ? -1 : 1);
             case "inc" -> setting.cycle(player, 1);
             case "dec" -> setting.cycle(player, -1);
             case "rem" -> {
@@ -834,6 +838,11 @@ public final class SettingsRegistry implements SettingsApi {
         } else {
             PandoricalApi.screens().update(player, screenId, setting.relabel(player));
         }
+    }
+
+    /** GLFW's right button. A choice steps back on it, so a long list is never a full lap away. */
+    private static boolean rightClicked(Map<String, String> data) {
+        return "1".equals(data.get("button"));
     }
 
     public final class GroupImpl implements Group {
@@ -892,16 +901,24 @@ public final class SettingsRegistry implements SettingsApi {
 
         @Override
         public Setting<String> choice(String key, String label, Map<String, String> options, String fallback) {
+            return choice(key, label, options, fallback, null);
+        }
+
+        @Override
+        public Setting<String> choice(String key, String label, Map<String, String> options, String fallback,
+                Function<String, String> preview) {
             Map<String, String> ordered = new LinkedHashMap<>(options);
             List<String> ids = new ArrayList<>(ordered.keySet());
             return add(new SettingImpl<>(this, key, label, fallback) {
                 @Override String encode(String v) { return v; }
                 @Override String decode(String s) { return ordered.containsKey(s) ? s : fallback; }
                 @Override String display(String v) { return ordered.getOrDefault(v, v); }
+                @Override Function<String, String> preview() { return preview; }
                 @Override int controlWidth(int most) {
                     int widest = 0;
                     for (String label : ordered.values()) widest = Math.max(widest, Glyphs.width(label));
-                    return Math.clamp(widest + 12, CONTROL_W, most);
+                    int room = widest + 12 + (preview == null ? 0 : PREVIEW + 4);
+                    return Math.clamp(room, CONTROL_W, most);
                 }
                 @Override String next(String v, int direction) {
                     int at = ids.indexOf(v);
@@ -973,6 +990,9 @@ public final class SettingsRegistry implements SettingsApi {
 
         /** Up to {@code most}; the client shrinks a label that still does not fit. */
         int controlWidth(int most) { return CONTROL_W; }
+
+        /** The texture for a value, for a setting whose options are shapes; null for words. */
+        Function<String, String> preview() { return null; }
 
         /** A value typed at a command, or null if it is not one this setting takes. */
         public T parse(String typed) {
@@ -1098,6 +1118,14 @@ public final class SettingsRegistry implements SettingsApi {
                     .prop(ComponentType.PROP_ALIGN, "center").build());
                 out.add(new ComponentBuilder("inc:" + id(), ComponentType.BUTTON)
                     .bounds(right - 20, y, 20, 20).prop(ComponentType.PROP_LABEL, "+").build());
+            } else if (preview() != null) {
+                String texture = preview().apply(get(player) == null ? null : String.valueOf(get(player)));
+                out.add(new ComponentBuilder("shape:" + id(), ComponentType.SPRITE)
+                    .bounds(right - width, y + 2, PREVIEW, PREVIEW)
+                    .prop(ComponentType.PROP_TEXTURE, texture == null ? "" : texture).build());
+                out.add(new ComponentBuilder("set:" + id(), ComponentType.BUTTON)
+                    .bounds(right - width + PREVIEW + 4, y, width - PREVIEW - 4, 20)
+                    .props(labelProps(player)).build());
             } else {
                 out.add(new ComponentBuilder("set:" + id(), ComponentType.BUTTON)
                     .bounds(right - width, y, width, 20).props(labelProps(player)).build());
@@ -1109,7 +1137,11 @@ public final class SettingsRegistry implements SettingsApi {
             if (stepped()) {
                 return List.of(new ComponentUpdate("val:" + id(), Map.of(ComponentType.PROP_TEXT, display(get(player)))));
             }
-            return List.of(new ComponentUpdate("set:" + id(), labelProps(player)));
+            if (preview() == null) return List.of(new ComponentUpdate("set:" + id(), labelProps(player)));
+            String texture = preview().apply(get(player) == null ? null : String.valueOf(get(player)));
+            return List.of(new ComponentUpdate("set:" + id(), labelProps(player)),
+                new ComponentUpdate("shape:" + id(),
+                    Map.of(ComponentType.PROP_TEXTURE, texture == null ? "" : texture)));
         }
     }
 

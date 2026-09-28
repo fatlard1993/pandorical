@@ -26,6 +26,7 @@ import justfatlard.pandorical.protocol.OpenScreenS2C;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import justfatlard.pandorical.protocol.RequirementS2C;
 import justfatlard.pandorical.protocol.ScreenActionC2S;
+import justfatlard.pandorical.protocol.SettingPreviewsC2S;
 import justfatlard.pandorical.protocol.ShowHudS2C;
 import justfatlard.pandorical.protocol.UpdateHudS2C;
 import justfatlard.pandorical.protocol.UpdateScreenS2C;
@@ -127,6 +128,8 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 			new ClientModToggleS2C("mymod.jar")));
 		out.put("client_mod_files", encode(ClientModFilesC2S.STREAM_CODEC, new ClientModFilesC2S(
 			List.of(new ClientModFilesC2S.Entry("mymod", "My Mod", "1.0", "mymod.jar", true)))));
+		out.put("setting_previews", encode(SettingPreviewsC2S.STREAM_CODEC, new SettingPreviewsC2S(
+			List.of(new SettingPreviewsC2S.Entry("mymod", "shape", "dot", "mymod:textures/dot.png")))));
 		out.put("not_understood", encode(NotUnderstoodC2S.STREAM_CODEC,
 			new NotUnderstoodC2S("component_type", "mymod:not_invented_yet")));
 		return out;

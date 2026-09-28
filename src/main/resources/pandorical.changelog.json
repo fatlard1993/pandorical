@@ -4,6 +4,18 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.11.0": [
+      "A setting whose options are shapes can show the shape beside its name in the mods menu."
+    ],
+    "15.10.0": [
+      "The mods screen puts the mods only you are running at the top, above the server's hundred.",
+      "A client-only mod like Sodium was listed all along, as row one hundred and nine."
+    ],
+    "15.9.0": [
+      "Opening the notice tray puts the badge out, even if you answered nothing. Looking is enough.",
+      "It comes back when something new arrives.",
+      "On a controller the badge names your button instead of telling you to press a key."
+    ],
     "15.8.0": [
       "The welcome is offered until you have actually read it, not just until it has been shown once.",
       "Anyone who was busy when it first arrived gets it again on their next login."
@@ -15,12 +27,12 @@
       "The notice badge shrinks once you have opened the tray. The key is on it the first time only."
     ],
     "15.5.0": [
-      "The notice tray is laid out properly: summaries wrap, answers line up, and the clock shows."
+      "In the notice tray, summaries wrap, answers line up down one edge, and the time left shows."
     ],
     "15.4.0": [
       "Buttons that close a screen work again.",
       "What changed since you were away wraps instead of running off the panel.",
-      "The notice badge names your key correctly."
+      "The notice badge names the key you actually have bound."
     ],
     "15.3.1": [
       "What changed since you were away is readable. It was grey on grey.",

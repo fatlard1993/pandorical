@@ -64,7 +64,12 @@ public final class Notices implements NoticeApi {
 	/** Beyond this the tray stops being a tray; the oldest go to make room. */
 	private static final int MOST = 8;
 
-	private record Pending(Notice notice, long expiresAt) {}
+	/** @param seen the tray has been opened since this arrived, answered or not. */
+	private record Pending(Notice notice, long expiresAt, boolean seen) {
+		Pending looked() {
+			return seen ? this : new Pending(notice, expiresAt, true);
+		}
+	}
 
 	/** What a button in somebody's open tray answers, so no id has to be packed into a string. */
 	private record Answer(String kind, String noticeId, String choiceId) {}
@@ -103,7 +108,7 @@ public final class Notices implements NoticeApi {
 			// Replaced rather than added: a second ask under one id is the same question again,
 			// which is what stops one impatient player filling somebody's tray.
 			mine.remove(key(notice.kind(), notice.id()));
-			mine.put(key(notice.kind(), notice.id()), new Pending(notice, until));
+			mine.put(key(notice.kind(), notice.id()), new Pending(notice, until, false));
 			while (mine.size() > MOST) {
 				String oldest = mine.keySet().iterator().next();
 				Pending dropped = mine.remove(oldest);
@@ -254,6 +259,10 @@ public final class Notices implements NoticeApi {
 	 */
 	private void badge(ServerPlayer player) {
 		int count = waiting(player);
+		if (unseen(player) == 0) {
+			PandoricalApi.hud().hide(player, BADGE);
+			return;
+		}
 		if (count == 0) {
 			PandoricalApi.hud().hide(player, BADGE);
 			return;
@@ -281,9 +290,11 @@ public final class Notices implements NoticeApi {
 				.prop(ComponentType.PROP_COLOR, BADGE_TEXT)
 				.prop(ComponentType.PROP_SHADOW, "true")
 				.build())
+			// Plain text and a key: TextComponent prefers the key on a pad.
 			.component(new ComponentBuilder("how", ComponentType.TEXT)
 				.bounds(PAD / 2 + BADGE_ICON + 4, 17, BADGE_WIDTH - BADGE_ICON - PAD, 9)
 				.prop(ComponentType.PROP_TEXT, howToOpen(player))
+				.prop(ComponentType.PROP_TEXT_KEY, hintKey(player))
 				.prop(ComponentType.PROP_COLOR, BADGE_HINT)
 				.prop(ComponentType.PROP_SHADOW, "true")
 				.build())
@@ -339,6 +350,25 @@ public final class Notices implements NoticeApi {
 			.build());
 	}
 
+	private int unseen(ServerPlayer player) {
+		Map<String, Pending> mine = waiting.get(player.getUUID());
+		if (mine == null) return 0;
+		synchronized (mine) {
+			int n = 0;
+			for (Pending each : mine.values()) if (!each.seen()) n++;
+			return n;
+		}
+	}
+
+	/** Everything in the tray has now been looked at, whether or not it was answered. */
+	private void looked(ServerPlayer player) {
+		Map<String, Pending> mine = waiting.get(player.getUUID());
+		if (mine == null) return;
+		synchronized (mine) {
+			mine.replaceAll((key, each) -> each.looked());
+		}
+	}
+
 	/** The most recent question waiting on this player: the one the badge describes. */
 	private @org.jspecify.annotations.Nullable Pending newest(ServerPlayer player) {
 		Map<String, Pending> mine = waiting.get(player.getUUID());
@@ -364,6 +394,11 @@ public final class Notices implements NoticeApi {
 		MinecraftServer server = player.level().getServer();
 		if (server == null) return;
 		PlayerSettings.get(server).put(player.getUUID(), OPENED, "1");
+	}
+
+	/** Which line a pad reads instead of the key one: bound, or not bound. */
+	private static String hintKey(ServerPlayer player) {
+		return howToOpen(player).startsWith("Press") ? "pandorical.notices.open" : "pandorical.notices.unbound";
 	}
 
 	/** A letter key's name from its code, or null for anything that is not one. */
@@ -408,6 +443,9 @@ public final class Notices implements NoticeApi {
 	private void openTray(ServerPlayer player) {
 		// Finding it once is the whole of what the hint was for.
 		remember(player);
+		// Mark and redraw together: nothing else redraws a hud, so the badge would stay lit.
+		looked(player);
+		badge(player);
 		Map<String, Pending> mine = waiting.get(player.getUUID());
 		List<Pending> rows;
 		synchronized (mine == null ? this : mine) {

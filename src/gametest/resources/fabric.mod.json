@@ -24,7 +24,8 @@
 			"justfatlard.pandorical.gametest.KeybindsNamed",
 			"justfatlard.pandorical.gametest.WhatsNew",
 			"justfatlard.pandorical.gametest.BriefOffered",
-			"justfatlard.pandorical.gametest.HeldAtTheGate"
+			"justfatlard.pandorical.gametest.HeldAtTheGate",
+			"justfatlard.pandorical.gametest.EveryModListed"
 		]
 	},
 	"depends": {

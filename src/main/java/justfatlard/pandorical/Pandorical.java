@@ -290,6 +290,9 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.serverboundPlay().register(
             justfatlard.pandorical.protocol.ClientModFilesC2S.TYPE,
             justfatlard.pandorical.protocol.ClientModFilesC2S.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(
+            justfatlard.pandorical.protocol.SettingPreviewsC2S.TYPE,
+            justfatlard.pandorical.protocol.SettingPreviewsC2S.STREAM_CODEC);
 
         PayloadTypeRegistry.serverboundPlay().register(HelloC2S.TYPE, HelloC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(ScreenActionC2S.TYPE, ScreenActionC2S.STREAM_CODEC);
@@ -528,6 +531,11 @@ public class Pandorical implements ModInitializer {
             justfatlard.pandorical.protocol.ClientModFilesC2S.TYPE, (payload, context) -> {
                 context.server().execute(() ->
                     ClientMods.declareFiles(context.player(), payload));
+            });
+        ServerPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.SettingPreviewsC2S.TYPE, (payload, context) -> {
+                context.server().execute(() ->
+                    ClientMods.declarePreviews(context.player(), payload));
             });
         ServerPlayNetworking.registerGlobalReceiver(
             justfatlard.pandorical.protocol.NotUnderstoodC2S.TYPE, (payload, context) -> {

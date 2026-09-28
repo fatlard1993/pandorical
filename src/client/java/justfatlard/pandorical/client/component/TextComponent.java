@@ -2,6 +2,8 @@ package justfatlard.pandorical.client.component;
 
 import justfatlard.pandorical.protocol.ComponentDef;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import justfatlard.pandorical.client.hint.InputHints;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 
 import java.util.ArrayList;
@@ -30,11 +32,16 @@ public class TextComponent extends AbstractComponent {
     }
 
     private void parseStyle() {
+        // Plain text wins - only the server knows this player's binding - except on a pad, where
+        // the .controller line is the true one. A component with only a key is unchanged.
         String textKey = props.get("text_key");
-        if (textKey != null) {
+        String plain = parseString("text", "");
+        boolean padSaysBetter = textKey != null && InputHints.controller()
+            && Language.getInstance().has(textKey + InputHints.SUFFIX);
+        if (textKey != null && (plain.isEmpty() || padSaysBetter)) {
             displayText = Component.translatable(textKey).getString();
         } else {
-            displayText = parseString("text", "");
+            displayText = plain;
         }
         color = parseColor("color", 0xFFFFFFFF);
         trackColor("color", color);

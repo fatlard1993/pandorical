@@ -31,6 +31,19 @@ public interface SettingsApi {
         /** Options in the order given, each with the label shown for it. */
         Setting<String> choice(String key, String label, Map<String, String> options, String fallback);
 
+        /**
+         * A choice that also shows what the chosen option looks like.
+         *
+         * <p>{@code preview} is given the current value and returns the texture to draw beside
+         * the control, as a full resource path with its extension, or null to draw nothing. For a
+         * setting whose options are shapes rather than words, the name is the worse half of the
+         * answer: "brackets round" and "brackets" are two labels and one glance.
+         *
+         * <p>The texture is stretched to a square, so a tall sprite is squeezed to fit.
+         */
+        Setting<String> choice(String key, String label, Map<String, String> options, String fallback,
+                java.util.function.Function<String, String> preview);
+
         Setting<Integer> number(String key, String label, int min, int max, int step, int fallback);
 
         /**

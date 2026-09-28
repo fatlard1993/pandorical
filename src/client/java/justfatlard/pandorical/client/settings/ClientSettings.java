@@ -4,6 +4,7 @@ import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.client.api.ClientSettingsApi;
 import justfatlard.pandorical.protocol.ClientSettingS2C;
 import justfatlard.pandorical.protocol.ClientSettingsC2S;
+import justfatlard.pandorical.protocol.SettingPreviewsC2S;
 import justfatlard.pandorical.settings.ModCatalog;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 
@@ -43,6 +44,21 @@ public final class ClientSettings implements ClientSettingsApi {
 
     /** Enough for any sane mods folder, and a bound on what one client can make the server hold. */
     private static final int MOST_MODS = 64;
+
+    /** Every declared preview, across every group; its own channel, so its own list. */
+    private static final List<SettingPreviewsC2S.Entry> shapes = new ArrayList<>();
+
+    /**
+     * The pictures first, then the settings.
+     *
+     * <p>That order matters: the server decides when a setting is registered whether to leave
+     * room for a picture beside it, and it can only know from what has already arrived.
+     */
+    public void sendShapes() {
+        if (shapes.isEmpty() || !ClientPlayNetworking.canSend(SettingPreviewsC2S.TYPE)) return;
+        ClientPlayNetworking.send(new SettingPreviewsC2S(List.copyOf(shapes)));
+    }
+
 
     /**
      * Every mod on this client, with its settings where it has any.
@@ -112,9 +128,20 @@ public final class ClientSettings implements ClientSettingsApi {
         @Override
         public Group choice(String key, String label, String description, Map<String, String> options,
                 Supplier<String> get, Consumer<String> set) {
+            return choice(key, label, description, options, Map.of(), get, set);
+        }
+
+        @Override
+        public Group choice(String key, String label, String description, Map<String, String> options,
+                Map<String, String> previews, Supplier<String> get, Consumer<String> set) {
             settings.put(key, new SettingImpl(
                 new ClientSettingsC2S.Setting(key, label, orEmpty(description), "choice", new LinkedHashMap<>(options), 0, 0, 0, ""),
                 get, v -> { if (options.containsKey(v)) set.accept(v); }));
+            for (var shape : previews.entrySet()) {
+                if (options.containsKey(shape.getKey())) {
+                    shapes.add(new SettingPreviewsC2S.Entry(modId, key, shape.getKey(), shape.getValue()));
+                }
+            }
             return this;
         }
 
