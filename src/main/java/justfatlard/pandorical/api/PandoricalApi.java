@@ -267,6 +267,8 @@ public final class PandoricalApi {
 
     public static SettingsApi settings() { return SETTINGS; }
 
+    public static TrustApi trust() { return justfatlard.pandorical.trust.TrustRules.INSTANCE; }
+
     public static KeepsakeApi keepsakes() { return Keepsakes.INSTANCE; }
 
     // --- Internal methods (used by Pandorical core, not for consuming mods) ---

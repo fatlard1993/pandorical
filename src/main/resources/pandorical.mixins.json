@@ -20,7 +20,9 @@
 		"PortalForcerPairingMixin",
 		"ExperienceOrbClumpMixin",
 		"ItemMergeRadiusMixin",
-		"TrackingRangeMixin"
+		"TrackingRangeMixin",
+		"PlayerTrustPvpMixin",
+		"TntProjectileTrustMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

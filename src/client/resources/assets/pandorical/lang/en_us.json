@@ -47,5 +47,8 @@
   "pandorical.settings.set": "%s: %s",
   "pandorical.settings.title": "Server Settings",
   "pandorical.settings.unknown": "No setting called %s.",
-  "pandorical.too_old": "This server needs Pandorical %s or newer. Yours is older; update it and join again."
+  "pandorical.too_old": "This server needs Pandorical %s or newer. Yours is older; update it and join again.",
+  "pandorical.trust.refused.fire": "An op has not trusted you with fire and lava",
+  "pandorical.trust.refused.explosives": "An op has not trusted you with explosives",
+  "pandorical.trust.refused.animals": "An op has not trusted you to hurt other people's animals"
 }

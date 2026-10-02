@@ -4,6 +4,10 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.12.0": [
+    	"Ops can trust players one by one with PvP, fire and lava, explosives, and hurting others' animals, on a page /pandorical trust opens.",
+    	"Each switch has a default for everyone; PvP's is the server's own pvp gamerule."
+    ],
     "15.11.0": [
       "A setting whose options are shapes can show the shape beside its name in the mods menu."
     ],

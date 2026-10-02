@@ -159,6 +159,34 @@ you play on from that machine and two players sharing one keep their own. The se
 not in that file at all, and the only part of them that is yours - the key each one opens with -
 is kept beside it in `config/pandorical/action-menu-keys.json`.
 
+## Trust
+
+Ops decide, player by player, who may do four things: fight other players, use fire and lava,
+use explosives, and hurt other people's animals. `/pandorical trust` opens the page for it on a
+Pandorical client: everyone's defaults on the first row, then every player the server has seen,
+online first, each switch stepping through **default**, **off** and **on**.
+
+| Switch | What it covers |
+|---|---|
+| PvP | Hurting other players and being hurt by them. Off for either player means neither way, so nobody is made a target who cannot hit back |
+| Fire and lava | Flint and steel and fire charges on a block, pouring lava, and fire a mod sets for a player |
+| Explosives | Lighting TNT by hand or by a burning arrow or fire charge, placing end crystals, setting off a bed or respawn anchor where it explodes, and setting a wither skeleton skull on soul sand or soil |
+| Others' animals | Hurting a pet or mount that is somebody else's, a villager, or a creature with a name |
+
+A player's own choice wins over the default. PvP's default is the server's own `pvp` gamerule, so
+the first row's PvP switch is the gamerule itself; the other three default to on, and are also on
+Pandorical's server settings. A server nobody touches plays exactly as before. What is refused is
+the deliberate act by hand; fire spreading and redstone reaching TNT are the world's, and not traced
+back to anyone.
+
+Without the screen, the same is `/pandorical trust <player> <pvp|fire|explosives|animals>
+<on|off|default>` for one player, online or not, and `/pandorical trust everyone <switch> <on|off>`
+for the defaults. Ops only.
+
+Mods ask through `PandoricalApi.trust()`: `may(player, what)` before doing one of these things their
+own way, and `mayHurt(attacker, target)` before harming something the game would not check. A place
+with PvP rules of its own, such as an arena, registers with `pvpDecidedElsewhere`.
+
 ## Installation
 
 Fabric, plus Fabric API. Drop the jar in `mods/` on the client, and in `mods/` on the

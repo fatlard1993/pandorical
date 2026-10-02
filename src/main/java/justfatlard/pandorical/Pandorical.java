@@ -28,6 +28,11 @@ import justfatlard.pandorical.settings.SettingsCommand;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import justfatlard.pandorical.api.Trust;
+import justfatlard.pandorical.trust.TrustBook;
+import justfatlard.pandorical.trust.TrustCommand;
+import justfatlard.pandorical.trust.TrustRules;
+import justfatlard.pandorical.trust.TrustScreen;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityLevelChangeEvents;
 import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.Event;
@@ -139,6 +144,14 @@ public class Pandorical implements ModInitializer {
             .describe("0 is vanilla's 96. A change reaches the items and orbs tracked after it")
             .backedBy(player -> DropsPolicy.trackingRange(player.level().getServer()),
                 (player, blocks) -> DropsPolicy.chooseTrackingRange(player.level().getServer(), blocks));
+        // Trust's defaults, for the three that are Pandorical's; PvP's is the pvp gamerule. Per
+        // player, on the trust page: /pandorical trust.
+        for (Trust what : new Trust[] {Trust.FIRE, Trust.EXPLOSIVES, Trust.ANIMALS}) {
+            settings.toggle("trust." + what.id(), "Everyone may: " + what.description.toLowerCase(java.util.Locale.ROOT), true)
+                .describe("Unless set otherwise for a player, on the page /pandorical trust opens")
+                .backedBy(player -> TrustBook.get(player.level().getServer()).byDefault(what),
+                    (player, on) -> TrustBook.get(player.level().getServer()).chooseDefault(what, on));
+        }
 
         // Dedicated server only: on a client this would filter every namespace.
         if (FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER) {
@@ -571,6 +584,10 @@ public class Pandorical implements ModInitializer {
         CommandRegistrationCallback.EVENT.register(
             (dispatcher, registry, environment) ->
                 SettingsCommand.register(dispatcher, PandoricalApi.settingsImpl()));
+        CommandRegistrationCallback.EVENT.register(
+            (dispatcher, registry, environment) -> TrustCommand.register(dispatcher));
+        TrustRules.register();
+        TrustScreen.register();
 
         ServerPlayNetworking.registerGlobalReceiver(ScreenActionC2S.TYPE, (payload, context) -> {
             context.server().execute(() -> {
