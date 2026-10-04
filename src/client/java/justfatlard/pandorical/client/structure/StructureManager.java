@@ -91,6 +91,11 @@ public final class StructureManager {
         return structures.values();
     }
 
+    /** Every structure, by the id the server knows it by. */
+    public static Map<String, ClientStructure> byId() {
+        return java.util.Collections.unmodifiableMap(structures);
+    }
+
     public static void clear() {
         structures.clear();
     }

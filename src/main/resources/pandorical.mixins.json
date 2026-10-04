@@ -22,7 +22,8 @@
 		"ItemMergeRadiusMixin",
 		"TrackingRangeMixin",
 		"PlayerTrustPvpMixin",
-		"TntProjectileTrustMixin"
+		"TntProjectileTrustMixin",
+		"StructureClimbMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

@@ -21,7 +21,8 @@ download.
   under "Pandorical", and rebind like any other key.
 - **Moving structures**, like a ship built out of blocks that sails as one piece. One the
   server marks walkable is solid underfoot and carries you with it, so you can stand and
-  walk on a ship's deck while it sails and turns.
+  walk on a ship's deck while it sails and turns, climb its ladders, and use its doors
+  and chests, for blocks the mod tags `pandorical:usable_on_structures`.
 - **Camera control**, when a server wants to pull the view back.
 - **Cosmetic overlays** on particular mobs or chests, so you can tell one from another.
 - **One block at one place a different colour**, so two of the same block in two places can

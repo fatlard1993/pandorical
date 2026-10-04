@@ -13,6 +13,7 @@ import justfatlard.pandorical.protocol.CloseScreenS2C;
 import justfatlard.pandorical.protocol.ComponentDef;
 import justfatlard.pandorical.protocol.ComponentUpdate;
 import justfatlard.pandorical.protocol.ContentReadyC2S;
+import justfatlard.pandorical.protocol.UseStructureC2S;
 import justfatlard.pandorical.protocol.EntityOverlayS2C;
 import justfatlard.pandorical.protocol.HelloC2S;
 import justfatlard.pandorical.protocol.HelloS2C;
@@ -108,6 +109,7 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 		out.put("screen_action", encode(ScreenActionC2S.STREAM_CODEC, new ScreenActionC2S(
 			"mymod:s1", "ok", "click", Map.of("value", "1"))));
 		out.put("content_ready", encode(ContentReadyC2S.STREAM_CODEC, new ContentReadyC2S()));
+		out.put("use_structure", encode(UseStructureC2S.STREAM_CODEC, new UseStructureC2S("mymod:ship", 1, -2, 3)));
 		out.put("key_press", encode(KeyPressC2S.STREAM_CODEC, new KeyPressC2S(3)));
 		out.put("keybind_rebind", encode(KeybindRebindS2C.STREAM_CODEC, new KeybindRebindS2C(3)));
 		out.put("keybind_declarations", encode(KeybindDeclarationsS2C.STREAM_CODEC,

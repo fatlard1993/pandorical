@@ -46,6 +46,16 @@ public interface StructureApi {
      */
     void updateBlocks(String structureId, List<BlockEntry> added, List<RelPos> removed, Map<RelPos, BlockState> changed);
 
+    /**
+     * Answer a player using a block of a walkable structure, such as a door on a ship at sea. A
+     * Pandorical client sends the use when the block under its crosshair is in the block tag
+     * {@code pandorical:usable_on_structures} and nearer than anything in the world. Pandorical
+     * fills that tag with nothing: the mod that answers the use tags the blocks it answers for. The
+     * server holds the block to the player's reach, against where the structure stood over its last
+     * few poses, and hands it to each handler in turn. Spectators and the dead are never handed on.
+     */
+    void onBlockUse(StructureUseHandler handler);
+
     /** Server-side blocks and pose are kept while hidden. */
     void setVisible(String structureId, boolean visible);
 

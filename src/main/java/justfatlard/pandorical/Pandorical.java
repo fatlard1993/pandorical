@@ -308,6 +308,9 @@ public class Pandorical implements ModInitializer {
             justfatlard.pandorical.protocol.SettingPreviewsC2S.STREAM_CODEC);
 
         PayloadTypeRegistry.serverboundPlay().register(HelloC2S.TYPE, HelloC2S.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(
+            justfatlard.pandorical.protocol.UseStructureC2S.TYPE,
+            justfatlard.pandorical.protocol.UseStructureC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(ScreenActionC2S.TYPE, ScreenActionC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(ContentReadyC2S.TYPE, ContentReadyC2S.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(
@@ -589,6 +592,10 @@ public class Pandorical implements ModInitializer {
         TrustRules.register();
         TrustScreen.register();
 
+        ServerPlayNetworking.registerGlobalReceiver(justfatlard.pandorical.protocol.UseStructureC2S.TYPE,
+            (payload, context) -> context.server().execute(() ->
+                justfatlard.pandorical.structure.StructureRegistry.INSTANCE.use(context.player(), payload.structureId(),
+                    new justfatlard.pandorical.api.RelPos(payload.x(), payload.y(), payload.z()))));
         ServerPlayNetworking.registerGlobalReceiver(ScreenActionC2S.TYPE, (payload, context) -> {
             context.server().execute(() -> {
                 PandoricalApi.screensImpl().handleAction(context.player(), payload);

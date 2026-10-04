@@ -154,6 +154,67 @@ public final class StructureDecks {
 		return into;
 	}
 
+	/**
+	 * Whether a walkable structure has a ladder, vine or anything else climbable at this entity's
+	 * feet: on a ship at sea there is no block in the world to climb, only the one drawn.
+	 */
+	public static boolean climbable(net.minecraft.world.entity.LivingEntity entity) {
+		for (ClientStructure structure : StructureManager.getActive()) {
+			if (!structure.walkable || !structure.visible) continue;
+			StructurePoseSnapshot pose = structure.thisTick();
+			double yaw = Math.toRadians(pose.yaw());
+			double dx = entity.getX() - pose.x();
+			double dz = entity.getZ() - pose.z();
+			int x = Mth.floor(dx * Math.cos(yaw) + dz * Math.sin(yaw));
+			int z = Mth.floor(-dx * Math.sin(yaw) + dz * Math.cos(yaw));
+			int y = Mth.floor(entity.getY() - pose.y());
+			BlockState state = structure.blocks.get(new RelPosKey(x, y, z));
+			if (state != null && (state.is(net.minecraft.tags.BlockTags.CLIMBABLE)
+					|| justfatlard.pandorical.client.content.ContentManager.isClimbable(state))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Blocks a mod answers a use of on a walkable structure; see {@code StructureApi.onBlockUse}. */
+	public static final net.minecraft.tags.TagKey<net.minecraft.world.level.block.Block> USABLE = net.minecraft.tags.TagKey.create(
+		net.minecraft.core.registries.Registries.BLOCK, net.minecraft.resources.Identifier.fromNamespaceAndPath("pandorical", "usable_on_structures"));
+
+	/** A block of a structure the player is pointing at: which structure, and where in it. */
+	public record Pick(String structureId, int x, int y, int z) {}
+
+	/**
+	 * What pressing use now means on a walkable structure, if anything: the nearest block along the
+	 * player's look on any of them, if it is one tagged usable and nothing in the world stands nearer.
+	 */
+	public static @org.jspecify.annotations.Nullable Pick usePick(LocalPlayer player, net.minecraft.world.phys.HitResult worldHit) {
+		Vec3 eye = player.getEyePosition();
+		Vec3 look = player.getViewVector(1);
+		double reach = player.blockInteractionRange();
+		if (worldHit != null && worldHit.getType() != net.minecraft.world.phys.HitResult.Type.MISS) {
+			reach = Math.min(reach, eye.distanceTo(worldHit.getLocation()) + 1.0E-3);
+		}
+		Pick nearest = null;
+		BlockState nearestState = null;
+		double best = reach;
+		for (java.util.Map.Entry<String, ClientStructure> entry : StructureManager.byId().entrySet()) {
+			ClientStructure structure = entry.getValue();
+			if (!structure.walkable || !structure.visible) continue;
+			StructurePoseSnapshot pose = structure.thisTick();
+			double[] hit = justfatlard.pandorical.structure.StructureRay.nearest(eye.x - pose.x(), eye.y - pose.y(), eye.z - pose.z(),
+				look.x, look.y, look.z, pose.yaw(), best, (x, y, z) -> structure.blocks.get(new RelPosKey(x, y, z)));
+			if (hit != null && hit[0] < best) {
+				best = hit[0];
+				nearest = new Pick(entry.getKey(), (int) hit[1], (int) hit[2], (int) hit[3]);
+				nearestState = structure.blocks.get(new RelPosKey(nearest.x(), nearest.y(), nearest.z()));
+			}
+		}
+		// The tag alone, the same test the server's handlers make: a block the client took over the
+		// click for and the server then passed on would be a click that did nothing.
+		return nearestState != null && nearestState.is(USABLE) ? nearest : null;
+	}
+
 	/** Deck within {@code reach} below any corner of the player's feet. */
 	private static boolean hasDeckBeneath(ClientStructure structure, StructurePoseSnapshot pose,
 										  LocalPlayer player, double reach) {

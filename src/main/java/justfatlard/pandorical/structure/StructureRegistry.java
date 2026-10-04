@@ -36,6 +36,8 @@ public final class StructureRegistry implements StructureApi {
 		final Entity anchorEntity;
 		final Map<RelPos, BlockState> blocks;
 		StructurePose pose;
+		/** The poses it has held lately, newest last: what a client may still be drawing. */
+		final java.util.ArrayDeque<StructurePose> recent = new java.util.ArrayDeque<>();
 		boolean visible;
 		boolean walkable;
 
@@ -43,13 +45,95 @@ public final class StructureRegistry implements StructureApi {
 			this.anchorEntity = anchorEntity;
 			this.blocks = blocks;
 			this.pose = pose;
+			this.recent.add(pose);
 			this.visible = visible;
 		}
+
+		void moveTo(StructurePose next) {
+			pose = next;
+			recent.addLast(next);
+			while (recent.size() > RECENT_POSES) recent.removeFirst();
+		}
 	}
+
+	/**
+	 * How many of a structure's last poses a player's click or climb is held to: about half a second
+	 * of ticks, enough to cover the client's smoothing and an ordinary round trip.
+	 */
+	private static final int RECENT_POSES = 10;
 
 	private final Map<String, StructureState> structures = new ConcurrentHashMap<>();
 
 	private StructureRegistry() {}
+
+	private final java.util.List<justfatlard.pandorical.api.StructureUseHandler> useHandlers =
+		new java.util.concurrent.CopyOnWriteArrayList<>();
+
+	@Override
+	public void onBlockUse(justfatlard.pandorical.api.StructureUseHandler handler) {
+		useHandlers.add(handler);
+	}
+
+	/**
+	 * A player pressed use on a block of a structure, as their client drew it: to the handlers, if
+	 * the block is there and was within their reach where the structure stood at any moment lately.
+	 * Held to reach the way vanilla holds a click on a block in the world, with the same margin.
+	 */
+	public void use(net.minecraft.server.level.ServerPlayer player, String structureId, RelPos pos) {
+		if (player.isSpectator() || !player.isAlive()) return;
+		StructureState state = structures.get(structureId);
+		if (state == null || !state.walkable || !state.visible || state.anchorEntity.level() != player.level()) return;
+		BlockState block = state.blocks.get(pos);
+		if (block == null || block.isAir()) return;
+
+		double reach = player.blockInteractionRange() + 1.0 + 0.87;
+		net.minecraft.world.phys.Vec3 eye = player.getEyePosition();
+		boolean near = false;
+		for (StructurePose pose : state.recent) {
+			if (eye.distanceToSqr(worldPoint(pose, pos.x() + 0.5, pos.y() + 0.5, pos.z() + 0.5)) <= reach * reach) {
+				near = true;
+				break;
+			}
+		}
+		if (!near) return;
+
+		for (justfatlard.pandorical.api.StructureUseHandler handler : useHandlers) {
+			net.minecraft.world.InteractionResult result = handler.use(player, state.anchorEntity, structureId, pos, block);
+			if (result != net.minecraft.world.InteractionResult.PASS) return;
+		}
+	}
+
+	/** A point in a structure's own frame, in the world, with the structure at this pose. */
+	private static net.minecraft.world.phys.Vec3 worldPoint(StructurePose pose, double lx, double ly, double lz) {
+		double yaw = Math.toRadians(pose.yaw());
+		double cos = Math.cos(yaw);
+		double sin = Math.sin(yaw);
+		return new net.minecraft.world.phys.Vec3(pose.x() + lx * cos - lz * sin, pose.y() + ly, pose.z() + lx * sin + lz * cos);
+	}
+
+	/**
+	 * The climbable block a walkable structure has at this entity's feet, if any: a ladder or vine
+	 * on a ship at sea is not a block in the world, so the game's own climbing check finds air there.
+	 * Answered the way the client finds the deck under a player, turning the point into the
+	 * structure's own frame - against each of its recent poses, since a player climbs the ladder
+	 * their client draws, which on a moving ship is a little behind where the server has it.
+	 */
+	public boolean climbableAt(Entity entity) {
+		for (StructureState state : structures.values()) {
+			if (!state.walkable || !state.visible || state.anchorEntity.level() != entity.level()) continue;
+			for (StructurePose pose : state.recent) {
+				double yaw = Math.toRadians(pose.yaw());
+				double dx = entity.getX() - pose.x();
+				double dz = entity.getZ() - pose.z();
+				int x = net.minecraft.util.Mth.floor(dx * Math.cos(yaw) + dz * Math.sin(yaw));
+				int z = net.minecraft.util.Mth.floor(-dx * Math.sin(yaw) + dz * Math.cos(yaw));
+				int y = net.minecraft.util.Mth.floor(entity.getY() - pose.y());
+				BlockState block = state.blocks.get(new RelPos(x, y, z));
+				if (block != null && block.is(net.minecraft.tags.BlockTags.CLIMBABLE)) return true;
+			}
+		}
+		return false;
+	}
 
 	@Override
 	public void spawn(Entity anchorEntity, String structureId, List<BlockEntry> blocks, StructurePose initialPose) {
@@ -76,7 +160,7 @@ public final class StructureRegistry implements StructureApi {
 	public void updatePose(String structureId, StructurePose pose) {
 		StructureState state = structures.get(structureId);
 		if (state == null) return;
-		state.pose = pose;
+		state.moveTo(pose);
 		pendingPoses.add(structureId);
 	}
 
