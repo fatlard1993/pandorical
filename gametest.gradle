@@ -82,6 +82,9 @@ tasks.matching { it.name == "runClientGameTest" }.configureEach {
 	// own entrypoint. It only ever passed because a build had happened to run before it.
 	if (sourceSets.findByName('client') != null) dependsOn 'clientClasses'
 	args("--width", "1920", "--height", "1080")
+	// Silent: OpenAL's null device ("OpenAL initialized on device No Output" in the log). Set on the
+	// game's own process, so it holds under a Gradle daemon too, which an exported variable does not.
+	environment("ALSOFT_DRIVERS", "null")
 	systemProperty("pandorical.test.level", project.findProperty("test.level") ?: "smoke")
 }
 
