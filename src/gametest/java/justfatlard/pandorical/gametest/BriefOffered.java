@@ -86,6 +86,7 @@ public final class BriefOffered implements FabricClientGameTest {
 				: client.gui.screen().getClass().getSimpleName());
 			check(screen.endsWith("PandoricalScreen"),
 				"the brief would not open: screen was " + screen);
+			context.takeScreenshot("brief");
 
 			// ...and now it is marked off and stops asking.
 			session.onServer(server -> {

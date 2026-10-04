@@ -6,6 +6,7 @@ import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.ScreenApi;
 import justfatlard.pandorical.api.ScreenBuilder;
 import justfatlard.pandorical.protocol.ComponentDef;
+import justfatlard.pandorical.settings.Glyphs;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.ArrayList;
@@ -32,9 +33,14 @@ public final class BriefScreen {
 	private static final int PAD = 8;
 	private static final int LINE = 10;
 	private static final int ROW = 14;
+	/** How far a line is indented under its mod name, the same as a changelog note. */
+	private static final int NOTE_INSET = 6;
 
-	private static final String NAME_COLOR = "#FFD8A0";
-	private static final String LINE_COLOR = "#C8C8C8";
+	// The changelog's frame and note colour, so the two screens a player meets on arrival read as
+	// one set. The bare panel drew these lines light grey on light grey.
+	private static final String FRAME_BACKGROUND = "#F0101010";
+	private static final String FRAME_BORDER = "#FF4A4A4A";
+	private static final String NOTE_COLOR = "#FFD8D8D8";
 
 	static void register() {
 		PandoricalApi.screens().onActionFallback(TYPE, (player, data) -> {
@@ -54,7 +60,10 @@ public final class BriefScreen {
 		List<Brief.Entry> entries = Brief.INSTANCE.entries();
 
 		ScreenBuilder screen = new ScreenBuilder(TYPE).size(WIDTH, HEIGHT).title("What is running here");
-		screen.panel("frame", 0, 0, WIDTH, HEIGHT, Map.of());
+		screen.panel("frame", 0, 0, WIDTH, HEIGHT, Map.of(
+			ComponentType.PROP_BACKGROUND, FRAME_BACKGROUND,
+			ComponentType.PROP_BORDER, "flat",
+			ComponentType.PROP_BORDER_COLOR, FRAME_BORDER));
 
 		int inner = WIDTH - PAD * 2;
 		List<ComponentDef> body = new ArrayList<>();
@@ -63,16 +72,17 @@ public final class BriefScreen {
 		for (Brief.Entry entry : entries) {
 			body.add(new ComponentBuilder("name" + n, ComponentType.TEXT)
 				.bounds(0, y, inner, LINE)
-				.prop(ComponentType.PROP_TEXT, entry.name())
-				.prop(ComponentType.PROP_COLOR, NAME_COLOR).build());
+				.prop(ComponentType.PROP_TEXT, entry.name()).build());
 			y += LINE;
 			int i = 0;
 			for (String line : entry.lines()) {
-				body.add(new ComponentBuilder("line" + n + "_" + i++, ComponentType.TEXT)
-					.bounds(6, y, inner - 6, LINE)
-					.prop(ComponentType.PROP_TEXT, line)
-					.prop(ComponentType.PROP_COLOR, LINE_COLOR).build());
-				y += LINE;
+				for (String part : Glyphs.wrap(line, inner - NOTE_INSET)) {
+					body.add(new ComponentBuilder("line" + n + "_" + i++, ComponentType.TEXT)
+						.bounds(NOTE_INSET, y, inner - NOTE_INSET, LINE)
+						.prop(ComponentType.PROP_TEXT, part)
+						.prop(ComponentType.PROP_COLOR, NOTE_COLOR).build());
+					y += LINE;
+				}
 			}
 			y += 4;
 			n++;
