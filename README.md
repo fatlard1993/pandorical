@@ -89,6 +89,7 @@ Fabric, plus Fabric API. Drop the jar in `mods/` on the client, and in `mods/` o
 
 For a crash nobody can reproduce, rename the jar so its name contains `diagnostic`. It then writes `logs/pandorical-trace.log` (each startup step and mixin applied, and where the game's threads are) and has the JVM keep `logs/pandorical-jvm.log`; the run before is kept as `pandorical-trace-previous.log`.
 
+![The notice tray: a teleport request and the village post, each waiting on an answer](notices.png)
 ![A Pandorical server drawing to the client](screenshot.png)
 
 Everything above the grass in that shot comes from the server: the corner panel and the prompt, the ration bar standing where the hunger bar would be, the marked chests, and the raft floating as one piece. The client installed one mod.
