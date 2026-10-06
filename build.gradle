@@ -123,6 +123,8 @@ jar {
 tasks.register('testSupportJar', Jar) {
     archiveClassifier = 'testsupport'
     from sourceSets.main.output
+    // The picture helper reaches into the client, so it lives in the client source set.
+    from sourceSets.client.output
     include 'justfatlard/pandorical/gametest/**'
     // Same reasoning as the main jar: dependent.gradle compares times, and Gradle judges
     // up-to-date by content.

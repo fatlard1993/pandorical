@@ -28,40 +28,7 @@ fabricApi {
 	}
 }
 
-// Pandorical's gametest harness, for every mod but Pandorical itself, which already has the
-// classes in its own output. It ships in a jar of its own because the harness is cut from the one
-// players install; see build.gradle. Named by the version it declares and never by glob order,
-// because Gradle leaves old jars in build/libs and the alphabetical one is the stale one.
-// Asked of the directory rather than the project's name: a checkout called anything else is
-// still Pandorical, and a name test sends it looking for a sibling of itself.
-def pandoricalRoot = file("../pandorical")
-if (sourceSets.findByName('gametest') != null && pandoricalRoot.exists()
-		&& pandoricalRoot.canonicalFile != projectDir.canonicalFile) {
-	def pandoricalVersion = new Properties().with {
-		new File(pandoricalRoot, "gradle.properties").withInputStream { load(it) }
-		getProperty("mod_version")?.trim()
-	}
-	def supportJar = new File(pandoricalRoot, "build/libs/pandorical-${pandoricalVersion}-testsupport.jar")
-
-	// Named whether or not it is there yet. Asking first is the wrong way round: on a tree where
-	// it has not been built - a fresh clone, or the first build after this harness arrived - the
-	// answer is no, so the harness went missing from the classpath AND the dependency that would
-	// have built it went undeclared with it. What that looks like is a band of mods failing with
-	// "package justfatlard.pandorical.gametest does not exist" while the ones configured after
-	// some other mod's build happened to produce the jar pass, which reads as flakiness.
-	dependencies { add("gametestCompileOnly", files(supportJar)) }
-	sourceSets.named('gametest') { runtimeClasspath += files(supportJar) }
-
-	// Where Pandorical is a subproject of this build, Gradle sees that file as another task's
-	// output and refuses to guess the order; naming the task that writes it is the whole fix. By
-	// path rather than by task object, because the task only exists once ':pandorical' has been
-	// evaluated and this runs before that: a path is looked up when the graph is built, a task is
-	// looked up now and is not there yet.
-	if (rootProject.findProject(':pandorical') != null) {
-		tasks.matching { it.name in ['compileGametestJava', 'runClientGameTest'] }
-			.configureEach { dependsOn ':pandorical:testSupportJar' }
-	}
-}
+apply from: file("../pandorical/testsupport.gradle")
 
 // A client gametest drives the client, so it compiles against the client source set. Loom does not
 // wire that up, and the tests only ever compiled because the last build had left classes in the
@@ -85,6 +52,8 @@ tasks.matching { it.name == "runClientGameTest" }.configureEach {
 	// Silent: OpenAL's null device ("OpenAL initialized on device No Output" in the log). Set on the
 	// game's own process, so it holds under a Gradle daemon too, which an exported variable does not.
 	environment("ALSOFT_DRIVERS", "null")
+	// -Ppictures: Pictures.shoot keeps each shot in the mod's screenshots/ folder too.
+	systemProperty("pandorical.pictures", project.hasProperty("pictures"))
 	systemProperty("pandorical.test.level", project.findProperty("test.level") ?: "smoke")
 }
 
