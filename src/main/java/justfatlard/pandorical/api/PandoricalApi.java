@@ -1,5 +1,6 @@
 package justfatlard.pandorical.api;
 
+import justfatlard.pandorical.capture.Captures;
 import justfatlard.pandorical.content.ContentRegistry;
 import justfatlard.pandorical.drops.DropsPolicy;
 import justfatlard.pandorical.hud.HudRegistry;
@@ -216,6 +217,8 @@ public final class PandoricalApi {
     public static MapReliefApi mapReliefs() { return MapReliefRegistry.INSTANCE; }
 
     public static PictureApi pictures() { return PictureRegistry.INSTANCE; }
+
+    public static CaptureApi capture() { return Captures.INSTANCE; }
 
     public static AnimationApi animations() { return ANIMATIONS; }
 

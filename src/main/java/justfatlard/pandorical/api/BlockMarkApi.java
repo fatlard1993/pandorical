@@ -19,13 +19,21 @@ public interface BlockMarkApi {
     String POST = "post";
 
     /**
-     * A fence gate hung as one leaf from its own left post, drawn open as that one leaf. Only for
-     * a gate with no gate beside it: a pair opens from the middle.
+     * A fence gate hung as one leaf from its own left post, drawn open as that one leaf. Every
+     * gate of a row carries the row's hinge. Unmarked, a gate opens as two leaves meeting in the
+     * middle.
      */
     String GATE_HINGE_LEFT = "moredoor:gate_left";
 
     /** As {@link #GATE_HINGE_LEFT}, from the right post. */
     String GATE_HINGE_RIGHT = "moredoor:gate_right";
+
+    /**
+     * A square of a wide fence gate standing open, its blocks swung out along the leaf: the
+     * hinge square and every square in front of it. Its {@link #GATE_HINGE_LEFT} or
+     * {@link #GATE_HINGE_RIGHT} mark is the post its leaf hangs from.
+     */
+    String GATE_WIDE = "moredoor:gate_wide";
 
     /** A door leaf cut loose from the leaves beside it: drawn as its own door, not part of a bank. */
     String DOOR_DETACHED = "moredoor:detached";

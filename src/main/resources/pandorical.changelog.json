@@ -4,6 +4,13 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.15.0": [
+      "A camera a server hands you takes its picture from your own screen, without the HUD or your hand, as F1 then F2 would."
+    ],
+    "15.14.0": [
+      "Wide fence gates are drawn piece by piece as their blocks swing out, for More Doors.",
+      "Joined fence gates are drawn from one model per shape, turned to face the way the gate does."
+    ],
     "15.13.0": [
       "A ladder or vine on a ship at sea climbs the same as one on land.",
       "Blocks on a ship at sea can be clicked, for a mod that says which: Big Boats opens its doors, chests, furnaces and crafting tables this way."

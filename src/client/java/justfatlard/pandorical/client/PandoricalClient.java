@@ -31,6 +31,7 @@ import justfatlard.pandorical.client.keepsake.ClientKeepsakes;
 import justfatlard.pandorical.client.keybind.KeybindManager;
 import justfatlard.pandorical.client.mixin.ClientCommonListenerAccessor;
 import justfatlard.pandorical.client.maprelief.ClientMapReliefs;
+import justfatlard.pandorical.client.capture.ClientCaptures;
 import justfatlard.pandorical.client.picture.ClientPictures;
 import justfatlard.pandorical.client.render.LeafCulling;
 import justfatlard.pandorical.client.renderer.ChestOverlayStore;
@@ -93,7 +94,7 @@ public class PandoricalClient implements ClientModInitializer {
             System.getProperty("pandorical.skip", "").split(","))
         .map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toSet());
     private static final Set<String> SKIPPABLE = Set.of(
-        "keybinds", "contextmodels", "suppressor", "hud", "structures", "decals", "pictures", "maprelief", "all");
+        "keybinds", "contextmodels", "suppressor", "hud", "structures", "decals", "pictures", "maprelief", "captures", "all");
 
     private static boolean skipped(String piece) {
         Diagnostics.mark("startup: " + piece);
@@ -166,6 +167,7 @@ public class PandoricalClient implements ClientModInitializer {
         if (!skipped("decals")) BannerDecalRenderer.register();
         if (!skipped("pictures")) ClientPictures.register();
         if (!skipped("maprelief")) ClientMapReliefs.register();
+        if (!skipped("captures")) ClientCaptures.register();
 
         ClientTickEvents.START_CLIENT_TICK.register(client -> StructureManager.tick());
         ClientTickEvents.END_CLIENT_TICK.register(client -> {

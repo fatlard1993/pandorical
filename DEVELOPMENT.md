@@ -516,6 +516,31 @@ left out when its alpha is nought. An invisible item display makes a good anchor
 tracked, and nothing to hit. State is in memory and dropped when the anchor unloads, so show it
 again when your anchor loads. mc-paint's easel is the working example.
 
+## Captures
+
+A picture of what a player sees, taken by their own client: the world as their screen shows it,
+cropped square from the middle of the window and scaled to the side asked for, with the HUD, hand
+and crosshair left out the way F1 leaves them out. New in 15.15.
+
+```java
+if (!PandoricalApi.capture().canCapture(player)) return;   // a client older than 15.15
+PandoricalApi.capture().request(player, 512).thenAccept(capture -> {
+    if (capture.isEmpty()) return;                          // declined, left, or too slow
+    int[] argb = capture.get().argb();                      // 512 * 512, row-major
+    byte[] png = capture.get().png();                       // the file as the client sent it
+});
+```
+
+The future completes on the server thread. It is empty when the client had a screen open over the
+world, left, sent anything but a PNG of exactly that side, or did not answer within ten seconds;
+asking again for a player whose last capture has not completed is answered empty at once. The
+picture comes in 32 KB slices, because vanilla refuses a serverbound payload larger than that, so
+a large side takes a moment.
+
+The pixels are the player's own upload: a modified client can send any picture of the right
+size. Use a capture for what the player chose to show, never as evidence of the world.
+redstone-photography's camera is the working example.
+
 ## Chest overlays
 
 Draw particular chests with a different texture, so a player can tell (say) the ones a
