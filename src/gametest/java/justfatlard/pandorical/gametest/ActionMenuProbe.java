@@ -23,8 +23,11 @@ public final class ActionMenuProbe implements ModInitializer {
 			dispatcher.register(Commands.literal("actionmenuprobe").executes(context -> RUNS.incrementAndGet())));
 
 		PandoricalApi.actionMenus().suggestMenu(MENU_ID, "Probe menu", List.of(
-			ActionMenuApi.Button.runs("minecraft:paper", "Probe", "actionmenuprobe")));
+			ActionMenuApi.Button.runs("minecraft:paper", "Probe", "actionmenuprobe"),
+			ActionMenuApi.Button.runs("sprite:minecraft:icon/checkmark", "Probe sprite", "actionmenuprobe")));
 		PandoricalApi.actionMenus().suggestButton(
 			ActionMenuApi.Button.runs("minecraft:stone", "Probe again", "actionmenuprobe"));
+		PandoricalApi.actionMenus().suggestTopButton(
+			ActionMenuApi.Button.runs("minecraft:diamond", "Probe first", "actionmenuprobe"));
 	}
 }

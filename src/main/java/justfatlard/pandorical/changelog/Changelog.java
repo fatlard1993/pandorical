@@ -58,6 +58,27 @@ public final class Changelog implements ChangelogApi {
 		return pending.getOrDefault(player.getUUID(), List.of());
 	}
 
+	/**
+	 * What every mod last said about itself, for a player asking with nothing new since their
+	 * visit: a mod's newest note each, so the question still has an answer.
+	 */
+	public List<Change> latest() {
+		NoteFiles.loadOnce();
+		List<Change> out = new ArrayList<>();
+		for (Map.Entry<String, String> mod : current().entrySet()) {
+			List<Released> releases = releases(mod.getKey());
+			if (releases.isEmpty()) continue;
+			Released newest = releases.getFirst();
+			out.add(new Change(Kind.UPDATED, mod.getKey(), nameOf(mod.getKey()), null, newest.version(), newest.lines()));
+		}
+		return out;
+	}
+
+	/** The what's new screen, asked for: what changed since this visit began, or each mod's latest. */
+	public static void show(ServerPlayer player) {
+		WhatsNewScreen.open(player);
+	}
+
 	/** Leaving ends it; the next visit works its own difference out. */
 	public static void forget(ServerPlayer player) {
 		INSTANCE.pending.remove(player.getUUID());

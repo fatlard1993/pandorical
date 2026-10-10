@@ -166,6 +166,7 @@ public class PandoricalClient implements ClientModInitializer {
         if (!skipped("structures")) StructureRenderer.register();
         if (!skipped("decals")) BannerDecalRenderer.register();
         if (!skipped("pictures")) ClientPictures.register();
+        if (!skipped("entitymodels")) justfatlard.pandorical.client.entitymodel.ClientEntityModels.register();
         if (!skipped("maprelief")) ClientMapReliefs.register();
         if (!skipped("captures")) ClientCaptures.register();
 
@@ -529,6 +530,7 @@ public class PandoricalClient implements ClientModInitializer {
         ClientEntityRendererRegistry.reset();
         StructureManager.clear();
         EntityOverlayStore.clear();
+        justfatlard.pandorical.client.entitymodel.ClientEntityModels.clear();
         ChestOverlayStore.clear();
         KeybindManager.clear();
         VanillaHudElementSuppressor.clear();

@@ -227,6 +227,7 @@ public class Pandorical implements ModInitializer {
 
         PayloadTypeRegistry.clientboundPlay().register(HelloS2C.TYPE, HelloS2C.STREAM_CODEC);
         PictureRegistry.register();
+        justfatlard.pandorical.entitymodel.EntityModelRegistry.register();
         justfatlard.pandorical.capture.Captures.register();
         MapReliefRegistry.register();
         PayloadTypeRegistry.clientboundPlay().register(

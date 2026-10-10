@@ -56,8 +56,10 @@ final class WhatsNewScreen {
 
 	static void open(ServerPlayer player) {
 		List<Changelog.Change> changes = Changelog.INSTANCE.pendingFor(player);
+		boolean since = !changes.isEmpty();
+		if (!since) changes = Changelog.INSTANCE.latest();
 
-		ScreenBuilder screen = new ScreenBuilder(TYPE).size(WIDTH, HEIGHT).title("Since you were away");
+		ScreenBuilder screen = new ScreenBuilder(TYPE).size(WIDTH, HEIGHT).title(since ? "Since you were away" : "What's new");
 		screen.panel("frame", 0, 0, WIDTH, HEIGHT, Map.of(
 			justfatlard.pandorical.api.ComponentType.PROP_BACKGROUND, FRAME_BACKGROUND,
 			justfatlard.pandorical.api.ComponentType.PROP_BORDER, "flat",
@@ -65,9 +67,13 @@ final class WhatsNewScreen {
 
 		int inner = WIDTH - PAD * 2;
 		List<Row> rows = new ArrayList<>();
-		add(rows, changes, Changelog.Kind.ADDED, "New here", inner);
-		add(rows, changes, Changelog.Kind.UPDATED, "Changed", inner);
-		add(rows, changes, Changelog.Kind.REMOVED, "No longer here", inner);
+		if (since) {
+			add(rows, changes, Changelog.Kind.ADDED, "New here", inner);
+			add(rows, changes, Changelog.Kind.UPDATED, "Changed", inner);
+			add(rows, changes, Changelog.Kind.REMOVED, "No longer here", inner);
+		} else {
+			add(rows, changes, Changelog.Kind.UPDATED, "The latest from each mod", inner);
+		}
 
 		if (rows.isEmpty()) {
 			screen.text("none", PAD, PAD, "Nothing has changed since your last visit.");

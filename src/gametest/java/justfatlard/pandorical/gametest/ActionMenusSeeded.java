@@ -37,6 +37,58 @@ public final class ActionMenusSeeded implements FabricClientGameTest {
 			check(names.contains("Server"), "the server's menu did not arrive: " + names);
 			check(names.contains("Probe menu"), "a mod's own menu did not arrive: " + names);
 
+			// A first-page button is on Menus itself, ahead of the menus, and is not a menu of its own.
+			List<String> first = context.computeOnClient(client -> ActionMenus.all().stream()
+				.filter(menu -> menu.id.equals("pandorical:menus")).findFirst()
+				.map(menu -> menu.buttons.stream().map(entry -> entry.label).toList()).orElse(List.of()));
+			check(!first.isEmpty() && first.getFirst().equals("Probe first"), "the first-page button is not first on Menus: " + first);
+			check(context.computeOnClient(client -> ActionMenus.all().stream()
+					.noneMatch(menu -> menu.id.equals(justfatlard.pandorical.protocol.ActionMenusS2C.TOP_MENU_ID))),
+				"the first-page buttons arrived as a menu of their own");
+
+			// The server's menu opens with Pandorical's own: the brief, what's new and the mods screen.
+			List<String> serverMenu = context.computeOnClient(client -> ActionMenus.menuById("pandorical:server").buttons.stream()
+				.limit(3).map(entry -> entry.command).toList());
+			check(serverMenu.equals(List.of("pandorical brief", "pandorical changes", "pandorical mods")),
+				"the server menu does not open with Welcome, What's new and Mods: " + serverMenu);
+
+			check(context.computeOnClient(client -> ActionMenus.menuById("pandorical:menus").buttons.stream()
+					.anyMatch(entry -> "pandorical:server".equals(entry.menu) && entry.icon.equals("minecraft:beacon"))),
+				"Server does not wear its beacon on Menus");
+			check(context.computeOnClient(client -> ActionMenus.menuById("pandorical:menus").buttons.stream()
+					.anyMatch(entry -> "pandorical:game".equals(entry.menu) && entry.icon.equals("minecraft:grass_block"))),
+				"Game does not wear its grass block on Menus");
+
+			// A button for somebody asks who before it runs: alone here, it says there is nobody.
+			String asked = context.computeOnClient(client -> {
+				ActionMenus.Entry who = new ActionMenus.Entry();
+				who.command = "actionmenuprobe {player}";
+				ActionMenus.run(who);
+				String shown = client.gui.screen() == null ? "nothing" : client.gui.screen().getClass().getSimpleName();
+				client.gui.setScreen(null);
+				return shown;
+			});
+			check(asked.equals("PlayerPickerScreen"), "a button for {player} opened " + asked + " instead of asking who");
+
+			// Perspective picks a view rather than stepping through them: a page of three, one press each,
+			// reached from Game and not listed on Menus.
+			check(context.computeOnClient(client -> {
+				ActionMenus.Menu game = ActionMenus.menuById("pandorical:game");
+				ActionMenus.Menu views = ActionMenus.menuById("pandorical:views");
+				return game != null && views != null && views.buttons.size() == 3
+					&& game.buttons.stream().anyMatch(entry -> ActionMenus.MENU.equals(entry.type) && "pandorical:views".equals(entry.menu))
+					&& views.buttons.stream().allMatch(entry -> ActionMenus.CAMERA.equals(entry.type));
+			}), "Perspective is not a page of three views");
+			check(context.computeOnClient(client -> ActionMenus.menuById("pandorical:menus").buttons.stream()
+					.noneMatch(entry -> "pandorical:views".equals(entry.menu))),
+				"the views page is listed on Menus as a menu of its own");
+			String behind = context.computeOnClient(client -> {
+				ActionMenus.run(ActionMenus.menuById("pandorical:views").buttons.get(1));
+				return client.options.getCameraType().name();
+			});
+			check(behind.equals("THIRD_PERSON_BACK"), "Behind left the camera " + behind);
+			context.runOnClient(client -> ActionMenus.run(ActionMenus.menuById("pandorical:views").buttons.get(0)));
+
 			// They are the server's: a player cannot edit them, and they are not saved as theirs.
 			check(context.computeOnClient(client -> ActionMenus.mine().isEmpty()),
 				"the server's menus were written into the player's own");
@@ -51,12 +103,18 @@ public final class ActionMenusSeeded implements FabricClientGameTest {
 					.anyMatch(one -> one.button().command.equals("actionmenuprobe"))),
 				"the probe button was not among the promoted");
 
+			// A sprite for an icon arrives as the mod named it, for the button to draw.
+			check(context.computeOnClient(client -> ActionMenus.promoted().stream()
+					.anyMatch(one -> one.button().icon.equals("sprite:minecraft:icon/checkmark"))),
+				"the sprite icon did not arrive as it was sent");
+
 			// A button built from a promoted command wears what the mod chose for it.
 			String made = context.computeOnClient(client -> {
 				ActionMenus.Entry entry = ActionMenus.buttonFor("/actionmenuprobe");
 				return entry.icon + " " + entry.label;
 			});
-			check(made.equals("minecraft:paper Probe") || made.equals("minecraft:stone Probe again"),
+			check(java.util.Set.of("minecraft:paper Probe", "minecraft:stone Probe again", "minecraft:diamond Probe first",
+					"sprite:minecraft:icon/checkmark Probe sprite").contains(made),
 				"a promoted command made a button of " + made);
 
 			// Rebuilt on every join, so offering them again has to replace the set rather than

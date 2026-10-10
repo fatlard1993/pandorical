@@ -35,6 +35,7 @@ public final class ActionMenuRegistry implements ActionMenuApi {
 	private static final int MAX_BUTTONS = 64;
 
 	private final List<Button> declaredButtons = new CopyOnWriteArrayList<>();
+	private final List<Button> topButtons = new CopyOnWriteArrayList<>();
 	private final Map<String, String> promotedKeybinds = new LinkedHashMap<>();
 	private final Map<String, ActionMenusS2C.Menu> declaredMenus = new LinkedHashMap<>();
 
@@ -47,6 +48,15 @@ public final class ActionMenuRegistry implements ActionMenuApi {
 			return;
 		}
 		declaredButtons.add(button);
+	}
+
+	@Override
+	public void suggestTopButton(Button button) {
+		if (button == null || button.command() == null || button.command().isBlank()) {
+			Pandorical.LOGGER.warn("Ignoring first-page action button with no command");
+			return;
+		}
+		topButtons.add(button);
 	}
 
 	@Override
@@ -99,7 +109,8 @@ public final class ActionMenuRegistry implements ActionMenuApi {
 	}
 
 	/**
-	 * The server's own menu: a button for every claimed keybind, then every declared command.
+	 * The server's own menu: Pandorical's own three, a button for every claimed keybind, then every
+	 * declared command.
 	 *
 	 * <p>Only keybinds a mod actually put forward, never every one it claimed. A menu that mirrored
 	 * the controls screen would be a slower controls screen; what earns a place here is the thing
@@ -110,6 +121,12 @@ public final class ActionMenuRegistry implements ActionMenuApi {
 	 */
 	private ActionMenusS2C.Menu serverMenu() {
 		List<ActionMenusS2C.Button> buttons = new ArrayList<>();
+
+		// Pandorical's own way back to what it showed once - the brief, what changed, the mods
+		// screen - first, before anything a mod put here.
+		buttons.add(new ActionMenusS2C.Button("minecraft:oak_sign", "Welcome", "pandorical brief", ""));
+		buttons.add(new ActionMenusS2C.Button("minecraft:writable_book", "What's new", "pandorical changes", ""));
+		buttons.add(new ActionMenusS2C.Button("minecraft:bookshelf", "Mods", "pandorical mods", ""));
 
 		for (KeybindPool.Claim claim : KeybindPool.INSTANCE.claims()) {
 			String icon = promotedKeybinds.get(claim.id());
@@ -155,6 +172,13 @@ public final class ActionMenuRegistry implements ActionMenuApi {
 		if (!ServerPlayNetworking.canSend(player, ActionMenusS2C.TYPE)) return;
 
 		List<ActionMenusS2C.Menu> menus = new ArrayList<>();
+		if (!topButtons.isEmpty()) {
+			List<ActionMenusS2C.Button> top = new ArrayList<>();
+			for (Button button : topButtons) {
+				top.add(new ActionMenusS2C.Button(icon(button.icon()), text(button.label()), text(button.command()), ""));
+			}
+			menus.add(new ActionMenusS2C.Menu(ActionMenusS2C.TOP_MENU_ID, "Menus", "", top));
+		}
 		menus.add(gameMenu());
 		ActionMenusS2C.Menu server = serverMenu();
 		if (!server.buttons().isEmpty()) menus.add(server);

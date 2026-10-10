@@ -26,6 +26,8 @@ public final class SettingsCommand {
             "Every mod on this server: what it is for, what it lets you change, and what it adds.");
         PandoricalApi.commandHelp().describe("/pandorical brief",
             "What every mod on this server is, in a line each. Shown once when you first join.");
+        PandoricalApi.commandHelp().describe("/pandorical changes",
+            "What changed since you were last here, or what each mod changed last.");
         PandoricalApi.commandHelp().describe("/pandorical settings",
             "Your settings, for every mod that has any.");
         PandoricalApi.commandHelp().describe("/pandorical settings list",
@@ -38,6 +40,8 @@ public final class SettingsCommand {
                 .executes(context -> mods(context.getSource())))
             .then(Commands.literal("brief")
                 .executes(context -> brief(context.getSource())))
+            .then(Commands.literal("changes")
+                .executes(context -> changes(context.getSource())))
             .then(Commands.literal("settings")
                 .executes(context -> open(context.getSource(), settings))
                 .then(Commands.literal("list").executes(context -> list(context.getSource(), settings)))
@@ -67,6 +71,16 @@ public final class SettingsCommand {
             return 0;
         }
         justfatlard.pandorical.brief.Brief.show(player);
+        return 1;
+    }
+
+    private static int changes(CommandSourceStack source) throws CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+        if (!PandoricalApi.hasCapability(player, Capabilities.SCREENS)) {
+            source.sendSuccess(() -> text("pandorical.settings.no_client"), false);
+            return 0;
+        }
+        justfatlard.pandorical.changelog.Changelog.show(player);
         return 1;
     }
 

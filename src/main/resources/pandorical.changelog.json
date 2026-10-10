@@ -4,8 +4,18 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.17.0": [
+      "A mod can put a button on the first page J opens, beside the menus rather than inside Server. Learning Blocks does.",
+      "An action menu button can wear a picture of a mod's own instead of an item. Particle Emote's buttons show the particles they throw.",
+      "Perspective on the Game menu offers the three views to pick from, instead of stepping to the next one.",
+      "The Server menu starts with Welcome, What's new and Mods. /pandorical changes shows what changed since you were last here, or what each mod changed last. Server wears a beacon on the menu of menus, and Game a grass block.",
+      "A menu button for somebody asks who by face, from everyone else online, instead of needing a name typed."
+    ],
+    "15.16.0": [
+      "A server mod can draw a mob in its own shape: new parts, or the mob's own resized, still walking and fighting as it always did. Baby Skeletons uses it for skeletons shaped like babies."
+    ],
     "15.15.0": [
-      "A camera a server hands you takes its picture from your own screen, without the HUD or your hand, as F1 then F2 would."
+      "A server mod's camera, like Redstone Photography's, takes its picture from your own screen, without the HUD or your hand, as F1 then F2 would."
     ],
     "15.14.0": [
       "Wide fence gates are drawn piece by piece as their blocks swing out, for More Doors.",

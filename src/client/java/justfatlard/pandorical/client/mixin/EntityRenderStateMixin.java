@@ -10,7 +10,20 @@ import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(EntityRenderState.class)
 public class EntityRenderStateMixin implements OverlayTextureHolder,
-		AnimationHolder {
+		AnimationHolder, justfatlard.pandorical.client.renderer.EntityModelHolder {
+
+	@Unique
+	private justfatlard.pandorical.client.entitymodel.ClientEntityModels.Drawn pandorical$entityModel;
+
+	@Override
+	public void pandorical$setEntityModel(justfatlard.pandorical.client.entitymodel.ClientEntityModels.Drawn drawn) {
+		this.pandorical$entityModel = drawn;
+	}
+
+	@Override
+	public justfatlard.pandorical.client.entitymodel.ClientEntityModels.Drawn pandorical$getEntityModel() {
+		return this.pandorical$entityModel;
+	}
 
 	@Unique
 	private EntityAnimations.Active pandorical$animation;

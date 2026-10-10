@@ -1,0 +1,6 @@
+{
+  "texture": "minecraft:textures/entity/zombie/husk.png",
+  "transforms": {
+    "head": { "scale": 1.5 }
+  }
+}

@@ -24,14 +24,24 @@ import java.util.List;
 public interface ActionMenuApi {
 
     /**
-     * @param icon       an item id drawn on the button, e.g. {@code minecraft:firework_rocket}
+     * @param icon       an item id drawn on the button, e.g. {@code minecraft:firework_rocket}; or
+     *                   {@code sprite:} and a GUI sprite's id, e.g. {@code sprite:mymod:emote/love} for
+     *                   {@code assets/mymod/textures/gui/sprites/emote/love.png}, which Pandorical sends
+     *                   with the mod's assets
      * @param label      the word under it; keep it to a word or two
      * @param command    what it runs, with or without the leading slash; empty for a key button
      * @param keyMapping the key it presses, e.g. {@code key.advancements}; empty for a command
      */
     record Button(String icon, String label, String command, String keyMapping) {
 
-        /** A button that runs a command, as if the player had typed it. */
+        /**
+         * A button that runs a command, as if the player had typed it.
+         *
+         * <p>A command for somebody names them with a placeholder, and the button asks who first,
+         * by face, from everybody else online: {@code {player}} picks one and runs the command for
+         * them, e.g. {@code "tpme ask {player}"}; {@code {players}} ticks several and runs it once
+         * for each, e.g. {@code "chest-lock share {players}"}.
+         */
         public static Button runs(String icon, String label, String command) {
             return new Button(icon, label, command, "");
         }
@@ -55,6 +65,16 @@ public interface ActionMenuApi {
      * a command nobody wants on a button either.
      */
     void suggestButton(Button button);
+
+    /**
+     * A button on the first page the menu key opens, beside the menus themselves rather than a page
+     * down inside the server's.
+     *
+     * <p>For the one thing a mod is the way into, that a player would otherwise open the menus to
+     * look for every time. Everything a server puts here crowds out its menus, so a mod has one at
+     * most, and most mods none.
+     */
+    void suggestTopButton(Button button);
 
     /**
      * A menu of this mod's own, for when a mod has more to offer than one button.

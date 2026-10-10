@@ -4,6 +4,8 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.protocol.ActionMenusS2C;
+import justfatlard.pandorical.protocol.CapturePartC2S;
+import justfatlard.pandorical.protocol.CaptureRequestS2C;
 import justfatlard.pandorical.protocol.AddToMenuS2C;
 import justfatlard.pandorical.protocol.CameraHintS2C;
 import justfatlard.pandorical.protocol.ChestOverlayS2C;
@@ -14,6 +16,7 @@ import justfatlard.pandorical.protocol.ComponentDef;
 import justfatlard.pandorical.protocol.ComponentUpdate;
 import justfatlard.pandorical.protocol.ContentReadyC2S;
 import justfatlard.pandorical.protocol.UseStructureC2S;
+import justfatlard.pandorical.protocol.EntityModelS2C;
 import justfatlard.pandorical.protocol.EntityOverlayS2C;
 import justfatlard.pandorical.protocol.HelloC2S;
 import justfatlard.pandorical.protocol.HelloS2C;
@@ -118,6 +121,7 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 			ChestOverlayS2C.OP_ADD, "minecraft:entity/chest/christmas", new long[] {1L, 2L})));
 		out.put("entity_overlay", encode(EntityOverlayS2C.STREAM_CODEC, new EntityOverlayS2C(
 			7, "mymod:textures/entity/glow.png")));
+		out.put("entity_model", encode(EntityModelS2C.STREAM_CODEC, new EntityModelS2C(7, "mymod:robot", "", 2F)));
 		out.put("camera_hint", encode(CameraHintS2C.STREAM_CODEC, new CameraHintS2C(
 			"perspective", Map.of("mode", "third_person_back"))));
 		out.put("keybind_defaults", encode(KeybindDefaultsS2C.STREAM_CODEC,
@@ -132,6 +136,8 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 			List.of(new ClientModFilesC2S.Entry("mymod", "My Mod", "1.0", "mymod.jar", true)))));
 		out.put("setting_previews", encode(SettingPreviewsC2S.STREAM_CODEC, new SettingPreviewsC2S(
 			List.of(new SettingPreviewsC2S.Entry("mymod", "shape", "dot", "mymod:textures/dot.png")))));
+		out.put("capture_request", encode(CaptureRequestS2C.STREAM_CODEC, new CaptureRequestS2C(3, 512)));
+		out.put("capture_part", encode(CapturePartC2S.STREAM_CODEC, new CapturePartC2S(3, 0, 1, new byte[] {1, 2, 3})));
 		out.put("not_understood", encode(NotUnderstoodC2S.STREAM_CODEC,
 			new NotUnderstoodC2S("component_type", "mymod:not_invented_yet")));
 		return out;

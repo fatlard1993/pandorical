@@ -13,6 +13,7 @@ Normally a modded server means every player installs every mod, matched version 
 - **Moving structures**, like a ship built out of blocks that sails as one piece. One the server marks walkable is solid underfoot and carries you with it, so you can stand and walk on a ship's deck while it sails and turns, climb its ladders, and use its doors and chests, for blocks the mod tags `pandorical:usable_on_structures`.
 - **Camera control**, when a server wants to pull the view back.
 - **Cosmetic overlays** on particular mobs or chests, so you can tell one from another.
+- **Mobs in a different shape**: a server's mod can redraw a mob with its own model, or with its own parts resized and moved, and it still walks and fights as before.
 - **One block at one place a different colour**, so two of the same block in two places can be told apart on sight.
 - **Extra squares and buttons on your own inventory screen**: a slot that only takes a map, a compass slot beside it, a button that tidies your pack. They sit in the vanilla panel and behave like the rest of it.
 
@@ -44,15 +45,15 @@ For that screen to list anything, your client tells the server which mods you ha
 
 The first time you join a server running Pandorical, a notice offers you **the brief**: every mod on the server in a line each, saying what it is rather than what changed in it. It waits in your tray rather than taking your first minute, and at the end it offers the mods screen for anything you want to read properly.
 
-It is offered once. `/pandorical brief` brings it back whenever you want it.
+It is offered once. `/pandorical brief` brings it back whenever you want it, and `/pandorical changes` shows what changed since you were last here, or, with nothing new, what each mod changed last.
 
 ### Action menus
 
 Also on Pandorical's page, under your client's settings: **Action menus**, whose **Edit...** opens an editor for your own grids of buttons. Give a menu a name and a key; fill it with buttons, each with an icon (any item, found by searching or taken from your hand), a label shown when you point at it, and what it does: **run a command**, as if you had typed it, with your own permissions; **press a key**, any key in the controls screen, other mods' keys included; or **open another menu**, so menus can be pages of one another, and a page needs no key of its own. Press the menu's key with nothing else open and the grid comes up in the middle of the screen; click a button to do it. Escape goes back a page, and the key you opened with puts them all away. A key that opens something of the game's own when pressed leaves the menu shut rather than covering it.
 
-**One key opens all of them.** **J** by default, **d-pad up** on a controller, and rebindable as "Open action menus" in the controls screen like any other key. It opens **Menus**, a menu whose buttons are the other menus, each wearing the first thing on it. A menu you reach for constantly can still have a key of its own; this is so the rest do not each need one.
+**One key opens all of them.** **J** by default, **d-pad up** on a controller, and rebindable as "Open action menus" in the controls screen like any other key. It opens **Menus**, a menu whose buttons are the other menus, each wearing the first thing on it, after anything a mod here has put on the first page itself, such as Learning Blocks. A menu you reach for constantly can still have a key of its own; this is so the rest do not each need one.
 
-**You do not have to start from nothing.** Some menus are the server's, and they are there the moment you join: **Game**, for corners of the vanilla game worth reaching for, **Server**, for what the mods here have put forward, and one more for each mod with enough to fill a grid of its own - Emotes, or Arena.
+**You do not have to start from nothing.** Some menus are the server's, and they are there the moment you join: **Game**, for corners of the vanilla game worth reaching for (its **Perspective** is a page of the three views, first person, behind and in front, picked outright rather than stepped through), **Server**, which starts with **Welcome** (the brief), **What's new** and **Mods** and then has what the mods here have put forward, and one more for each mod with enough to fill a grid of its own - Emotes, or Arena.
 
 What is on them is chosen, not swept up. An action menu is for the useful but less common: the thing you would otherwise have to remember a command for. Anything you do constantly - your inventory, chat, petting an animal - is already faster on the key it is bound to, so it is not here. A menu that mirrored the controls screen would only be a slower controls screen.
 

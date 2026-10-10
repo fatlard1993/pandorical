@@ -60,13 +60,15 @@ public final class ActionMenus {
 	public static final class Entry {
 		public String icon = "minecraft:compass";
 		public String label = "";
-		/** {@link #COMMAND}, {@link #KEY} or {@link #MENU}. */
+		/** {@link #COMMAND}, {@link #KEY}, {@link #MENU} or {@link #CAMERA}. */
 		public String type = COMMAND;
 		public String command = "";
 		/** A key mapping's name, e.g. {@code key.inventory}. */
 		public String keyMapping = "";
 		/** The {@link Menu#id} of the menu it opens. */
 		public String menu = "";
+		/** The view it puts the camera in, by {@link CameraType} name. */
+		public String camera = "";
 
 		/** For tests: the same button, as a separate one. */
 		public Entry copyForTest() {
@@ -81,6 +83,7 @@ public final class ActionMenus {
 			out.command = command;
 			out.keyMapping = keyMapping;
 			out.menu = menu;
+			out.camera = camera;
 			return out;
 		}
 	}
@@ -88,6 +91,8 @@ public final class ActionMenus {
 	public static final String COMMAND = "command";
 	public static final String KEY = "key";
 	public static final String MENU = "menu";
+	/** A view picked outright, where the game's own key only steps through them. */
+	public static final String CAMERA = "camera";
 
 	private static final Path FILE = FabricLoader.getInstance().getConfigDir().resolve("pandorical-action-menus.json");
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -260,8 +265,17 @@ public final class ActionMenus {
 	public static void offered(java.util.List<justfatlard.pandorical.protocol.ActionMenusS2C.Menu> menus) {
 		promoted.clear();
 		builtins.clear();
+		top.clear();
 
 		for (justfatlard.pandorical.protocol.ActionMenusS2C.Menu offered : menus) {
+			if (offered.id().equals(justfatlard.pandorical.protocol.ActionMenusS2C.TOP_MENU_ID)) {
+				for (var button : offered.buttons()) {
+					Entry entry = entryOf(button);
+					top.add(entry);
+					promoted.add(new Promoted(offered.name(), entry));
+				}
+				continue;
+			}
 			Menu menu = new Menu();
 			menu.builtin = true;
 			menu.id = offered.id();
@@ -276,6 +290,7 @@ public final class ActionMenus {
 			}
 			builtins.add(menu);
 		}
+		pickViews();
 		addMetaMenu();
 		tellOnce();
 	}
@@ -323,6 +338,47 @@ public final class ActionMenus {
 		return key;
 	}
 
+	private static final String VIEWS_ID = "pandorical:views";
+	private static final Map<String, String> BUILT_IN_ICONS = Map.of(
+		"pandorical:server", "minecraft:beacon",
+		"pandorical:game", "minecraft:grass_block");
+
+	/**
+	 * The game's perspective key, offered as a button, only steps through the three views: pressed
+	 * from a menu, a player cannot see which they will land on. So it opens a page of the three
+	 * instead, one press each. Done here because the view is the client's own, and no command can
+	 * set it; any server's menu that offers the key gets the page.
+	 */
+	private static void pickViews() {
+		boolean offered = false;
+		for (Menu menu : builtins) {
+			for (Entry entry : menu.buttons) {
+				if (!KEY.equals(entry.type) || !"key.togglePerspective".equals(entry.keyMapping)) continue;
+				entry.type = MENU;
+				entry.menu = VIEWS_ID;
+				offered = true;
+			}
+		}
+		if (!offered) return;
+		Menu views = new Menu();
+		views.builtin = true;
+		views.id = VIEWS_ID;
+		views.name = "Perspective";
+		views.buttons.add(view("minecraft:spyglass", "First person", net.minecraft.client.CameraType.FIRST_PERSON));
+		views.buttons.add(view("minecraft:armor_stand", "Behind", net.minecraft.client.CameraType.THIRD_PERSON_BACK));
+		views.buttons.add(view("minecraft:player_head", "In front", net.minecraft.client.CameraType.THIRD_PERSON_FRONT));
+		builtins.add(views);
+	}
+
+	private static Entry view(String icon, String label, net.minecraft.client.CameraType camera) {
+		Entry entry = new Entry();
+		entry.icon = icon;
+		entry.label = label;
+		entry.type = CAMERA;
+		entry.camera = camera.name();
+		return entry;
+	}
+
 	/** Where the one key lands, until the player moves it. Vanilla leaves J alone. */
 	private static final String META_KEY = "key.keyboard.j";
 	private static final String META_ID = "pandorical:menus";
@@ -338,7 +394,7 @@ public final class ActionMenus {
 	 * after this one was written is on it without having asked.
 	 */
 	private static void addMetaMenu() {
-		if (builtins.size() < 2) return;
+		if (builtins.stream().filter(menu -> !VIEWS_ID.equals(menu.id)).count() < 2 && top.isEmpty()) return;
 
 		Menu meta = new Menu();
 		meta.builtin = true;
@@ -348,10 +404,18 @@ public final class ActionMenus {
 		// rebind there move the key rather than add a second: the hub used to answer both to
 		// whatever was bound and to J for ever, and no screen said why.
 		meta.key = menusKey != null ? menusKey.saveString() : META_KEY;
+		// What a mod is the way into, first, ahead of the menus.
+		for (Entry entry : top) meta.buttons.add(entry.copy());
 		for (Menu target : builtins) {
+			// A page of another menu, reached from it rather than from here.
+			if (VIEWS_ID.equals(target.id)) continue;
 			Entry open = new Entry();
-			// The first thing on a menu stands for it: Emotes wears a heart, Arena a sword.
-			open.icon = target.buttons.isEmpty() ? "minecraft:book" : target.buttons.getFirst().icon;
+			// The first thing on a menu stands for it: Emotes wears a heart, Arena a sword. The two
+			// built from the server's side start with a button that says nothing about the menu -
+			// Pandorical's welcome sign, the players' head - so they wear their own.
+			String own = BUILT_IN_ICONS.get(target.id);
+			open.icon = own != null ? own
+				: target.buttons.isEmpty() ? "minecraft:book" : target.buttons.getFirst().icon;
 			open.label = target.name;
 			open.type = MENU;
 			open.menu = target.id;
@@ -359,6 +423,9 @@ public final class ActionMenus {
 		}
 		builtins.addFirst(meta);
 	}
+
+	/** The buttons the server put on the first page itself, rebuilt each join. */
+	private static final List<Entry> top = new ArrayList<>();
 
 	/** The server's menus, rebuilt each join and belonging to nobody. */
 	private static final List<Menu> builtins = new ArrayList<>();
@@ -495,10 +562,21 @@ public final class ActionMenus {
 	public static void run(Entry entry) {
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.player == null) return;
+		if (CAMERA.equals(entry.type)) {
+			view(mc, entry.camera);
+			return;
+		}
 		if (COMMAND.equals(entry.type)) {
-			String command = entry.command.strip();
-			if (command.startsWith("/")) command = command.substring(1);
-			if (!command.isEmpty()) mc.player.connection.sendCommand(command);
+			// A command for somebody: who, picked by face first.
+			if (entry.command.contains(PLAYERS)) {
+				mc.gui.setScreen(new PlayerPickerScreen(entry, true));
+				return;
+			}
+			if (entry.command.contains(PLAYER)) {
+				mc.gui.setScreen(new PlayerPickerScreen(entry, false));
+				return;
+			}
+			send(mc, entry.command);
 			return;
 		}
 		KeyMapping mapping = mapping(entry.keyMapping);
@@ -509,6 +587,39 @@ public final class ActionMenus {
 		KeyMappingAccessor clicks = (KeyMappingAccessor) mapping;
 		clicks.pandorical$setClickCount(clicks.pandorical$getClickCount() + 1);
 		pressing.put(mapping, PRESS_TICKS);
+	}
+
+	/** The camera put in a view, as the game's own key leaves it: the spectating tint redone on the way in or out of first person. */
+	private static void view(Minecraft mc, String name) {
+		net.minecraft.client.CameraType wanted;
+		try {
+			wanted = net.minecraft.client.CameraType.valueOf(name);
+		} catch (IllegalArgumentException e) {
+			return;
+		}
+		net.minecraft.client.CameraType was = mc.options.getCameraType();
+		mc.options.setCameraType(wanted);
+		if (was.isFirstPerson() != wanted.isFirstPerson()) {
+			mc.gameRenderer.checkEntityPostEffect(wanted.isFirstPerson() ? mc.getCameraEntity() : null);
+		}
+	}
+
+	/** In a button's command, where the player picked goes: one picked, the command runs for them. */
+	public static final String PLAYER = "{player}";
+	/** The same for several: each picked, ticked, and the command run once for each of them. */
+	public static final String PLAYERS = "{players}";
+
+	/** A button's command, run for this player. */
+	static void runFor(Entry entry, String name) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.player == null) return;
+		send(mc, entry.command.replace(PLAYERS, name).replace(PLAYER, name));
+	}
+
+	private static void send(Minecraft mc, String raw) {
+		String command = raw.strip();
+		if (command.startsWith("/")) command = command.substring(1);
+		if (!command.isEmpty()) mc.player.connection.sendCommand(command);
 	}
 
 	/** The player's menu with this id, or null: it may have been removed since the button was made. */

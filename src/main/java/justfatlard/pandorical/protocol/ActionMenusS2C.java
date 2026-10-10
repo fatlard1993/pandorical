@@ -19,6 +19,9 @@ import java.util.List;
  * <p>A separate payload, so an older client is never sent it.
  */
 public record ActionMenusS2C(List<Menu> menus) implements CustomPacketPayload {
+    /** Not a menu of its own: its buttons go on the first page of the menu of menus, before the menus. */
+    public static final String TOP_MENU_ID = "pandorical:top";
+
     public ActionMenusS2C {
         menus = Wire.fit(menus, 64, "action menus");
     }

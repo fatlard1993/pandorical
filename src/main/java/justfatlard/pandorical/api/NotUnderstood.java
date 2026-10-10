@@ -42,6 +42,11 @@ public interface NotUnderstood {
     String HUD_ELEMENT = "hud_element";
     /** A HUD anchor. The overlay sits top left. */
     String HUD_ANCHOR = "hud_anchor";
+    /**
+     * An entity model this client could not find or read. The value is the model's id; the entity
+     * is drawn as it would be without one.
+     */
+    String ENTITY_MODEL = "entity_model";
 
     /** Told when a player's client reports a word it could not act on. */
     @FunctionalInterface

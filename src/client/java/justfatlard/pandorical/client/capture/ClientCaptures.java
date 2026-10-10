@@ -77,7 +77,7 @@ public final class ClientCaptures {
             byte[] png = crop(frame, size);
             client.execute(() -> send(id, png));
         });
-        // The frame is copied in the order it was asked for, ahead of the next one drawn
+        // Safe to show the HUD at once: the copy is queued ahead of the next frame drawn
         showHud(client);
     }
 

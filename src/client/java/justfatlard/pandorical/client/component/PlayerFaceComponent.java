@@ -44,9 +44,12 @@ public class PlayerFaceComponent extends AbstractComponent {
         PlayerFaceExtractor.extractRenderState(graphics, skin(), x, y, Math.min(width, height));
     }
 
-    /** An offline server's tab list has no skins, so the override is looked up by player. */
     private PlayerSkin skin() {
-        var minecraft = context.minecraft();
+        return skinOf(context.minecraft(), player);
+    }
+
+    /** An offline server's tab list has no skins, so the override is looked up by player. */
+    public static PlayerSkin skinOf(net.minecraft.client.Minecraft minecraft, java.util.UUID player) {
         PlayerSkin theirs;
         if (minecraft.level != null && minecraft.level.getPlayerByUUID(player) instanceof AbstractClientPlayer seen) {
             theirs = seen.getSkin();

@@ -28,7 +28,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-/** Server side of captures: asks, gathers the slices, and checks what arrives before handing it on. */
 public final class Captures implements CaptureApi {
     public static final Captures INSTANCE = new Captures();
 

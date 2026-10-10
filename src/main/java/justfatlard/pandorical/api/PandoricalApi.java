@@ -224,6 +224,9 @@ public final class PandoricalApi {
 
     public static EntityOverlayApi entityOverlays() { return ENTITY_OVERLAYS; }
 
+    /** Entities drawn with a model a mod ships, for a client that can. New in 15.16. */
+    public static EntityModelApi entityModels() { return justfatlard.pandorical.entitymodel.EntityModelRegistry.INSTANCE; }
+
     public static BlockTintApi blockTints() { return BLOCK_TINTS; }
 
     public static BlockMarkApi blockMarks() { return BLOCK_MARKS; }

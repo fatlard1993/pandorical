@@ -96,8 +96,8 @@ before anything else.
 Pass the constant, `hasCapability(player, Capabilities.SCREENS)`, and a typo is a compile
 error. `hasCapability(player, "blockTints")` returns false forever, because `blockTints` is an
 API surface, not a capability. Player inventory slots and buttons, block tints, block marks,
-banner decals, pictures, map reliefs, action menus, keepsakes, and built-in entity renderers have
-no capability string and are not guarded that way; each is sent only to a client that registered
+banner decals, pictures, map reliefs, action menus, keepsakes, entity models, and built-in entity
+renderers have no capability string and are not guarded that way; each is sent only to a client that registered
 its channel, which Fabric answers with `ServerPlayNetworking.canSend`.
 
 `Capabilities.Server.SETTINGS` and `Capabilities.Server.BLOCK_MARKS` are a server's announcements
@@ -494,6 +494,63 @@ Broadcast to every current and future tracker of the entity, so there is no play
 argument. State is in-memory only and dropped when the entity unloads: re-call `set`
 when your entity loads, from a tick hook reading your own persisted flag.
 
+## Entity models
+
+A living entity drawn with a model your mod ships: its own parts moved and resized, or new
+geometry in place of its own, or both, with a texture if you like. New in 15.16.
+
+The model is content, shipped like a block model: a JSON file at
+`assets/<yourmod>/pandorical/entity_models/<name>.json`, sent by `registerModAssets` (or
+`registerAsset`), and named by the id `<yourmod>:<name>`.
+
+```json
+{
+  "texture": "mymod:textures/entity/lantern_bearer.png",
+  "transforms": {
+    "head":     { "scale": 1.25, "offset": [0, -1, 0] },
+    "left_arm": { "scale": [1, 1.5, 1] }
+  }
+}
+```
+
+```java
+// A zombie that carries the lantern drawn as a lantern bearer, at its own size.
+PandoricalApi.entityModels().set(zombie, Identifier.fromNamespaceAndPath("mymod", "lantern_bearer"));
+// Or with a texture chosen per entity, drawn at 1.5 times the size its scale attribute gives it.
+PandoricalApi.entityModels().set(zombie, model, texture, 1.5F);
+PandoricalApi.entityModels().clear(zombie);
+```
+
+**Transforms** act on the entity's own model, by part name, after its animation has posed it, on
+every model drawn for the entity: its body, its armour, a stray's coat. Each is `scale` (one number
+or three) then `offset`, in model pixels - `pose.scaled(scale).translated(offset)`, the two steps
+the game's own mesh transformers are built from. Position is scaled with the part, so a scale about
+a part's pivot needs no offset; an offset moves the pivot. They keep everything the entity does:
+walking, aiming, swinging, held items (kept at their own size on a resized arm), worn heads, armour.
+Prefer them when the entity's own texture will do. Only top-level parts are named; a child moves with
+its parent. Names a model does not have are skipped.
+
+**Geometry**, under `parts` with a `texture_size`, replaces the model: a tree of named parts, each
+with `pivot`, `rotation` (degrees), `scale`, `children`, and `cubes` of `origin`, `size`, `uv`,
+`inflate` and `mirror`, in the game's units - sixteen to a block, y down, the feet at 24. It is
+built into a fresh instance of the model class the entity's renderer already uses, so the game's
+animation for that class drives it. That is where it stops: the class must take only its root part,
+and the geometry must have every part the class finds by name - for a humanoid mob `head` (with a
+child `hat`), `body`, `right_arm`, `left_arm`, `right_leg`, `left_leg`; for anything else, whatever
+that class looks up. Geometry that does not fit is not drawn. Layers keep their own models: armour,
+clothes and held items follow the named parts' poses, not the shape of your cubes.
+
+**Size.** The hitbox is the server's, from the scale attribute, and is what a vanilla client, or a
+Pandorical older than 15.16, draws. `drawScale` multiplies the drawn size only, on a client that has
+this: a mod that halved the attribute for a small hitbox and ships a model already small passes 2.
+
+A client that cannot find, read or fit a model draws the entity as it was and reports
+`NotUnderstood.ENTITY_MODEL` with the id. Shaped like entity overlays: broadcast off tracking, kept by
+UUID in memory, dropped on unload, so set it again when the entity loads; `get` says what the server
+has set. Sent only to clients that registered `pandorical:entity_model`.
+
+There is still no custom animation: a model moves as its entity's own model class moves it.
+
 ## Pictures
 
 A grid of palette-coloured cells standing in the world as a thin panel, at any yaw, tilt and
@@ -650,7 +707,22 @@ PandoricalApi.actionMenus().suggestMenu("mymod:arena", "Arena", List.of(
 // Or offer one button for the player to put wherever they like.
 PandoricalApi.actionMenus().suggestButton(
     ActionMenuApi.Button.runs("minecraft:paper", "Home", "home"));
+
+// Or, for the one thing your mod is the way into, a button on the first page J opens.
+PandoricalApi.actionMenus().suggestTopButton(
+    ActionMenuApi.Button.runs("minecraft:book", "Learning Blocks", "learn"));
 ```
+
+An icon is an item id, or `sprite:` and a GUI sprite's id for a picture of your own:
+`sprite:mymod:emote/love` draws `assets/mymod/textures/gui/sprites/emote/love.png`, which goes to the
+client with your mod's assets. Particle Emote's buttons wear the particles they throw this way.
+
+A command for somebody takes a placeholder, and the button asks who by face before running it:
+`{player}` picks one (`"tpme ask {player}"`), and `{players}` ticks several and runs the command
+once for each (`"chest-lock share {players}"`). Nobody types a name.
+
+A first-page button sits on **Menus** itself, ahead of the menus, rather than a page down in
+**Server**. Every one crowds the menus, so keep it to the one thing a player opens the menus for.
 
 A suggested menu is the server's: the player can give it a key but cannot edit it, and it is gone
 the moment they leave. A suggested button is an offer - it shows up in the editor's **Add what
