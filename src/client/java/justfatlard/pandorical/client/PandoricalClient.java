@@ -441,6 +441,9 @@ public class PandoricalClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(SetStructureWalkableS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> StructureManager.handleSetWalkable(payload));
         });
+        ClientPlayNetworking.registerGlobalReceiver(justfatlard.pandorical.protocol.SetStructureDryS2C.TYPE, (payload, context) -> {
+            context.client().execute(() -> StructureManager.handleSetDry(payload));
+        });
         ClientPlayNetworking.registerGlobalReceiver(DespawnStructureS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> StructureManager.handleDespawn(payload));
         });

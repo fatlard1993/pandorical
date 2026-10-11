@@ -7,6 +7,7 @@ import justfatlard.pandorical.api.RelPos;
 import justfatlard.pandorical.api.StructureApi;
 import justfatlard.pandorical.api.StructurePose;
 import justfatlard.pandorical.protocol.DespawnStructureS2C;
+import justfatlard.pandorical.protocol.SetStructureDryS2C;
 import justfatlard.pandorical.protocol.SetStructureVisibleS2C;
 import justfatlard.pandorical.protocol.SetStructureWalkableS2C;
 import justfatlard.pandorical.protocol.SpawnStructureS2C;
@@ -40,6 +41,7 @@ public final class StructureRegistry implements StructureApi {
 		final java.util.ArrayDeque<StructurePose> recent = new java.util.ArrayDeque<>();
 		boolean visible;
 		boolean walkable;
+		DryCells dry = new DryCells(List.of());
 
 		StructureState(Entity anchorEntity, Map<RelPos, BlockState> blocks, StructurePose pose, boolean visible) {
 			this.anchorEntity = anchorEntity;
@@ -130,6 +132,20 @@ public final class StructureRegistry implements StructureApi {
 				int y = net.minecraft.util.Mth.floor(entity.getY() - pose.y());
 				BlockState block = state.blocks.get(new RelPos(x, y, z));
 				if (block != null && block.is(net.minecraft.tags.BlockTags.CLIMBABLE)) return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Whether this point is in a dry cell of a structure in the entity's level, at any pose it has
+	 * held lately: a player is in the hold their client draws, a little behind the server's.
+	 */
+	public boolean dryAt(Entity entity, double x, double y, double z) {
+		for (StructureState state : structures.values()) {
+			if (state.dry.isEmpty() || !state.visible || state.anchorEntity.level() != entity.level()) continue;
+			for (StructurePose pose : state.recent) {
+				if (state.dry.holds(pose.x(), pose.y(), pose.z(), pose.yaw(), x, y, z)) return true;
 			}
 		}
 		return false;
@@ -242,6 +258,26 @@ public final class StructureRegistry implements StructureApi {
 	}
 
 	@Override
+	public void setDry(String structureId, java.util.Collection<RelPos> cells) {
+		StructureState state = structures.get(structureId);
+		if (state == null) return;
+		state.dry = new DryCells(cells);
+
+		SetStructureDryS2C packet = dryPacket(structureId, state.dry);
+		for (ServerPlayer player : PlayerLookup.tracking(state.anchorEntity)) {
+			if (PandoricalApi.hasCapability(player, Capabilities.DRY_STRUCTURES)) {
+				ServerPlayNetworking.send(player, packet);
+			}
+		}
+	}
+
+	private static SetStructureDryS2C dryPacket(String structureId, DryCells dry) {
+		return new SetStructureDryS2C(structureId, dry.cells().stream()
+			.map(p -> new StructureRelPos(p.x(), p.y(), p.z()))
+			.toList());
+	}
+
+	@Override
 	public void despawn(String structureId) {
 		StructureState state = structures.remove(structureId);
 		if (state == null) return;
@@ -258,6 +294,9 @@ public final class StructureRegistry implements StructureApi {
 				ServerPlayNetworking.send(player, buildSpawnPacket(entry.getKey(), entry.getValue()));
 				if (entry.getValue().walkable && PandoricalApi.hasCapability(player, Capabilities.WALKABLE_STRUCTURES)) {
 					ServerPlayNetworking.send(player, new SetStructureWalkableS2C(entry.getKey(), true));
+				}
+				if (!entry.getValue().dry.isEmpty() && PandoricalApi.hasCapability(player, Capabilities.DRY_STRUCTURES)) {
+					ServerPlayNetworking.send(player, dryPacket(entry.getKey(), entry.getValue().dry));
 				}
 			}
 		}

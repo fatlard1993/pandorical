@@ -21,6 +21,8 @@ public final class Capabilities {
     public static final String MOUNT_POLICY = "mount_policy";
     /** The client stands on and is carried by structures marked walkable. */
     public static final String WALKABLE_STRUCTURES = "walkable_structures";
+    /** The client keeps the sea out of the cells a structure marks dry. */
+    public static final String DRY_STRUCTURES = "dry_structures";
 
     /**
      * What a server announces about itself, for its clients to read. These are not client
@@ -38,12 +40,13 @@ public final class Capabilities {
 
     /** What a Pandorical client of this version declares. */
     public static final List<String> CLIENT = List.of(SCREENS, CONTENT, HUD, CAMERA, STRUCTURES, ENTITY_OVERLAYS,
-        CHEST_OVERLAYS, KEYBINDS, HUD_ELEMENTS, SKINS, RENDER_POLICY, ANIMATIONS, MOUNT_POLICY, WALKABLE_STRUCTURES);
+        CHEST_OVERLAYS, KEYBINDS, HUD_ELEMENTS, SKINS, RENDER_POLICY, ANIMATIONS, MOUNT_POLICY, WALKABLE_STRUCTURES,
+        DRY_STRUCTURES);
 
     /** What a Pandorical server of this version announces. */
     public static final List<String> SERVER = List.of(SCREENS, CONTENT, CAMERA, HUD, STRUCTURES, ENTITY_OVERLAYS,
         CHEST_OVERLAYS, KEYBINDS, HUD_ELEMENTS, SKINS, RENDER_POLICY, ANIMATIONS, MOUNT_POLICY, Server.SETTINGS,
-        Server.BLOCK_MARKS, WALKABLE_STRUCTURES);
+        Server.BLOCK_MARKS, WALKABLE_STRUCTURES, DRY_STRUCTURES);
 
     /** True for a string only a server announces, which no client can ever declare. */
     static boolean isServerOnly(String capability) {

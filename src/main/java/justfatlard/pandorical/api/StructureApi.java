@@ -72,6 +72,20 @@ public interface StructureApi {
      */
     void setWalkable(String structureId, boolean walkable);
 
+    /**
+     * Keep the sea out of these cells of a structure, such as the hold of a ship at sea, which
+     * stands where the world has water: nothing in them is in water, on the server or on a client
+     * with the {@code "dry_structures"} capability, which also stops drawing the water's surface
+     * across them. Replaces any cells set before; pass an empty collection for none. Hidden
+     * structures keep nothing dry.
+     *
+     * <p>A cell is dry for what is in it, not for the world: the water is still there, and flows,
+     * freezes and is drawn everywhere else as ever. Mark the structure's own cells at and below the
+     * water as well as the space they enclose, or something pressed against the hull, in a cell
+     * the turned structure only partly covers, is wet.
+     */
+    void setDry(String structureId, java.util.Collection<RelPos> cells);
+
     /** Remove the structure for every tracker and forget its server-side state. */
     void despawn(String structureId);
 }

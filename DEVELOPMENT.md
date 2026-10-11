@@ -91,7 +91,7 @@ before anything else.
 
 `screens` · `content` · `camera` · `hud` · `structures` · `entity_overlays` ·
 `chest_overlays` · `keybinds` · `hud_elements` · `skins` · `render_policy` ·
-`animations` · `mount_policy` · `walkable_structures`
+`animations` · `mount_policy` · `walkable_structures` · `dry_structures`
 
 Pass the constant, `hasCapability(player, Capabilities.SCREENS)`, and a typo is a compile
 error. `hasCapability(player, "blockTints")` returns false forever, because `blockTints` is an

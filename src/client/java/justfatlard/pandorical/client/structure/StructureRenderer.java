@@ -86,6 +86,8 @@ public final class StructureRenderer {
             poseStack.popPose();
         }
 
+        StructureHolds.submitMask(structure, poseStack, collector);
+
         poseStack.popPose();
     }
 

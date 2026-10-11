@@ -30,6 +30,8 @@ import justfatlard.pandorical.protocol.OpenScreenS2C;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import justfatlard.pandorical.protocol.RequirementS2C;
 import justfatlard.pandorical.protocol.ScreenActionC2S;
+import justfatlard.pandorical.protocol.SetStructureDryS2C;
+import justfatlard.pandorical.protocol.StructureRelPos;
 import justfatlard.pandorical.protocol.SettingPreviewsC2S;
 import justfatlard.pandorical.protocol.ShowHudS2C;
 import justfatlard.pandorical.protocol.UpdateHudS2C;
@@ -113,6 +115,8 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 			"mymod:s1", "ok", "click", Map.of("value", "1"))));
 		out.put("content_ready", encode(ContentReadyC2S.STREAM_CODEC, new ContentReadyC2S()));
 		out.put("use_structure", encode(UseStructureC2S.STREAM_CODEC, new UseStructureC2S("mymod:ship", 1, -2, 3)));
+		out.put("set_structure_dry", encode(SetStructureDryS2C.STREAM_CODEC, new SetStructureDryS2C("mymod:ship",
+			List.of(new StructureRelPos(1, -2, 3)))));
 		out.put("key_press", encode(KeyPressC2S.STREAM_CODEC, new KeyPressC2S(3)));
 		out.put("keybind_rebind", encode(KeybindRebindS2C.STREAM_CODEC, new KeybindRebindS2C(3)));
 		out.put("keybind_declarations", encode(KeybindDeclarationsS2C.STREAM_CODEC,

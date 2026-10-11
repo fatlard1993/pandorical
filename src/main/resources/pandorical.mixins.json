@@ -23,7 +23,8 @@
 		"TrackingRangeMixin",
 		"PlayerTrustPvpMixin",
 		"TntProjectileTrustMixin",
-		"StructureClimbMixin"
+		"StructureClimbMixin",
+		"StructureDryMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

@@ -1,7 +1,9 @@
 package justfatlard.pandorical.client.structure;
 
 import justfatlard.pandorical.Pandorical;
+import justfatlard.pandorical.api.RelPos;
 import justfatlard.pandorical.protocol.DespawnStructureS2C;
+import justfatlard.pandorical.protocol.SetStructureDryS2C;
 import justfatlard.pandorical.protocol.SetStructureVisibleS2C;
 import justfatlard.pandorical.protocol.SetStructureWalkableS2C;
 import justfatlard.pandorical.protocol.SpawnStructureS2C;
@@ -9,6 +11,7 @@ import justfatlard.pandorical.protocol.StructureBlockEntry;
 import justfatlard.pandorical.protocol.StructureRelPos;
 import justfatlard.pandorical.protocol.UpdateStructureBlocksS2C;
 import justfatlard.pandorical.protocol.UpdateStructurePoseS2C;
+import justfatlard.pandorical.structure.DryCells;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.Collection;
@@ -76,6 +79,12 @@ public final class StructureManager {
         structure.walkable = payload.walkable();
     }
 
+    public static void handleSetDry(SetStructureDryS2C payload) {
+        ClientStructure structure = structures.get(payload.structureId());
+        if (structure == null) return;
+        structure.dry = new DryCells(payload.cells().stream().map(p -> new RelPos(p.x(), p.y(), p.z())).toList());
+    }
+
     public static void handleDespawn(DespawnStructureS2C payload) {
         structures.remove(payload.structureId());
     }
@@ -108,6 +117,8 @@ public final class StructureManager {
         public final Map<RelPosKey, BlockState> blocks;
         public boolean visible;
         public boolean walkable;
+        /** Where the sea is kept out; see {@link StructureHolds}. */
+        public DryCells dry = new DryCells(java.util.List.of());
 
         /** Ticks a hidden walkable structure stays solid; see {@link StructureDecks#hidden}. */
         int solidTicks;

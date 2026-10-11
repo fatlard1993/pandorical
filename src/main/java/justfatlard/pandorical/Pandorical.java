@@ -282,6 +282,9 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(UpdateStructureBlocksS2C.TYPE, UpdateStructureBlocksS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SetStructureVisibleS2C.TYPE, SetStructureVisibleS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(SetStructureWalkableS2C.TYPE, SetStructureWalkableS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.SetStructureDryS2C.TYPE,
+            justfatlard.pandorical.protocol.SetStructureDryS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(DespawnStructureS2C.TYPE, DespawnStructureS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(EntityOverlayS2C.TYPE, EntityOverlayS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(

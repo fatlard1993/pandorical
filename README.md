@@ -10,7 +10,7 @@ Normally a modded server means every player installs every mod, matched version 
 - **HUD overlays** that sit alongside your hotbar or replace a vanilla bar outright, and update live.
 - **Custom blocks and items** that arrive when you join, with no resource pack to install and no download prompt.
 - **Rebindable keys** the server defines. They appear in your normal controls screen under "Pandorical", and rebind like any other key.
-- **Moving structures**, like a ship built out of blocks that sails as one piece. One the server marks walkable is solid underfoot and carries you with it, so you can stand and walk on a ship's deck while it sails and turns, climb its ladders, and use its doors and chests, for blocks the mod tags `pandorical:usable_on_structures`.
+- **Moving structures**, like a ship built out of blocks that sails as one piece. One the server marks walkable is solid underfoot and carries you with it, so you can stand and walk on a ship's deck while it sails and turns, climb its ladders, and use its doors and chests, for blocks the mod tags `pandorical:usable_on_structures`. One can also keep the sea out of part of itself, so a ship's hold below the waterline is air you walk and breathe, not water you swim.
 - **Camera control**, when a server wants to pull the view back.
 - **Cosmetic overlays** on particular mobs or chests, so you can tell one from another.
 - **Mobs in a different shape**: a server's mod can redraw a mob with its own model, or with its own parts resized and moved, and it still walks and fights as before.
