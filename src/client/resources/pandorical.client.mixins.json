@@ -50,7 +50,8 @@
     "SingleQuadParticleAccessor",
     "StackValidationMixin",
     "StructureDeckCarryMixin",
-    "StructureDeckCollisionMixin"
+    "StructureDeckCollisionMixin",
+    "StructureDeckWalkMixin"
   ],
   "injectors": {
     "defaultRequire": 1

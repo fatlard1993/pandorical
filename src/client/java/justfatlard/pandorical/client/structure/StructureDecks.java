@@ -27,6 +27,10 @@ import java.util.List;
  * <p>The carry runs at the head of the player's tick, after the position it is drawn from has been
  * kept, and the structure has already ticked: the player is drawn moving by the same step the deck
  * is drawn moving, in the same frames.
+ *
+ * <p>Walking legs are worked out by each client from how far an entity moved in a tick, so a deck
+ * under sail would have everyone on it walking on the spot. {@link #deckStep} is how far the deck
+ * carried an entity this tick, taken back off before the legs are worked out.
  */
 public final class StructureDecks {
 	private StructureDecks() {}
@@ -47,10 +51,20 @@ public final class StructureDecks {
 	 */
 	private static final int HIDDEN_SOLID_TICKS = 10;
 
+	/**
+	 * How far below its feet another entity may find a moving deck and have its legs measured
+	 * against it: past a jump's height (1.25), so a jump on deck is not a stride at the top of it.
+	 */
+	private static final double ANIMATION_REACH = 1.5;
+
 	private static ClientStructure riding;
+
+	/** How far {@link #carry} moved the local player this tick, or null. */
+	private static @org.jspecify.annotations.Nullable Vec3 carried;
 
 	/** At the head of the local player's tick. */
 	public static void carry(LocalPlayer player) {
+		carried = null;
 		if (player.isPassenger() || player.isSpectator() || player.getAbilities().flying) {
 			riding = null;
 			return;
@@ -60,13 +74,43 @@ public final class StructureDecks {
 		for (ClientStructure structure : StructureManager.getActive()) {
 			if (!structure.walkable || !structure.visible) continue;
 			double reach = structure == riding ? AIRBORNE_REACH : SUPPORT_REACH;
-			if (hasDeckBeneath(structure, structure.lastTick(), player, reach)) {
+			if (hasDeckBeneath(structure, structure.lastTick(), player.getX(), player.getY(), player.getZ(),
+					player.getBbWidth() / 2, reach)) {
 				aboard = structure;
 				break;
 			}
 		}
 		riding = aboard;
-		if (aboard != null) move(player, aboard.lastTick(), aboard.thisTick());
+		if (aboard != null) {
+			double x = player.getX(), y = player.getY(), z = player.getZ();
+			move(player, aboard.lastTick(), aboard.thisTick());
+			if (player.getX() != x || player.getY() != y || player.getZ() != z) {
+				carried = new Vec3(player.getX() - x, player.getY() - y, player.getZ() - z);
+			}
+		}
+	}
+
+	/**
+	 * How far a moving deck carried this entity this tick, for its walk animation, or null if none
+	 * did. The local player's is the step {@link #carry} took. Anyone else, another player or a mob,
+	 * is drawn where the server last had them, moving at the deck's speed, so theirs is how far the
+	 * deck under where they stood at the start of the tick moved over it.
+	 */
+	public static @org.jspecify.annotations.Nullable Vec3 deckStep(net.minecraft.world.entity.LivingEntity entity) {
+		if (entity instanceof LocalPlayer) return carried;
+		if (!StructureManager.anyDeckMoving()) return null;
+		double x = entity.xo, y = entity.yo, z = entity.zo;
+		for (ClientStructure structure : StructureManager.getActive()) {
+			if (!structure.walkable || !structure.visible) continue;
+			StructurePoseSnapshot from = structure.lastTick();
+			StructurePoseSnapshot to = structure.thisTick();
+			if (from.equals(to)) continue;
+			if (hasDeckBeneath(structure, from, x, y, z, entity.getBbWidth() / 2, ANIMATION_REACH)) {
+				Vec3 there = carriedTo(x, y, z, from, to);
+				return new Vec3(there.x - x, there.y - y, there.z - z);
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -215,20 +259,28 @@ public final class StructureDecks {
 		return nearestState != null && nearestState.is(USABLE) ? nearest : null;
 	}
 
-	/** Deck within {@code reach} below any corner of the player's feet. */
+	/** Deck within {@code reach} below any corner of feet at this point, {@code halfWidth} across. */
 	private static boolean hasDeckBeneath(ClientStructure structure, StructurePoseSnapshot pose,
-										  LocalPlayer player, double reach) {
+										  double px, double py, double pz, double halfWidth, double reach) {
 		double yaw = Math.toRadians(pose.yaw());
 		double cos = Math.cos(yaw);
 		double sin = Math.sin(yaw);
-		double half = player.getBbWidth() / 2 - 1.0E-3;
-		double ly = player.getY() - pose.y();
+		double half = halfWidth - 1.0E-3;
+		double ly = py - pose.y();
 		int top = Mth.floor(ly - 0.05);
 		int bottom = Mth.floor(ly - reach);
 
+		// Nowhere near it: one bounds test rather than a lookup per corner and layer.
+		double cx = px - pose.x();
+		double cz = pz - pose.z();
+		int lx = Mth.floor(cx * cos + cz * sin);
+		int lz = Mth.floor(-cx * sin + cz * cos);
+		int spread = Mth.ceil(half) + 1;
+		if (!structure.mayHold(lx - spread, bottom, lz - spread, lx + spread, top, lz + spread)) return false;
+
 		for (int corner = 0; corner < 4; corner++) {
-			double dx = player.getX() + ((corner & 1) == 0 ? -half : half) - pose.x();
-			double dz = player.getZ() + ((corner & 2) == 0 ? -half : half) - pose.z();
+			double dx = px + ((corner & 1) == 0 ? -half : half) - pose.x();
+			double dz = pz + ((corner & 2) == 0 ? -half : half) - pose.z();
 			int x = Mth.floor(dx * cos + dz * sin);
 			int z = Mth.floor(-dx * sin + dz * cos);
 			for (int y = top; y >= bottom; y--) {
@@ -242,21 +294,26 @@ public final class StructureDecks {
 		return false;
 	}
 
-	/** Move the player from where they stand on the deck at one pose to the same spot at another. */
-	private static void move(LocalPlayer player, StructurePoseSnapshot from, StructurePoseSnapshot to) {
-		if (from.equals(to)) return;
-
+	/** Where a point on the deck at one pose is at another. */
+	private static Vec3 carriedTo(double x, double y, double z, StructurePoseSnapshot from, StructurePoseSnapshot to) {
 		double fromYaw = Math.toRadians(from.yaw());
-		double dx = player.getX() - from.x();
-		double dz = player.getZ() - from.z();
+		double dx = x - from.x();
+		double dz = z - from.z();
 		double lx = dx * Math.cos(fromYaw) + dz * Math.sin(fromYaw);
 		double lz = -dx * Math.sin(fromYaw) + dz * Math.cos(fromYaw);
 
 		double toYaw = Math.toRadians(to.yaw());
-		player.setPos(
+		return new Vec3(
 			to.x() + lx * Math.cos(toYaw) - lz * Math.sin(toYaw),
-			player.getY() + (to.y() - from.y()),
+			y + (to.y() - from.y()),
 			to.z() + lx * Math.sin(toYaw) + lz * Math.cos(toYaw));
+	}
+
+	/** Move the player from where they stand on the deck at one pose to the same spot at another. */
+	private static void move(LocalPlayer player, StructurePoseSnapshot from, StructurePoseSnapshot to) {
+		if (from.equals(to)) return;
+
+		player.setPos(carriedTo(player.getX(), player.getY(), player.getZ(), from, to));
 
 		float turn = Mth.wrapDegrees(to.yaw() - from.yaw());
 		if (turn != 0) {

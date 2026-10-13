@@ -89,11 +89,25 @@ public final class StructureManager {
         structures.remove(payload.structureId());
     }
 
+    /** Whether a walkable structure was drawn moving this tick; see {@link StructureDecks#deckStep}. */
+    private static boolean deckMoving;
+
     /** Once per client tick. */
     public static void tick() {
+        boolean moving = false;
         for (ClientStructure structure : structures.values()) {
             structure.tick();
+            if (structure.walkable && structure.visible && !structure.lastTick.equals(structure.thisTick)) moving = true;
         }
+        deckMoving = moving;
+    }
+
+    /**
+     * Whether any walkable structure moved this tick: asked for every living thing every tick, so
+     * the answer when nothing is sailing costs one field read.
+     */
+    public static boolean anyDeckMoving() {
+        return deckMoving;
     }
 
     public static Collection<ClientStructure> getActive() {
@@ -107,6 +121,7 @@ public final class StructureManager {
 
     public static void clear() {
         structures.clear();
+        deckMoving = false;
     }
 
     public record RelPosKey(int x, int y, int z) {}

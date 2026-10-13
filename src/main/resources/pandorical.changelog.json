@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.18.1": [
+      "Standing still on a ship at sea, you and everyone else aboard stand still, instead of walking on the spot at the ship's speed."
+    ],
     "15.18.0": [
       "A mod can keep the sea out of part of a structure: Big Boats keeps a ship's hold dry while she sails, so you walk it in air instead of swimming."
     ],

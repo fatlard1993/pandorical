@@ -15,6 +15,8 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.animal.pig.Pig;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
@@ -24,12 +26,17 @@ import java.util.List;
 
 /**
  * A player stood on a walkable structure stays where they stood on it while it sails and turns,
- * walks across it, and is still standing a moment after it is hidden.
+ * walks across it, and is still standing a moment after it is hidden. Neither they nor a pig carried
+ * along on it walk on the spot while it sails: their legs move only when they cross it.
  */
 public final class WalkableDecks implements FabricClientGameTest {
 	private static final String ID = "pandorical-gametest:deck";
 	private static final double SPEED = 0.45;
 	private static final float TURN = 1.5f;
+	/** Where the pig stands on the deck, out of the player's way. */
+	private static final double PIG_X = -2.5, PIG_Z = -2.5;
+	/** A walk animation this slow is legs at rest; walking is several times it. */
+	private static final float STILL = 0.05f;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -66,15 +73,38 @@ public final class WalkableDecks implements FabricClientGameTest {
 			Vec3 stood = local(context);
 			check(Math.abs(stood.y - 1) < 0.01, "the player did not come to rest on the deck: local " + stood);
 
+			// A pig the server carries along with the deck, as a ship's mod carries its crew.
+			int pig = server.computeOnServer(s -> {
+				Pig carried = new Pig(EntityTypes.PIG, s.overworld());
+				carried.setNoAi(true);
+				carried.setNoGravity(true);
+				carried.setPos(onDeck(origin.x, origin.y, origin.z, 0));
+				s.overworld().addFreshEntity(carried);
+				return carried.getId();
+			});
+			context.waitTicks(10);
+
 			// Sail and turn it for five seconds; they should not have moved on it at all.
 			for (int tick = 1; tick <= 100; tick++) {
 				double x = origin.x + SPEED * tick;
 				float yaw = TURN * tick;
-				server.runOnServer(s -> PandoricalApi.structures().updatePose(ID, new StructurePose(x, origin.y, origin.z, yaw)));
+				server.runOnServer(s -> {
+					PandoricalApi.structures().updatePose(ID, new StructurePose(x, origin.y, origin.z, yaw));
+					s.overworld().getEntity(pig).setPos(onDeck(x, origin.y, origin.z, yaw));
+				});
 				context.waitTick();
 				Vec3 now = local(context);
 				check(now.distanceTo(stood) < 0.05,
 					"tick " + tick + ": the player moved on the deck from " + stood + " to " + now);
+				float legs = context.computeOnClient(client -> client.player.walkAnimation.speed());
+				check(legs < STILL, "tick " + tick + ": the player stood still on the deck walks at " + legs);
+				// The pig is drawn a few ticks behind the server, so it takes a moment to come up to the
+				// deck's pace from rest; past that its legs should be still.
+				if (tick > 15) {
+					float pigLegs = context.computeOnClient(client ->
+						((LivingEntity) client.level.getEntity(pig)).walkAnimation.speed());
+					check(pigLegs < STILL, "tick " + tick + ": the pig carried on the deck walks at " + pigLegs);
+				}
 			}
 
 			// Walking across it, still sailing.
@@ -85,7 +115,9 @@ public final class WalkableDecks implements FabricClientGameTest {
 				server.runOnServer(s -> PandoricalApi.structures().updatePose(ID, new StructurePose(x, origin.y, origin.z, yaw)));
 				context.waitTick();
 			}
+			float walking = context.computeOnClient(client -> client.player.walkAnimation.speed());
 			context.getInput().releaseKey(options -> options.keyUp);
+			check(walking > 0.3f, "walking across the deck, the player's legs move only at " + walking);
 			Vec3 walked = local(context);
 			check(Math.abs(walked.y - 1) < 0.01, "walking, the player left the deck's surface: local " + walked);
 			check(Math.hypot(walked.x - stood.x, walked.z - stood.z) > 1.0, "walking forward moved the player only to " + walked);
@@ -99,6 +131,13 @@ public final class WalkableDecks implements FabricClientGameTest {
 
 			server.runOnServer(s -> PandoricalApi.structures().despawn(ID));
 		}
+	}
+
+	/** The pig's spot on the deck at this pose. */
+	private static Vec3 onDeck(double x, double y, double z, float yaw) {
+		double r = Math.toRadians(yaw);
+		return new Vec3(x + PIG_X * Math.cos(r) - PIG_Z * Math.sin(r), y + 1,
+			z + PIG_X * Math.sin(r) + PIG_Z * Math.cos(r));
 	}
 
 	private static ClientStructure deck() {
