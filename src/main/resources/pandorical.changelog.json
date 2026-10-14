@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.19.1": [
+      "The server keeps your Fabric API at its own version too, the same way it keeps Pandorical."
+    ],
     "15.19.0": [
       "A server can keep client mods for you: a newer Pandorical, and any client-only mods it carries. Joining downloads them, and back at the title screen or server list the game asks before installing. Switch one off from Mods and it stays off."
     ],

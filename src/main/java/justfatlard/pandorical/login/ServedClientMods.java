@@ -40,8 +40,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 /**
- * Client mods kept by the server: Pandorical's own jar, and every jar in the {@code client-mods}
- * folder beside {@code mods}, which the server itself never loads.
+ * Client mods kept by the server: its own Pandorical and Fabric API, and every jar in the
+ * {@code client-mods} folder beside {@code mods}, which the server itself never loads.
  *
  * <p>The client decides: it is told each mod's id, version, hash and size, and asks for the ones
  * it wants. Nothing it receives runs until the player agrees to install it and restarts the game.
@@ -54,6 +54,12 @@ public final class ServedClientMods {
 
 	/** Well under the configuration phase's packet cap, and a few packets for a whole jar. */
 	private static final int PART_BYTES = 512 * 1024;
+
+	/**
+	 * Mods every client needs at the server's own version, offered from the server's mods folder
+	 * so they keep in step with it without anybody copying them into {@code client-mods}.
+	 */
+	private static final List<String> SERVERS_OWN = List.of(Pandorical.MOD_ID, "fabric-api");
 
 	private static final String ID_SHAPE = "[a-z][a-z0-9_-]{0,63}";
 
@@ -125,9 +131,11 @@ public final class ServedClientMods {
 
 	private static Map<String, Jar> readJars() {
 		Map<String, Jar> out = new LinkedHashMap<>();
-		FabricLoader.getInstance().getModContainer(Pandorical.MOD_ID).ifPresent(mod -> {
-			for (Path path : mod.getOrigin().getPaths()) read(path, out);
-		});
+		for (String id : SERVERS_OWN) {
+			FabricLoader.getInstance().getModContainer(id).ifPresent(mod -> {
+				for (Path path : mod.getOrigin().getPaths()) read(path, out);
+			});
+		}
 
 		Path folder = FabricLoader.getInstance().getGameDir().resolve("client-mods");
 		if (Files.isDirectory(folder)) {
