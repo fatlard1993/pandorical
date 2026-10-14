@@ -76,6 +76,13 @@ public final class WhatsNew implements FabricClientGameTest {
 			});
 			check(complaint.get() == null, complaint.get());
 
+			// The screen itself, for the eye: each mod's name clear of the last note above it.
+			session.onServer(server -> Changelog.show(session.player()));
+			session.waitTicks(10);
+			context.takeScreenshot("whats-new");
+			session.onServer(server -> PandoricalApi.screens().close(session.player(), "pandorical:whats_new_screen"));
+			session.waitTicks(5);
+
 			// A mod the player has never seen is introduced, not patch-noted. Most mods arrive on
 			// a patch version, where the note for that version is the least useful thing that
 			// could be said to somebody meeting it, so this is the common case and not the edge.

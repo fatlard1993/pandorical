@@ -33,6 +33,11 @@ final class WhatsNewScreen {
 	private static final int LINE = 10;
 	private static final int ROW = 14;
 	private static final int ICON = 16;
+	/** Space under a mod's last note before the next mod's name. */
+	private static final int ENTRY_GAP = 8;
+	/** Space over a section heading, and between it and the first mod under it. */
+	private static final int HEADING_ABOVE = 10;
+	private static final int HEADING_BELOW = 4;
 	/** How far a note is indented under its mod name. */
 	private static final int NOTE_INSET = 6;
 
@@ -120,13 +125,13 @@ final class WhatsNewScreen {
 	}
 
 	private record Heading(String text) implements Row {
-		@Override public int height() { return ROW + 4; }
+		@Override public int height() { return HEADING_ABOVE + LINE + HEADING_BELOW; }
 
 		@Override
 		public void draw(List<justfatlard.pandorical.protocol.ComponentDef> out, int n, int y, int width) {
 			out.add(new justfatlard.pandorical.api.ComponentBuilder("head" + n,
 					justfatlard.pandorical.api.ComponentType.TEXT)
-				.bounds(0, y + 4, width, LINE)
+				.bounds(0, y + HEADING_ABOVE, width, LINE)
 				.prop(justfatlard.pandorical.api.ComponentType.PROP_TEXT, text)
 				.prop(justfatlard.pandorical.api.ComponentType.PROP_COLOR, HEADING_COLOR).build());
 		}
@@ -146,9 +151,10 @@ final class WhatsNewScreen {
 			return new Entry(change, wrapped);
 		}
 
+		/** The name, the versions and every line of the notes, as {@link #draw} lays them out, and the gap after. */
 		@Override
 		public int height() {
-			return ROW + Math.max(1, wrapped.size()) * LINE + 2;
+			return LINE * 2 + wrapped.size() * LINE + ENTRY_GAP;
 		}
 
 		@Override
