@@ -221,6 +221,7 @@ public class Pandorical implements ModInitializer {
             KeepsakesAskConfigS2C.TYPE,
             KeepsakesAskConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.serverboundConfiguration().register(ContentReadyConfigC2S.TYPE, ContentReadyConfigC2S.STREAM_CODEC);
+        justfatlard.pandorical.login.ServedClientMods.registerPayloads();
         PayloadTypeRegistry.serverboundConfiguration().register(
             KeepsakesConfigC2S.TYPE,
             KeepsakesConfigC2S.STREAM_CODEC);
@@ -457,6 +458,7 @@ public class Pandorical implements ModInitializer {
                 LOGGER.debug("Client does not support config-phase content sync — will use play-phase fallback");
             }
         });
+        justfatlard.pandorical.login.ServedClientMods.register();
     }
 
     private void registerServerHandlers() {

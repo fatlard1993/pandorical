@@ -28,6 +28,7 @@ import justfatlard.pandorical.client.hud.VanillaHudElementSuppressor;
 import justfatlard.pandorical.client.inventory.ClientInventoryButtons;
 import justfatlard.pandorical.client.inventory.ClientInventorySlotRegistry;
 import justfatlard.pandorical.client.keepsake.ClientKeepsakes;
+import justfatlard.pandorical.client.update.KeptClientMods;
 import justfatlard.pandorical.client.keybind.KeybindManager;
 import justfatlard.pandorical.client.mixin.ClientCommonListenerAccessor;
 import justfatlard.pandorical.client.maprelief.ClientMapReliefs;
@@ -247,8 +248,9 @@ public class PandoricalClient implements ClientModInitializer {
                     Pandorical.LOGGER.warn("Server needs Pandorical {} (protocol v{}); this client speaks v{}",
                         payload.serverModVersion(), payload.minimumProtocol(), Pandorical.PROTOCOL_VERSION);
                     var connection = ((ClientCommonListenerAccessor) context.packetListener()).pandorical$connection();
-                    context.client().execute(() -> connection.disconnect(Component.translatable(
-                        "pandorical.too_old", payload.serverModVersion())));
+                    Component reason = Component.translatable("pandorical.too_old", payload.serverModVersion());
+                    if (KeptClientMods.holdDisconnect(connection, reason)) return;
+                    context.client().execute(() -> connection.disconnect(reason));
                 } else {
                     Pandorical.LOGGER.debug("Server runs Pandorical {} — protocol v{}, minimum v{}",
                         payload.serverModVersion(), payload.protocolVersion(), payload.minimumProtocol());
@@ -305,6 +307,7 @@ public class PandoricalClient implements ClientModInitializer {
                 context.client().execute(() -> BannerDecalStore.apply(payload)));
 
         ClientKeepsakes.register();
+        KeptClientMods.register();
 
         ClientPlayNetworking.registerGlobalReceiver(HelloS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> {

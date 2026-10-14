@@ -10,6 +10,9 @@ import justfatlard.pandorical.protocol.AddToMenuS2C;
 import justfatlard.pandorical.protocol.CameraHintS2C;
 import justfatlard.pandorical.protocol.ChestOverlayS2C;
 import justfatlard.pandorical.protocol.ClientModFilesC2S;
+import justfatlard.pandorical.protocol.ClientModPartS2C;
+import justfatlard.pandorical.protocol.ClientModsOfferS2C;
+import justfatlard.pandorical.protocol.ClientModsWantC2S;
 import justfatlard.pandorical.protocol.ClientModToggleS2C;
 import justfatlard.pandorical.protocol.CloseScreenS2C;
 import justfatlard.pandorical.protocol.ComponentDef;
@@ -144,6 +147,10 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 		out.put("capture_part", encode(CapturePartC2S.STREAM_CODEC, new CapturePartC2S(3, 0, 1, new byte[] {1, 2, 3})));
 		out.put("not_understood", encode(NotUnderstoodC2S.STREAM_CODEC,
 			new NotUnderstoodC2S("component_type", "mymod:not_invented_yet")));
+		out.put("client_mods_offer", encode(ClientModsOfferS2C.STREAM_CODEC, new ClientModsOfferS2C(
+			List.of(new ClientModsOfferS2C.Entry("mymod", "1.0", "ab".repeat(32), 1048576)))));
+		out.put("client_mods_want", encode(ClientModsWantC2S.STREAM_CODEC, new ClientModsWantC2S(List.of("mymod"))));
+		out.put("client_mod_part", encode(ClientModPartS2C.STREAM_CODEC, new ClientModPartS2C("mymod", 0, 1, new byte[] {1, 2, 3})));
 		return out;
 	}
 
