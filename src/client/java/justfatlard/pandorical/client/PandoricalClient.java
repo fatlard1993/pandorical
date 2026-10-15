@@ -215,6 +215,9 @@ public class PandoricalClient implements ClientModInitializer {
         ClientConfigurationNetworking.registerGlobalReceiver(
             justfatlard.pandorical.protocol.EntityKindsConfigS2C.TYPE,
             (payload, context) -> justfatlard.pandorical.client.entitykind.ClientEntityKinds.receive(payload));
+        ClientConfigurationNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.EntityBodiesConfigS2C.TYPE,
+            (payload, context) -> justfatlard.pandorical.client.entitykind.ClientEntityKinds.receive(payload));
 
         ClientConfigurationNetworking.registerGlobalReceiver(SyncContentConfigS2C.TYPE, (payload, context) -> {
             Pandorical.LOGGER.info("Config phase: received content sync — {} blocks, {} items, {} expected asset chunks",

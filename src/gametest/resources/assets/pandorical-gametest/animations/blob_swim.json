@@ -1,0 +1,12 @@
+{
+  "length": 1.0,
+  "looping": true,
+  "bones": {
+    "tail": [
+      { "target": "rotation",
+        "keyframes": [ { "time": 0.0, "value": [0, -30, 0], "interpolation": "catmullrom" },
+                       { "time": 0.5, "value": [0, 30, 0], "interpolation": "catmullrom" },
+                       { "time": 1.0, "value": [0, -30, 0], "interpolation": "catmullrom" } ] }
+    ]
+  }
+}

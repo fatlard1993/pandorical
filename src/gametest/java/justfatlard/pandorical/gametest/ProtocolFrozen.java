@@ -130,6 +130,10 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 			new justfatlard.pandorical.protocol.EntityKindsConfigS2C(List.of(
 				new justfatlard.pandorical.protocol.EntityKindsConfigS2C.Entry("mymod:shark", "minecraft:dolphin",
 					"", "mymod:textures/entity/shark.png", "mymod:textures/entity/shark_pup.png", 1.15F)))));
+		out.put("entity_bodies", encode(justfatlard.pandorical.protocol.EntityBodiesConfigS2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.EntityBodiesConfigS2C(List.of(
+				new justfatlard.pandorical.protocol.EntityBodiesConfigS2C.Entry("mymod:shark", "ageable", List.of(0, 1, 8),
+					0.9F, 0.6F, 0.3F, "WATER_CREATURE", 10, 3, false, "mymod:shark", "", 1F)))));
 		out.put("entity_overlay", encode(EntityOverlayS2C.STREAM_CODEC, new EntityOverlayS2C(
 			7, "mymod:textures/entity/glow.png")));
 		out.put("entity_model", encode(EntityModelS2C.STREAM_CODEC, new EntityModelS2C(7, "mymod:robot", "", 2F)));

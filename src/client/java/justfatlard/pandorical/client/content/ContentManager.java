@@ -1088,14 +1088,23 @@ public class ContentManager {
                     continue;
                 }
                 var kind = justfatlard.pandorical.client.entitykind.ClientEntityKinds.get(idStr);
+                var body = justfatlard.pandorical.client.entitykind.ClientEntityKinds.body(idStr);
                 if (BuiltInRegistries.ENTITY_TYPE.containsKey(id)) {
                     // The mod is on this client too (singleplayer, or installed by hand): the real
-                    // type and class are here, but nothing gave the type a renderer. Its base's.
+                    // type and class are here, but nothing gave the type a renderer. Its base's,
+                    // or its own body's.
                     if (kind != null) ClientEntityRendererRegistry.mirror(BuiltInRegistries.ENTITY_TYPE.getValue(id), kind.base());
+                    if (body != null) ClientEntityRendererRegistry.provideBody(BuiltInRegistries.ENTITY_TYPE.getValue(id));
                     Pandorical.LOGGER.debug("Config phase: entity type '{}' already registered — skipping", idStr);
                     continue;
                 }
                 ResourceKey<EntityType<?>> key = ResourceKey.create(Registries.ENTITY_TYPE, id);
+                if (body != null) {
+                    registerWithHolder(BuiltInRegistries.ENTITY_TYPE, id, bodyStub(key, idStr, body));
+                    count++;
+                    Pandorical.LOGGER.debug("Config phase: registered {} with its own body", idStr);
+                    continue;
+                }
                 if (kind != null) {
                     registerWithHolder(BuiltInRegistries.ENTITY_TYPE, id, kindStub(key, idStr, kind));
                     count++;
@@ -1154,6 +1163,28 @@ public class ContentManager {
         if (base.fireImmune()) builder = builder.fireImmune();
         EntityType<?> stub = builder.build(key);
         ClientEntityRendererRegistry.mirror(stub, base);
+        return stub;
+    }
+
+    /**
+     * A registered entity with its own body: the server's size, range and category, built as one
+     * of Pandorical's generic mobs and drawn from its model. Like a kind's, the factory asks for the
+     * body at spawn.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static EntityType<?> bodyStub(ResourceKey<EntityType<?>> key, String idStr,
+            justfatlard.pandorical.client.entitykind.ClientEntityKinds.Body body) {
+        EntityType.Builder builder = EntityType.Builder.of((type, level) -> {
+                var now = justfatlard.pandorical.client.entitykind.ClientEntityKinds.body(idStr);
+                return now == null ? null : justfatlard.pandorical.client.entitykind.ClientEntityKinds.create(now, type, level);
+            }, body.category())
+            .sized(body.width(), body.height())
+            .eyeHeight(body.eyeHeight())
+            .clientTrackingRange(body.trackingRange())
+            .updateInterval(body.updateInterval());
+        if (body.fireImmune()) builder = builder.fireImmune();
+        EntityType<?> stub = builder.build(key);
+        ClientEntityRendererRegistry.provideBody(stub);
         return stub;
     }
 

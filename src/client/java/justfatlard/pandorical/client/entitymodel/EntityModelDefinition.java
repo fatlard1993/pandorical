@@ -18,12 +18,25 @@ import net.minecraft.util.Mth;
 import org.jspecify.annotations.Nullable;
 
 /**
- * An entity model as a mod ships it: geometry, part transforms and a texture, any of them optional.
+ * An entity model as a mod ships it: geometry, part transforms, a texture and, for an entity with
+ * its own body, how it moves - any of them optional.
  * The file format is documented on {@code EntityModelApi}; this reads it into the game's own model
  * builders, so a part here is built exactly as the game builds its own.
  */
 public record EntityModelDefinition(@Nullable LayerDefinition geometry, @Nullable Identifier texture,
-        Map<String, PartTransform> transforms) {
+        Map<String, PartTransform> transforms, @Nullable Motion motion) {
+
+    /**
+     * How an entity with its own body moves, from the model's {@code animation} block: the part
+     * that turns to look where the entity looks, and the animations it plays at rest, on the move
+     * and when it strikes. Each animation is an id of the kind {@code AnimationApi} plays, or an
+     * object with it as {@code animation} beside a {@code pace} (how fast it plays: at rest against
+     * real time, on the move against the distance covered) and, on the move, a {@code strength}
+     * (how much of its full swing the entity's speed is worth).
+     */
+    public record Motion(@Nullable String look, @Nullable Clip idle, @Nullable Clip moving, @Nullable Clip attack) {}
+
+    public record Clip(Identifier animation, float pace, float strength) {}
 
     /**
      * {@code pose.scaled(scale).translated(offset)}, the two steps the game's own mesh transformers
@@ -61,7 +74,24 @@ public record EntityModelDefinition(@Nullable LayerDefinition geometry, @Nullabl
             parts(mesh.getRoot(), json.getAsJsonObject("parts"));
             geometry = LayerDefinition.create(mesh, size.get(0).getAsInt(), size.get(1).getAsInt());
         }
-        return new EntityModelDefinition(geometry, texture, Map.copyOf(transforms));
+        return new EntityModelDefinition(geometry, texture, Map.copyOf(transforms), motion(json));
+    }
+
+    private static @Nullable Motion motion(JsonObject json) {
+        if (!json.has("animation")) return null;
+        JsonObject animation = json.getAsJsonObject("animation");
+        String look = animation.has("look") ? animation.get("look").getAsString() : null;
+        return new Motion(look, clip(animation, "idle"), clip(animation, "moving"), clip(animation, "attack"));
+    }
+
+    private static @Nullable Clip clip(JsonObject animation, String key) {
+        if (!animation.has(key)) return null;
+        JsonElement value = animation.get(key);
+        if (value.isJsonPrimitive()) return new Clip(Identifier.parse(value.getAsString()), 1F, 1F);
+        JsonObject clip = value.getAsJsonObject();
+        return new Clip(Identifier.parse(clip.get("animation").getAsString()),
+            clip.has("pace") ? clip.get("pace").getAsFloat() : 1F,
+            clip.has("strength") ? clip.get("strength").getAsFloat() : 1F);
     }
 
     private static void parts(PartDefinition parent, JsonObject parts) {

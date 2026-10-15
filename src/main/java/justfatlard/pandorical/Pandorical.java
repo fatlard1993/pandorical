@@ -212,6 +212,9 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundConfiguration().register(
             justfatlard.pandorical.protocol.EntityKindsConfigS2C.TYPE,
             justfatlard.pandorical.protocol.EntityKindsConfigS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundConfiguration().register(
+            justfatlard.pandorical.protocol.EntityBodiesConfigS2C.TYPE,
+            justfatlard.pandorical.protocol.EntityBodiesConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(SyncAssetsConfigS2C.TYPE, SyncAssetsConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(PlayerInventoryRegistrationsS2C.TYPE, PlayerInventoryRegistrationsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(
@@ -436,14 +439,19 @@ public class Pandorical implements ModInitializer {
                         // play handshake, and must already know whether this client can read them.
                         boolean tellsKinds = ServerConfigurationNetworking.canSend(handler,
                             justfatlard.pandorical.protocol.EntityKindsConfigS2C.TYPE);
+                        boolean tellsBodies = ServerConfigurationNetworking.canSend(handler,
+                            justfatlard.pandorical.protocol.EntityBodiesConfigS2C.TYPE);
                         if (handler.getOwner() != null) {
-                            justfatlard.pandorical.entitykind.EntityKinds.understood(handler.getOwner().id(), tellsKinds);
+                            justfatlard.pandorical.entitykind.EntityKinds.understood(handler.getOwner().id(),
+                                tellsKinds, tellsBodies);
                         }
                         var task = new PandoricalSyncTask(blocks, items, assetChunks,
                             entityTypes, blockEntityTypes, villagerProfessions,
                             poiTypes, menuTypes, recipeBookCategories, contentRegistry.railsSolid(),
                             tellsKinds && justfatlard.pandorical.entitykind.EntityKinds.any()
-                                ? justfatlard.pandorical.entitykind.EntityKinds.payload() : null);
+                                ? justfatlard.pandorical.entitykind.EntityKinds.payload() : null,
+                            tellsBodies && justfatlard.pandorical.entitykind.EntityKinds.anyBodies()
+                                ? justfatlard.pandorical.entitykind.EntityKinds.bodiesPayload() : null);
                         try {
                             var field = ServerConfigurationPacketListenerImpl.class
                                 .getDeclaredField("configurationTasks");

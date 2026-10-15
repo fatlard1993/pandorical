@@ -1,0 +1,21 @@
+{
+  "texture": "minecraft:textures/entity/slime/slime.png",
+  "texture_size": [64, 32],
+  "parts": {
+    "body": {
+      "pivot": [0, 20, 0],
+      "cubes": [{ "uv": [0, 0], "origin": [-4, -4, -4], "size": [8, 8, 8] }],
+      "children": {
+        "tail": {
+          "pivot": [0, 0, 4],
+          "cubes": [{ "uv": [0, 16], "origin": [-1, -1, 0], "size": [2, 2, 6] }]
+        }
+      }
+    }
+  },
+  "animation": {
+    "look": "body",
+    "idle": "pandorical-gametest:blob_bob",
+    "moving": { "animation": "pandorical-gametest:blob_swim", "pace": 2, "strength": 3 }
+  }
+}

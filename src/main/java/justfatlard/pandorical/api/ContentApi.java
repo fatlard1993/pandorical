@@ -15,8 +15,9 @@ public interface ContentApi {
 
     /**
      * Declare an entity for client sync, during onInitialize, after registering its type with
-     * vanilla's {@code Registry.register()}. Pandorical clients draw it as its base, dressed as the
-     * registration says; see {@link EntityRegistration} for the one rule its class must keep.
+     * vanilla's {@code Registry.register()}. Pandorical clients build it from its own model, or as
+     * the vanilla mob it is based on; see {@link EntityRegistration} for which, and what each asks
+     * of its class.
      */
     void registerEntity(net.minecraft.world.entity.EntityType<?> type, EntityRegistration registration);
 

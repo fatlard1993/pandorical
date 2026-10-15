@@ -30,6 +30,8 @@ public class PandoricalSyncTask implements ConfigurationTask {
     private final boolean solidRails;
     /** Null when the client cannot take it or there are none. */
     private final justfatlard.pandorical.protocol.EntityKindsConfigS2C kinds;
+    /** Null when the client cannot take it or there are none. */
+    private final justfatlard.pandorical.protocol.EntityBodiesConfigS2C bodies;
 
     public PandoricalSyncTask(
             List<SyncContentS2C.BlockEntry> blocks,
@@ -41,7 +43,8 @@ public class PandoricalSyncTask implements ConfigurationTask {
             List<String> poiTypes,
             List<String> menuTypes,
             List<String> recipeBookCategories, boolean solidRails,
-            justfatlard.pandorical.protocol.EntityKindsConfigS2C kinds) {
+            justfatlard.pandorical.protocol.EntityKindsConfigS2C kinds,
+            justfatlard.pandorical.protocol.EntityBodiesConfigS2C bodies) {
         this.blocks = blocks;
         this.items = items;
         this.assetChunks = assetChunks;
@@ -53,6 +56,7 @@ public class PandoricalSyncTask implements ConfigurationTask {
         this.recipeBookCategories = recipeBookCategories;
         this.solidRails = solidRails;
         this.kinds = kinds;
+        this.bodies = bodies;
     }
 
     /**
@@ -107,6 +111,7 @@ public class PandoricalSyncTask implements ConfigurationTask {
         // First: the client builds each entity type's stand-in from its kind as the content below
         // registers it.
         if (kinds != null) sender.accept(ServerConfigurationNetworking.createClientboundPacket(kinds));
+        if (bodies != null) sender.accept(ServerConfigurationNetworking.createClientboundPacket(bodies));
 
         for (int i = 0; i < total; i++) {
             var contentPacket = new SyncContentConfigS2C(

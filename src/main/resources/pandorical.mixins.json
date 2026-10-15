@@ -27,7 +27,8 @@
 		"StructureDryMixin",
 		"SynchedEntityDataAccessor",
 		"EntityKindTrackingMixin",
-		"EntityKindPairingMixin"
+		"EntityKindPairingMixin",
+		"EntityBodyDataMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

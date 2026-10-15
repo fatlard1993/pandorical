@@ -1,5 +1,7 @@
 package justfatlard.pandorical.client.renderer;
 
+import justfatlard.pandorical.client.entitykind.BodyRenderer;
+
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.NotUnderstood;
 import justfatlard.pandorical.client.ClientNotices;
@@ -112,6 +114,29 @@ public final class ClientEntityRendererRegistry {
         providersMap.put(stub, provider);
         Minecraft mc = Minecraft.getInstance();
         mc.execute(() -> mc.getEntityRenderDispatcher().onResourceManagerReload(mc.getResourceManager()));
+    }
+
+    /**
+     * Draw a registered entity with its own body with {@link BodyRenderer}. Rebuilt on the render
+     * thread, like {@link #mirror}.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static void provideBody(EntityType<?> type) {
+        Map providersMap = getProvidersMap();
+        if (providersMap == null) return;
+        if (providersMap.get(type) instanceof BodyProvider) return;
+        providersMap.put(type, new BodyProvider(type));
+        Minecraft mc = Minecraft.getInstance();
+        mc.execute(() -> mc.getEntityRenderDispatcher().onResourceManagerReload(mc.getResourceManager()));
+    }
+
+    /** A provider that is known for one, so a second provideBody does not rebuild every renderer for nothing. */
+    @SuppressWarnings({"rawtypes"})
+    private record BodyProvider(EntityType<?> type) implements EntityRendererProvider {
+        @Override
+        public net.minecraft.client.renderer.entity.EntityRenderer create(EntityRendererProvider.Context context) {
+            return new BodyRenderer(context, type);
+        }
     }
 
     public static void reset() {

@@ -4,6 +4,11 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.21.0": [
+      "A mod can add a mob the game has nothing like: drawn from its own model, with its own animations - idle, swimming or walking, striking - and its own size, rather than dressed up as a vanilla mob.",
+      "Such a mob can carry values of its own, which used to garble every client it was sent to.",
+      "Players without Pandorical are shown a stand-in vanilla mob for it only if that mob can read it; otherwise they are not sent it at all."
+    ],
     "15.20.3": [
       "A mod's new mob is drawn in its own skin and shape every time; joining sometimes lost them and drew the plain vanilla mob.",
       "Its young are drawn small, not their parents' size.",

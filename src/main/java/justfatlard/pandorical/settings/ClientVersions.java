@@ -46,7 +46,9 @@ public final class ClientVersions {
     /** At the handshake: every Pandorical client sends one, however old. */
     public static void hello(ServerPlayer player, int protocol) {
         Pandorical.LOGGER.info("[pandorical] {}: Pandorical protocol v{}, {}", player.getName().getString(),
-            protocol, EntityKinds.understands(player) ? "draws mod entities" : "shown mod entities as their vanilla base");
+            protocol, EntityKinds.understandsBodies(player) ? "draws mod entities"
+            : EntityKinds.understands(player) ? "draws mod entities on a vanilla base only"
+            : "shown mod entities as their vanilla fallback");
     }
 
     /** At joining, for a game that never registered Pandorical's channels at all. */

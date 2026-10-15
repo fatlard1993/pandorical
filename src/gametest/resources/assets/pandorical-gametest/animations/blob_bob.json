@@ -1,0 +1,12 @@
+{
+  "length": 2.0,
+  "looping": true,
+  "bones": {
+    "body": [
+      { "target": "position",
+        "keyframes": [ { "time": 0.0, "value": [0, 0, 0] },
+                       { "time": 1.0, "value": [0, 1, 0] },
+                       { "time": 2.0, "value": [0, 0, 0] } ] }
+    ]
+  }
+}

@@ -29,7 +29,8 @@
 			"justfatlard.pandorical.gametest.HeldAtTheGate",
 			"justfatlard.pandorical.gametest.EveryModListed",
 			"justfatlard.pandorical.gametest.TrustHolds",
-			"justfatlard.pandorical.gametest.EntityModels"
+			"justfatlard.pandorical.gametest.EntityModels",
+			"justfatlard.pandorical.gametest.EntityBodies"
 		]
 	},
 	"depends": {
