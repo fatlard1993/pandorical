@@ -53,9 +53,10 @@ import java.util.zip.ZipInputStream;
  * mods, installed and kept current unless the player switches one off.
  *
  * <p>Jars are downloaded during the login and checked, then left in a folder of their own where
- * the loader never looks. They go into the mods folder only when the player, back at the title
- * screen or the server list, says yes, and only run once they restart the game. A server can
- * therefore hand over bytes, but never code the player did not agree to.
+ * the loader never looks. They go into the mods folder only when the player, at a menu, says yes,
+ * and only run once the game restarts, so saying yes closes the game: playing on after an install
+ * is playing on the old version against a server that sent the new one. A server can therefore
+ * hand over bytes, but never code the player did not agree to.
  *
  * <p>Opting out of one mod is switching it off from the Mods screen, which leaves its jar in the
  * folder as {@code .disabled}: a mod switched off is never installed or updated again. Saying no
@@ -279,8 +280,11 @@ public final class KeptClientMods {
 		}
 		ConfirmScreen confirm = new ConfirmScreen(
 			yes -> {
-				if (yes) install(staged);
-				else decline(staged);
+				if (yes && install(staged)) {
+					client.exitWorldAndClose();
+					return;
+				}
+				if (!yes) decline(staged);
 				client.gui.setScreen(previous);
 			},
 			Component.translatable("pandorical.update.title"),
@@ -294,8 +298,10 @@ public final class KeptClientMods {
 		confirm.setDelay(ARM_TICKS);
 	}
 
-	private static void install(List<Staged> staged) {
+	/** Whether every one is in, or will be when the game quits: only then is quitting worth it. */
+	private static boolean install(List<Staged> staged) {
 		Path mods = modsDir();
+		boolean all = true;
 		boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
 		Map<Path, Path[]> onQuit = new LinkedHashMap<>();
 		for (Staged one : staged) {
@@ -324,8 +330,9 @@ public final class KeptClientMods {
 					}
 				}
 				Files.deleteIfExists(one.file());
-				Pandorical.LOGGER.info("[pandorical] installed {} {}; it takes effect when the game restarts", one.id(), one.version());
+				Pandorical.LOGGER.info("[pandorical] installed {} {}", one.id(), one.version());
 			} catch (Exception e) {
+				all = false;
 				Pandorical.LOGGER.warn("[pandorical] could not install {} {}: put {} in {} by hand",
 					one.id(), one.version(), one.file(), mods, e);
 			}
@@ -334,9 +341,11 @@ public final class KeptClientMods {
 			try {
 				installOnQuit(onQuit);
 			} catch (IOException e) {
+				all = false;
 				Pandorical.LOGGER.warn("[pandorical] could not arrange the update for when the game quits: {}", e.getMessage());
 			}
 		}
+		return all;
 	}
 
 	/**

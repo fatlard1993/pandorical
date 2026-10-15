@@ -4,8 +4,12 @@ import com.mojang.brigadier.CommandDispatcher;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.entitykind.EntityKinds;
+import justfatlard.pandorical.login.ServedClientMods;
 import justfatlard.pandorical.protocol.ClientModFilesC2S;
 import net.minecraft.commands.CommandSourceStack;
+import net.fabricmc.loader.api.Version;
+import net.fabricmc.loader.api.VersionParsingException;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -14,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -30,6 +35,9 @@ public final class ClientVersions {
 
     /** The last line logged for each player, so a report that changed nothing is not logged twice. */
     private static final Map<UUID, String> LOGGED = new ConcurrentHashMap<>();
+
+    /** Players already told this session that their game is behind. */
+    private static final Set<UUID> TOLD = ConcurrentHashMap.newKeySet();
 
     /** Named first, in this order; everything else after them by id. */
     private static final List<String> FIRST = List.of("pandorical", "fabric-api", "minecraft", "fabricloader");
@@ -58,6 +66,7 @@ public final class ClientVersions {
 
     /** When the client reports its mods, on joining and after every change it makes to them. */
     public static void reported(ServerPlayer player, List<ClientModFilesC2S.Entry> entries) {
+        tellIfBehind(player, entries);
         String line = summary(entries);
         if (line.equals(LOGGED.put(player.getUUID(), line))) return;
         Pandorical.LOGGER.info("[pandorical] {} runs {}", player.getName().getString(), line);
@@ -65,6 +74,36 @@ public final class ClientVersions {
 
     public static void forget(UUID player) {
         LOGGED.remove(player);
+        TOLD.remove(player);
+    }
+
+    /**
+     * A game running an older mod than this server keeps for it has been sent the new one, and
+     * plays on the old one until it installs it and restarts. Clients before 15.21 installed it and
+     * played on without a word about restarting, and a client cannot be taught that after the
+     * fact, so the server says it: once a join, to the player whose game it is.
+     */
+    private static void tellIfBehind(ServerPlayer player, List<ClientModFilesC2S.Entry> entries) {
+        Map<String, String> kept = ServedClientMods.versions();
+        List<String> behind = new ArrayList<>();
+        for (ClientModFilesC2S.Entry entry : entries) {
+            String offered = kept.get(entry.id());
+            if (entry.enabled() && offered != null && newer(offered, entry.version())) {
+                behind.add(entry.name() + " " + offered + " (you are running " + entry.version() + ")");
+            }
+        }
+        if (behind.isEmpty() || !TOLD.add(player.getUUID())) return;
+        player.sendSystemMessage(Component.literal("This server has newer mods for your game: "
+            + String.join(", ", behind) + ". Open the pause menu to install, then restart the game.")
+            .withStyle(ChatFormatting.YELLOW));
+    }
+
+    private static boolean newer(String offered, String running) {
+        try {
+            return Version.parse(offered).compareTo(Version.parse(running)) > 0;
+        } catch (VersionParsingException e) {
+            return false;
+        }
     }
 
     /**

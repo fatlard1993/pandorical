@@ -129,6 +129,13 @@ public final class ServedClientMods {
 		}
 	}
 
+	/** The version kept of each client mod, by id. */
+	public static Map<String, String> versions() {
+		Map<String, String> out = new LinkedHashMap<>();
+		jars.forEach((id, jar) -> out.put(id, jar.entry().version()));
+		return out;
+	}
+
 	private static Map<String, Jar> readJars() {
 		Map<String, Jar> out = new LinkedHashMap<>();
 		for (String id : SERVERS_OWN) {
