@@ -4,6 +4,24 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.20.3": [
+      "A mod's new mob is drawn in its own skin and shape every time; joining sometimes lost them and drew the plain vanilla mob.",
+      "Its young are drawn small, not their parents' size.",
+      "In singleplayer, a mod's new mob keeps its own size and strength rather than the vanilla mob's it is built on."
+    ],
+    "15.20.2": [
+      "The question to install the client mods a server keeps for you appears again; on 26.3 it failed every time, so nothing was ever installed.",
+      "It also appears in the pause menu and on the screen you are sent back to, for a game that joins a server as it starts and never shows the title screen.",
+      "Switching one of your mods on or off from the Mods screen works again too."
+    ],
+    "15.20.1": [
+      "The server log says which Pandorical, Fabric API and mods each player's game is running when they join.",
+      "Ops can ask the same in game with /pandorical clients."
+    ],
+    "15.20.0": [
+      "Server mods can add new mobs, and you see them in their own skins with nothing else to install.",
+      "Players without Pandorical are shown a vanilla mob in their place, or nothing, as the mod chooses."
+    ],
     "15.19.1": [
       "The server keeps your Fabric API at its own version too, the same way it keeps Pandorical."
     ],

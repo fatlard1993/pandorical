@@ -526,6 +526,9 @@ public class PandoricalClient implements ClientModInitializer {
         // Filled on the network thread during configuration, so cleared here, before the next
         // server's packets can arrive. Everything else is render-thread state.
         ContentManager.reset();
+        // The kinds arrive on the network thread too, right behind this: cleared any later, on
+        // the render thread, it wiped the ones a fast connection had already delivered.
+        justfatlard.pandorical.client.entitykind.ClientEntityKinds.clear();
         ClientNotices.forgetConnection();
         justfatlard.pandorical.client.settings.ClientModFiles.forget();
         ClientInventorySlotRegistry.reset();
@@ -539,7 +542,6 @@ public class PandoricalClient implements ClientModInitializer {
         CameraManager.onDisconnect();
         HudManager.clear();
         ClientEntityRendererRegistry.reset();
-        justfatlard.pandorical.client.entitykind.ClientEntityKinds.clear();
         StructureManager.clear();
         EntityOverlayStore.clear();
         justfatlard.pandorical.client.entitymodel.ClientEntityModels.clear();

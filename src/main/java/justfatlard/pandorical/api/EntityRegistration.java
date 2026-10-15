@@ -40,6 +40,9 @@ public final class EntityRegistration {
      * Geometry for the whole type, as {@link EntityModelApi} reads it:
      * {@code assets/<namespace>/pandorical/entity_models/<path>.json}. Living entities only. One set
      * on a single entity through {@link EntityModelApi} wins over this.
+     *
+     * <p>It stands in for the baby's model too, so a baby wears {@link #texture} rather than
+     * {@link #babyTexture}, and is drawn at its age scale.
      */
     public EntityRegistration model(Identifier model) {
         this.model = model;

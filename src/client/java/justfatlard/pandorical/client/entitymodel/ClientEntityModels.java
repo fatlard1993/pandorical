@@ -156,6 +156,10 @@ public final class ClientEntityModels {
         if (model == null && transforms.isEmpty() && texture == null) return;
         holder.pandorical$setEntityModel(new Drawn(kind.model(), transforms, model, texture));
         state.scale *= kind.drawScale();
+        // The game draws most babies small through a baby model's own geometry, which a type's
+        // geometry replaces: without this a pup is drawn its parent's size. Its age scale is the
+        // share the game itself gives the baby's hitbox.
+        if (model != null && entity.isBaby()) state.scale *= entity.getAgeScale();
     }
 
     /**
