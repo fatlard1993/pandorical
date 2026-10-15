@@ -43,6 +43,7 @@ public final class ClientMods {
     public static void declareFiles(ServerPlayer player,
             justfatlard.pandorical.protocol.ClientModFilesC2S payload) {
         filesByPlayer.put(player.getUUID(), List.copyOf(payload.entries()));
+        ClientVersions.reported(player, payload.entries());
     }
 
     public static void declare(ServerPlayer player, ClientSettingsC2S payload) {

@@ -492,10 +492,8 @@ public class Pandorical implements ModInitializer {
                     player.getUUID(),
                     new HashSet<>(payload.capabilities())
                 );
-                LOGGER.debug("Player {} connected with Pandorical v{}, capabilities: {}",
-                    player.getName().getString(),
-                    payload.protocolVersion(),
-                    payload.capabilities());
+                justfatlard.pandorical.settings.ClientVersions.hello(player, payload.protocolVersion());
+                LOGGER.debug("Player {} capabilities: {}", player.getName().getString(), payload.capabilities());
 
                 var contentRegistry = PandoricalApi.contentRegistry();
                 if (contentRegistry.hasContent()
@@ -609,6 +607,8 @@ public class Pandorical implements ModInitializer {
                 SettingsCommand.register(dispatcher, PandoricalApi.settingsImpl()));
         CommandRegistrationCallback.EVENT.register(
             (dispatcher, registry, environment) -> TrustCommand.register(dispatcher));
+        CommandRegistrationCallback.EVENT.register((dispatcher, registry, environment) ->
+            justfatlard.pandorical.settings.ClientVersions.register(dispatcher));
         TrustRules.register();
         TrustScreen.register();
 
@@ -637,6 +637,10 @@ public class Pandorical implements ModInitializer {
 
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             sender.sendPacket(new HelloS2C(PROTOCOL_VERSION, SERVER_CAPABILITIES));
+            // Channels are agreed in the configuration phase, so this is already true or false.
+            if (!ServerPlayNetworking.canSend(handler.getPlayer(), HelloS2C.TYPE)) {
+                justfatlard.pandorical.settings.ClientVersions.vanilla(handler.getPlayer());
+            }
 
             // Capabilities wait for HelloC2S: until the handshake the client cannot decode full
             // component data.
@@ -661,6 +665,7 @@ public class Pandorical implements ModInitializer {
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             PandoricalApi.removePlayer(handler.getPlayer().getUUID());
             justfatlard.pandorical.entitykind.EntityKinds.forget(handler.getPlayer().getUUID());
+            justfatlard.pandorical.settings.ClientVersions.forget(handler.getPlayer().getUUID());
             SkinOverrides.forget(handler.getPlayer().getUUID());
             Keepsakes.INSTANCE.forget(handler.getPlayer().getUUID());
             PandoricalApi.settingsImpl().forget(handler.getPlayer().getUUID());
