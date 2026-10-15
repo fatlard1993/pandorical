@@ -16,6 +16,8 @@ import net.fabricmc.loader.api.VersionParsingException;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.DisconnectedScreen;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.network.Connection;
@@ -137,13 +139,28 @@ public final class KeptClientMods {
 		});
 
 		ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
-			if (askedThisRun || client.level != null) return;
-			if (!(screen instanceof TitleScreen || screen instanceof JoinMultiplayerScreen)) return;
+			if (askedThisRun || !askingPlace(client, screen)) return;
 			List<Staged> staged = staged();
 			if (staged.isEmpty()) return;
 			askedThisRun = true;
 			client.execute(() -> ask(client, screen, staged));
 		});
+	}
+
+	/**
+	 * Where the question can be put: anywhere the player has stopped to look at a menu.
+	 *
+	 * <p>Not only the title screen and the server list. A launcher that joins a server on start
+	 * (quick play, the way the house launches) never shows either: the game goes straight from
+	 * loading into the world, and an update that waited for the title screen waited forever while
+	 * the server sent it again on every join. So the pause menu asks too, in game, and so does the
+	 * screen a too-old client is sent home to.
+	 */
+	private static boolean askingPlace(Minecraft client, Screen screen) {
+		if (screen instanceof PauseScreen) return client.level != null;
+		if (client.level != null) return false;
+		return screen instanceof TitleScreen || screen instanceof JoinMultiplayerScreen
+			|| screen instanceof DisconnectedScreen;
 	}
 
 	/**
@@ -270,8 +287,11 @@ public final class KeptClientMods {
 			Component.translatable("pandorical.update.message", String.join(", ", lines)),
 			Component.translatable("pandorical.update.yes"),
 			Component.translatable("pandorical.update.no"));
-		confirm.setDelay(ARM_TICKS);
+		// Shown before it is armed: the delay switches the buttons off, and the buttons only exist
+		// once the screen has been laid out. Armed first, it threw on every ask since 26.3, and the
+		// question never once reached a player.
 		client.gui.setScreen(confirm);
+		confirm.setDelay(ARM_TICKS);
 	}
 
 	private static void install(List<Staged> staged) {

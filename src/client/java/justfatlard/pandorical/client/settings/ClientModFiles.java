@@ -193,9 +193,10 @@ public final class ClientModFiles {
 			CommonComponents.GUI_CANCEL);
 		// The server chooses the moment this appears, and it can appear under a click already on
 		// its way down. Vanilla arms its own confirm screens on a clock for the same reason.
-		confirm.setDelay(ARM_TICKS);
+		// Armed after it is shown: the delay reaches for buttons that only exist once laid out.
 		asking = confirm;
 		client.gui.setScreen(confirm);
+		confirm.setDelay(ARM_TICKS);
 	}
 
 	/** Do what the player agreed to, to a file this client has already named. */
