@@ -42,7 +42,7 @@ public final class ClientEntityModels {
     private ClientEntityModels() {}
 
     /** What one entity is drawn with, carried on its render state. */
-    public record Drawn(Identifier id, Map<String, EntityModelDefinition.PartTransform> transforms,
+    public record Drawn(@Nullable Identifier id, Map<String, EntityModelDefinition.PartTransform> transforms,
             @Nullable EntityModel<?> model, @Nullable Identifier texture) {}
 
     private record Assignment(Identifier model, @Nullable Identifier texture, float drawScale) {}
@@ -116,9 +116,11 @@ public final class ClientEntityModels {
     public static void extract(LivingEntityRenderer<?, ?, ?> renderer, LivingEntity entity, LivingEntityRenderState state) {
         EntityModelHolder holder = (EntityModelHolder) state;
         holder.pandorical$setEntityModel(null);
-        if (ASSIGNED.isEmpty()) return;
-        Assignment a = ASSIGNED.get(entity.getId());
-        if (a == null) return;
+        Assignment a = ASSIGNED.isEmpty() ? null : ASSIGNED.get(entity.getId());
+        if (a == null) {
+            extractKind(renderer, entity, state, holder);
+            return;
+        }
         EntityModelDefinition definition = definition(a.model());
         if (definition == null) return;
         EntityModel<?> model = null;
@@ -130,6 +132,30 @@ public final class ClientEntityModels {
         Identifier texture = a.texture() != null ? a.texture() : definition.texture();
         holder.pandorical$setEntityModel(new Drawn(a.model(), definition.transforms(), model, texture));
         state.scale *= a.drawScale();
+    }
+
+    /**
+     * A registered entity with nothing assigned to it alone: dressed as its type says. A skin with
+     * no model draws the base's own geometry in it.
+     */
+    private static void extractKind(LivingEntityRenderer<?, ?, ?> renderer, LivingEntity entity,
+            LivingEntityRenderState state, EntityModelHolder holder) {
+        var kind = justfatlard.pandorical.client.entitykind.ClientEntityKinds.of(entity.getType());
+        if (kind == null) return;
+        Identifier texture = kind.textureFor(entity);
+        EntityModel<?> model = null;
+        Map<String, EntityModelDefinition.PartTransform> transforms = Map.of();
+        if (kind.model() != null) {
+            EntityModelDefinition definition = definition(kind.model());
+            if (definition != null) {
+                if (definition.geometry() != null) model = built(renderer, kind.model(), definition);
+                transforms = definition.transforms();
+                if (texture == null) texture = definition.texture();
+            }
+        }
+        if (model == null && transforms.isEmpty() && texture == null) return;
+        holder.pandorical$setEntityModel(new Drawn(kind.model(), transforms, model, texture));
+        state.scale *= kind.drawScale();
     }
 
     /**

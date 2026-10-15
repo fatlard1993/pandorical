@@ -94,6 +94,26 @@ public final class ClientEntityRendererRegistry {
         }
     }
 
+    /**
+     * Draw a registered entity's stand-in with its base's renderer. Rebuilt on the render thread,
+     * because the dispatcher copied the providers when resources last loaded.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static void mirror(EntityType<?> stub, EntityType<?> base) {
+        Map providersMap = getProvidersMap();
+        if (providersMap == null) return;
+        Object provider = providersMap.get(base);
+        if (provider == null) {
+            Pandorical.LOGGER.warn("[pandorical] {} has no renderer to stand {} in with",
+                BuiltInRegistries.ENTITY_TYPE.getKey(base), BuiltInRegistries.ENTITY_TYPE.getKey(stub));
+            return;
+        }
+        if (providersMap.get(stub) == provider) return;
+        providersMap.put(stub, provider);
+        Minecraft mc = Minecraft.getInstance();
+        mc.execute(() -> mc.getEntityRenderDispatcher().onResourceManagerReload(mc.getResourceManager()));
+    }
+
     public static void reset() {
         registeredTypes.clear();
         rendererKeys.clear();

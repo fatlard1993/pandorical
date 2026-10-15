@@ -14,6 +14,7 @@ Normally a modded server means every player installs every mod, matched version 
 - **Camera control**, when a server wants to pull the view back.
 - **Cosmetic overlays** on particular mobs or chests, so you can tell one from another.
 - **Mobs in a different shape**: a server's mod can redraw a mob with its own model, or with its own parts resized and moved, and it still walks and fights as before.
+- **New mobs**, with nothing to install but Pandorical: a server's mod can add an animal of its own, and you meet it in its own skin, built on a vanilla mob the game already knows how to move.
 - **One block at one place a different colour**, so two of the same block in two places can be told apart on sight.
 - **Extra squares and buttons on your own inventory screen**: a slot that only takes a map, a compass slot beside it, a button that tidies your pack. They sit in the vanilla panel and behave like the rest of it.
 

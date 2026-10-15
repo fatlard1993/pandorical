@@ -467,6 +467,43 @@ content.overrideVanillaItem("minecraft:rabbit_hide", new VanillaItemOverride(...
 overlays, chest overlays, custom blocks) must be registered here or the client has
 nothing to load.
 
+### Entities
+
+A new mob is a real entity type with its own class, goals, attributes, spawns and loot, which
+Pandorical clients draw as a vanilla mob it is built on: the **base**. The client runs the base's
+class under your type's id, at the base's size, with the base's renderer, dressed in your skin
+or model. New in 15.20.
+
+```java
+public static final EntityType<Shark> SHARK = FabricEntityType.Builder.createMob(Shark::new,
+        MobCategory.WATER_CREATURE, mob -> mob.defaultAttributes(Shark::createAttributes))
+    .sized(EntityTypes.DOLPHIN.getWidth(), EntityTypes.DOLPHIN.getHeight())
+    .build(ResourceKey.create(Registries.ENTITY_TYPE, id));
+
+Registry.register(BuiltInRegistries.ENTITY_TYPE, id, SHARK);
+PandoricalApi.content().registerEntity(SHARK, new EntityRegistration()
+    .base(EntityTypes.DOLPHIN)
+    .texture(Identifier.fromNamespaceAndPath("mymod", "textures/entity/shark.png"))
+    .babyTexture(Identifier.fromNamespaceAndPath("mymod", "textures/entity/shark_baby.png"))
+    .vanillaFallback());
+```
+
+- **The class extends the base's and adds no synced data.** The client decodes your entity's
+  data by the base's layout, so a new `EntityDataAccessor` garbles it. Fields, attributes, goals
+  and save data are all free. The first one of each type to load is checked, and a break is
+  logged at error level.
+- **Size is the base's.** The client sizes the stand-in from the base's dimensions, so register
+  yours at the base's and put any extra bulk on the `SCALE` attribute, which every client reads.
+- **Skins follow the base's model layout**, and most babies are drawn with a model of their own
+  that lays its texture out differently: give `babyTexture` one laid out for that. `model` takes
+  an entity model as `EntityModelApi` reads it, for the whole type; one set on a single entity
+  through `EntityModelApi` wins.
+- **Vanilla clients** are never paired with the entity unless `vanillaFallback()` is set, in which
+  case they are sent the base. They read its name from your translation key; override
+  `getTypeName` with `Component.translatableWithFallback` if they should read a word instead.
+- **A client that has your mod installed too** (singleplayer, or a player who installed it) runs
+  your real class; Pandorical still gives the type the base's renderer and dresses it.
+
 ## Camera
 
 ```java

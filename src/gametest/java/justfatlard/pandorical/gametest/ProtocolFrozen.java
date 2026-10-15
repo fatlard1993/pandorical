@@ -126,6 +126,10 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 			new KeybindDeclarationsS2C(List.of(0, 1, 2))));
 		out.put("chest_overlay", encode(ChestOverlayS2C.STREAM_CODEC, new ChestOverlayS2C(
 			ChestOverlayS2C.OP_ADD, "minecraft:entity/chest/christmas", new long[] {1L, 2L})));
+		out.put("entity_kinds", encode(justfatlard.pandorical.protocol.EntityKindsConfigS2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.EntityKindsConfigS2C(List.of(
+				new justfatlard.pandorical.protocol.EntityKindsConfigS2C.Entry("mymod:shark", "minecraft:dolphin",
+					"", "mymod:textures/entity/shark.png", "mymod:textures/entity/shark_pup.png", 1.15F)))));
 		out.put("entity_overlay", encode(EntityOverlayS2C.STREAM_CODEC, new EntityOverlayS2C(
 			7, "mymod:textures/entity/glow.png")));
 		out.put("entity_model", encode(EntityModelS2C.STREAM_CODEC, new EntityModelS2C(7, "mymod:robot", "", 2F)));

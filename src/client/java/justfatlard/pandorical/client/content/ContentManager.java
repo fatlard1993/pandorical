@@ -1087,11 +1087,22 @@ public class ContentManager {
                     Pandorical.LOGGER.warn("Config phase: invalid entity type ID: '{}'", idStr);
                     continue;
                 }
+                var kind = justfatlard.pandorical.client.entitykind.ClientEntityKinds.get(idStr);
                 if (BuiltInRegistries.ENTITY_TYPE.containsKey(id)) {
+                    // The mod is on this client too (singleplayer, or installed by hand): the real
+                    // type and class are here, but nothing gave the type a renderer. Its base's.
+                    if (kind != null) ClientEntityRendererRegistry.mirror(BuiltInRegistries.ENTITY_TYPE.getValue(id), kind.base());
                     Pandorical.LOGGER.debug("Config phase: entity type '{}' already registered — skipping", idStr);
                     continue;
                 }
                 ResourceKey<EntityType<?>> key = ResourceKey.create(Registries.ENTITY_TYPE, id);
+                if (kind != null) {
+                    registerWithHolder(BuiltInRegistries.ENTITY_TYPE, id, kindStub(key, idStr, kind));
+                    count++;
+                    Pandorical.LOGGER.debug("Config phase: registered {} standing on {}", idStr,
+                        BuiltInRegistries.ENTITY_TYPE.getKey(kind.base()));
+                    continue;
+                }
                 // Runs at spawn, after EntityRenderersS2C delivered the keys. With no key it
                 // returns null and vanilla skips the spawn: a type without a renderer must not
                 // reach the render dispatcher.
@@ -1120,6 +1131,30 @@ public class ContentManager {
             }
         }
         return count;
+    }
+
+    /**
+     * A registered entity's stand-in: its base's size, range and class, and its base's renderer.
+     * The factory asks for the kind at spawn rather than holding the one it was built with, so a
+     * stand-in left registered from another server is built as this server says.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static EntityType<?> kindStub(ResourceKey<EntityType<?>> key, String idStr,
+            justfatlard.pandorical.client.entitykind.ClientEntityKinds.Kind kind) {
+        EntityType<?> base = kind.base();
+        var dimensions = base.getDimensions();
+        EntityType.Builder builder = EntityType.Builder.of((type, level) -> {
+                var now = justfatlard.pandorical.client.entitykind.ClientEntityKinds.get(idStr);
+                return now == null ? null : justfatlard.pandorical.client.entitykind.ClientEntityKinds.create(now, type, level);
+            }, base.getCategory())
+            .sized(dimensions.width(), dimensions.height())
+            .eyeHeight(dimensions.eyeHeight())
+            .clientTrackingRange(base.clientTrackingRange())
+            .updateInterval(base.updateInterval());
+        if (base.fireImmune()) builder = builder.fireImmune();
+        EntityType<?> stub = builder.build(key);
+        ClientEntityRendererRegistry.mirror(stub, base);
+        return stub;
     }
 
     private static int registerBlockEntityTypeStubs(List<String> ids) {

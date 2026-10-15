@@ -24,7 +24,10 @@
 		"PlayerTrustPvpMixin",
 		"TntProjectileTrustMixin",
 		"StructureClimbMixin",
-		"StructureDryMixin"
+		"StructureDryMixin",
+		"SynchedEntityDataAccessor",
+		"EntityKindTrackingMixin",
+		"EntityKindPairingMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

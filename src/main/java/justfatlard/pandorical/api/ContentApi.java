@@ -13,6 +13,13 @@ public interface ContentApi {
     /** Same contract as {@link #registerBlock}, for items. */
     void registerItem(String id, ItemRegistration registration);
 
+    /**
+     * Declare an entity for client sync, during onInitialize, after registering its type with
+     * vanilla's {@code Registry.register()}. Pandorical clients draw it as its base, dressed as the
+     * registration says; see {@link EntityRegistration} for the one rule its class must keep.
+     */
+    void registerEntity(net.minecraft.world.entity.EntityType<?> type, EntityRegistration registration);
+
     /** @param path relative to {@code assets/}, e.g. {@code "big-boats/models/block/helm.json"} */
     void registerAsset(String path, byte[] data);
 

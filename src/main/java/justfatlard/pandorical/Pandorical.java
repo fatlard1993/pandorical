@@ -163,6 +163,7 @@ public class Pandorical implements ModInitializer {
         registerConfigPhase();
         registerServerHandlers();
         registerStructureTracking();
+        justfatlard.pandorical.entitykind.EntityKinds.registerCheck();
 
         LOGGER.info("Pandorical initialized — protocol v{}, server-only namespaces: {}",
             PROTOCOL_VERSION,
@@ -208,6 +209,9 @@ public class Pandorical implements ModInitializer {
 
     private void registerPayloads() {
         PayloadTypeRegistry.clientboundConfiguration().register(SyncContentConfigS2C.TYPE, SyncContentConfigS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundConfiguration().register(
+            justfatlard.pandorical.protocol.EntityKindsConfigS2C.TYPE,
+            justfatlard.pandorical.protocol.EntityKindsConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(SyncAssetsConfigS2C.TYPE, SyncAssetsConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(PlayerInventoryRegistrationsS2C.TYPE, PlayerInventoryRegistrationsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(
@@ -428,9 +432,18 @@ public class Pandorical implements ModInitializer {
                         // Content must reach the client before the registry sync that assigns
                         // its ids. The queue is still empty at BEFORE_CONFIGURE; inserting at
                         // the front keeps the order if vanilla ever fills it earlier.
+                        // Recorded now, by profile: entities are paired with the player before the
+                        // play handshake, and must already know whether this client can read them.
+                        boolean tellsKinds = ServerConfigurationNetworking.canSend(handler,
+                            justfatlard.pandorical.protocol.EntityKindsConfigS2C.TYPE);
+                        if (handler.getOwner() != null) {
+                            justfatlard.pandorical.entitykind.EntityKinds.understood(handler.getOwner().id(), tellsKinds);
+                        }
                         var task = new PandoricalSyncTask(blocks, items, assetChunks,
                             entityTypes, blockEntityTypes, villagerProfessions,
-                            poiTypes, menuTypes, recipeBookCategories, contentRegistry.railsSolid());
+                            poiTypes, menuTypes, recipeBookCategories, contentRegistry.railsSolid(),
+                            tellsKinds && justfatlard.pandorical.entitykind.EntityKinds.any()
+                                ? justfatlard.pandorical.entitykind.EntityKinds.payload() : null);
                         try {
                             var field = ServerConfigurationPacketListenerImpl.class
                                 .getDeclaredField("configurationTasks");
@@ -647,6 +660,7 @@ public class Pandorical implements ModInitializer {
 
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             PandoricalApi.removePlayer(handler.getPlayer().getUUID());
+            justfatlard.pandorical.entitykind.EntityKinds.forget(handler.getPlayer().getUUID());
             SkinOverrides.forget(handler.getPlayer().getUUID());
             Keepsakes.INSTANCE.forget(handler.getPlayer().getUUID());
             PandoricalApi.settingsImpl().forget(handler.getPlayer().getUUID());

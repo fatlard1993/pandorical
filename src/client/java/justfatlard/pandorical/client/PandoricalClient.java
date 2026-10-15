@@ -211,6 +211,11 @@ public class PandoricalClient implements ClientModInitializer {
      * registered here are ones it sees.
      */
     private void registerConfigPhaseReceivers() {
+        // Ahead of the content sync, which builds each kind's stand-in as it registers the type.
+        ClientConfigurationNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.EntityKindsConfigS2C.TYPE,
+            (payload, context) -> justfatlard.pandorical.client.entitykind.ClientEntityKinds.receive(payload));
+
         ClientConfigurationNetworking.registerGlobalReceiver(SyncContentConfigS2C.TYPE, (payload, context) -> {
             Pandorical.LOGGER.info("Config phase: received content sync — {} blocks, {} items, {} expected asset chunks",
                 payload.blocks().size(), payload.items().size(), payload.expectedAssetChunks());
@@ -534,6 +539,7 @@ public class PandoricalClient implements ClientModInitializer {
         CameraManager.onDisconnect();
         HudManager.clear();
         ClientEntityRendererRegistry.reset();
+        justfatlard.pandorical.client.entitykind.ClientEntityKinds.clear();
         StructureManager.clear();
         EntityOverlayStore.clear();
         justfatlard.pandorical.client.entitymodel.ClientEntityModels.clear();

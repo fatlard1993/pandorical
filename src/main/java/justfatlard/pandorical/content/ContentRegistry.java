@@ -3,6 +3,7 @@ package justfatlard.pandorical.content;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.BlockRegistration;
 import justfatlard.pandorical.api.ContentApi;
+import justfatlard.pandorical.api.EntityRegistration;
 import justfatlard.pandorical.api.ItemRegistration;
 import justfatlard.pandorical.api.VanillaItemOverride;
 import justfatlard.pandorical.protocol.StatePropertySpec;
@@ -61,6 +62,12 @@ public class ContentRegistry implements ContentApi {
         items.put(id, new RegisteredItem(id, registration));
         trackNamespace(id);
         Pandorical.LOGGER.info("Registered custom item: {}", id);
+    }
+
+    @Override
+    public void registerEntity(net.minecraft.world.entity.EntityType<?> type, EntityRegistration registration) {
+        justfatlard.pandorical.entitykind.EntityKinds.register(type, registration);
+        trackNamespace(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(type).toString());
     }
 
     private void trackNamespace(String id) {

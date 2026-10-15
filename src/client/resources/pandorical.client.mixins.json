@@ -5,6 +5,8 @@
   "compatibilityLevel": "JAVA_25",
   "mixins": [],
   "client": [
+    "EntityKindAttributesMixin",
+    "EntityTypeAccessor",
     "AbstractMinecartRendererMixin",
     "ActionMenuKeyMixin",
     "BannerRendererInvoker",
