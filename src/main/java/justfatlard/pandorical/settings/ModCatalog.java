@@ -57,7 +57,8 @@ public final class ModCatalog {
         List<ModInfo> mods = new ArrayList<>();
         for (ModContainer container : FabricLoader.getInstance().getAllMods()) {
             ModMetadata meta = container.getMetadata();
-            if (plumbing(meta.getId())) continue;
+            // A jar nested in another mod is that mod's library, not something anyone installed.
+            if (plumbing(meta.getId()) || container.getContainingMod().isPresent()) continue;
             List<String> names = new ArrayList<>();
             for (Person person : meta.getAuthors()) names.add(person.getName());
             mods.add(new ModInfo(meta.getId(), meta.getName(), meta.getVersion().getFriendlyString(),

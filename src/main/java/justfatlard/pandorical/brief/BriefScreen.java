@@ -5,8 +5,10 @@ import justfatlard.pandorical.api.ComponentType;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.ScreenApi;
 import justfatlard.pandorical.api.ScreenBuilder;
+import justfatlard.pandorical.form.SimpleForm;
 import justfatlard.pandorical.protocol.ComponentDef;
 import justfatlard.pandorical.settings.Glyphs;
+import justfatlard.pandorical.settings.SettingsCommand;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.ArrayList;
@@ -54,6 +56,15 @@ public final class BriefScreen {
 				PandoricalApi.settings().open(player);
 			}
 		});
+	}
+
+	/** The same, as a form, for a client that can't draw Pandorical's screens. */
+	public static void openForm(ServerPlayer player) {
+		var form = SimpleForm.titled("What is running here");
+		for (Brief.Entry entry : Brief.INSTANCE.entries()) {
+			form.text(entry.name() + "\n" + String.join("\n", entry.lines()));
+		}
+		form.button("mods", "Every mod, in full").onAnswer(answer -> SettingsCommand.openMods(player)).open(player);
 	}
 
 	public static void open(ServerPlayer player) {

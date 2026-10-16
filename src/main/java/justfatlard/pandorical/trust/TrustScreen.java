@@ -6,14 +6,17 @@ import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.ScreenApi;
 import justfatlard.pandorical.api.ScreenBuilder;
 import justfatlard.pandorical.api.Trust;
+import justfatlard.pandorical.form.SimpleForm;
 import justfatlard.pandorical.protocol.ComponentDef;
 import justfatlard.pandorical.settings.SettingsRegistry;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.gamerules.GameRules;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -70,6 +73,90 @@ public final class TrustScreen {
 		});
 	}
 
+	/** The same, as forms, for an op whose client can't draw Pandorical's screens. */
+	public static void openForm(ServerPlayer op) {
+		if (!SettingsRegistry.isOp(op)) return;
+		MinecraftServer server = op.level().getServer();
+		TrustBook book = TrustBook.get(server);
+		List<UUID> players = sortedPlayers(server, book);
+		SimpleForm form = SimpleForm.titled("Who may do what").button("everyone", "Everyone, by default");
+		for (UUID who : players) {
+			boolean online = server.getPlayerList().getPlayer(who) != null;
+			form.button(who.toString(), book.known().get(who) + (online ? "" : " (away)"));
+		}
+		form.onAnswer(answer -> {
+			if (!SettingsRegistry.isOp(op)) return;
+			if (answer.button().equals("everyone")) {
+				everyoneForm(op);
+			} else {
+				UUID who = UUID.fromString(answer.button());
+				if (book.known().containsKey(who)) playerForm(op, who);
+			}
+		}).open(op);
+	}
+
+	private static void everyoneForm(ServerPlayer op) {
+		MinecraftServer server = op.level().getServer();
+		SimpleForm form = SimpleForm.titled("Everyone, by default")
+			.text("For anyone not set by name. PvP is the game's pvp gamerule.");
+		for (Trust what : Trust.values()) form.toggle(what.id(), what.label, TrustRules.byDefault(server.overworld(), what));
+		form.button("back", "Back").onAnswer(answer -> {
+			if (!SettingsRegistry.isOp(op)) return;
+			if (answer.button().equals("back")) {
+				openForm(op);
+				return;
+			}
+			TrustBook book = TrustBook.get(server);
+			for (Trust what : Trust.values()) {
+				boolean on = Boolean.parseBoolean(answer.values().get(what.id()));
+				if (on == TrustRules.byDefault(server.overworld(), what)) continue;
+				if (what == Trust.PVP) server.overworld().getGameRules().set(GameRules.PVP, on, server);
+				else book.chooseDefault(what, on);
+			}
+			op.sendSystemMessage(Component.literal("Saved the defaults."));
+		}).open(op);
+	}
+
+	private static void playerForm(ServerPlayer op, UUID who) {
+		MinecraftServer server = op.level().getServer();
+		TrustBook book = TrustBook.get(server);
+		String name = book.known().get(who);
+		SimpleForm form = SimpleForm.titled(name);
+		for (Trust what : Trust.values()) {
+			Map<String, String> options = new LinkedHashMap<>();
+			options.put("default", "Default (" + (TrustRules.byDefault(server.overworld(), what) ? "on" : "off") + ")");
+			options.put("on", "On");
+			options.put("off", "Off");
+			Boolean own = book.choice(who, what);
+			form.choice(what.id(), what.label, options, own == null ? "default" : own ? "on" : "off");
+		}
+		form.button("back", "Back").onAnswer(answer -> {
+			if (!SettingsRegistry.isOp(op)) return;
+			if (answer.button().equals("back")) {
+				openForm(op);
+				return;
+			}
+			for (Trust what : Trust.values()) {
+				Boolean chosen = switch (answer.values().get(what.id())) {
+					case "on" -> true;
+					case "off" -> false;
+					default -> null;
+				};
+				book.choose(who, what, chosen);
+			}
+			op.sendSystemMessage(Component.literal("Saved " + name + "'s trust."));
+		}).open(op);
+	}
+
+	/** Online first, then by name. */
+	private static List<UUID> sortedPlayers(MinecraftServer server, TrustBook book) {
+		List<UUID> players = new ArrayList<>(book.known().keySet());
+		players.sort(Comparator
+			.comparing((UUID id) -> server.getPlayerList().getPlayer(id) == null)
+			.thenComparing(id -> book.known().get(id).toLowerCase()));
+		return players;
+	}
+
 	/** Default, then off, then on, then back to default. */
 	private static Boolean next(Boolean current) {
 		if (current == null) return false;
@@ -107,10 +194,7 @@ public final class TrustScreen {
 				ComponentType.PROP_TOOLTIP, what == Trust.PVP ? "The game's pvp gamerule" : "Anyone not set below"));
 		}
 
-		List<UUID> players = new ArrayList<>(book.known().keySet());
-		players.sort(Comparator
-			.comparing((UUID id) -> server.getPlayerList().getPlayer(id) == null)
-			.thenComparing(id -> book.known().get(id).toLowerCase()));
+		List<UUID> players = sortedPlayers(server, book);
 
 		List<ComponentDef> rows = new ArrayList<>();
 		int y = 0;

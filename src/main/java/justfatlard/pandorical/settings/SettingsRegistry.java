@@ -7,6 +7,7 @@ import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.ScreenBuilder;
 import justfatlard.pandorical.api.SettingsApi;
 import justfatlard.pandorical.api.Viewport;
+import justfatlard.pandorical.form.SimpleForm;
 import justfatlard.pandorical.keybind.KeybindPool;
 import justfatlard.pandorical.protocol.ClientSettingS2C;
 import justfatlard.pandorical.protocol.ComponentDef;
@@ -896,6 +897,7 @@ public final class SettingsRegistry implements SettingsApi {
                     };
                 }
                 @Override String accepts() { return "on or off"; }
+                @Override void addField(SimpleForm form, ServerPlayer player) { form.toggle(id(), label, get(player)); }
             });
         }
 
@@ -926,6 +928,7 @@ public final class SettingsRegistry implements SettingsApi {
                 }
                 @Override public String parse(String s) { return ordered.containsKey(s) ? s : null; }
                 @Override String accepts() { return String.join(", ", ids); }
+                @Override void addField(SimpleForm form, ServerPlayer player) { form.choice(id(), label, ordered, get(player)); }
             });
         }
 
@@ -949,6 +952,7 @@ public final class SettingsRegistry implements SettingsApi {
                     try { return Math.clamp(Integer.parseInt(s), min, max); } catch (NumberFormatException e) { return null; }
                 }
                 @Override String accepts() { return "a number from " + min + " to " + max; }
+                @Override void addField(SimpleForm form, ServerPlayer player) { form.number(id(), label, min, max, step, get(player)); }
             });
         }
     }
@@ -1002,6 +1006,21 @@ public final class SettingsRegistry implements SettingsApi {
         /** What {@link #parse} takes, for a player who typed something else; empty for nothing to list. */
         String accepts() {
             return "";
+        }
+
+        /** This setting as a form field; a kind with no field (a list) adds nothing. */
+        void addField(SimpleForm form, ServerPlayer player) {}
+
+        /** What a form's answer did to this setting. */
+        enum Answered { CHANGED, UNCHANGED, REFUSED }
+
+        /** A value a form sent back, read as a typed one would be; stored only when it changed. */
+        Answered answer(ServerPlayer player, String value) {
+            T parsed = parse(value);
+            if (parsed == null) return Answered.REFUSED;
+            if (parsed.equals(get(player))) return Answered.UNCHANGED;
+            set(player, parsed);
+            return Answered.CHANGED;
         }
 
         public String shown(ServerPlayer player) {
@@ -1167,6 +1186,11 @@ public final class SettingsRegistry implements SettingsApi {
         @Override
         public String get(ServerPlayer player) {
             return String.join(", ", entries.apply(player).keySet());
+        }
+
+        /** Entry id to what the player sees. */
+        Map<String, String> entries(ServerPlayer player) {
+            return entries.apply(player);
         }
 
         @Override

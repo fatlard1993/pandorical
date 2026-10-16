@@ -21,8 +21,11 @@ public interface ContentApi {
      */
     void registerEntity(net.minecraft.world.entity.EntityType<?> type, EntityRegistration registration);
 
-    /** @param path relative to {@code assets/}, e.g. {@code "big-boats/models/block/helm.json"} */
+    /** @param path from the pack root, e.g. {@code "assets/big-boats/models/block/helm.json"} */
     void registerAsset(String path, byte[] data);
+
+    /** What was registered at {@code path}, by {@link #registerAsset} or {@link #registerModAssets}. */
+    java.util.Optional<byte[]> asset(String path);
 
     /** Register every file under the mod's {@code assets/<modId>/} on the classpath. */
     void registerModAssets(String modId);

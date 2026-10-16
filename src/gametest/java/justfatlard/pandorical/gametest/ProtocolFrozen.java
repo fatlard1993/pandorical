@@ -88,6 +88,7 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 	 */
 	private static final java.util.Set<String> NOT_YET_FROZEN = java.util.Set.of(
 		"banner_decals", "block_marks", "block_tint_positions", "block_tints_config",
+		"capture_view_request",
 		"client_setting", "client_settings", "content_ready_config", "despawn_structure",
 		"entity_renderers", "inventory_button", "inventory_buttons", "keepsake_store",
 		"keepsakes", "keepsakes_ask", "key_release", "keybind_bindings",

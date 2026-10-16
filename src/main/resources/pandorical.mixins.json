@@ -28,7 +28,8 @@
 		"SynchedEntityDataAccessor",
 		"EntityKindTrackingMixin",
 		"EntityKindPairingMixin",
-		"EntityBodyDataMixin"
+		"EntityBodyDataMixin",
+		"CustomClickActionMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

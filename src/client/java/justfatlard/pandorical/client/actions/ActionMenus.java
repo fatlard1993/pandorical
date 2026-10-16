@@ -501,14 +501,7 @@ public final class ActionMenus {
 	private static void tick(Minecraft mc) {
 		// The hub key, drained even with a screen up so a held press cannot pile up.
 		boolean wanted = menusKey != null && menusKey.consumeClick();
-		if (wanted && mc.player != null && mc.gui.screen() == null) {
-			Menu hub = menuById(META_ID);
-			if (hub == null && !builtins.isEmpty()) hub = builtins.getFirst();
-			if (hub != null && !hub.buttons.isEmpty()) {
-				mc.gui.setScreen(new ActionMenuScreen(hub, null));
-				return;
-			}
-		}
+		if (wanted && mc.player != null && mc.gui.screen() == null && openHub()) return;
 
 		pressing.entrySet().removeIf(pressed -> {
 			if (pressed.getValue() > 1) {
@@ -537,6 +530,16 @@ public final class ActionMenus {
 			return;
 		}
 
+	}
+
+	/** The menus' first page, opened; false when there is none to open. */
+	public static boolean openHub() {
+		Minecraft mc = Minecraft.getInstance();
+		Menu hub = menuById(META_ID);
+		if (hub == null && !builtins.isEmpty()) hub = builtins.getFirst();
+		if (hub == null || hub.buttons.isEmpty()) return false;
+		mc.gui.setScreen(new ActionMenuScreen(hub, null));
+		return true;
 	}
 
 	/**

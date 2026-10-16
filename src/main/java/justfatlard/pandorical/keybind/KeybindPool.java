@@ -261,6 +261,31 @@ public final class KeybindPool implements KeybindApi {
 		}
 	}
 
+	/**
+	 * A press and release from a menu button, for a player whose client has no keys of
+	 * Pandorical's to press. Server thread only.
+	 */
+	public void pressFromMenu(ServerPlayer player, String id) {
+		for (Registration registration : bySlot.values()) {
+			if (!registration.id().equals(id)) continue;
+			try {
+				registration.handler().onPress(player);
+			} catch (Exception e) {
+				Pandorical.LOGGER.error("Keybind handler '{}' threw for player {}: {}",
+					id, player.getName().getString(), e.getMessage(), e);
+			} finally {
+				// Released whatever the press did, or a held-key mod would think it still down.
+				try {
+					registration.handler().onRelease(player);
+				} catch (Exception e) {
+					Pandorical.LOGGER.error("Keybind release handler '{}' threw for player {}: {}",
+						id, player.getName().getString(), e.getMessage(), e);
+				}
+			}
+			return;
+		}
+	}
+
 	/** @hidden Server thread only. */
 	public void handleKeyRelease(ServerPlayer player, int slot) {
 		if (!PandoricalApi.hasCapability(player, Capabilities.KEYBINDS)) return;

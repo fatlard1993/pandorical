@@ -4,6 +4,7 @@ import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.ScreenApi;
 import justfatlard.pandorical.settings.Glyphs;
 import justfatlard.pandorical.api.ScreenBuilder;
+import justfatlard.pandorical.form.SimpleForm;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.ArrayList;
@@ -57,6 +58,38 @@ final class WhatsNewScreen {
 				PandoricalApi.screens().close(player, TYPE);
 			}
 		});
+	}
+
+	/** The same, as a form, for a client that can't draw Pandorical's screens. */
+	static void openForm(ServerPlayer player) {
+		List<Changelog.Change> changes = Changelog.INSTANCE.pendingFor(player);
+		boolean since = !changes.isEmpty();
+		if (!since) changes = Changelog.INSTANCE.latest();
+		var form = SimpleForm.titled(since ? "Since you were away" : "What's new");
+		if (since) {
+			section(form, changes, Changelog.Kind.ADDED, "New here");
+			section(form, changes, Changelog.Kind.UPDATED, "Changed");
+			section(form, changes, Changelog.Kind.REMOVED, "No longer here");
+		} else {
+			section(form, changes, Changelog.Kind.UPDATED, "The latest from each mod");
+		}
+		if (changes.isEmpty()) form.text("Nothing to report.");
+		form.open(player);
+	}
+
+	private static void section(SimpleForm form, List<Changelog.Change> changes, Changelog.Kind kind, String heading) {
+		StringBuilder text = new StringBuilder();
+		for (Changelog.Change change : changes) {
+			if (change.kind() != kind) continue;
+			String versions = switch (change.kind()) {
+				case ADDED -> change.to();
+				case REMOVED -> "was " + change.from();
+				case UPDATED -> change.from() + " to " + change.to();
+			};
+			text.append('\n').append(change.name()).append(" (").append(versions).append(')');
+			for (String line : change.lines()) text.append("\n  - ").append(line);
+		}
+		if (!text.isEmpty()) form.text(heading + text);
 	}
 
 	static void open(ServerPlayer player) {

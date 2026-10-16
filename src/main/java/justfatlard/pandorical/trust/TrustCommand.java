@@ -4,6 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.PandoricalApi;
+import justfatlard.pandorical.form.Forms;
 import justfatlard.pandorical.api.Trust;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -59,6 +60,10 @@ public final class TrustCommand {
 	}
 
 	private static int show(CommandSourceStack source) {
+		if (source.getEntity() instanceof ServerPlayer op && Forms.wanted(op)) {
+			TrustScreen.openForm(op);
+			return 1;
+		}
 		if (source.getEntity() instanceof ServerPlayer op && PandoricalApi.hasCapability(op, Capabilities.SCREENS)) {
 			TrustScreen.open(op);
 			return 1;

@@ -100,6 +100,20 @@ public final class ActionMenuRegistry implements ActionMenuApi {
 		promotedKeybinds.put(keybindId, icon);
 	}
 
+	/** Every button a mod suggested that runs a command, labelled with its menu where it has one. */
+	public List<Button> commandButtons() {
+		List<Button> out = new ArrayList<>();
+		for (Button button : topButtons) out.add(button);
+		for (Button button : declaredButtons) out.add(button);
+		for (ActionMenusS2C.Menu menu : declaredMenus.values()) {
+			for (ActionMenusS2C.Button button : menu.buttons()) {
+				if (button.command().isEmpty()) continue;
+				out.add(new Button(button.icon(), menu.name() + ": " + button.label(), button.command(), ""));
+			}
+		}
+		return out;
+	}
+
 	private static String icon(String icon) {
 		return icon == null || icon.isBlank() ? DEFAULT_ICON : icon;
 	}

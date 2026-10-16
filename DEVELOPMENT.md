@@ -635,6 +635,24 @@ The pixels are the player's own upload: a modified client can send any picture o
 size. Use a capture for what the player chose to show, never as evidence of the world.
 redstone-photography's camera is the working example.
 
+From 15.22 a client can also draw the world from somewhere else: a viewpoint the server names,
+looking along an entity's yaw and pitch, at a 70 degree field of view.
+
+```java
+if (!PandoricalApi.capture().canCaptureFrom(player)) return;   // a client older than 15.22
+PandoricalApi.capture().request(player, 512, eye, yRot, xRot).thenAccept(capture -> { ... });
+```
+
+The client draws it between frames into the main target, as vanilla draws a panorama, so the next
+frame covers it before the screen shows it and an open screen does not stop it. The view is
+detached, so the player's own body is in the picture when it stands in view, and their hand and
+screen overlays are not. Which sections can be seen is worked out from the viewpoint and waited
+for, then the player's own answer is put back. A section the player has never had in view may not
+be built yet; the client tries again each tick until it is, for at most a second, and then sends
+what it has. It can only draw what it has loaded, so ask a player who has the viewpoint's chunk:
+`chunkMap.getPlayers(chunk, false)`. It shares the one-capture-at-a-time limit with `request(player, side)`.
+redstone-photography's placed camera is the working example.
+
 ## Chest overlays
 
 Draw particular chests with a different texture, so a player can tell (say) the ones a

@@ -21,6 +21,7 @@
 			"justfatlard.pandorical.gametest.PortalPairs",
 			"justfatlard.pandorical.gametest.ActionMenusWork",
 			"justfatlard.pandorical.gametest.ActionMenusSeeded",
+			"justfatlard.pandorical.gametest.QuickActionsOpenMenus",
 			"justfatlard.pandorical.gametest.OlderClients",
 			"justfatlard.pandorical.gametest.ProtocolFrozen",
 			"justfatlard.pandorical.gametest.KeybindsNamed",
@@ -29,6 +30,8 @@
 			"justfatlard.pandorical.gametest.HeldAtTheGate",
 			"justfatlard.pandorical.gametest.EveryModListed",
 			"justfatlard.pandorical.gametest.TrustHolds",
+			"justfatlard.pandorical.gametest.FormsRefuseForgeries",
+			"justfatlard.pandorical.gametest.OpsOnlyFormsHold",
 			"justfatlard.pandorical.gametest.EntityModels",
 			"justfatlard.pandorical.gametest.EntityBodies"
 		]

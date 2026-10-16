@@ -1,8 +1,10 @@
 package justfatlard.pandorical.mixin;
 
+import justfatlard.pandorical.api.ClientKind;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.PlayerInventoryApi;
 import justfatlard.pandorical.api.PlayerInventoryApiImpl;
+import justfatlard.pandorical.login.ClientKinds;
 import net.minecraft.core.NonNullList;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
@@ -36,6 +38,9 @@ public abstract class InventoryMenuMixin extends AbstractContainerMenu {
                                           CallbackInfo ci) {
         // The client's slots are added by its own mixin.
         if (!(player instanceof ServerPlayer serverPlayer)) return;
+        // A game without Pandorical has 46 slots and throws on the 47th. Its extra slots stay in
+        // the attachment, where getSlot and setSlot reach them without the menu.
+        if (ClientKinds.of(serverPlayer.getUUID()) != ClientKind.PANDORICAL) return;
 
         PlayerInventoryApiImpl impl = PandoricalApi.playerInventoryImpl();
         List<PlayerInventoryApi.SlotRegistration> registrations = impl.getRegistrations();

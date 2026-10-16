@@ -4,6 +4,7 @@ import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.BriefApi;
 import justfatlard.pandorical.api.NoticeApi;
 import justfatlard.pandorical.api.PandoricalApi;
+import justfatlard.pandorical.form.Forms;
 import justfatlard.pandorical.settings.ModCatalog;
 import justfatlard.pandorical.settings.PlayerSettings;
 import net.minecraft.server.MinecraftServer;
@@ -154,7 +155,11 @@ public final class Brief implements BriefApi {
 	public static void show(ServerPlayer player) {
 		MinecraftServer server = player.level().getServer();
 		if (server != null) PlayerSettings.get(server).put(player.getUUID(), BRIEFED, "1");
-		BriefScreen.open(player);
+		if (Forms.wanted(player)) {
+			BriefScreen.openForm(player);
+		} else {
+			BriefScreen.open(player);
+		}
 	}
 
 	/** Wired once, from Pandorical's own init. */

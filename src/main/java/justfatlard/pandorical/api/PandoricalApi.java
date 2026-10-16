@@ -5,6 +5,7 @@ import justfatlard.pandorical.content.ContentRegistry;
 import justfatlard.pandorical.drops.DropsPolicy;
 import justfatlard.pandorical.hud.HudRegistry;
 import justfatlard.pandorical.keybind.KeybindPool;
+import justfatlard.pandorical.login.ClientKinds;
 import justfatlard.pandorical.login.Keepsakes;
 import justfatlard.pandorical.maprelief.MapReliefRegistry;
 import justfatlard.pandorical.picture.PictureRegistry;
@@ -159,6 +160,29 @@ public final class PandoricalApi {
         notUnderstoodListeners.add(listener);
     }
 
+    /** What kind of game the player joined with. For logs and ops: see {@link ClientKind}. */
+    public static ClientKind clientKind(ServerPlayer player) {
+        return ClientKinds.of(player.getUUID());
+    }
+
+    /**
+     * Teaches Pandorical to recognise Bedrock players, for a bridge mod that can ask Geyser or
+     * Floodgate. Asked by profile id as configuration begins, before the player exists, and again
+     * as they join for one it said no to then. The first ask may come on a network thread, so it
+     * must answer from what it already knows and touch no world.
+     */
+    public static void detectBedrock(java.util.function.Predicate<UUID> isBedrock) {
+        ClientKinds.addBedrockDetector(isBedrock);
+    }
+
+    /**
+     * For a bridge mod: carries {@link #camera()} hints to Bedrock players, who can't take
+     * Pandorical's packets. Mods keep calling {@link #camera()} and never see the difference.
+     */
+    public static void bridgeBedrockCamera(CameraApi camera) {
+        CAMERA.bridgeBedrock(camera);
+    }
+
     /**
      * Both of these come off the wire, so both are flattened before they reach a log line: a
      * value with newlines in it can otherwise write whole entries of its own, and an operator
@@ -172,9 +196,11 @@ public final class PandoricalApi {
 
     /** @hidden */
     public static void reportNotUnderstood(ServerPlayer player, String kind, String value) {
-        Pandorical.LOGGER.warn("{}'s client could not act on {} \"{}\": that feature is absent for them."
-            + " Their Pandorical is older than this server, or the value is wrong.",
-            player.getName().getString(), forLog(kind), forLog(value));
+        String why = ClientKinds.of(player.getUUID()) == ClientKind.BEDROCK
+            ? "Bedrock has nothing to do it with."
+            : "Their Pandorical is older than this server, or the value is wrong.";
+        Pandorical.LOGGER.warn("{}'s client could not act on {} \"{}\": that feature is absent for them. {}",
+            player.getName().getString(), forLog(kind), forLog(value), why);
         for (NotUnderstood.Listener listener : notUnderstoodListeners) {
             try {
                 listener.accept(player, kind, value);

@@ -4,11 +4,13 @@ import justfatlard.pandorical.api.Capture;
 import justfatlard.pandorical.api.CaptureApi;
 import justfatlard.pandorical.protocol.CapturePartC2S;
 import justfatlard.pandorical.protocol.CaptureRequestS2C;
+import justfatlard.pandorical.protocol.CaptureViewRequestS2C;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +61,7 @@ public final class Captures implements CaptureApi {
     /** Once on each side, before any player connects: it registers the payload types. */
     public static void register() {
         PayloadTypeRegistry.clientboundPlay().register(CaptureRequestS2C.TYPE, CaptureRequestS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(CaptureViewRequestS2C.TYPE, CaptureViewRequestS2C.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(CapturePartC2S.TYPE, CapturePartC2S.STREAM_CODEC);
         ServerPlayNetworking.registerGlobalReceiver(CapturePartC2S.TYPE, (payload, context) ->
             context.server().execute(() -> INSTANCE.receive(context.player(), payload)));
@@ -73,15 +76,36 @@ public final class Captures implements CaptureApi {
     }
 
     @Override
+    public boolean canCaptureFrom(ServerPlayer player) {
+        return ServerPlayNetworking.canSend(player, CaptureViewRequestS2C.TYPE);
+    }
+
+    @Override
     public CompletableFuture<Optional<Capture>> request(ServerPlayer player, int side) {
         if (side < 1 || side > MOST_SIDE) throw new IllegalArgumentException("a capture " + side + " across");
         if (!canCapture(player) || pending.containsKey(player.getUUID())) {
             return CompletableFuture.completedFuture(Optional.empty());
         }
-        Pending asked = new Pending(nextId++, side, tick + TIMEOUT_TICKS);
-        pending.put(player.getUUID(), asked);
+        Pending asked = ask(player, side);
         ServerPlayNetworking.send(player, new CaptureRequestS2C(asked.id, side));
         return asked.result;
+    }
+
+    @Override
+    public CompletableFuture<Optional<Capture>> request(ServerPlayer player, int side, Vec3 eye, float yRot, float xRot) {
+        if (side < 1 || side > MOST_SIDE) throw new IllegalArgumentException("a capture " + side + " across");
+        if (!canCaptureFrom(player) || pending.containsKey(player.getUUID())) {
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+        Pending asked = ask(player, side);
+        ServerPlayNetworking.send(player, new CaptureViewRequestS2C(asked.id, side, eye.x, eye.y, eye.z, yRot, xRot));
+        return asked.result;
+    }
+
+    private Pending ask(ServerPlayer player, int side) {
+        Pending asked = new Pending(nextId++, side, tick + TIMEOUT_TICKS);
+        pending.put(player.getUUID(), asked);
+        return asked;
     }
 
     private void receive(ServerPlayer player, CapturePartC2S part) {

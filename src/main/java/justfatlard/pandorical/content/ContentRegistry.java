@@ -44,7 +44,10 @@ public class ContentRegistry implements ContentApi {
 
     private final Map<String, VanillaItemOverride> vanillaItemOverrides = new LinkedHashMap<>();
 
-    /** Kept out of Fabric's registry sync, so a vanilla client can connect. */
+    /**
+     * The namespaces whose content is synced to Pandorical clients. Fabric's registry sync still
+     * covers them, so a client without Fabric is refused in configuration.
+     */
     private static final Set<String> serverOnlyNamespaces = ConcurrentHashMap.newKeySet();
 
     public record RegisteredBlock(String id, BlockRegistration registration) {}
@@ -85,6 +88,12 @@ public class ContentRegistry implements ContentApi {
     public void registerAsset(String path, byte[] data) {
         assets.put(path, data);
         cachedAssetChunks = null;
+    }
+
+    @Override
+    public Optional<byte[]> asset(String path) {
+        byte[] data = assets.get(path);
+        return data == null ? Optional.empty() : Optional.of(data.clone());
     }
 
     private boolean solidRails;

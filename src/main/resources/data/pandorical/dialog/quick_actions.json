@@ -1,0 +1,15 @@
+{
+	"type": "minecraft:notice",
+	"title": "Pandorical",
+	"body": {
+		"type": "minecraft:plain_message",
+		"contents": "This server's menus, settings and mod keys."
+	},
+	"action": {
+		"label": "Open",
+		"action": {
+			"type": "minecraft:custom",
+			"id": "pandorical:quick_actions"
+		}
+	}
+}

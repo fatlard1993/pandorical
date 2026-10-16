@@ -1,6 +1,7 @@
 package justfatlard.pandorical.api;
 
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -34,4 +35,21 @@ public interface CaptureApi {
      * @throws IllegalArgumentException if {@code side} is not 1 to {@link #MOST_SIDE}
      */
     CompletableFuture<Optional<Capture>> request(ServerPlayer player, int side);
+
+    /** Whether this player's client takes captures from a viewpoint; false for clients older than 15.22. */
+    boolean canCaptureFrom(ServerPlayer player);
+
+    /**
+     * Ask the player's client for a square picture of the world as seen from {@code eye}, looking
+     * along {@code yRot} and {@code xRot} as an entity's rotation does, at a 70 degree field of
+     * view. The client draws it off screen, so the player sees nothing of it and an open screen
+     * does not stop it, and the player's own body is in the picture if it stands in view. The
+     * client can draw only what it has loaded, so ask a player with {@code eye}'s chunk in view.
+     *
+     * <p>Completes as {@link #request(ServerPlayer, int)} does, and shares its one capture at a
+     * time per player.
+     *
+     * @throws IllegalArgumentException if {@code side} is not 1 to {@link #MOST_SIDE}
+     */
+    CompletableFuture<Optional<Capture>> request(ServerPlayer player, int side, Vec3 eye, float yRot, float xRot);
 }

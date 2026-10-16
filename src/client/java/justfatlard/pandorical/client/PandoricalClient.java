@@ -33,6 +33,7 @@ import justfatlard.pandorical.client.keybind.KeybindManager;
 import justfatlard.pandorical.client.mixin.ClientCommonListenerAccessor;
 import justfatlard.pandorical.client.maprelief.ClientMapReliefs;
 import justfatlard.pandorical.client.capture.ClientCaptures;
+import justfatlard.pandorical.client.capture.ViewCaptures;
 import justfatlard.pandorical.client.picture.ClientPictures;
 import justfatlard.pandorical.client.render.LeafCulling;
 import justfatlard.pandorical.client.renderer.ChestOverlayStore;
@@ -169,7 +170,10 @@ public class PandoricalClient implements ClientModInitializer {
         if (!skipped("pictures")) ClientPictures.register();
         if (!skipped("entitymodels")) justfatlard.pandorical.client.entitymodel.ClientEntityModels.register();
         if (!skipped("maprelief")) ClientMapReliefs.register();
-        if (!skipped("captures")) ClientCaptures.register();
+        if (!skipped("captures")) {
+            ClientCaptures.register();
+            ViewCaptures.register();
+        }
 
         ClientTickEvents.START_CLIENT_TICK.register(client -> StructureManager.tick());
         ClientTickEvents.END_CLIENT_TICK.register(client -> {

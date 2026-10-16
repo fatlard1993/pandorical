@@ -7,6 +7,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.PandoricalApi;
+import justfatlard.pandorical.form.Forms;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -28,10 +29,14 @@ public final class SettingsCommand {
             "What every mod on this server is, in a line each. Shown once when you first join.");
         PandoricalApi.commandHelp().describe("/pandorical changes",
             "What changed since you were last here, or what each mod changed last.");
+        PandoricalApi.commandHelp().describe("/pandorical actions",
+            "This server's menus, settings and mod keys as one list.");
+        PandoricalApi.commandHelp().describe("/pandorical notices",
+            "Notices waiting for you, and their answers.");
         PandoricalApi.commandHelp().describe("/pandorical settings",
             "Your settings, for every mod that has any.");
         PandoricalApi.commandHelp().describe("/pandorical settings list",
-            "The same as a list of lines, for a client that cannot draw the screen.");
+            "The same as a list of lines in chat.");
         PandoricalApi.commandHelp().describe("/pandorical settings <mod> <key> <value>",
             "Change one setting by name, without the screen.");
 
@@ -42,6 +47,16 @@ public final class SettingsCommand {
                 .executes(context -> brief(context.getSource())))
             .then(Commands.literal("changes")
                 .executes(context -> changes(context.getSource())))
+            .then(Commands.literal("actions")
+                .executes(context -> {
+                    justfatlard.pandorical.actions.QuickActions.open(context.getSource().getPlayerOrException());
+                    return 1;
+                }))
+            .then(Commands.literal("notices")
+                .executes(context -> {
+                    PandoricalApi.notices().open(context.getSource().getPlayerOrException());
+                    return 1;
+                }))
             .then(Commands.literal("settings")
                 .executes(context -> open(context.getSource(), settings))
                 .then(Commands.literal("list").executes(context -> list(context.getSource(), settings)))
@@ -56,6 +71,10 @@ public final class SettingsCommand {
 
     private static int open(CommandSourceStack source, SettingsRegistry settings) throws CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
+        if (Forms.wanted(player)) {
+            SettingsDialogs.open(player, settings);
+            return 1;
+        }
         if (!PandoricalApi.hasCapability(player, Capabilities.SCREENS)) {
             source.sendSuccess(() -> text("pandorical.settings.no_client"), false);
             return list(source, settings);
@@ -66,35 +85,33 @@ public final class SettingsCommand {
 
     private static int brief(CommandSourceStack source) throws CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
-        if (!PandoricalApi.hasCapability(player, Capabilities.SCREENS)) {
-            source.sendSuccess(() -> text("pandorical.settings.no_client"), false);
-            return 0;
-        }
         justfatlard.pandorical.brief.Brief.show(player);
         return 1;
     }
 
     private static int changes(CommandSourceStack source) throws CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
-        if (!PandoricalApi.hasCapability(player, Capabilities.SCREENS)) {
-            source.sendSuccess(() -> text("pandorical.settings.no_client"), false);
-            return 0;
-        }
         justfatlard.pandorical.changelog.Changelog.show(player);
         return 1;
     }
 
     private static int mods(CommandSourceStack source) throws CommandSyntaxException {
-        ServerPlayer player = source.getPlayerOrException();
-        if (PandoricalApi.hasCapability(player, Capabilities.SCREENS)) {
+        openMods(source.getPlayerOrException());
+        return 1;
+    }
+
+    /** The mod menu: Pandorical's screen where the client draws it, a form where it can't. */
+    public static void openMods(ServerPlayer player) {
+        if (Forms.wanted(player)) {
+            SettingsDialogs.mods(player, PandoricalApi.settingsImpl());
+        } else if (PandoricalApi.hasCapability(player, Capabilities.SCREENS)) {
             PandoricalApi.settingsImpl().open(player, null);
-            return 1;
+        } else {
+            for (ModCatalog.ModInfo mod : ModCatalog.all()) {
+                String line = mod.name() + " " + mod.version() + (mod.description().isEmpty() ? "" : " - " + mod.description());
+                player.sendSystemMessage(Component.literal(line));
+            }
         }
-        for (ModCatalog.ModInfo mod : ModCatalog.all()) {
-            String line = mod.name() + " " + mod.version() + (mod.description().isEmpty() ? "" : " - " + mod.description());
-            source.sendSuccess(() -> Component.literal(line), false);
-        }
-        return ModCatalog.all().size();
     }
 
     private static int list(CommandSourceStack source, SettingsRegistry settings) throws CommandSyntaxException {

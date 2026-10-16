@@ -4,6 +4,11 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.22.0": [
+      "A server mod can ask your game for a picture of the world from somewhere other than where you stand, such as a camera set down in the world. Your game draws it out of sight, so you see nothing of it, even with a menu open.",
+      "Playing without Pandorical, on Bedrock through Geyser too, the mods list, settings, notices, the welcome, what's new and trust open as the game's own forms. /pandorical actions, or the game's Quick Actions, has them all in one place.",
+      "The mods list no longer shows the libraries packed inside other mods."
+    ],
     "15.21.0": [
       "A mod can add a mob the game has nothing like: drawn from its own model, with its own animations - idle, swimming or walking, striking - and its own size, rather than dressed up as a vanilla mob.",
       "Such a mob can carry values of its own, which used to garble every client it was sent to.",

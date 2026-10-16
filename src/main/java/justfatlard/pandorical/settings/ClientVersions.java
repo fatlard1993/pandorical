@@ -2,8 +2,10 @@ package justfatlard.pandorical.settings;
 
 import com.mojang.brigadier.CommandDispatcher;
 import justfatlard.pandorical.Pandorical;
+import justfatlard.pandorical.api.ClientKind;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.entitykind.EntityKinds;
+import justfatlard.pandorical.login.ClientKinds;
 import justfatlard.pandorical.login.ServedClientMods;
 import justfatlard.pandorical.protocol.ClientModFilesC2S;
 import net.minecraft.commands.CommandSourceStack;
@@ -61,7 +63,11 @@ public final class ClientVersions {
 
     /** At joining, for a game that never registered Pandorical's channels at all. */
     public static void vanilla(ServerPlayer player) {
-        Pandorical.LOGGER.info("[pandorical] {}: no Pandorical on this client", player.getName().getString());
+        Pandorical.LOGGER.info("[pandorical] {}: {}", player.getName().getString(), withoutPandorical(player));
+    }
+
+    private static String withoutPandorical(ServerPlayer player) {
+        return ClientKinds.of(player.getUUID()) == ClientKind.BEDROCK ? "Bedrock, through Geyser" : "no Pandorical";
     }
 
     /** When the client reports its mods, on joining and after every change it makes to them. */
@@ -141,7 +147,7 @@ public final class ClientVersions {
         for (ServerPlayer player : players) {
             String line;
             if (!PandoricalApi.isAvailable(player)) {
-                line = "no Pandorical";
+                line = withoutPandorical(player);
             } else {
                 List<ClientModFilesC2S.Entry> files = ClientMods.filesOf(player);
                 line = files.isEmpty() ? "Pandorical, too old to report its version" : summary(files);

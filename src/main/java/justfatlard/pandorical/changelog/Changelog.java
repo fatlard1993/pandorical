@@ -4,8 +4,10 @@ import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.ChangelogApi;
 import justfatlard.pandorical.api.NoticeApi;
 import justfatlard.pandorical.api.PandoricalApi;
+import justfatlard.pandorical.form.Forms;
 import justfatlard.pandorical.settings.ModCatalog;
 import justfatlard.pandorical.settings.PlayerSettings;
+import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.Version;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -76,7 +78,11 @@ public final class Changelog implements ChangelogApi {
 
 	/** The what's new screen, asked for: what changed since this visit began, or each mod's latest. */
 	public static void show(ServerPlayer player) {
-		WhatsNewScreen.open(player);
+		if (Forms.wanted(player)) {
+			WhatsNewScreen.openForm(player);
+		} else {
+			WhatsNewScreen.open(player);
+		}
 	}
 
 	/** Leaving ends it; the next visit works its own difference out. */
@@ -183,7 +189,9 @@ public final class Changelog implements ChangelogApi {
 			}
 		}
 		for (Map.Entry<String, String> entry : seen.entrySet()) {
-			if (!now.containsKey(entry.getKey())) {
+			// Still loaded is not gone: a mod can stop being listed (a library inside another
+			// mod's jar) without leaving.
+			if (!now.containsKey(entry.getKey()) && !FabricLoader.getInstance().isModLoaded(entry.getKey())) {
 				changes.add(new Change(Kind.REMOVED, entry.getKey(), entry.getKey(),
 					entry.getValue(), null, List.of()));
 			}

@@ -479,7 +479,10 @@ public class Pandorical implements ModInitializer {
                 LOGGER.debug("Client does not support config-phase content sync — will use play-phase fallback");
             }
         });
+        justfatlard.pandorical.login.ClientKinds.register();
         justfatlard.pandorical.login.ServedClientMods.register();
+        justfatlard.pandorical.form.Forms.register();
+        justfatlard.pandorical.actions.QuickActions.register();
     }
 
     private void registerServerHandlers() {
@@ -647,7 +650,11 @@ public class Pandorical implements ModInitializer {
             sender.sendPacket(new HelloS2C(PROTOCOL_VERSION, SERVER_CAPABILITIES));
             // Channels are agreed in the configuration phase, so this is already true or false.
             if (!ServerPlayNetworking.canSend(handler.getPlayer(), HelloS2C.TYPE)) {
+                justfatlard.pandorical.login.ClientKinds.joined(handler.getPlayer().getUUID());
                 justfatlard.pandorical.settings.ClientVersions.vanilla(handler.getPlayer());
+                // No handshake is coming, so this is as ready as they get: the brief and what's
+                // new reach them as chat lines that open forms.
+                Arrivals.arrived(handler.getPlayer());
             }
 
             // Capabilities wait for HelloC2S: until the handshake the client cannot decode full

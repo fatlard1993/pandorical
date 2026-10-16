@@ -10,8 +10,12 @@ import justfatlard.pandorical.api.HudBuilder;
 import justfatlard.pandorical.api.NoticeApi;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.ScreenApi;
+import justfatlard.pandorical.form.Forms;
+import justfatlard.pandorical.form.SimpleForm;
 import justfatlard.pandorical.settings.Glyphs;
 import justfatlard.pandorical.settings.PlayerSettings;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import justfatlard.pandorical.api.ComponentBuilder;
 import justfatlard.pandorical.api.ComponentType;
@@ -122,8 +126,18 @@ public final class Notices implements NoticeApi {
 		// Quiet and short: a notice arriving should be noticed, not announced.
 		player.level().playSound(null, player.blockPosition(), SoundEvents.NOTE_BLOCK_BELL.value(),
 			SoundSource.PLAYERS, 0.4F, 1.6F);
+		if (Forms.wanted(player)) {
+			// No badge to light, so a line in chat says where it is. Clickable on Java; Bedrock
+			// shows the words.
+			player.sendSystemMessage(Component.literal(notice.summary() + ". ")
+				.append(Component.literal("/pandorical notices").withStyle(style -> style
+					.withUnderlined(true)
+					.withClickEvent(new ClickEvent.RunCommand("/pandorical notices")))));
+		}
 		badge(player);
 	}
+
+
 
 	@Override
 	public void withdraw(ServerPlayer player, String kind, String id) {
@@ -258,6 +272,8 @@ public final class Notices implements NoticeApi {
 	 * any scale and collides at none.
 	 */
 	private void badge(ServerPlayer player) {
+		// No HUD to draw it on; the chat line said where the notices are.
+		if (Forms.wanted(player)) return;
 		int count = waiting(player);
 		if (unseen(player) == 0) {
 			PandoricalApi.hud().hide(player, BADGE);
@@ -441,6 +457,10 @@ public final class Notices implements NoticeApi {
 	}
 
 	private void openTray(ServerPlayer player) {
+		if (Forms.wanted(player)) {
+			openForms(player);
+			return;
+		}
 		// Finding it once is the whole of what the hint was for.
 		remember(player);
 		// Mark and redraw together: nothing else redraws a hud, so the badge would stay lit.
@@ -589,7 +609,12 @@ public final class Notices implements NoticeApi {
 		}
 		Answer answer = buttons.get(componentId);
 		if (answer == null) return;
+		choose(player, answer);
+		PandoricalApi.screens().close(player, TYPE);
+		if (waiting(player) > 0) openTray(player);
+	}
 
+	private void choose(ServerPlayer player, Answer answer) {
 		// Taken away before the handler runs: answering is what spends a notice, and a handler that
 		// offers a fresh one in reply must not have it swept up afterwards.
 		withdraw(player, answer.kind(), answer.noticeId());
@@ -598,8 +623,41 @@ public final class Notices implements NoticeApi {
 		if (handler != null && !answer.choiceId().isEmpty()) {
 			handler.answered(player, answer.noticeId(), answer.choiceId());
 		}
+	}
 
-		PandoricalApi.screens().close(player, TYPE);
-		if (waiting(player) > 0) openTray(player);
+	/** The tray as forms: one notice straight away, several as a list to pick from. */
+	private void openForms(ServerPlayer player) {
+		looked(player);
+		Map<String, Pending> mine = waiting.get(player.getUUID());
+		List<Notice> notices;
+		synchronized (mine == null ? this : mine) {
+			notices = mine == null ? List.of() : mine.values().stream().map(Pending::notice).toList();
+		}
+		if (notices.isEmpty()) {
+			player.sendSystemMessage(Component.literal("No notices waiting."));
+		} else if (notices.size() == 1) {
+			openForm(player, notices.getFirst());
+		} else {
+			SimpleForm list = SimpleForm.titled("Notices");
+			for (int i = 0; i < notices.size(); i++) list.button(String.valueOf(i), notices.get(i).summary());
+			list.onAnswer(answer -> openForm(player, notices.get(Integer.parseInt(answer.button())))).open(player);
+		}
+	}
+
+	private void openForm(ServerPlayer player, Notice notice) {
+		SimpleForm form = SimpleForm.titled("Notice").text(notice.summary());
+		for (Choice choice : notice.choices()) form.button(choice.id(), choice.label());
+		form.onAnswer(answer -> {
+			// Answered only while it's still waiting: it may have expired or been withdrawn since.
+			if (isWaiting(player, notice)) choose(player, new Answer(notice.kind(), notice.id(), answer.button()));
+		}).open(player);
+	}
+
+	private boolean isWaiting(ServerPlayer player, Notice notice) {
+		Map<String, Pending> mine = waiting.get(player.getUUID());
+		if (mine == null) return false;
+		synchronized (mine) {
+			return mine.containsKey(key(notice.kind(), notice.id()));
+		}
 	}
 }

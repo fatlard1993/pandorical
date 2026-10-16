@@ -37,7 +37,7 @@ public final class ClientCaptures {
         ClientPlayNetworking.registerGlobalReceiver(CaptureRequestS2C.TYPE, (payload, context) ->
             context.client().execute(() -> ask(context.client(), payload)));
         LevelRenderEvents.END_MAIN.register(context -> {
-            if (asked != NONE) framesSince++;
+            if (asked != NONE && ViewCaptures.drawing() == null) framesSince++;
         });
         ClientTickEvents.START_CLIENT_TICK.register(client -> {
             if (asked != NONE && framesSince > 0) take(client);
@@ -46,6 +46,11 @@ public final class ClientCaptures {
             showHud(client);
             asked = NONE;
         }));
+    }
+
+    /** Whether a picture of the player's own view is on its way. */
+    static boolean busy() {
+        return asked != NONE;
     }
 
     private static void ask(Minecraft client, CaptureRequestS2C payload) {
@@ -81,7 +86,7 @@ public final class ClientCaptures {
         showHud(client);
     }
 
-    private static byte[] crop(NativeImage frame, int size) {
+    static byte[] crop(NativeImage frame, int size) {
         Path file = null;
         try (frame; NativeImage square = new NativeImage(size, size, false)) {
             int across = Math.min(frame.getWidth(), frame.getHeight());
@@ -103,7 +108,7 @@ public final class ClientCaptures {
         }
     }
 
-    private static void send(int id, byte[] png) {
+    static void send(int id, byte[] png) {
         if (!ClientPlayNetworking.canSend(CapturePartC2S.TYPE)) return;
         if (png == null) {
             ClientPlayNetworking.send(CapturePartC2S.declined(id));

@@ -1,6 +1,7 @@
 package justfatlard.pandorical.client.mixin;
 
 import justfatlard.pandorical.client.camera.CameraManager;
+import justfatlard.pandorical.client.capture.ViewCaptures;
 import net.minecraft.client.renderer.Projection;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,6 +17,6 @@ public class ProjectionFovMixin {
 	@ModifyVariable(method = "setupPerspective", at = @At("HEAD"), argsOnly = true, index = 3)
 	private float pandorical$narrowFov(float fov) {
 		float factor = CameraManager.getZoomFactor();
-		return factor == 1.0F ? fov : fov * factor;
+		return factor == 1.0F || ViewCaptures.drawing() != null ? fov : fov * factor;
 	}
 }
