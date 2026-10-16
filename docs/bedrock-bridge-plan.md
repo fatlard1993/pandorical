@@ -371,6 +371,48 @@ Still open from the reviews, needing a real client or a decision:
 - Whether Pandorical clients should see the shipped quick-actions entry.
 - Gametests for a non-op answering an ops-only form.
 
+### Checked without a client, 2026-10-16
+
+No Bedrock client runs on Linux without buying the Android version again, so two checks stand in
+for one.
+
+**Geometry, against Blockbench.** Blockbench 5.2.2's web build ran headless (puppeteer, Chrome's
+headless shell). Its Bedrock block format draws a model the way Bedrock does, which is what its
+creators build with. The test subject was redstone-photography's camera, which is asymmetric: a lens
+on its north face, a button set off toward the east, and all six facings. For each facing, the Java
+model and the Bedrock geometry this mod made from it were rendered from matching views, with the
+Java view turned by the inverse of the blockstate rotation. Each pair was given the same textures,
+an arrow on the body so a turned or mirrored face shows.
+
+- **Unrotated (north).** Identical from northwest and southeast, from straight above and straight
+  below. East and west aren't swapped; the x mirror, face names, the up/down UV flip and the
+  material instances all agree.
+- **Turned about y (east).** Identical from all four views, including the top and bottom faces'
+  arrows. `uv_rotation` turns a top face and a bottom face the right way.
+- **Turned about x (up).** The lens points up and the parts sit on the right sides. Textures on
+  faces an x turn moves aren't turned yet, which is known.
+
+This settles the checklist's east/west and rotation-direction questions as far as Blockbench and
+Bedrock agree.
+
+**Chunks, through the bot.** The bot never received chunks before because it had died (slimes, in
+this superflat) and never answered the respawn prompt, so its player entity was removed and tracked
+nothing. Answering `respawn` with state 2, as a client does, brought chunks and block updates.
+
+That run found a **Geyser bug**: `CustomBlockRegistryPopulator#populateNonVanilla` registers a Java
+`BlockState` for only the first state of each non-vanilla block it meets. `BlockState.of()` returns
+air for the others, so a block update sends air, and a modded block placed or changed into any other
+state vanished on Bedrock until its chunk was resent. A grass slab placed beside the bot arrived as
+air while the server held the slab.
+
+- **Workaround.** pandorical-geyser's `GeyserStates` (a flagged hack) fills in the missing states
+  once Geyser has started. It filled in 574 (654 states, less the 80 Geyser registered), and the
+  slab then arrived as its custom block.
+- **Upstream.** The fix was proven on a Geyser-Fabric built from the same commit, where the
+  workaround found nothing to fill in, and opened as a draft PR:
+  [GeyserMC/Geyser#6789](https://github.com/GeyserMC/Geyser/pull/6789). When it ships, the
+  workaround logs that it filled in none and can be removed.
+
 ### Real-client checklist
 
 What the headless bot can't see, to be run once on a real Bedrock client (phone, Windows or
@@ -407,8 +449,8 @@ pack ("Pandorical content").
 3. Look from every side.
    - No face is missing.
    - No face shows another face's texture.
-4. **The east and west check.** Find a modded block whose east and west faces differ, or a
-   furnace-like block, and look at both sides.
+4. **The east and west check** (Blockbench already agrees; this confirms Bedrock does). Find a
+   modded block whose east and west faces differ, or a furnace-like block, and look at both sides.
    - If they are swapped, report it: it decides whether face names flip under Bedrock's mirrored x.
 5. Place a block that turns, facing each way. A log on its side, a furnace or a stair will do.
    - Note any top texture or side texture that sits at the wrong angle.
