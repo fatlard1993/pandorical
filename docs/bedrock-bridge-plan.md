@@ -389,8 +389,12 @@ an arrow on the body so a turned or mirrored face shows.
   material instances all agree.
 - **Turned about y (east).** Identical from all four views, including the top and bottom faces'
   arrows. `uv_rotation` turns a top face and a bottom face the right way.
-- **Turned about x (up).** The lens points up and the parts sit on the right sides. Textures on
-  faces an x turn moves aren't turned yet, which is known.
+- **Turned about x (up and down).** The first pass put the parts in the right places but left the
+  textures on faces an x turn moves unturned. `BlockModels` now works out every face's turn in
+  general: it carries the texture's top direction through the rotation and compares it with the top
+  direction of the face it lands on. That gives the same output as before for y turns (the east,
+  south and west geometries kept their ids), and all four views of facing up and facing down now
+  match Java, arrows included.
 
 This settles the checklist's east/west and rotation-direction questions as far as Blockbench and
 Bedrock agree.
