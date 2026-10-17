@@ -32,6 +32,9 @@ public final class StructureManager {
     /** Fixed, not derived from the update interval; suits updates about once per server tick. */
     public static final int INTERPOLATION_TICKS = 3;
 
+    /** Two seconds of drawn poses, past any ping worth sailing with; see {@link ClientStructure#drawnAgo}. */
+    private static final int DRAWN_KEPT = 40;
+
     private static final Map<String, ClientStructure> structures = new ConcurrentHashMap<>();
 
     public static void handleSpawn(SpawnStructureS2C payload) {
@@ -148,6 +151,9 @@ public final class StructureManager {
         private StructurePoseSnapshot lastTick;
         private StructurePoseSnapshot thisTick;
 
+        /** The poses drawn on recent ticks, newest first; see {@link #drawnAgo}. */
+        private final java.util.ArrayDeque<StructurePoseSnapshot> drawn = new java.util.ArrayDeque<>();
+
         ClientStructure(Map<RelPosKey, BlockState> blocks, StructurePoseSnapshot initialPose, boolean visible) {
             this.blocks = blocks;
             this.previousPose = initialPose;
@@ -167,7 +173,18 @@ public final class StructureManager {
             lastTick = thisTick;
             if (ticksSinceUpdate < INTERPOLATION_TICKS) ticksSinceUpdate++;
             thisTick = blended(ticksSinceUpdate / (float) INTERPOLATION_TICKS);
+            drawn.addFirst(thisTick);
+            if (drawn.size() > DRAWN_KEPT) drawn.removeLast();
             if (solidTicks > 0) solidTicks--;
+        }
+
+        /** The pose drawn this many ticks ago, or the oldest kept; 0 is {@link #thisTick}. */
+        public StructurePoseSnapshot drawnAgo(int ticks) {
+            if (ticks <= 0 || drawn.isEmpty()) return thisTick;
+            if (ticks >= drawn.size()) return drawn.getLast();
+            var poses = drawn.iterator();
+            for (int i = 0; i < ticks; i++) poses.next();
+            return poses.next();
         }
 
         /** The pose drawn at the end of the previous tick. */
@@ -186,6 +203,7 @@ public final class StructureManager {
             lastTick = targetPose;
             thisTick = targetPose;
             ticksSinceUpdate = INTERPOLATION_TICKS;
+            drawn.clear();
         }
 
         /** Whether any block lies in these relative bounds, inclusive. */

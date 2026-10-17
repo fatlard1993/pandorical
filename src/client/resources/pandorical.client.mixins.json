@@ -53,6 +53,7 @@
     "PlayerTabOverlayAccessor",
     "ProjectionFovMixin",
     "ReliefCullingMixin",
+    "RemotePlayerDeckMixin",
     "SectionCompilerMixin",
     "SingleQuadParticleAccessor",
     "StackValidationMixin",

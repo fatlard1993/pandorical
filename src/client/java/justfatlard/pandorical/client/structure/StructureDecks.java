@@ -114,6 +114,38 @@ public final class StructureDecks {
 	}
 
 	/**
+	 * The walkable deck under this point at the pose drawn {@code ticksAgo}, or null. The deck
+	 * already being stood on is held to the looser reach, so a jump on it stays on it.
+	 */
+	public static @org.jspecify.annotations.Nullable ClientStructure deckUnder(Vec3 at, double halfWidth, int ticksAgo,
+			@org.jspecify.annotations.Nullable ClientStructure current) {
+		for (ClientStructure structure : StructureManager.getActive()) {
+			if (!structure.walkable || !structure.visible) continue;
+			double reach = structure == current ? AIRBORNE_REACH : SUPPORT_REACH;
+			if (hasDeckBeneath(structure, structure.drawnAgo(ticksAgo), at.x, at.y, at.z, halfWidth, reach)) {
+				return structure;
+			}
+		}
+		return null;
+	}
+
+	/** A point in the structure's own unturned frame, measured from its pose origin. */
+	public static Vec3 toLocal(Vec3 at, StructurePoseSnapshot pose) {
+		double yaw = Math.toRadians(pose.yaw());
+		double dx = at.x - pose.x();
+		double dz = at.z - pose.z();
+		return new Vec3(dx * Math.cos(yaw) + dz * Math.sin(yaw), at.y - pose.y(),
+			-dx * Math.sin(yaw) + dz * Math.cos(yaw));
+	}
+
+	/** The inverse of {@link #toLocal}. */
+	public static Vec3 toWorld(Vec3 local, StructurePoseSnapshot pose) {
+		double yaw = Math.toRadians(pose.yaw());
+		return new Vec3(pose.x() + local.x * Math.cos(yaw) - local.z * Math.sin(yaw), pose.y() + local.y,
+			pose.z() + local.x * Math.sin(yaw) + local.z * Math.cos(yaw));
+	}
+
+	/**
 	 * A walkable structure is being hidden, which is a ship docking: it is replaced where it now
 	 * is by real blocks, at the newest pose rather than the one still being blended toward.
 	 */
