@@ -399,6 +399,19 @@ an arrow on the body so a turned or mirrored face shows.
 This settles the checklist's east/west and rotation-direction questions as far as Blockbench and
 Bedrock agree.
 
+**All of it, rerunnable.** pandorical-geyser's `tools/bedrock-check` does this for every converted
+block. A server started with `-Dpandorical-geyser.export=true` writes each look with its unturned
+Java pieces. The check draws both in Blockbench with shading and grid off, undoing the blockstate
+rotation with its own maths, and compares pixels. Fed a deliberately broken look, it reported 66%
+different.
+
+The first full run found 116 differences. They were Blockbench drawing see-through pixels
+differently for the two formats, which the check now avoids by making textures opaque. That left
+one real one: plain `alpha_test` draws every face from both sides, unlike Java's cutout, so an
+attached stem showed two planes on Bedrock where Java shows one. Cutout blocks now use
+`alpha_test_single_sided`. After that, with dirt-slab and the camera: **429 drawings compared, 0
+differ** (worst 0.9%). Ten are skipped, all stand-in boxes.
+
 **Chunks, through the bot.** The bot never received chunks before because it had died (slimes, in
 this superflat) and never answered the respawn prompt, so its player entity was removed and tracked
 nothing. Answering `respawn` with state 2, as a client does, brought chunks and block updates.
