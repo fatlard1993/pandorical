@@ -180,6 +180,14 @@ public final class KeybindManager {
 		return category;
 	}
 
+	/** Whether a slot the server claimed is bound to the same key as this mapping. */
+	public static boolean claimsSameKey(KeyMapping mapping) {
+		for (int slot : claimedSlots) {
+			if (pool[slot] != null && !mapping.isUnbound() && pool[slot].same(mapping)) return true;
+		}
+		return false;
+	}
+
 	public static KeyMapping poolMapping(int slot) {
 		return slot >= 0 && slot < MAX_SLOTS ? pool[slot] : null;
 	}
