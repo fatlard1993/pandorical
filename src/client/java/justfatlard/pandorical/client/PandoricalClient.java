@@ -12,6 +12,7 @@ import justfatlard.pandorical.client.api.PandoricalClientApi;
 import justfatlard.pandorical.client.camera.CameraManager;
 import justfatlard.pandorical.client.component.ComponentRegistry;
 import justfatlard.pandorical.client.content.ContentManager;
+import justfatlard.pandorical.client.contextmodel.ConnectedFaces;
 import justfatlard.pandorical.client.contextmodel.ContextModels;
 import justfatlard.pandorical.client.contextmodel.DoorBanks;
 import justfatlard.pandorical.client.contextmodel.DoorJambs;
@@ -144,6 +145,7 @@ public class PandoricalClient implements ClientModInitializer {
             ContextModels.register(new TrapdoorBanks());
             ContextModels.register(new DoorJambs());
             ContextModels.register(new SlabHung());
+            ContextModels.register(new ConnectedFaces());
             ContextModels.init();
         }
 

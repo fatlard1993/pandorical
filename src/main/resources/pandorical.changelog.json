@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.23.0": [
+      "Glass from a server mod such as Better Glass can join up with the same glass beside it, drawn as one clear sheet instead of a grid of framed blocks."
+    ],
     "15.22.3": [
       "A game whose folder is a link to somewhere else, as a launcher's instance can be, takes the mods a server keeps for it again. It used to turn every update down without saying so."
     ],

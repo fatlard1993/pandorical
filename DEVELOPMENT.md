@@ -684,7 +684,7 @@ Nothing is persisted across a reconnect. Send the marks again on join.
 A block can be drawn differently for what stands beside it. The client swaps the model where
 the chunk compiler looks it up, with the neighbours in hand; each case is a provider that names
 the extra models it wants (found by scanning, so nothing is loaded that nobody shipped) and
-picks one at render time. Six ship today.
+picks one at render time. Seven ship today.
 
 **Rail diagonals.** A run of alternating curved rails is drawn as the straight diagonal it stands for. The
 client swaps a curve's model for a chord when a connected neighbour is the same bend turned half
@@ -722,6 +722,24 @@ for the wooden doors and iron.
 **Hung from a slab.** A ceiling-mounted block under a top slab would float half a block below
 it; a block that ships `<block>_hung_<facing>[_on]` takes that model there. Lever Torch ships
 them for its torch and vanilla's lever.
+
+**Connected faces.** Glass beside the same glass drawn as one sheet: the frame is left off every
+edge where the same block stands beyond it. This one assembles its model from pieces rather than
+picking one whole, so a block ships a handful instead of one per neighbour pattern. A full block
+ships `<block>_connected_<face>`, each face without a frame, and `<block>_connected_<face>_<toward>`,
+the frame along one edge of one face, laid over that face. No edge is framed where the same block
+carries on beyond it, or where the surface folds inward or outward round it into more of the same.
+Of the edges left, one where the same block still touches beyond either face, by an edge or a
+corner, is an odd corner of a larger shape: it takes `<block>_connected_<face>_<toward>_faint`
+instead, when the block ships one. A box keeps its outline at full strength; a sphere's steps are
+faint. A pane (any `IronBarsBlock`) ships vanilla's four pane parts without their caps as
+`<pane>_connected_<side|side_alt|noside|noside_alt>`, each with `_top` and `_bottom` frame strips,
+the arms also with `_end` and `_cap_<up|down>`, and the post's caps as `<pane>_connected_cap_<up|down>`;
+they are turned as vanilla's pane multipart turns its own. A face, or one of the four pane parts,
+may also ship `_bare`, the same without its streaks: a joined sheet draws that on all but one face
+in five, spread a knight's move apart, while a block standing alone keeps its streaks everywhere. A
+frame piece must repeat the faces it lies on exactly, vertex for vertex, or it fights them for depth
+instead of landing on top. Better Glass ships them for every vanilla glass and pane.
 
 ## Keybinds
 
