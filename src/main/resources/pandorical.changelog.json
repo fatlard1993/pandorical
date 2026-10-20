@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.22.3": [
+      "A game whose folder is a link to somewhere else, as a launcher's instance can be, takes the mods a server keeps for it again. It used to turn every update down without saying so."
+    ],
     "15.22.2": [
       "A mod's key that shares the game's Quick Actions key works again: G poops again with Poopsmith, instead of opening the menus. The menus are still on their own key."
     ],

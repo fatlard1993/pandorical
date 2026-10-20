@@ -199,10 +199,14 @@ public final class KeptClientMods {
 
 			ModContainer mod = FabricLoader.getInstance().getModContainer(entry.id()).orElse(null);
 			if (mod != null) {
+				if (!newer(entry.version(), mod.getMetadata().getVersion().getFriendlyString())) continue;
 				// Only a jar of its own in the mods folder can be swapped; a mod inside another,
 				// or one from a dev environment, is somebody else's to update.
-				if (jarOf(mod) == null) continue;
-				if (!newer(entry.version(), mod.getMetadata().getVersion().getFriendlyString())) continue;
+				if (jarOf(mod) == null) {
+					Pandorical.LOGGER.info("[pandorical] not taking {} {}: {} is not a jar of its own in {}",
+						entry.id(), entry.version(), mod.getOrigin().getPaths(), modsDir());
+					continue;
+				}
 			}
 			out.add(entry);
 		}
@@ -491,10 +495,19 @@ public final class KeptClientMods {
 		if (mod.getContainingMod().isPresent()) return null;
 		for (Path path : mod.getOrigin().getPaths()) {
 			if (path.getFileName() != null && path.getFileName().toString().endsWith(".jar")
-					&& modsDir().equals(path.getParent()) && Files.isRegularFile(path)) {
+					&& inModsDir(path) && Files.isRegularFile(path)) {
 				return path;
 			}
 		}
 		return null;
+	}
+
+	/** The loader resolves symlinks in a mod's path but not in the game dir's, so compare the files. */
+	private static boolean inModsDir(Path path) {
+		try {
+			return path.getParent() != null && Files.isSameFile(modsDir(), path.getParent());
+		} catch (IOException e) {
+			return false;
+		}
 	}
 }
