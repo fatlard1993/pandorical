@@ -1,5 +1,7 @@
 package justfatlard.pandorical.content;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.BlockRegistration;
 import justfatlard.pandorical.api.ContentApi;
@@ -40,6 +42,8 @@ public class ContentRegistry implements ContentApi {
     private final Map<String, byte[]> assets = new ConcurrentHashMap<>();
 
     private final Map<String, String> vanillaAssetOwners = new ConcurrentHashMap<>();
+    /** Each mod's own copy of a vanilla lang file, by path then mod, merged into the one served. */
+    private final Map<String, Map<String, byte[]>> vanillaLangContributions = new ConcurrentHashMap<>();
     private volatile List<SyncAssetsS2C> cachedAssetChunks = null;
 
     private final Map<String, VanillaItemOverride> vanillaItemOverrides = new LinkedHashMap<>();
@@ -168,6 +172,14 @@ public class ContentRegistry implements ContentApi {
                                     + assetsDir.relativize(file).toString();
                                 byte[] data = Files.readAllBytes(file);
 
+                                // A lang file in the vanilla namespace is the only one that beats
+                                // vanilla's own text, and several mods rename things there, so
+                                // their copies merge instead of the last one wiping the rest.
+                                if (namespace.equals("minecraft") && isLangFile(relativePath)) {
+                                    contributeVanillaLang(relativePath, modId, data);
+                                    return;
+                                }
+
                                 // Warn only on another mod's claim: this reruns on every
                                 // registration, so a mod meets its own files constantly.
                                 if (namespace.equals("minecraft")) {
@@ -191,6 +203,43 @@ public class ContentRegistry implements ContentApi {
         } catch (Exception e) {
             Pandorical.LOGGER.warn("Failed to scan assets for mod {}: {}", modId, e.getMessage());
         }
+    }
+
+    private static boolean isLangFile(String path) {
+        return path.startsWith("assets/minecraft/lang/") && path.endsWith(".json");
+    }
+
+    /**
+     * Serve the union of every mod's copy of one vanilla lang file. Keys two mods both set keep the
+     * later mod's text, with a warning naming both, the same rule a whole-file clash follows.
+     */
+    private synchronized void contributeVanillaLang(String path, String modId, byte[] data) {
+        var byMod = vanillaLangContributions.computeIfAbsent(path, p -> new LinkedHashMap<>());
+        byMod.put(modId, data);
+
+        var merged = new JsonObject();
+        var setBy = new HashMap<String, String>();
+        for (var contribution : byMod.entrySet()) {
+            JsonObject entries;
+            try {
+                entries = JsonParser.parseString(
+                    new String(contribution.getValue(), StandardCharsets.UTF_8)).getAsJsonObject();
+            } catch (RuntimeException e) {
+                Pandorical.LOGGER.warn("[pandorical] '{}' ships an unreadable {}: {}",
+                    contribution.getKey(), path, e.getMessage());
+                continue;
+            }
+            for (var entry : entries.entrySet()) {
+                String previous = setBy.put(entry.getKey(), contribution.getKey());
+                if (previous != null && !previous.equals(contribution.getKey())
+                        && !merged.get(entry.getKey()).equals(entry.getValue())) {
+                    Pandorical.LOGGER.warn("[pandorical] '{}' overwrites '{}' from '{}' in {}",
+                        contribution.getKey(), entry.getKey(), previous, path);
+                }
+                merged.add(entry.getKey(), entry.getValue());
+            }
+        }
+        registerAsset(path, merged.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     @Override
