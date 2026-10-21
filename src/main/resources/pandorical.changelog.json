@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.24.3": [
+      "Pandorical from CurseForge takes no client mods from servers: update it and your other client mods from CurseForge. Elsewhere nothing changes."
+    ],
     "15.24.2": [
       "The newer-mods notice has an Install and quit button that does just that, with no second question."
     ],
