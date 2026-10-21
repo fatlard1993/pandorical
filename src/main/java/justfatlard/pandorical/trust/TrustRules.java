@@ -54,6 +54,7 @@ public final class TrustRules implements TrustApi {
 
     @Override
     public boolean may(ServerPlayer player, Trust what) {
+        if (decidedElsewhere(player.level())) return true;
         Boolean own = TrustBook.get(player.level().getServer()).choice(player.getUUID(), what);
         if (own != null) return own;
         return byDefault(player.level(), what);
@@ -77,6 +78,11 @@ public final class TrustRules implements TrustApi {
         elsewhere.add(where);
     }
 
+    private boolean decidedElsewhere(ServerLevel level) {
+        for (Predicate<ServerLevel> where : elsewhere) if (where.test(level)) return true;
+        return false;
+    }
+
     @Override
     public void open(ServerPlayer op) {
         TrustScreen.open(op);
@@ -89,7 +95,7 @@ public final class TrustRules implements TrustApi {
      */
     public @Nullable Boolean pvp(ServerPlayer victim, ServerPlayer attacker) {
         if (victim == attacker) return null;
-        for (Predicate<ServerLevel> where : elsewhere) if (where.test(victim.level())) return null;
+        if (decidedElsewhere(victim.level())) return null;
         TrustBook book = TrustBook.get(victim.level().getServer());
         if (book.choice(victim.getUUID(), Trust.PVP) == null && book.choice(attacker.getUUID(), Trust.PVP) == null) return null;
         return may(victim, Trust.PVP) && may(attacker, Trust.PVP);

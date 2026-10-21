@@ -26,8 +26,8 @@ public interface TrustApi {
     boolean mayHurt(ServerPlayer attacker, LivingEntity target);
 
     /**
-     * Places whose own PvP rules stand whatever anyone's trust says, such as an arena: in a level
-     * this holds for, Pandorical leaves PvP to the game and whoever else decides it.
+     * Places whose own rules stand whatever anyone's trust says, such as an arena: in a level this
+     * holds for, Pandorical refuses nothing and leaves PvP to the game and whoever else decides it.
      */
     void pvpDecidedElsewhere(Predicate<ServerLevel> where);
 
