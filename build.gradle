@@ -25,6 +25,16 @@ loom {
     }
 }
 
+// Taking client mods from a server writes jars into the mods folder, which CurseForge holds for
+// manual review. -Pcurseforge builds the jar it gets with a stand-in that takes nothing, into a
+// build directory of its own so the suite's builds against build/ are untouched.
+if (project.hasProperty('curseforge')) {
+    layout.buildDirectory = file('build-curseforge')
+    sourceSets.client.java.srcDir 'src/curseforge/java'
+} else {
+    sourceSets.client.java.srcDir 'src/updater/java'
+}
+
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
