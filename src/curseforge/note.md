@@ -1,1 +1,1 @@
-This CurseForge build does not take client mods from servers. Update Pandorical and your other client mods here on CurseForge.
+This CurseForge build does not pass mods between server and player: a server running it keeps no client mods for players, and a game running it takes none. Update Pandorical and your other client mods here on CurseForge.
