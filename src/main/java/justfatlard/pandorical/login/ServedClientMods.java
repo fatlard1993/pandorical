@@ -6,6 +6,7 @@ import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.protocol.ClientModPartS2C;
 import justfatlard.pandorical.protocol.ClientModsOfferS2C;
 import justfatlard.pandorical.protocol.ClientModsWantC2S;
+import justfatlard.pandorical.protocol.InstallKeptS2C;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationConnectionEvents;
@@ -77,6 +78,7 @@ public final class ServedClientMods {
 		PayloadTypeRegistry.clientboundConfiguration().register(ClientModsOfferS2C.TYPE, ClientModsOfferS2C.STREAM_CODEC);
 		PayloadTypeRegistry.clientboundConfiguration().register(ClientModPartS2C.TYPE, ClientModPartS2C.STREAM_CODEC);
 		PayloadTypeRegistry.serverboundConfiguration().register(ClientModsWantC2S.TYPE, ClientModsWantC2S.STREAM_CODEC);
+		PayloadTypeRegistry.clientboundPlay().register(InstallKeptS2C.TYPE, InstallKeptS2C.STREAM_CODEC);
 	}
 
 	/** After every other BEFORE_CONFIGURE listener, so the task this puts first stays first. */

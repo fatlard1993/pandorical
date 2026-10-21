@@ -73,6 +73,11 @@ public final class TrapdoorBanks implements ContextModels.Provider {
 	}
 
 	@Override
+	public boolean covers(Block block) {
+		return KEYS.keySet().stream().anyMatch(key -> key.block() == block);
+	}
+
+	@Override
 	public BlockStateModel pick(BlockState state, BlockAndTintGetter level, BlockPos pos, ContextModels.Lookup models) {
 		if (KEYS.isEmpty() || !(state.getBlock() instanceof TrapDoorBlock)) return null;
 		boolean open = state.getValue(TrapDoorBlock.OPEN);

@@ -30,6 +30,7 @@ hello_c2s 0f020773637265656e7303687564
 hello_s2c 0f020773637265656e7303687564
 hide_hud 086d796d6f643a6831
 immersive_portals 01
+install_kept 
 key_press 03
 keybind_declarations 03000102
 keybind_defaults 0100086d796d6f643a6b3141

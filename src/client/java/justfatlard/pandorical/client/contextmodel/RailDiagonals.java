@@ -108,6 +108,13 @@ public final class RailDiagonals implements ContextModels.Provider {
 	}
 
 	@Override
+	public boolean covers(Block block) {
+		return KEYS.keySet().stream().anyMatch(key -> key.block() == block)
+			|| EASINGS.keySet().stream().anyMatch(key -> key.block() == block)
+			|| ENDS.keySet().stream().anyMatch(key -> key.block() == block);
+	}
+
+	@Override
 	public BlockStateModel pick(BlockState state, BlockAndTintGetter level, BlockPos pos, ContextModels.Lookup models) {
 		if (KEYS.isEmpty()) return null;
 		Property<RailShape> property = shapeProperty(state.getBlock());

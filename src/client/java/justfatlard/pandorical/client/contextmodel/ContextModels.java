@@ -7,34 +7,43 @@ import net.fabricmc.fabric.api.client.model.loading.v1.FabricModelManager;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.fabricmc.fabric.api.client.model.loading.v1.PreparableModelLoadingPlugin;
 import net.fabricmc.fabric.api.client.model.loading.v1.SimpleUnbakedExtraModel;
+import net.fabricmc.fabric.api.client.renderer.v1.mesh.QuadEmitter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.BlockAndTintGetter;
-import net.minecraft.client.renderer.block.BlockStateModelSet;
 import net.minecraft.client.renderer.block.dispatch.BlockModelRotation;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.block.dispatch.ModelState;
+import net.minecraft.client.resources.model.sprite.Material;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
 
 /**
- * Models chosen by a block's neighbours. A model cannot see the world, so the choice is made
- * where the chunk compiler looks the model up. Providers register only models that exist.
+ * Models chosen by a block's neighbours. A block some provider covers has its model wrapped, and
+ * the wrapper picks when it is drawn, through the Fabric renderer's world-aware quad emission, so
+ * it holds under any renderer that implements it, vanilla's and Sodium's alike. Providers register
+ * only models that exist.
  */
 @Environment(EnvType.CLIENT)
 public final class ContextModels {
 	private ContextModels() {}
 
-	public static final ThreadLocal<BlockAndTintGetter> LEVEL = new ThreadLocal<>();
-	public static final ThreadLocal<BlockPos> POS = new ThreadLocal<>();
-
 	public interface Provider {
 		void scan(ResourceManager resources, Registrar add);
+
+		/** Whether this provider may ever pick for the block; only those blocks are wrapped. */
+		boolean covers(Block block);
 
 		/** Null leaves the block's own model. */
 		BlockStateModel pick(BlockState state, BlockAndTintGetter level, BlockPos pos, Lookup models);
@@ -53,12 +62,6 @@ public final class ContextModels {
 	private record Wanted(ExtraModelKey<BlockStateModel> key, Identifier model, ModelState state) {}
 
 	private static final List<Provider> PROVIDERS = new ArrayList<>();
-	private static boolean any;
-
-	public static boolean active() {
-		return any;
-	}
-
 	public static void register(Provider provider) {
 		PROVIDERS.add(provider);
 	}
@@ -88,21 +91,51 @@ public final class ContextModels {
 				for (Wanted w : wanted) {
 					context.addModel(w.key(), SimpleUnbakedExtraModel.blockStateModel(w.model(), w.state()));
 				}
-				any = !wanted.isEmpty();
+				if (wanted.isEmpty()) return;
+				context.modifyBlockModelAfterBake().register((model, baked) -> {
+					Block block = baked.state().getBlock();
+					for (Provider provider : PROVIDERS) {
+						if (provider.covers(block)) return new Contextual(model);
+					}
+					return model;
+				});
 			});
 	}
 
-	public static BlockStateModel pick(BlockStateModelSet models, BlockState state) {
-		BlockStateModel own = models.get(state);
-		if (!any) return own;
-		BlockAndTintGetter level = LEVEL.get();
-		BlockPos pos = POS.get();
-		if (level == null || pos == null) return own;
+	private static BlockStateModel pick(BlockStateModel own, BlockState state, BlockAndTintGetter level, BlockPos pos) {
 		Lookup lookup = key -> ((FabricModelManager) Minecraft.getInstance().getModelManager()).getModel(key);
 		for (Provider provider : PROVIDERS) {
 			BlockStateModel chosen = provider.pick(state, level, pos, lookup);
 			if (chosen != null) return chosen;
 		}
 		return own;
+	}
+
+	/** A block's own model wherever no provider picks another; out of the world, always its own. */
+	private record Contextual(BlockStateModel own) implements BlockStateModel {
+		@Override
+		public void emitQuads(QuadEmitter emitter, BlockAndTintGetter level, BlockPos pos, BlockState state, RandomSource random, Predicate<@Nullable Direction> cullTest) {
+			pick(own, state, level, pos).emitQuads(emitter, level, pos, state, random, cullTest);
+		}
+
+		@Override
+		public int materialFlags(BlockAndTintGetter level, BlockPos pos, BlockState state, RandomSource random) {
+			return pick(own, state, level, pos).materialFlags(level, pos, state, random);
+		}
+
+		@Override
+		public void collectParts(RandomSource random, List<BlockStateModelPart> parts) {
+			own.collectParts(random, parts);
+		}
+
+		@Override
+		public Material.Baked particleMaterial() {
+			return own.particleMaterial();
+		}
+
+		@Override
+		public int materialFlags() {
+			return own.materialFlags();
+		}
 	}
 }

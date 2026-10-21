@@ -133,6 +133,11 @@ public final class ConnectedFaces implements ContextModels.Provider {
 	}
 
 	@Override
+	public boolean covers(Block block) {
+		return SHEETS.contains(block) || PANES.contains(block);
+	}
+
+	@Override
 	public BlockStateModel pick(BlockState state, BlockAndTintGetter level, BlockPos pos, ContextModels.Lookup models) {
 		Block block = state.getBlock();
 		if (!PANES.contains(block) && !SHEETS.contains(block)) return null;

@@ -7,7 +7,9 @@ import justfatlard.pandorical.client.mixin.ClientCommonListenerAccessor;
 import justfatlard.pandorical.protocol.ClientModPartS2C;
 import justfatlard.pandorical.protocol.ClientModsOfferS2C;
 import justfatlard.pandorical.protocol.ClientModsWantC2S;
+import justfatlard.pandorical.protocol.InstallKeptS2C;
 import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworking;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
@@ -139,6 +141,9 @@ public final class KeptClientMods {
 			}
 		});
 
+		ClientPlayNetworking.registerGlobalReceiver(InstallKeptS2C.TYPE, (payload, context) ->
+			context.client().execute(() -> askNow(context.client())));
+
 		ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
 			if (askedThisRun || !askingPlace(client, screen)) return;
 			List<Staged> staged = staged();
@@ -162,6 +167,26 @@ public final class KeptClientMods {
 		if (client.level != null) return false;
 		return screen instanceof TitleScreen || screen instanceof JoinMultiplayerScreen
 			|| screen instanceof DisconnectedScreen;
+	}
+
+	/**
+	 * Asked for from the server's notice, so put now, whatever is on screen. Nothing staged means
+	 * this version was turned down or never came; the player has just said they want it, so the
+	 * refusal is forgotten and the next join fetches it again.
+	 */
+	private static void askNow(Minecraft client) {
+		List<Staged> staged = staged();
+		if (staged.isEmpty()) {
+			try {
+				Files.deleteIfExists(declinedFile());
+			} catch (IOException e) {
+				Pandorical.LOGGER.debug("[pandorical] could not forget what was declined", e);
+			}
+			client.gui.hud.getChat().addClientSystemMessage(Component.translatable("pandorical.update.none_staged"));
+			return;
+		}
+		askedThisRun = true;
+		ask(client, client.gui.screen(), staged);
 	}
 
 	/**

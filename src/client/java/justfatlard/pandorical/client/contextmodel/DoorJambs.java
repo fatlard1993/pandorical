@@ -60,6 +60,11 @@ public final class DoorJambs implements ContextModels.Provider {
 	}
 
 	@Override
+	public boolean covers(Block block) {
+		return KEYS.keySet().stream().anyMatch(key -> key.block() == block);
+	}
+
+	@Override
 	public BlockStateModel pick(BlockState state, BlockAndTintGetter level, BlockPos pos, ContextModels.Lookup models) {
 		if (KEYS.isEmpty() || !isDoor(state)) return null;
 		Direction facing = state.getValue(DoorBlock.FACING);

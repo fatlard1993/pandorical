@@ -715,10 +715,13 @@ Nothing is persisted across a reconnect. Send the marks again on join.
 
 ## Context models
 
-A block can be drawn differently for what stands beside it. The client swaps the model where
-the chunk compiler looks it up, with the neighbours in hand; each case is a provider that names
-the extra models it wants (found by scanning, so nothing is loaded that nobody shipped) and
-picks one at render time. Seven ship today.
+A block can be drawn differently for what stands beside it. Each case is a provider that names
+the extra models it wants (found by scanning, so nothing is loaded that nobody shipped), says
+which blocks it covers, and picks one at render time. A covered block's model is wrapped, and the
+wrapper picks as the Fabric renderer asks it for its quads with the world and position in hand,
+so it works under any renderer that implements that, vanilla's and Sodium's alike; a hook into
+vanilla's own chunk compiler would be passed over by Sodium, which builds chunks its own way.
+Seven ship today.
 
 **Rail diagonals.** A run of alternating curved rails is drawn as the straight diagonal it stands for. The
 client swaps a curve's model for a chord when a connected neighbour is the same bend turned half

@@ -423,6 +423,7 @@ public class Pandorical implements ModInitializer {
         justfatlard.pandorical.notice.Notices.register();
         justfatlard.pandorical.changelog.Changelog.register();
         justfatlard.pandorical.brief.Brief.register();
+        justfatlard.pandorical.settings.ClientVersions.registerNotice();
         // Pandorical's own overview and news are in pandorical.changelog.json beside the other
         // mods' - the same file, read the same way. A feature whose author reaches past it for
         // something more convenient is a feature nobody else should be asked to use.

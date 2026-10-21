@@ -4,6 +4,10 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.24.1": [
+      "Blocks drawn by what stands beside them, joined glass, rail diagonals, door jambs and the rest, now show with Sodium installed too, where before they fell back to their plain look.",
+      "An arena that makes its own PvP rules, like PvP Dimensions' arenas, makes its own fire and explosives rules too: what an op has not trusted a player with is theirs to use in there."
+    ],
     "15.24.0": [
       "Immersive portals, a server setting an op or a mod can turn on: a nether portal shows what is past it through the swirl, and you step through in half a second instead of standing in it for four.",
       "The trip itself is one swirl: it thickens as you go in, covers the change of world where the loading screen was, and thins on the far side, with a squelch each way. Your own settings can turn it off."

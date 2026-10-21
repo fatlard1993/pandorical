@@ -52,6 +52,7 @@
   "pandorical.update.message": "%s. Installing closes the game, because the running game keeps the old ones until it restarts: start it again to play on them. Switch any of them off later from Mods, and it stays off.",
   "pandorical.update.yes": "Install and quit",
   "pandorical.update.no": "Not these versions",
+  "pandorical.update.none_staged": "Nothing has downloaded to install yet. Join the server again and it will, then this will ask.",
   "pandorical.too_old": "This server needs Pandorical %s or newer. Yours is older; update it and join again.",
   "pandorical.trust.refused.fire": "An op has not trusted you with fire and lava",
   "pandorical.trust.refused.explosives": "An op has not trusted you with explosives",

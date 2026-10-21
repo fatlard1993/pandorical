@@ -55,6 +55,11 @@ public final class SlabHung implements ContextModels.Provider {
 	}
 
 	@Override
+	public boolean covers(Block block) {
+		return KEYS.keySet().stream().anyMatch(key -> key.block() == block);
+	}
+
+	@Override
 	public BlockStateModel pick(BlockState state, BlockAndTintGetter level, BlockPos pos, ContextModels.Lookup models) {
 		if (KEYS.isEmpty() || !state.hasProperty(BlockStateProperties.ATTACH_FACE)) return null;
 		if (state.getValue(BlockStateProperties.ATTACH_FACE) != AttachFace.CEILING) return null;

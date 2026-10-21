@@ -3,15 +3,17 @@ package justfatlard.pandorical.settings;
 import com.mojang.brigadier.CommandDispatcher;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.api.ClientKind;
+import justfatlard.pandorical.api.NoticeApi;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.entitykind.EntityKinds;
 import justfatlard.pandorical.login.ClientKinds;
 import justfatlard.pandorical.login.ServedClientMods;
 import justfatlard.pandorical.protocol.ClientModFilesC2S;
+import justfatlard.pandorical.protocol.InstallKeptS2C;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.commands.CommandSourceStack;
 import net.fabricmc.loader.api.Version;
 import net.fabricmc.loader.api.VersionParsingException;
-import net.minecraft.ChatFormatting;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -37,6 +39,8 @@ public final class ClientVersions {
 
     /** The last line logged for each player, so a report that changed nothing is not logged twice. */
     private static final Map<UUID, String> LOGGED = new ConcurrentHashMap<>();
+
+    private static final String UPDATE_KIND = "pandorical:update";
 
     /** Players already told this session that their game is behind. */
     private static final Set<UUID> TOLD = ConcurrentHashMap.newKeySet();
@@ -84,10 +88,23 @@ public final class ClientVersions {
     }
 
     /**
+     * The notice's own answers. Install sends the client the word to ask now; a client before
+     * 15.24.1 cannot take it, so it is offered only a dismissal and told where the question waits.
+     */
+    public static void registerNotice() {
+        PandoricalApi.notices().onChoice(UPDATE_KIND, (player, noticeId, choiceId) -> {
+            if ("install".equals(choiceId) && ServerPlayNetworking.canSend(player, InstallKeptS2C.TYPE)) {
+                ServerPlayNetworking.send(player, new InstallKeptS2C());
+            }
+        });
+    }
+
+    /**
      * A game running an older mod than this server keeps for it has been sent the new one, and
-     * plays on the old one until it installs it and restarts. Clients before 15.21 installed it and
-     * played on without a word about restarting, and a client cannot be taught that after the
-     * fact, so the server says it: once a join, to the player whose game it is.
+     * plays on the old one until it installs it and restarts. The client asks at the next menu it
+     * shows, which a player who joined straight into the world may not open for an hour, and a
+     * chat line on joining scrolled away under everybody else's arrival. So the server leaves a
+     * notice, once a join, which waits in the tray until it is answered.
      */
     private static void tellIfBehind(ServerPlayer player, List<ClientModFilesC2S.Entry> entries) {
         Map<String, String> kept = ServedClientMods.versions();
@@ -99,9 +116,15 @@ public final class ClientVersions {
             }
         }
         if (behind.isEmpty() || !TOLD.add(player.getUUID())) return;
-        player.sendSystemMessage(Component.literal("This server has newer mods for your game: "
-            + String.join(", ", behind) + ". Open the pause menu to install, then restart the game.")
-            .withStyle(ChatFormatting.YELLOW));
+        String newer = "Newer mods for your game: " + String.join(", ", behind);
+        boolean canInstall = ServerPlayNetworking.canSend(player, InstallKeptS2C.TYPE);
+        PandoricalApi.notices().offer(player, new NoticeApi.Notice("update", UPDATE_KIND, "minecraft:emerald",
+            canInstall ? newer : newer + ". Press Esc and pick Install and quit, then start the game again.",
+            canInstall
+                ? List.of(new NoticeApi.Choice("install", "minecraft:lime_dye", "Install now"),
+                    new NoticeApi.Choice("later", "minecraft:clock", "Later"))
+                : List.of(),
+            0));
     }
 
     private static boolean newer(String offered, String running) {

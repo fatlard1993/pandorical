@@ -126,6 +126,8 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 		out.put("screen_action", encode(ScreenActionC2S.STREAM_CODEC, new ScreenActionC2S(
 			"mymod:s1", "ok", "click", Map.of("value", "1"))));
 		out.put("content_ready", encode(ContentReadyC2S.STREAM_CODEC, new ContentReadyC2S()));
+		out.put("install_kept", encode(justfatlard.pandorical.protocol.InstallKeptS2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.InstallKeptS2C()));
 		out.put("use_structure", encode(UseStructureC2S.STREAM_CODEC, new UseStructureC2S("mymod:ship", 1, -2, 3)));
 		out.put("set_structure_dry", encode(SetStructureDryS2C.STREAM_CODEC, new SetStructureDryS2C("mymod:ship",
 			List.of(new StructureRelPos(1, -2, 3)))));
