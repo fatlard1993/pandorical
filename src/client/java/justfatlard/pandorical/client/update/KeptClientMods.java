@@ -142,7 +142,7 @@ public final class KeptClientMods {
 		});
 
 		ClientPlayNetworking.registerGlobalReceiver(InstallKeptS2C.TYPE, (payload, context) ->
-			context.client().execute(() -> askNow(context.client())));
+			context.client().execute(() -> installNow(context.client())));
 
 		ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
 			if (askedThisRun || !askingPlace(client, screen)) return;
@@ -170,11 +170,12 @@ public final class KeptClientMods {
 	}
 
 	/**
-	 * Asked for from the server's notice, so put now, whatever is on screen. Nothing staged means
-	 * this version was turned down or never came; the player has just said they want it, so the
-	 * refusal is forgotten and the next join fetches it again.
+	 * Install and quit, from the server's notice: that button was the yes, so nothing asks again,
+	 * and an install that fails puts the usual question instead. Nothing staged means this version
+	 * was turned down or never came; the player has just said they want it, so the refusal is
+	 * forgotten and the next join fetches it again.
 	 */
-	private static void askNow(Minecraft client) {
+	private static void installNow(Minecraft client) {
 		List<Staged> staged = staged();
 		if (staged.isEmpty()) {
 			try {
@@ -186,6 +187,10 @@ public final class KeptClientMods {
 			return;
 		}
 		askedThisRun = true;
+		if (install(staged)) {
+			client.exitWorldAndClose();
+			return;
+		}
 		ask(client, client.gui.screen(), staged);
 	}
 

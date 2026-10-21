@@ -87,10 +87,7 @@ public final class ClientVersions {
         TOLD.remove(player);
     }
 
-    /**
-     * The notice's own answers. Install sends the client the word to ask now; a client before
-     * 15.24.1 cannot take it, so it is offered only a dismissal and told where the question waits.
-     */
+    /** The notice's own answer: install sends the client the word to install and quit now. */
     public static void registerNotice() {
         PandoricalApi.notices().onChoice(UPDATE_KIND, (player, noticeId, choiceId) -> {
             if ("install".equals(choiceId) && ServerPlayNetworking.canSend(player, InstallKeptS2C.TYPE)) {
@@ -104,7 +101,8 @@ public final class ClientVersions {
      * plays on the old one until it installs it and restarts. The client asks at the next menu it
      * shows, which a player who joined straight into the world may not open for an hour, and a
      * chat line on joining scrolled away under everybody else's arrival. So the server leaves a
-     * notice, once a join, which waits in the tray until it is answered.
+     * notice, once a join, which waits in the tray until it is answered. A client before 15.24.1
+     * cannot take the word to install, so it gets no notice: its pause menu asks on its own.
      */
     private static void tellIfBehind(ServerPlayer player, List<ClientModFilesC2S.Entry> entries) {
         Map<String, String> kept = ServedClientMods.versions();
@@ -115,15 +113,12 @@ public final class ClientVersions {
                 behind.add(entry.name() + " " + offered + " (you are running " + entry.version() + ")");
             }
         }
-        if (behind.isEmpty() || !TOLD.add(player.getUUID())) return;
-        String newer = "Newer mods for your game: " + String.join(", ", behind);
-        boolean canInstall = ServerPlayNetworking.canSend(player, InstallKeptS2C.TYPE);
+        if (behind.isEmpty() || !ServerPlayNetworking.canSend(player, InstallKeptS2C.TYPE)) return;
+        if (!TOLD.add(player.getUUID())) return;
         PandoricalApi.notices().offer(player, new NoticeApi.Notice("update", UPDATE_KIND, "minecraft:emerald",
-            canInstall ? newer : newer + ". Press Esc and pick Install and quit, then start the game again.",
-            canInstall
-                ? List.of(new NoticeApi.Choice("install", "minecraft:lime_dye", "Install now"),
-                    new NoticeApi.Choice("later", "minecraft:clock", "Later"))
-                : List.of(),
+            "Newer mods for your game: " + String.join(", ", behind),
+            List.of(new NoticeApi.Choice("install", "minecraft:lime_dye", "Install and quit"),
+                new NoticeApi.Choice("later", "minecraft:clock", "Later")),
             0));
     }
 

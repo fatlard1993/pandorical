@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.24.2": [
+      "The newer-mods notice has an Install and quit button that does just that, with no second question."
+    ],
     "15.24.1": [
       "Blocks drawn by what stands beside them, joined glass, rail diagonals, door jambs and the rest, now show with Sodium installed too, where before they fell back to their plain look.",
       "An arena that makes its own PvP rules, like PvP Dimensions' arenas, makes its own fire and explosives rules too: what an op has not trusted a player with is theirs to use in there."
