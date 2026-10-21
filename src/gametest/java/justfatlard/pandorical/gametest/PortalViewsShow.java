@@ -1,6 +1,8 @@
 package justfatlard.pandorical.gametest;
 
 import justfatlard.pandorical.client.portal.PortalViews;
+import justfatlard.pandorical.api.PandoricalApi;
+import justfatlard.pandorical.api.PortalApi;
 import justfatlard.pandorical.portal.ImmersivePortals;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -9,6 +11,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestServerContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -21,6 +24,7 @@ import net.minecraft.world.phys.Vec3;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 import javax.imageio.ImageIO;
 
@@ -30,6 +34,10 @@ import javax.imageio.ImageIO;
  * With immersive portals off the view goes.
  */
 public final class PortalViewsShow implements FabricClientGameTest {
+	/** The far end this test's own answer gives the overworld portal; null leaves it to pairing. */
+	private static volatile PortalApi.FarEnd oneFace;
+	private static BlockPos netherPortal;
+	private static Direction glowstoneSide;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -38,6 +46,7 @@ public final class PortalViewsShow implements FabricClientGameTest {
 			TestServerConnection connection = world.getConnection();
 			connection.waitForChunksRender();
 			server.runOnServer(s -> ImmersivePortals.choose(s, true));
+			PandoricalApi.portals().lookThrough((viewer, level, pos) -> level.dimension() == Level.OVERWORLD ? oneFace : null);
 
 			BlockPos spawn = server.computeOnServer(s -> connection.getServerPlayer().blockPosition());
 			BlockPos base = server.computeOnServer(s -> {
@@ -59,12 +68,24 @@ public final class PortalViewsShow implements FabricClientGameTest {
 			Pictures.look(server, middle.add(0, -1.2, -5), middle);
 			waitForView(context, true);
 			Path on = Pictures.shoot(context, connection, "portal-view-front");
+			double plane = base.getZ() + 0.5;
+			Vec3 front = new Vec3(middle.x, middle.y, plane - 5), back = new Vec3(middle.x, middle.y, plane + 5);
+			allBeyond(context, front, plane);
+			allBeyond(context, back, plane);
 			Pictures.look(server, middle.add(-3.5, -1.2, -3.5), middle);
 			context.waitTicks(20);
 			Pictures.shoot(context, connection, "portal-view-angle");
 			Pictures.look(server, middle.add(0, -1.2, 5), middle);
 			context.waitTicks(20);
 			Pictures.shoot(context, connection, "portal-view-back");
+
+			// Out of one face only: both sides of the near sheet show what stands in front of it
+			oneFace = PortalApi.FarEnd.outOf(GlobalPos.of(Level.NETHER, netherPortal), glowstoneSide);
+			context.waitTicks(30);
+			int fromFront = allBeyond(context, front, plane), fromBack = allBeyond(context, back, plane);
+			if (fromFront != fromBack) throw new AssertionError("one face showed " + fromFront + " blocks from the front and " + fromBack + " from the back");
+			oneFace = null;
+			context.waitTicks(30);
 
 			Pictures.look(server, middle.add(0, -1.2, -5), middle);
 			server.runOnServer(s -> ImmersivePortals.choose(s, false));
@@ -73,6 +94,16 @@ public final class PortalViewsShow implements FabricClientGameTest {
 			double changed = difference(on, off);
 			if (changed < 6.0) throw new AssertionError("the view changed the portal by only " + changed + " on average: it is not showing");
 		}
+	}
+
+	/** Every far block an eye here sees stands past the sheet from it; how many there are. */
+	private static int allBeyond(ClientGameTestContext context, Vec3 eye, double plane) {
+		List<Vec3> shown = context.computeOnClient(client -> PortalViews.shownFrom(eye));
+		if (shown.isEmpty()) throw new AssertionError("nothing shows past the sheet from " + eye);
+		for (Vec3 at : shown) {
+			if ((at.z - plane) * (eye.z - plane) >= 0) throw new AssertionError("a far block at " + at + " stands on the eye's side of the sheet, from " + eye);
+		}
+		return shown.size();
 	}
 
 	/** How far apart two shots are in the middle of the frame, where the sheet stands: mean of each channel's difference. */
@@ -124,6 +155,8 @@ public final class PortalViewsShow implements FabricClientGameTest {
 		BlockPos portal = portalBlockNear(nether, inside);
 		if (portal == null) throw new AssertionError("arrived nowhere near a nether portal");
 		boolean alongX = nether.getBlockState(portal).getValue(NetherPortalBlock.AXIS) == Direction.Axis.X;
+		netherPortal = portal;
+		glowstoneSide = alongX ? Direction.SOUTH : Direction.EAST;
 		BlockState gold = Blocks.GOLD_BLOCK.defaultBlockState();
 		for (int side : new int[] {-3, 3}) {
 			for (int up = 0; up < 3; up++) {

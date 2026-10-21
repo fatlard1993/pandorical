@@ -662,7 +662,8 @@ where a mod says it:
 PandoricalApi.portals().pairNetherPortals(true);    // each portal goes back the way it came
 PandoricalApi.portals().immersivePortals(true);     // see through them, step through them
 PandoricalApi.portals().keepOutOfPairing((level, pos) -> isMine(level, pos));
-PandoricalApi.portals().lookThrough((level, pos) -> isMine(level, pos) ? whereMineLeads(level, pos) : null);
+PandoricalApi.portals().lookThrough((viewer, level, pos) ->
+    isMine(level, pos) ? PortalApi.FarEnd.of(whereMineLeads(level, pos)) : null);
 ```
 
 Both switches are defaults: the last mod to call wins, and an op's choice on Pandorical's page
@@ -675,10 +676,16 @@ the far end of the portal nearest them, a dozen deep, and the client draws them 
 with vanilla's swirl over the top. It is a short look, and the swirl is what hides that.
 
 A portal kept out of pairing has no partner to show, so a mod that sends travellers somewhere
-itself answers `lookThrough` with any block of the portal its own leads to. The view is laid out
-the way vanilla carries a traveller, sheet middle to sheet middle, turned a quarter between sheets
-facing different ways; a mod that turns travellers its own way shows a far side they do not come
-out facing.
+itself answers `lookThrough` with any block of the portal its own leads to. It is asked per player,
+for portals that lead each traveller somewhere of their own, and null passes the question on.
+
+`FarEnd.of(portal)` lays the view out the way vanilla carries a traveller: sheet middle to sheet
+middle, turned a quarter between sheets facing different ways, so each side of the near sheet shows
+the side of the far one a traveller walking in from there comes out of. A mod whose trips always
+come out of one face says which, `FarEnd.outOf(portal, face)`, and both sides of the near sheet show
+what stands in front of that face, turned so that walking in is walking out of it. A face the far
+sheet does not have is taken as none. pvp-dimensions' arena exits, which put each player back on
+the side of the gate they came in by, are the working example.
 
 ## Chest overlays
 

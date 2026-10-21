@@ -103,12 +103,11 @@ public final class PortalViews {
     private static final class View {
         final ClientLevel level;
         final PortalViewS2C.Sheet near;
-        final boolean turned;
         final Vector4f sky;
         final Holder<Biome> biome;
-        /** Split by which side of the near sheet they stand on: the side away from the eye is drawn. */
-        final List<Shown> lowSide = new ArrayList<>();
-        final List<Shown> highSide = new ArrayList<>();
+        /** What an eye on the near sheet's low side sees past it, and an eye on its high side. */
+        final Layout fromLow;
+        final Layout fromHigh;
         final Long2ObjectOpenHashMap<BlockState> states = new Long2ObjectOpenHashMap<>();
         /** Light on each far block's open faces, and on the air beside it: what its faces are lit by. */
         final Long2IntOpenHashMap light = new Long2IntOpenHashMap();
@@ -116,29 +115,19 @@ public final class PortalViews {
         View(ClientLevel level, PortalViewS2C view) {
             this.level = level;
             this.near = view.near();
-            this.turned = view.near().alongX() != view.far().alongX();
             this.sky = new Vector4f(((view.sky() >> 16) & 0xFF) / 255.0F, ((view.sky() >> 8) & 0xFF) / 255.0F, (view.sky() & 0xFF) / 255.0F, 1.0F);
             this.biome = biome(level, view.biome(), view.near().corner());
             light.defaultReturnValue(0);
 
-            Vec3 farMiddle = middle(view.far());
-            Vec3 nearMiddle = middle(view.near());
-            double plane = thin(nearMiddle);
             BlockPos corner = view.far().corner();
             for (PortalViewS2C.Block block : view.blocks()) {
                 BlockPos far = corner.offset(block.dx(), block.dy(), block.dz());
-                BlockState state = Block.stateById(block.state());
-                states.put(far.asLong(), state);
+                states.put(far.asLong(), Block.stateById(block.state()));
                 light.put(far.asLong(), block.light());
-
-                double cx = far.getX() + 0.5 - farMiddle.x, cy = far.getY() + 0.5 - farMiddle.y, cz = far.getZ() + 0.5 - farMiddle.z;
-                // Vanilla turns a traveller between sheets facing different ways by a quarter: this is that turn, undone
-                Vec3 at = turned ? nearMiddle.add(cz, cy, -cx) : nearMiddle.add(cx, cy, cz);
-                double side = thin(at) - plane;
-                // The sheet's own row is half on each side of it, and would stand in front of it
-                if (Math.abs(side) < 0.5) continue;
-                (side < 0 ? lowSide : highSide).add(new Shown(far, state, at.x, at.y, at.z));
             }
+            Direction lowNormal = near.alongX() ? Direction.SOUTH : Direction.EAST;
+            fromLow = new Layout(view, lowNormal, states);
+            fromHigh = new Layout(view, lowNormal.getOpposite(), states);
             for (PortalViewS2C.Block block : view.blocks()) {
                 BlockPos far = corner.offset(block.dx(), block.dy(), block.dz());
                 for (Direction side : Direction.values()) {
@@ -161,6 +150,10 @@ public final class PortalViews {
             return near.alongX() ? at.z : at.x;
         }
 
+        Layout seenFrom(Vec3 eye) {
+            return thin(eye) < thin(middle(near)) ? fromLow : fromHigh;
+        }
+
         /** The far side's own biome; the near sheet's when this client does not know it. */
         private static Holder<Biome> biome(ClientLevel level, String id, BlockPos near) {
             Identifier parsed = id.isEmpty() ? null : Identifier.tryParse(id);
@@ -170,6 +163,53 @@ public final class PortalViews {
                 if (found.isPresent()) return found.get();
             }
             return level.getBiome(near);
+        }
+    }
+
+    /**
+     * The far side as one eye sees it: the blocks in front of the face a traveller walking in from
+     * that eye's side comes out of, set behind the near sheet and turned so that walking in is
+     * walking out.
+     *
+     * <p>Without a face, that is vanilla's: the matching side of the far sheet, turned a quarter
+     * between sheets facing different ways as vanilla turns a traveller. With one, it is always that
+     * face, whichever side the eye is on.
+     */
+    private static final class Layout {
+        /** The turn about the vertical, a multiple of a quarter, that takes far directions to near ones. */
+        final int degrees;
+        final List<Shown> shown = new ArrayList<>();
+
+        Layout(PortalViewS2C view, Direction in, Long2ObjectOpenHashMap<BlockState> states) {
+            Direction out = view.face() != null ? view.face()
+                : view.near().alongX() == view.far().alongX() ? in : in.getClockWise();
+            int turn = 0;
+            while (turn < 360 && !turned(out, turn).equals(in)) turn += 90;
+            this.degrees = turn;
+
+            Vec3 farMiddle = View.middle(view.far());
+            Vec3 nearMiddle = View.middle(view.near());
+            BlockPos corner = view.far().corner();
+            for (PortalViewS2C.Block block : view.blocks()) {
+                BlockPos far = corner.offset(block.dx(), block.dy(), block.dz());
+                double cx = far.getX() + 0.5 - farMiddle.x, cy = far.getY() + 0.5 - farMiddle.y, cz = far.getZ() + 0.5 - farMiddle.z;
+                // Only past the far sheet, out of the face: the sheet's own row would stand in front of the near one
+                if (cx * out.getStepX() + cz * out.getStepZ() < 0.5) continue;
+                double[] at = turn(cx, cz, degrees);
+                shown.add(new Shown(far, states.get(far.asLong()), nearMiddle.x + at[0], nearMiddle.y + cy, nearMiddle.z + at[1]));
+            }
+        }
+
+        /** A horizontal direction turned the way the pose stack turns about +Y. */
+        private static Direction turned(Direction direction, int degrees) {
+            double[] at = turn(direction.getStepX(), direction.getStepZ(), degrees);
+            return Direction.getApproximateNearest(at[0], 0, at[1]);
+        }
+
+        private static double[] turn(double x, double z, int degrees) {
+            int cos = switch (degrees) { case 0 -> 1; case 180 -> -1; default -> 0; };
+            int sin = switch (degrees) { case 90 -> 1; case 270 -> -1; default -> 0; };
+            return new double[] {x * cos + z * sin, -x * sin + z * cos};
         }
     }
 
@@ -215,7 +255,14 @@ public final class PortalViews {
     /** How many far blocks are being drawn, for tests; zero with no view. */
     public static int showing() {
         View now = current();
-        return now == null ? 0 : now.lowSide.size() + now.highSide.size();
+        return now == null ? 0 : now.fromLow.shown.size() + now.fromHigh.shown.size();
+    }
+
+    /** Where each far block stands, in this world, for an eye here; empty with no view. For tests. */
+    public static List<Vec3> shownFrom(Vec3 eye) {
+        View now = current();
+        if (now == null) return List.of();
+        return now.seenFrom(eye).shown.stream().map(shown -> new Vec3(shown.x(), shown.y(), shown.z())).toList();
     }
 
     private static View current() {
@@ -236,14 +283,13 @@ public final class PortalViews {
         texture.fit(main.width, main.height);
 
         Vec3 eye = camera.pos;
-        double plane = now.thin(new Vec3(now.near.corner().getX() + 0.5, 0, now.near.corner().getZ() + 0.5));
-        List<Shown> beyond = now.thin(eye) > plane ? now.lowSide : now.highSide;
+        Layout layout = now.seenFrom(eye);
 
         PoseStack pose = new PoseStack();
-        for (Shown shown : beyond) {
+        for (Shown shown : layout.shown) {
             pose.pushPose();
             pose.translate(shown.x() - eye.x, shown.y() - eye.y, shown.z() - eye.z);
-            if (now.turned) pose.rotateDegrees(Axis.YP, 90.0F);
+            if (layout.degrees != 0) pose.rotateDegrees(Axis.YP, layout.degrees);
             pose.translate(-0.5F, -0.5F, -0.5F);
             FarBlock block = new FarBlock(now);
             block.blockState = shown.state();

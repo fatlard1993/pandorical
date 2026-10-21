@@ -2,6 +2,7 @@ package justfatlard.pandorical.protocol;
 
 import io.netty.buffer.ByteBuf;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.VarInt;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -17,13 +18,15 @@ import java.util.List;
  *
  * @param near   the sheet the player is near, in their own world
  * @param far    the sheet it leads to, in the far world
+ * @param face   the side of it every traveller comes out of, whichever side they go in; null when
+ *               each side of the near sheet leads out of the matching side of the far one, as vanilla's do
  * @param sky    the far world's colour where no block stands, as RGB
  * @param biome  the far side's biome, for grass and leaves; empty for the client's own default
  * @param blocks the far side, positions relative to {@code far}'s corner
  */
-public record PortalViewS2C(Sheet near, Sheet far, int sky, String biome, List<Block> blocks) implements CustomPacketPayload {
+public record PortalViewS2C(Sheet near, Sheet far, Direction face, int sky, String biome, List<Block> blocks) implements CustomPacketPayload {
 
-	public static final PortalViewS2C NONE = new PortalViewS2C(Sheet.NONE, Sheet.NONE, 0, "", List.of());
+	public static final PortalViewS2C NONE = new PortalViewS2C(Sheet.NONE, Sheet.NONE, null, 0, "", List.of());
 
 	public static final Type<PortalViewS2C> TYPE =
 		new Type<>(Identifier.fromNamespaceAndPath("pandorical", "portal_view"));
@@ -59,6 +62,7 @@ public record PortalViewS2C(Sheet near, Sheet far, int sky, String biome, List<B
 		(buf, view) -> {
 			Sheet.STREAM_CODEC.encode(buf, view.near);
 			Sheet.STREAM_CODEC.encode(buf, view.far);
+			buf.writeByte(view.face == null ? -1 : view.face.get3DDataValue());
 			buf.writeInt(view.sky);
 			ByteBufCodecs.STRING_UTF8.encode(buf, view.biome);
 			VarInt.write(buf, view.blocks.size());
@@ -73,6 +77,7 @@ public record PortalViewS2C(Sheet near, Sheet far, int sky, String biome, List<B
 		buf -> {
 			Sheet near = Sheet.STREAM_CODEC.decode(buf);
 			Sheet far = Sheet.STREAM_CODEC.decode(buf);
+			byte face = buf.readByte();
 			int sky = buf.readInt();
 			String biome = ByteBufCodecs.STRING_UTF8.decode(buf);
 			int count = VarInt.read(buf);
@@ -81,7 +86,7 @@ public record PortalViewS2C(Sheet near, Sheet far, int sky, String biome, List<B
 				blocks.add(new Block(unzigzag(VarInt.read(buf)), unzigzag(VarInt.read(buf)), unzigzag(VarInt.read(buf)),
 					VarInt.read(buf), buf.readUnsignedByte()));
 			}
-			return new PortalViewS2C(near, far, sky, biome, blocks);
+			return new PortalViewS2C(near, far, face < 0 ? null : Direction.from3DDataValue(face), sky, biome, blocks);
 		}
 	);
 

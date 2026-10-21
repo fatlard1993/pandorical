@@ -57,8 +57,8 @@ public final class PortalPairing implements PortalApi {
 	}
 
 	@Override
-	public void lookThrough(java.util.function.BiFunction<ServerLevel, BlockPos, GlobalPos> farSide) {
-		FarSides.lookThrough(farSide);
+	public void lookThrough(LookThrough answer) {
+		FarSides.lookThrough(answer);
 	}
 
 	@Override

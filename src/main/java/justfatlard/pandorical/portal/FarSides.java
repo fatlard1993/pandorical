@@ -1,5 +1,6 @@
 package justfatlard.pandorical.portal;
 
+import justfatlard.pandorical.api.PortalApi;
 import justfatlard.pandorical.protocol.PortalViewS2C;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -27,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.BiFunction;
 
 /**
  * Sends each player with immersive portals what lies past the paired portal nearest them: the
@@ -54,19 +54,20 @@ public final class FarSides {
 	private static final int SKYLESS_GLOW = 13;
 
 	private static final Map<UUID, Integer> sent = new HashMap<>();
-	private static final List<BiFunction<ServerLevel, BlockPos, GlobalPos>> answers = new CopyOnWriteArrayList<>();
+	private static final List<PortalApi.LookThrough> answers = new CopyOnWriteArrayList<>();
 
-	public static void lookThrough(BiFunction<ServerLevel, BlockPos, GlobalPos> farSide) {
-		if (farSide != null) answers.add(farSide);
+	public static void lookThrough(PortalApi.LookThrough answer) {
+		if (answer != null) answers.add(answer);
 	}
 
-	/** Where a portal leads: a mod's own answer first, then the portal it is paired with. */
-	private static GlobalPos farSideOf(ServerLevel level, BlockPos near) {
-		for (BiFunction<ServerLevel, BlockPos, GlobalPos> answer : answers) {
-			GlobalPos far = answer.apply(level, near);
+	/** Where a portal leads for this player: a mod's own answer first, then the portal it is paired with. */
+	private static PortalApi.FarEnd farEndOf(ServerPlayer viewer, ServerLevel level, BlockPos near) {
+		for (PortalApi.LookThrough answer : answers) {
+			PortalApi.FarEnd far = answer.farEnd(viewer, level, near);
 			if (far != null) return far;
 		}
-		return PortalPairing.partnerOf(level, near);
+		GlobalPos partner = PortalPairing.partnerOf(level, near);
+		return partner == null ? null : PortalApi.FarEnd.of(partner);
 	}
 
 	public static void register() {
@@ -102,8 +103,9 @@ public final class FarSides {
 			.findClosest(type -> type.is(PoiTypes.NETHER_PORTAL), player.blockPosition(), SEARCH, PoiManager.Occupancy.ANY)
 			.orElse(null);
 		if (near == null) return PortalViewS2C.NONE;
-		GlobalPos partner = farSideOf(level, near);
-		if (partner == null) return PortalViewS2C.NONE;
+		PortalApi.FarEnd farEnd = farEndOf(player, level, near);
+		if (farEnd == null) return PortalViewS2C.NONE;
+		GlobalPos partner = farEnd.portal();
 		ServerLevel farLevel = server.getLevel(partner.dimension());
 		if (farLevel == null) return PortalViewS2C.NONE;
 
@@ -114,8 +116,11 @@ public final class FarSides {
 		PortalViewS2C.Sheet nearSheet = sheet(level, near);
 		PortalViewS2C.Sheet farSheet = sheet(farLevel, partner.pos());
 		if (nearSheet == null || farSheet == null) return PortalViewS2C.NONE;
+		Direction face = farEnd.face();
+		// A face the sheet does not have is no face: both sides, as vanilla would
+		if (face != null && (face.getAxis() == Direction.Axis.Y || (face.getAxis() == Direction.Axis.Z) != farSheet.alongX())) face = null;
 
-		return new PortalViewS2C(nearSheet, farSheet, sky(farLevel), biome(farLevel, partner.pos()), blocks(farLevel, farSheet));
+		return new PortalViewS2C(nearSheet, farSheet, face, sky(farLevel), biome(farLevel, partner.pos()), blocks(farLevel, farSheet, face));
 	}
 
 	private static PortalViewS2C.Sheet sheet(ServerLevel level, BlockPos inside) {
@@ -133,13 +138,14 @@ public final class FarSides {
 		return new PortalViewS2C.Sheet(new BlockPos(lowX, lowY, lowZ), alongX, width, highY - lowY + 1);
 	}
 
-	/** Every block either side of the sheet with a face open to the air, nearest rows first. */
-	private static List<PortalViewS2C.Block> blocks(ServerLevel level, PortalViewS2C.Sheet sheet) {
+	/** Every block in front of the sheet with a face open to the air, nearest rows first: both sides, or only {@code face}'s. */
+	private static List<PortalViewS2C.Block> blocks(ServerLevel level, PortalViewS2C.Sheet sheet, Direction face) {
 		List<PortalViewS2C.Block> out = new ArrayList<>();
 		boolean skyless = !level.dimensionType().hasSkyLight();
 		BlockPos corner = sheet.corner();
 		for (int depth = 1; depth <= DEEP; depth++) {
-			for (int side : new int[] {-depth, depth}) {
+			int[] sides = face == null ? new int[] {-depth, depth} : new int[] {depth * face.getAxisDirection().getStep()};
+			for (int side : sides) {
 				for (int across = -WIDE; across < sheet.width() + WIDE; across++) {
 					for (int up = -TALL; up < sheet.height() + TALL; up++) {
 						BlockPos at = sheet.alongX() ? corner.offset(across, up, side) : corner.offset(side, up, across);

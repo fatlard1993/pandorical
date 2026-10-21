@@ -120,7 +120,7 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 			new justfatlard.pandorical.protocol.PortalViewS2C(
 				new justfatlard.pandorical.protocol.PortalViewS2C.Sheet(new net.minecraft.core.BlockPos(1, 2, 3), true, 2, 3),
 				new justfatlard.pandorical.protocol.PortalViewS2C.Sheet(new net.minecraft.core.BlockPos(-4, 64, 8), false, 2, 3),
-				0x330808, "minecraft:plains",
+				net.minecraft.core.Direction.EAST, 0x330808, "minecraft:plains",
 				List.of(new justfatlard.pandorical.protocol.PortalViewS2C.Block(0, -1, 1, 5, 0xF8)))));
 		out.put("hide_hud", encode(HideHudS2C.STREAM_CODEC, new HideHudS2C("mymod:h1")));
 		out.put("screen_action", encode(ScreenActionC2S.STREAM_CODEC, new ScreenActionC2S(
