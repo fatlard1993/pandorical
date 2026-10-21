@@ -19,6 +19,8 @@
 			"justfatlard.pandorical.gametest.WalkableDecks",
 			"justfatlard.pandorical.gametest.DryHolds",
 			"justfatlard.pandorical.gametest.PortalPairs",
+			"justfatlard.pandorical.gametest.ImmersiveCrossing",
+			"justfatlard.pandorical.gametest.PortalViewsShow",
 			"justfatlard.pandorical.gametest.ActionMenusWork",
 			"justfatlard.pandorical.gametest.ActionMenusSeeded",
 			"justfatlard.pandorical.gametest.QuickActionsOpenMenus",

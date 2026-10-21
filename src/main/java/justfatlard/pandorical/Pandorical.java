@@ -17,6 +17,10 @@ import justfatlard.pandorical.picture.PictureRegistry;
 import justfatlard.pandorical.portal.PortalPairing;
 import justfatlard.pandorical.protocol.*;
 import justfatlard.pandorical.push.DeclaredMountPolicy;
+import justfatlard.pandorical.portal.ImmersivePortals;
+import justfatlard.pandorical.protocol.ImmersivePortalsS2C;
+import justfatlard.pandorical.protocol.PortalViewS2C;
+import justfatlard.pandorical.portal.FarSides;
 import justfatlard.pandorical.push.DeclaredRenderPolicy;
 import justfatlard.pandorical.push.PlayingAnimations;
 import justfatlard.pandorical.push.SkinOverrides;
@@ -128,6 +132,10 @@ public class Pandorical implements ModInitializer {
             .describe("Each portal remembers the one its first traveller came out of, both ways round")
             .backedBy(player -> PortalPairing.enabled(player.level().getServer()),
                 (player, on) -> PortalPairing.choose(player.level().getServer(), on));
+        settings.toggle("immersivePortals", "Portals show what is past them, and you step through", false)
+            .describe("The far side shows through the swirl, and a portal takes half a second, not four")
+            .backedBy(player -> ImmersivePortals.enabled(player.level().getServer()),
+                (player, on) -> ImmersivePortals.choose(player.level().getServer(), on));
         settings.toggle("clumpExperience", "XP orbs clump and are taken at once", false)
             .describe("Nearby orbs of any value merge into one, and a touch takes all of it")
             .shownWhen(player -> !DropsPolicy.clumpsInstalled())
@@ -163,6 +171,7 @@ public class Pandorical implements ModInitializer {
         registerConfigPhase();
         registerServerHandlers();
         registerStructureTracking();
+        FarSides.register();
         justfatlard.pandorical.entitykind.EntityKinds.registerCheck();
 
         LOGGER.info("Pandorical initialized — protocol v{}, server-only namespaces: {}",
@@ -275,6 +284,12 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(
             MountPolicyS2C.TYPE,
             MountPolicyS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            ImmersivePortalsS2C.TYPE,
+            ImmersivePortalsS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            PortalViewS2C.TYPE,
+            PortalViewS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
             PlayAnimationS2C.TYPE,
             PlayAnimationS2C.STREAM_CODEC);
@@ -524,6 +539,7 @@ public class Pandorical implements ModInitializer {
                 DeclaredRenderPolicy.sendTo(player);
                 PlayingAnimations.sendAllTo(player);
                 DeclaredMountPolicy.sendTo(player);
+                ImmersivePortals.sendTo(player);
 
                 // Last, and after the mods have finished announcing themselves: what these have
                 // to say is about all of them. Held back if something is gating play - see

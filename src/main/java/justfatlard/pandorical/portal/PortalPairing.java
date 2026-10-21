@@ -52,13 +52,24 @@ public final class PortalPairing implements PortalApi {
 	}
 
 	@Override
+	public void immersivePortals(boolean byDefault) {
+		ImmersivePortals.setDefault(byDefault);
+	}
+
+	@Override
+	public void lookThrough(java.util.function.BiFunction<ServerLevel, BlockPos, GlobalPos> farSide) {
+		FarSides.lookThrough(farSide);
+	}
+
+	@Override
 	public void keepOutOfPairing(BiPredicate<ServerLevel, BlockPos> ours) {
 		keepOut(ours);
 	}
 
+	/** Immersive portals pair too, unless an op has said otherwise: a view needs a far side that stays put. */
 	public static boolean enabled(MinecraftServer server) {
 		Boolean chosen = Pairs.get(server).chosen;
-		return chosen != null ? chosen : byDefault;
+		return chosen != null ? chosen : byDefault || ImmersivePortals.enabled(server);
 	}
 
 	public static void choose(MinecraftServer server, boolean on) {
@@ -119,6 +130,17 @@ public final class PortalPairing implements PortalApi {
 			return false;
 		}
 		return true;
+	}
+
+	/**
+	 * The anchor of the portal this one leads to, for looking through it; null while it is unpaired.
+	 * Read only: a partner found broken is unlinked by the next trip, not by a look.
+	 */
+	public static GlobalPos partnerOf(ServerLevel level, BlockPos inside) {
+		if (!enabled(level.getServer())) return null;
+		GlobalPos source = anchorOf(level, inside);
+		if (source == null || isKept(level, source.pos())) return null;
+		return Pairs.get(level.getServer()).links.get(source);
 	}
 
 	/** Null leaves the trip to vanilla. */
@@ -185,7 +207,7 @@ public final class PortalPairing implements PortalApi {
 	}
 
 	/** Every block of the portal sheet this block is part of; empty if it is not a portal. */
-	private static Set<BlockPos> sheetOf(ServerLevel level, BlockPos inside) {
+	static Set<BlockPos> sheetOf(ServerLevel level, BlockPos inside) {
 		if (!level.getBlockState(inside).is(Blocks.NETHER_PORTAL)) return Set.of();
 		Set<BlockPos> seen = new HashSet<>();
 		ArrayDeque<BlockPos> next = new ArrayDeque<>();

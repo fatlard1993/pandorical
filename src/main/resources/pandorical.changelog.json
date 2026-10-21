@@ -4,6 +4,10 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.24.0": [
+      "Immersive portals, a server setting an op or a mod can turn on: a nether portal shows what is past it through the swirl, and you step through in half a second instead of standing in it for four.",
+      "The trip itself is one swirl: it thickens as you go in, covers the change of world where the loading screen was, and thins on the far side, with a squelch each way. Your own settings can turn it off."
+    ],
     "15.23.0": [
       "Glass from a server mod such as Better Glass can join up with the same glass beside it, drawn as one clear sheet instead of a grid of framed blocks."
     ],

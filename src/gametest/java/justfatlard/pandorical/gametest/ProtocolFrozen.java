@@ -114,6 +114,14 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 			"mymod:h1", "top_left", 4, 5, List.of(TEXT))));
 		out.put("update_hud", encode(UpdateHudS2C.STREAM_CODEC, new UpdateHudS2C(
 			"mymod:h1", List.of(new ComponentUpdate("line", Map.of("text", "changed"))))));
+		out.put("immersive_portals", encode(justfatlard.pandorical.protocol.ImmersivePortalsS2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.ImmersivePortalsS2C(true)));
+		out.put("portal_view", encode(justfatlard.pandorical.protocol.PortalViewS2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.PortalViewS2C(
+				new justfatlard.pandorical.protocol.PortalViewS2C.Sheet(new net.minecraft.core.BlockPos(1, 2, 3), true, 2, 3),
+				new justfatlard.pandorical.protocol.PortalViewS2C.Sheet(new net.minecraft.core.BlockPos(-4, 64, 8), false, 2, 3),
+				0x330808, "minecraft:plains",
+				List.of(new justfatlard.pandorical.protocol.PortalViewS2C.Block(0, -1, 1, 5, 0xF8)))));
 		out.put("hide_hud", encode(HideHudS2C.STREAM_CODEC, new HideHudS2C("mymod:h1")));
 		out.put("screen_action", encode(ScreenActionC2S.STREAM_CODEC, new ScreenActionC2S(
 			"mymod:s1", "ok", "click", Map.of("value", "1"))));

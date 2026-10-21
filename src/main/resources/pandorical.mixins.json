@@ -4,6 +4,7 @@
 	"plugin": "justfatlard.pandorical.DiagnosticMixinPlugin",
   "compatibilityLevel": "JAVA_25",
 	"mixins": [
+		"NetherPortalWaitMixin",
 		"RailCollisionMixin",
 		"SlotMixin",
 		"InventoryMenuMixin",

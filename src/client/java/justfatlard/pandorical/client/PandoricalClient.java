@@ -97,7 +97,7 @@ public class PandoricalClient implements ClientModInitializer {
             System.getProperty("pandorical.skip", "").split(","))
         .map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toSet());
     private static final Set<String> SKIPPABLE = Set.of(
-        "keybinds", "contextmodels", "suppressor", "hud", "structures", "decals", "pictures", "maprelief", "captures", "all");
+        "keybinds", "contextmodels", "suppressor", "hud", "structures", "decals", "pictures", "maprelief", "captures", "portalviews", "all");
 
     private static boolean skipped(String piece) {
         Diagnostics.mark("startup: " + piece);
@@ -176,6 +176,8 @@ public class PandoricalClient implements ClientModInitializer {
             ClientCaptures.register();
             ViewCaptures.register();
         }
+        if (!skipped("portalviews")) justfatlard.pandorical.client.portal.PortalViews.register();
+        justfatlard.pandorical.client.portal.Crossing.register();
 
         ClientTickEvents.START_CLIENT_TICK.register(client -> StructureManager.tick());
         ClientTickEvents.END_CLIENT_TICK.register(client -> {

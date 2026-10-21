@@ -653,6 +653,33 @@ what it has. It can only draw what it has loaded, so ask a player who has the vi
 `chunkMap.getPlayers(chunk, false)`. It shares the one-capture-at-a-time limit with `request(player, side)`.
 redstone-photography's placed camera is the working example.
 
+## Portals
+
+Nether portals are vanilla's until a mod or an op says otherwise, and `PandoricalApi.portals()` is
+where a mod says it:
+
+```java
+PandoricalApi.portals().pairNetherPortals(true);    // each portal goes back the way it came
+PandoricalApi.portals().immersivePortals(true);     // see through them, step through them
+PandoricalApi.portals().keepOutOfPairing((level, pos) -> isMine(level, pos));
+PandoricalApi.portals().lookThrough((level, pos) -> isMine(level, pos) ? whereMineLeads(level, pos) : null);
+```
+
+Both switches are defaults: the last mod to call wins, and an op's choice on Pandorical's page
+outranks them all. Immersive portals pair as well, unless an op has turned pairing off, because a
+view needs a far side that stays put.
+
+Immersive, a player waits half a second in a nether portal instead of four. A Pandorical client
+also draws what is past it: twice a second the server sends each player the blocks either side of
+the far end of the portal nearest them, a dozen deep, and the client draws them behind the sheet
+with vanilla's swirl over the top. It is a short look, and the swirl is what hides that.
+
+A portal kept out of pairing has no partner to show, so a mod that sends travellers somewhere
+itself answers `lookThrough` with any block of the portal its own leads to. The view is laid out
+the way vanilla carries a traveller, sheet middle to sheet middle, turned a quarter between sheets
+facing different ways; a mod that turns travellers its own way shows a far side they do not come
+out facing.
+
 ## Chest overlays
 
 Draw particular chests with a different texture, so a player can tell (say) the ones a
