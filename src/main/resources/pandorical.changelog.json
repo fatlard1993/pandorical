@@ -4,6 +4,11 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.25.0": [
+      "Joining a server you have joined before skips downloading its textures, models and sounds: your game keeps the last few servers' sets and the server only sends them when they have changed.",
+      "Servers no longer hand out Pandorical or other client mods, and the game no longer offers to install them. Keep your mods up to date with your launcher.",
+      "A slow download of a server's textures no longer trips a timer meant for older servers partway through joining."
+    ],
     "15.24.4": [
       "A server running Pandorical from CurseForge keeps no client mods for players either. Elsewhere nothing changes."
     ],

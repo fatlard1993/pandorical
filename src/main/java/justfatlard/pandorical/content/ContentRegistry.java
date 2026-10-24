@@ -45,6 +45,11 @@ public class ContentRegistry implements ContentApi {
     /** Each mod's own copy of a vanilla lang file, by path then mod, merged into the one served. */
     private final Map<String, Map<String, byte[]>> vanillaLangContributions = new ConcurrentHashMap<>();
     private volatile List<SyncAssetsS2C> cachedAssetChunks = null;
+    private volatile ConfigAssets cachedConfigAssets = null;
+    /** Moves on every asset change, so a build that raced one is not kept. */
+    private final java.util.concurrent.atomic.AtomicLong assetGeneration = new java.util.concurrent.atomic.AtomicLong();
+    /** Namespaces whose jars were walked for assets: a jar has the same files on the second walk. */
+    private final Set<String> scannedNamespaces = ConcurrentHashMap.newKeySet();
 
     private final Map<String, VanillaItemOverride> vanillaItemOverrides = new LinkedHashMap<>();
 
@@ -90,8 +95,11 @@ public class ContentRegistry implements ContentApi {
 
     @Override
     public void registerAsset(String path, byte[] data) {
-        assets.put(path, data);
+        // Rescans put the same bytes back constantly; only a real change re-gzips.
+        if (Arrays.equals(assets.put(path, data), data)) return;
+        assetGeneration.incrementAndGet();
         cachedAssetChunks = null;
+        cachedConfigAssets = null;
     }
 
     @Override
@@ -671,6 +679,7 @@ public class ContentRegistry implements ContentApi {
 
     public void autoScanAllModAssets() {
         for (String namespace : serverOnlyNamespaces) {
+            if (!scannedNamespaces.add(namespace)) continue;
             boolean hasAssets = assets.keySet().stream().anyMatch(k -> k.startsWith("assets/" + namespace + "/"));
             if (hasAssets) continue;
 
@@ -681,9 +690,18 @@ public class ContentRegistry implements ContentApi {
         }
     }
 
-    public List<SyncAssetsConfigS2C> buildConfigAssetChunks() throws IOException {
+    /** The config-phase assets, chunked, and the SHA-256 of what they unpack to. */
+    public record ConfigAssets(String sha256, List<SyncAssetsConfigS2C> chunks) {
+        public static final ConfigAssets NONE = new ConfigAssets("", List.of());
+    }
+
+    /** Built once and kept until an asset changes: every join sends the same bytes. */
+    public ConfigAssets buildConfigAssets() throws IOException {
         autoScanAllModAssets();
-        if (assets.isEmpty()) return List.of();
+        ConfigAssets cached = cachedConfigAssets;
+        if (cached != null) return cached;
+        if (assets.isEmpty()) return ConfigAssets.NONE;
+        long generation = assetGeneration.get();
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(baos);
@@ -714,7 +732,17 @@ public class ContentRegistry implements ContentApi {
             chunks.add(new SyncAssetsConfigS2C(i, totalChunks, chunk));
         }
 
-        return chunks;
+        ConfigAssets built = new ConfigAssets(sha256(raw), chunks);
+        if (assetGeneration.get() == generation) cachedConfigAssets = built;
+        return built;
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("every Java has SHA-256", e);
+        }
     }
 
     private List<String> scanRegistry(Registry<?> registry) {

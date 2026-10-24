@@ -30,6 +30,7 @@ import net.minecraft.server.packs.repository.PackCompatibility;
 import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.server.packs.repository.RepositorySource;
 import net.minecraft.tags.TagKey;
+import net.minecraft.util.Util;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.MobCategory;
@@ -121,6 +122,7 @@ public class ContentManager {
         expectedConfigAssetChunks = -1;
         configContentChunks.clear();
         expectedConfigContentChunks = -1;
+        configAssetsToCache = null;
 
         // The last server's assets stay in the atlases and Language table until the next join
         // reloads. Do not reload here: a reload on disconnect hangs the loading screen.
@@ -138,6 +140,8 @@ public class ContentManager {
     private static volatile int expectedConfigContentChunks = -1;
     private static final List<byte[]> configAssetChunks = new ArrayList<>();
     private static volatile int expectedConfigAssetChunks = -1;
+    /** The hash the server offered and this client is downloading, to cache once it has it all. */
+    private static volatile String configAssetsToCache = null;
 
     public static boolean isSyncing() { return syncing && !contentRegistered; }
 
@@ -238,9 +242,10 @@ public class ContentManager {
             return;
         }
 
+        // Not syncStartTime: that times out the play-phase fallback, whose finalize sends on a
+        // play connection the configuration phase does not have yet.
         expectedConfigContentChunks = total;
         expectedConfigAssetChunks = payload.expectedAssetChunks();
-        syncStartTime = System.currentTimeMillis();
         syncing = true;
 
         while (configContentChunks.size() <= payload.chunkIndex()) {
@@ -308,6 +313,32 @@ public class ContentManager {
         tryFinalizeConfig();
     }
 
+    /**
+     * Tells the server whether it must send the assets. Cached ones stand in for every chunk at
+     * once, so finalizing cannot tell them from a download.
+     */
+    public static void handleConfigAssetsOffer(AssetsOfferConfigS2C offer) {
+        if (configPhaseSynced) return;
+        String sha = offer.sha256();
+        byte[] cached = AssetCache.load(sha, MAX_ASSET_BYTES);
+        if (cached == null) {
+            configAssetsToCache = sha;
+            Pandorical.LOGGER.info("Config phase: assets {} not cached; downloading {} chunk(s)",
+                sha.substring(0, Math.min(12, sha.length())), offer.totalChunks());
+            ClientConfigurationNetworking.send(new AssetsWantConfigC2S(true));
+            return;
+        }
+        Pandorical.LOGGER.info("Config phase: assets {} cached ({} bytes); skipping the download",
+            sha.substring(0, 12), cached.length);
+        synchronized (ContentManager.class) {
+            configAssetChunks.clear();
+            configAssetChunks.add(cached);
+            expectedConfigAssetChunks = 1;
+        }
+        ClientConfigurationNetworking.send(new AssetsWantConfigC2S(false));
+        tryFinalizeConfig();
+    }
+
     private static boolean allConfigAssetsReceived() {
         if (expectedConfigAssetChunks == 0) return true;
         if (expectedConfigAssetChunks < 0) return false;
@@ -337,6 +368,12 @@ public class ContentManager {
 
         if (expectedConfigAssetChunks > 0) {
             unpackAssets(configAssetChunks, true);
+            String toCache = configAssetsToCache;
+            configAssetsToCache = null;
+            if (toCache != null) {
+                byte[] gz = joined(configAssetChunks);
+                Util.ioPool().execute(() -> AssetCache.store(toCache, gz, MAX_ASSET_BYTES));
+            }
         }
 
         // No reconnect fast path: each register method is idempotent per entry, and a mod
@@ -459,6 +496,14 @@ public class ContentManager {
                 ? "Config phase: failed to unpack assets: {}"
                 : "Failed to unpack assets: {}", e.getMessage(), e);
         }
+    }
+
+    private static byte[] joined(List<byte[]> chunks) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        for (byte[] chunk : chunks) {
+            if (chunk != null) out.writeBytes(chunk);
+        }
+        return out.toByteArray();
     }
 
     public static boolean wasConfigPhaseSynced() {

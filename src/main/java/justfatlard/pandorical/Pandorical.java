@@ -225,6 +225,8 @@ public class Pandorical implements ModInitializer {
             justfatlard.pandorical.protocol.EntityBodiesConfigS2C.TYPE,
             justfatlard.pandorical.protocol.EntityBodiesConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(SyncAssetsConfigS2C.TYPE, SyncAssetsConfigS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundConfiguration().register(AssetsOfferConfigS2C.TYPE, AssetsOfferConfigS2C.STREAM_CODEC);
+        PayloadTypeRegistry.serverboundConfiguration().register(AssetsWantConfigC2S.TYPE, AssetsWantConfigC2S.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(PlayerInventoryRegistrationsS2C.TYPE, PlayerInventoryRegistrationsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(
             RequirementS2C.TYPE,
@@ -237,7 +239,6 @@ public class Pandorical implements ModInitializer {
             KeepsakesAskConfigS2C.TYPE,
             KeepsakesAskConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.serverboundConfiguration().register(ContentReadyConfigC2S.TYPE, ContentReadyConfigC2S.STREAM_CODEC);
-        justfatlard.pandorical.login.ServedClientMods.registerPayloads();
         PayloadTypeRegistry.serverboundConfiguration().register(
             KeepsakesConfigC2S.TYPE,
             KeepsakesConfigC2S.STREAM_CODEC);
@@ -378,6 +379,11 @@ public class Pandorical implements ModInitializer {
             }
         });
 
+        ServerConfigurationNetworking.registerGlobalReceiver(AssetsWantConfigC2S.TYPE, (payload, context) -> {
+            var handler = context.packetListener();
+            context.server().execute(() -> PandoricalSyncTask.answered(handler, payload.want()));
+        });
+
         ServerConfigurationNetworking.registerGlobalReceiver(ContentReadyConfigC2S.TYPE, (payload, context) -> {
             var handler = context.packetListener();
 
@@ -416,6 +422,7 @@ public class Pandorical implements ModInitializer {
         ServerConfigurationConnectionEvents.DISCONNECT.register((handler, server) -> {
             ackedConfigConnections.remove(handler);
             ConfigPatience.forget(handler);
+            PandoricalSyncTask.forget(handler);
         });
         ServerTickEvents.END_SERVER_TICK.register(server -> ConfigPatience.expire());
         ServerTickEvents.END_SERVER_TICK.register(justfatlard.pandorical.notice.Notices::tick);
@@ -423,7 +430,6 @@ public class Pandorical implements ModInitializer {
         justfatlard.pandorical.notice.Notices.register();
         justfatlard.pandorical.changelog.Changelog.register();
         justfatlard.pandorical.brief.Brief.register();
-        justfatlard.pandorical.settings.ClientVersions.registerNotice();
         // Pandorical's own overview and news are in pandorical.changelog.json beside the other
         // mods' - the same file, read the same way. A feature whose author reaches past it for
         // something more convenient is a feature nobody else should be asked to use.
@@ -441,7 +447,7 @@ public class Pandorical implements ModInitializer {
                     try {
                         var blocks = contentRegistry.buildBlockEntries();
                         var items = contentRegistry.buildItemEntries();
-                        var assetChunks = contentRegistry.buildConfigAssetChunks();
+                        var assets = contentRegistry.buildConfigAssets();
                         var entityTypes = contentRegistry.buildEntityTypeEntries();
                         var blockEntityTypes = contentRegistry.buildBlockEntityTypeEntries();
                         var villagerProfessions = contentRegistry.buildVillagerProfessionEntries();
@@ -461,7 +467,7 @@ public class Pandorical implements ModInitializer {
                             justfatlard.pandorical.entitykind.EntityKinds.understood(handler.getOwner().id(),
                                 tellsKinds, tellsBodies);
                         }
-                        var task = new PandoricalSyncTask(blocks, items, assetChunks,
+                        var task = new PandoricalSyncTask(handler, blocks, items, assets,
                             entityTypes, blockEntityTypes, villagerProfessions,
                             poiTypes, menuTypes, recipeBookCategories, contentRegistry.railsSolid(),
                             tellsKinds && justfatlard.pandorical.entitykind.EntityKinds.any()
@@ -496,7 +502,6 @@ public class Pandorical implements ModInitializer {
             }
         });
         justfatlard.pandorical.login.ClientKinds.register();
-        justfatlard.pandorical.login.ServedClientMods.register();
         justfatlard.pandorical.form.Forms.register();
         justfatlard.pandorical.actions.QuickActions.register();
     }

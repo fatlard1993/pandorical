@@ -574,7 +574,7 @@ the code described in section 4. "Dialog" means a Java dialog, which Geyser show
 | Keepsakes (`KeepsakeApi`) | supported | unsupported (`canKeep` false), by design | same |
 | Solid rails (`content.solidRails`) | supported | degraded: server collision the client cannot predict **[I]** | same |
 | Server-only rules: trust, portal pairing, drops | supported | supported | supported |
-| Client mod serving (`ServedClientMods`), versions (`ClientVersions`) | supported | n/a | n/a; `/pandorical clients` should say "Bedrock (Geyser)" |
+| Client versions (`ClientVersions`) | supported | n/a | n/a; `/pandorical clients` should say "Bedrock (Geyser)" |
 
 What a Bedrock player gets is decided almost entirely by two rows: blocks and items. A server with
 no custom content is playable today **[I]**. One with custom content is playable only if Geyser

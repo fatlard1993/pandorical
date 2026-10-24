@@ -3,6 +3,8 @@ package justfatlard.pandorical.login;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import justfatlard.pandorical.Pandorical;
+import justfatlard.pandorical.content.ContentRegistry;
+import justfatlard.pandorical.protocol.AssetsOfferConfigS2C;
 import justfatlard.pandorical.protocol.SyncAssetsConfigS2C;
 import justfatlard.pandorical.protocol.SyncContentConfigS2C;
 import justfatlard.pandorical.protocol.SyncContentS2C;
@@ -10,9 +12,13 @@ import net.fabricmc.fabric.api.networking.v1.ServerConfigurationNetworking;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.server.network.ConfigurationTask;
+import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.function.Consumer;
 
 public class PandoricalSyncTask implements ConfigurationTask {
@@ -20,7 +26,8 @@ public class PandoricalSyncTask implements ConfigurationTask {
 
     private final List<SyncContentS2C.BlockEntry> blocks;
     private final List<SyncContentS2C.ItemEntry> items;
-    private final List<SyncAssetsConfigS2C> assetChunks;
+    private final ServerConfigurationPacketListenerImpl handler;
+    private final ContentRegistry.ConfigAssets assets;
     private final List<String> entityTypes;
     private final List<String> blockEntityTypes;
     private final List<String> villagerProfessions;
@@ -33,10 +40,15 @@ public class PandoricalSyncTask implements ConfigurationTask {
     /** Null when the client cannot take it or there are none. */
     private final justfatlard.pandorical.protocol.EntityBodiesConfigS2C bodies;
 
+    /** Logins offered the assets by hash whose answer is still out, with the chunks it may ask for. */
+    private static final Map<ServerConfigurationPacketListenerImpl, List<SyncAssetsConfigS2C>> offered =
+        Collections.synchronizedMap(new WeakHashMap<>());
+
     public PandoricalSyncTask(
+            ServerConfigurationPacketListenerImpl handler,
             List<SyncContentS2C.BlockEntry> blocks,
             List<SyncContentS2C.ItemEntry> items,
-            List<SyncAssetsConfigS2C> assetChunks,
+            ContentRegistry.ConfigAssets assets,
             List<String> entityTypes,
             List<String> blockEntityTypes,
             List<String> villagerProfessions,
@@ -47,7 +59,8 @@ public class PandoricalSyncTask implements ConfigurationTask {
             justfatlard.pandorical.protocol.EntityBodiesConfigS2C bodies) {
         this.blocks = blocks;
         this.items = items;
-        this.assetChunks = assetChunks;
+        this.handler = handler;
+        this.assets = assets;
         this.entityTypes = entityTypes;
         this.blockEntityTypes = blockEntityTypes;
         this.villagerProfessions = villagerProfessions;
@@ -99,6 +112,7 @@ public class PandoricalSyncTask implements ConfigurationTask {
 
     @Override
     public void start(Consumer<Packet<?>> sender) {
+        List<SyncAssetsConfigS2C> assetChunks = assets.chunks();
         int expectedChunks = assetChunks.size();
 
         List<List<SyncContentS2C.BlockEntry>> blockChunks =
@@ -130,9 +144,31 @@ public class PandoricalSyncTask implements ConfigurationTask {
             villagerProfessions.size(), poiTypes.size(), menuTypes.size(),
             recipeBookCategories.size(), expectedChunks);
 
-        for (SyncAssetsConfigS2C chunk : assetChunks) {
-            sender.accept(ServerConfigurationNetworking.createClientboundPacket(chunk));
+        if (!assetChunks.isEmpty() && ServerConfigurationNetworking.canSend(handler, AssetsOfferConfigS2C.TYPE)) {
+            offered.put(handler, assetChunks);
+            sender.accept(ServerConfigurationNetworking.createClientboundPacket(
+                new AssetsOfferConfigS2C(assets.sha256(), expectedChunks)));
+            return;
         }
+        assetChunks.forEach(chunk -> sender.accept(ServerConfigurationNetworking.createClientboundPacket(chunk)));
+    }
+
+    /** The client's answer to the offer: the chunks if it asked, nothing if it has them already. */
+    public static void answered(ServerConfigurationPacketListenerImpl handler, boolean want) {
+        List<SyncAssetsConfigS2C> chunks = offered.remove(handler);
+        if (chunks == null) return;
+        var profile = handler.getOwner();
+        String name = profile != null ? profile.name() : "(unknown profile)";
+        if (!want) {
+            Pandorical.LOGGER.info("Client {} has these assets cached; sending none", name);
+            return;
+        }
+        Pandorical.LOGGER.info("Client {} asked for the assets; sending {} chunk(s)", name, chunks.size());
+        chunks.forEach(chunk -> ServerConfigurationNetworking.send(handler, chunk));
+    }
+
+    public static void forget(ServerConfigurationPacketListenerImpl handler) {
+        offered.remove(handler);
     }
 
     @Override

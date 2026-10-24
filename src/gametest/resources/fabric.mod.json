@@ -12,7 +12,6 @@
 			"justfatlard.pandorical.gametest.ActionMenuProbe"
 		],
 		"fabric-client-gametest": [
-			"justfatlard.pandorical.gametest.UpdatesAskInGame",
 			"justfatlard.pandorical.gametest.LaunchGate",
 			"justfatlard.pandorical.gametest.NoticesAnswer",
 			"justfatlard.pandorical.gametest.DropsFixes",

@@ -1,7 +1,6 @@
 # Gradle
 .gradle/
 build/
-build-curseforge/
 
 # Minecraft dev run directory
 run/
