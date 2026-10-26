@@ -7,5 +7,7 @@ import org.jspecify.annotations.Nullable;
 public class BodyRenderState extends LivingEntityRenderState {
     /** How far through a strike, nought to one; nought when it is not striking. */
     public float swing;
+    /** How far through flinching from a hit, nought to one; nought when it has not been hit. */
+    public float hurt;
     public @Nullable Identifier texture;
 }

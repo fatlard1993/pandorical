@@ -14,7 +14,8 @@ import org.jspecify.annotations.Nullable;
  * A model built from a model file, posed only by what the file says: its look part turned where the
  * entity looks, and its animations laid over the rest pose. At rest it plays its idle animation;
  * on the move its moving one, by the distance covered, taking over from the idle one as it speeds
- * up; and its attack animation through a strike.
+ * up; its attack animation through a strike; and its hurt animation through the flinch from a hit,
+ * over everything else.
  */
 public class BodyModel extends EntityModel<BodyRenderState> {
     private final EntityModelDefinition.@Nullable Motion motion;
@@ -47,12 +48,16 @@ public class BodyModel extends EntityModel<BodyRenderState> {
             KeyframeAnimation idle = baked(motion.idle());
             if (idle != null) idle.apply((long) (state.ageInTicks * 50F * motion.idle().pace()), 1F - moving);
         }
-        if (motion.attack() != null && state.swing > 0F) {
-            KeyframeAnimation attack = baked(motion.attack());
-            AnimationDefinition definition = AnimationLibrary.get(motion.attack().animation());
-            if (attack != null && definition != null) {
-                attack.apply((long) (state.swing * definition.lengthInSeconds() * 1000F), 1F);
-            }
+        if (motion.attack() != null && state.swing > 0F) through(motion.attack(), state.swing);
+        if (motion.hurt() != null && state.hurt > 0F) through(motion.hurt(), state.hurt);
+    }
+
+    /** Plays a clip at {@code progress} of the way through it, nought to one. */
+    private void through(EntityModelDefinition.Clip clip, float progress) {
+        KeyframeAnimation animation = baked(clip);
+        AnimationDefinition definition = AnimationLibrary.get(clip.animation());
+        if (animation != null && definition != null) {
+            animation.apply((long) (progress * definition.lengthInSeconds() * 1000F), 1F);
         }
     }
 

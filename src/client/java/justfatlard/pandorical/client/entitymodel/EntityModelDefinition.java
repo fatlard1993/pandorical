@@ -28,13 +28,14 @@ public record EntityModelDefinition(@Nullable LayerDefinition geometry, @Nullabl
 
     /**
      * How an entity with its own body moves, from the model's {@code animation} block: the part
-     * that turns to look where the entity looks, and the animations it plays at rest, on the move
-     * and when it strikes. Each animation is an id of the kind {@code AnimationApi} plays, or an
+     * that turns to look where the entity looks, and the animations it plays at rest, on the move,
+     * when it strikes and when it is hit. Each animation is an id of the kind {@code AnimationApi} plays, or an
      * object with it as {@code animation} beside a {@code pace} (how fast it plays: at rest against
      * real time, on the move against the distance covered) and, on the move, a {@code strength}
      * (how much of its full swing the entity's speed is worth).
      */
-    public record Motion(@Nullable String look, @Nullable Clip idle, @Nullable Clip moving, @Nullable Clip attack) {}
+    public record Motion(@Nullable String look, @Nullable Clip idle, @Nullable Clip moving, @Nullable Clip attack,
+            @Nullable Clip hurt) {}
 
     public record Clip(Identifier animation, float pace, float strength) {}
 
@@ -81,7 +82,8 @@ public record EntityModelDefinition(@Nullable LayerDefinition geometry, @Nullabl
         if (!json.has("animation")) return null;
         JsonObject animation = json.getAsJsonObject("animation");
         String look = animation.has("look") ? animation.get("look").getAsString() : null;
-        return new Motion(look, clip(animation, "idle"), clip(animation, "moving"), clip(animation, "attack"));
+        return new Motion(look, clip(animation, "idle"), clip(animation, "moving"), clip(animation, "attack"),
+            clip(animation, "hurt"));
     }
 
     private static @Nullable Clip clip(JsonObject animation, String key) {

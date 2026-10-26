@@ -25,7 +25,8 @@ import org.jspecify.annotations.Nullable;
  * <li>{@code animation}: for an entity registered with its own body (see {@link EntityRegistration}),
  * how it moves, since there is no vanilla model to move it - {@code look}, the part turned where the
  * entity looks; {@code idle}, played at rest; {@code moving}, played by the distance covered and
- * taking over from {@code idle} as it speeds up; {@code attack}, played through a strike. Each is an
+ * taking over from {@code idle} as it speeds up; {@code attack}, played through a strike;
+ * {@code hurt}, played through the half second it flinches from a hit, over the rest. Each is an
  * animation id as {@link AnimationApi} plays them, or an object with it as {@code animation} beside
  * a {@code pace} (how fast it plays: at rest against real time, on the move against the distance)
  * and, for {@code moving}, a {@code strength} (how much of its full swing its speed is worth).</li>

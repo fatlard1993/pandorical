@@ -37,6 +37,8 @@ public class BodyRenderer extends MobRenderer<Mob, BodyRenderState, BodyModel> {
     public void extractRenderState(Mob entity, BodyRenderState state, float partialTicks) {
         super.extractRenderState(entity, state, partialTicks);
         state.swing = entity.getSwingAnimation(partialTicks);
+        state.hurt = entity.hurtTime > 0 && entity.hurtDuration > 0
+            ? Math.clamp(1F - (entity.hurtTime - partialTicks) / entity.hurtDuration, 0F, 1F) : 0F;
         state.texture = null;
         ClientEntityKinds.Body body = ClientEntityKinds.bodyOf(entity.getType());
         if (body == null) return;

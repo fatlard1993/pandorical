@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.26.0": [
+      "A mod's creature with its own body can flinch when it is hit, with a hurt animation of its own."
+    ],
     "15.25.0": [
       "Joining a server you have joined before skips downloading its textures, models and sounds: your game keeps the last few servers' sets and the server only sends them when they have changed.",
       "Servers no longer hand out Pandorical or other client mods, and the game no longer offers to install them. Keep your mods up to date with your launcher.",
