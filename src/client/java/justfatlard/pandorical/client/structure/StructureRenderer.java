@@ -86,6 +86,7 @@ public final class StructureRenderer {
             poseStack.popPose();
         }
 
+        StructureFluids.submit(structure, level, poseStack, collector, rel -> worldBlockPos(pose, rel, cos, sin));
         StructureHolds.submitMask(structure, poseStack, collector);
 
         poseStack.popPose();

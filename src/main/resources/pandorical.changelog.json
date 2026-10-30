@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.26.1": [
+      "A structure's waterlogged blocks keep their water while it moves, so a ship's waterlogged slabs and stairs no longer sail off dry."
+    ],
     "15.26.0": [
       "A mod's creature with its own body can flinch when it is hit, with a hurt animation of its own."
     ],
