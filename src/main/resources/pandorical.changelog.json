@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.26.2": [
+      "A player not trusted with fire can still light a nether portal: flint and steel or a fire charge on an empty frame makes the portal, never fire."
+    ],
     "15.26.1": [
       "A structure's waterlogged blocks keep their water while it moves, so a ship's waterlogged slabs and stairs no longer sail off dry."
     ],

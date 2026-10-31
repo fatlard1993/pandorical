@@ -8,6 +8,7 @@ import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -20,12 +21,14 @@ import net.minecraft.world.entity.npc.villager.AbstractVillager;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RespawnAnchorBlock;
 import net.minecraft.world.level.block.TntBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.portal.PortalShape;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jspecify.annotations.Nullable;
 
@@ -137,7 +140,8 @@ public final class TrustRules implements TrustApi {
         BlockPos pos = hit.getBlockPos();
         BlockState state = level.getBlockState(pos);
         if (held.is(Items.FLINT_AND_STEEL) || held.is(Items.FIRE_CHARGE)) {
-            return state.getBlock() instanceof TntBlock ? Trust.EXPLOSIVES : Trust.FIRE;
+            if (state.getBlock() instanceof TntBlock) return Trust.EXPLOSIVES;
+            return lightsPortal(level, pos.relative(hit.getDirection())) ? null : Trust.FIRE;
         }
         if (held.is(Items.END_CRYSTAL)) return Trust.EXPLOSIVES;
         if (held.is(Items.WITHER_SKELETON_SKULL) && besideSoul(level, pos.relative(hit.getDirection()))) return Trust.EXPLOSIVES;
@@ -149,6 +153,15 @@ public final class TrustRules implements TrustApi {
             return Trust.EXPLOSIVES;
         }
         return null;
+    }
+
+    /**
+     * Fire set here would open a nether portal instead of burning: the game's own test, from the
+     * fire block's placing, so a frame lit by hand is never fire at all.
+     */
+    private static boolean lightsPortal(ServerLevel level, BlockPos fire) {
+        if (level.dimension() != Level.OVERWORLD && level.dimension() != Level.NETHER) return false;
+        return level.getBlockState(fire).isAir() && PortalShape.findEmptyPortalShape(level, fire, Direction.Axis.X).isPresent();
     }
 
     /** A skull set on the soul sand or soil a wither is built from, which is what summons one. */

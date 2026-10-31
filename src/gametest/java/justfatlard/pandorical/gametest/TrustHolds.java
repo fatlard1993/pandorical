@@ -102,6 +102,15 @@ public final class TrustHolds implements FabricClientGameTest {
 		player.gameMode.useItem(player, level, player.getMainHandItem(), InteractionHand.MAIN_HAND);
 		check(player.getMainHandItem().is(Items.LAVA_BUCKET), "nor does a lava bucket empty");
 
+		BlockPos frame = player.blockPosition().offset(0, 0, 6);
+		for (int x = 0; x <= 3; x++) for (int y = 0; y <= 4; y++) {
+			boolean edge = x == 0 || x == 3 || y == 0 || y == 4;
+			level.setBlockAndUpdate(frame.offset(x, y, 0), edge ? Blocks.OBSIDIAN.defaultBlockState() : Blocks.AIR.defaultBlockState());
+		}
+		useOn(player, Items.FLINT_AND_STEEL, frame.offset(1, 0, 0));
+		check(level.getBlockState(frame.offset(1, 1, 0)).is(Blocks.NETHER_PORTAL), "but a frame still lights: a portal is not fire");
+		for (int x = 0; x <= 3; x++) for (int y = 0; y <= 4; y++) level.setBlockAndUpdate(frame.offset(x, y, 0), Blocks.AIR.defaultBlockState());
+
 		book.choose(player.getUUID(), Trust.FIRE, true);
 		useOn(player, Items.FLINT_AND_STEEL, ground);
 		check(level.getBlockState(ground.above()).is(Blocks.FIRE), "trusted by name, the same flint lights it");
