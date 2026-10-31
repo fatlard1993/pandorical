@@ -11,6 +11,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientConfigurationNetworkin
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.LoadingOverlay;
 import net.minecraft.client.color.block.BlockTintSource;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
@@ -123,6 +124,7 @@ public class ContentManager {
         configContentChunks.clear();
         expectedConfigContentChunks = -1;
         configAssetsToCache = null;
+        reloadWaiter = null;
 
         // The last server's assets stay in the atlases and Language table until the next join
         // reloads. Do not reload here: a reload on disconnect hangs the loading screen.
@@ -200,6 +202,7 @@ public class ContentManager {
     }
 
     public static void tick() {
+        watchReload();
         if (syncStartTime > 0 && !contentRegistered) {
             if (System.currentTimeMillis() - syncStartTime > SYNC_TIMEOUT_MS) {
                 Pandorical.LOGGER.warn("Content sync timed out after {}ms — finalizing with available data",
@@ -678,9 +681,13 @@ public class ContentManager {
         registerBlockColors(client);
         registerCreativeTabItems();
 
+        reloadWaiter = afterReload;
+        reloadStartedAt = System.currentTimeMillis();
+        ticksWithoutOverlay = 0;
         CompletableFuture<Void> reload = client.reloadResourcePacks();
         reload.whenComplete((unused, error) -> {
             if (error != null) Pandorical.LOGGER.error("Resource reload failed: {}", error.toString());
+            reloadWaiter = null;
             afterReload.run();
         });
         reload.thenRun(() -> {
@@ -711,6 +718,36 @@ public class ContentManager {
             }
 
         });
+    }
+
+    /**
+     * The reload's caller, until the reload answers. Minecraft never completes the future of a
+     * reload that failed: it drops the player's resource packs, reloads without them and leaves
+     * the first one hanging. Nor does it finish one while the window is hidden. A login waiting on
+     * it waits out the server's five minutes, so {@link #watchReload} answers for it.
+     */
+    private static volatile Runnable reloadWaiter = null;
+    private static volatile long reloadStartedAt = 0;
+    private static int ticksWithoutOverlay = 0;
+    /** Two seconds with no loading screen up: Minecraft starts a queued reload within a tick. */
+    private static final int ABANDONED_TICKS = 40;
+    /** Under the server's five minutes, so the login goes on rather than being dropped. */
+    private static final long RELOAD_DEADLINE_MS = 4 * 60_000;
+
+    private static void watchReload() {
+        Runnable waiting = reloadWaiter;
+        if (waiting == null) return;
+
+        boolean loading = Minecraft.getInstance().gui.overlay() instanceof LoadingOverlay;
+        ticksWithoutOverlay = loading ? 0 : ticksWithoutOverlay + 1;
+        long waited = System.currentTimeMillis() - reloadStartedAt;
+        if (ticksWithoutOverlay < ABANDONED_TICKS && waited < RELOAD_DEADLINE_MS) return;
+
+        reloadWaiter = null;
+        Pandorical.LOGGER.error(ticksWithoutOverlay >= ABANDONED_TICKS
+            ? "Resource reload was abandoned (Minecraft rolls back a failed reload without answering); going on without it"
+            : "Resource reload still unfinished after {}s; going on without it", waited / 1000);
+        waiting.run();
     }
 
     private static void registerCreativeTabItems() {
