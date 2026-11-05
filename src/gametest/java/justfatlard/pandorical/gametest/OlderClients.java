@@ -35,6 +35,7 @@ public final class OlderClients implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		if (!Smoke.full()) return;
 		context.runOnClient(client -> {
 			// An unknown type draws nothing at all. It used to draw an opaque grey panel, which put
 			// a slab over whatever the server was showing.

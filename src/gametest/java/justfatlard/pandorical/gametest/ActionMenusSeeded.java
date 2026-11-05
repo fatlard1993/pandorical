@@ -21,6 +21,7 @@ public final class ActionMenusSeeded implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		if (!Smoke.full()) return;
 		context.runOnClient(client -> {
 			ActionMenus.mine().clear();
 			ActionMenus.save();

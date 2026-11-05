@@ -289,8 +289,8 @@ public final class Pictures {
 		return missing;
 	}
 
-	/** Ticks between checks: five seconds. */
-	private static final int CHECK = 100;
+	/** Ticks between checks: half a second, so a frame waits no longer than its chunks do. */
+	private static final int CHECK = 10;
 	/** Ticks with nothing arriving before a wait is called off: five minutes. */
 	private static final int STALL = 6000;
 
@@ -300,13 +300,29 @@ public final class Pictures {
 	 */
 	private static final int RENDER_DISTANCE = 10;
 
+	/** Whether this run was asked for pictures ({@code -Ppictures}); without it a shot is skipped. */
+	public static boolean wanted() {
+		return Boolean.getBoolean("pandorical.pictures");
+	}
+
 	/**
-	 * Take the picture, once every chunk in view has drawn and the scene has had a moment to
-	 * settle, and with chat cleared again in case anything spoke since {@link #stage}.
+	 * Take the picture with {@code -Ppictures}, once every chunk in view has drawn and the scene
+	 * has had a moment to settle, and with chat cleared again in case anything spoke since
+	 * {@link #stage}. Without it nothing is waited for or taken: a picture is for a README, and an
+	 * ordinary run should not pay for one.
 	 *
-	 * @return where the test framework saved it
+	 * @return where the test framework saved it, or would have
 	 */
 	public static Path shoot(ClientGameTestContext context, TestServerConnection connection, String name) {
+		if (!wanted()) return Path.of(name + ".png (not taken: run with -Ppictures)");
+		return frame(context, connection, name);
+	}
+
+	/**
+	 * Take the picture whatever the run, for a test that reads the image itself. Settled and saved
+	 * as {@link #shoot} does.
+	 */
+	public static Path frame(ClientGameTestContext context, TestServerConnection connection, String name) {
 		settle(context, connection);
 		context.runOnClient(client -> client.gui.hud.getChat().clearMessages(false));
 		context.waitTick();
@@ -434,7 +450,7 @@ public final class Pictures {
 
 	/** With {@code -Ppictures}, into the mod's {@code screenshots/} folder as well. */
 	private static void keep(Path shot, String name) {
-		if (!Boolean.getBoolean("pandorical.pictures")) return;
+		if (!wanted()) return;
 		// The test runs in <mod>/build/run/clientGameTest.
 		Path folder = Path.of("").toAbsolutePath().getParent().getParent().getParent().resolve("screenshots");
 		try {

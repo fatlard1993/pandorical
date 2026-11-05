@@ -28,6 +28,7 @@ public final class ImmersiveCrossing implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		if (!Smoke.full()) return;
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
 			TestServerContext server = world.getServer();
 			TestServerConnection connection = world.getConnection();

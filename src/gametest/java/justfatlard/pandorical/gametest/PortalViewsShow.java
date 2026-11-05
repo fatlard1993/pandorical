@@ -41,6 +41,7 @@ public final class PortalViewsShow implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
+		if (!Smoke.full()) return;
 		try (TestSingleplayerContext world = Pictures.world(context, 1L)) {
 			TestServerContext server = world.getServer();
 			TestServerConnection connection = world.getConnection();
@@ -67,7 +68,7 @@ public final class PortalViewsShow implements FabricClientGameTest {
 			Vec3 middle = Vec3.atBottomCenterOf(base).add(0.5, 2, 0);
 			Pictures.look(server, middle.add(0, -1.2, -5), middle);
 			waitForView(context, true);
-			Path on = Pictures.shoot(context, connection, "portal-view-front");
+			Path on = Pictures.frame(context, connection, "portal-view-front");
 			double plane = base.getZ() + 0.5;
 			Vec3 front = new Vec3(middle.x, middle.y, plane - 5), back = new Vec3(middle.x, middle.y, plane + 5);
 			allBeyond(context, front, plane);
@@ -90,7 +91,7 @@ public final class PortalViewsShow implements FabricClientGameTest {
 			Pictures.look(server, middle.add(0, -1.2, -5), middle);
 			server.runOnServer(s -> ImmersivePortals.choose(s, false));
 			waitForView(context, false);
-			Path off = Pictures.shoot(context, connection, "portal-view-off");
+			Path off = Pictures.frame(context, connection, "portal-view-off");
 			double changed = difference(on, off);
 			if (changed < 6.0) throw new AssertionError("the view changed the portal by only " + changed + " on average: it is not showing");
 		}

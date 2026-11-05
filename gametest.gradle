@@ -42,13 +42,15 @@ if (sourceSets.findByName('client') != null) {
 }
 
 // The window is 854x480 unless it is told otherwise, and a screenshot taken larger than the window
-// leaves the HUD laid out for the small one: the hotbar ends up a postage stamp in the corner.
+// leaves the HUD laid out for the small one: the hotbar ends up a postage stamp in the corner. So a
+// pictures run gets the full size; any other run keeps the small window, which software rendering
+// draws several times faster on every tick of every test.
 tasks.matching { it.name == "runClientGameTest" }.configureEach {
 	// The client output directory is on the run classpath, but nothing said it had to hold anything
 	// first: from a clean tree the game launched against an empty one and died looking for the mod's
 	// own entrypoint. It only ever passed because a build had happened to run before it.
 	if (sourceSets.findByName('client') != null) dependsOn 'clientClasses'
-	args("--width", "1920", "--height", "1080")
+	if (project.hasProperty("pictures")) args("--width", "1920", "--height", "1080")
 	// Silent: OpenAL's null device ("OpenAL initialized on device No Output" in the log). Set on the
 	// game's own process, so it holds under a Gradle daemon too, which an exported variable does not.
 	environment("ALSOFT_DRIVERS", "null")

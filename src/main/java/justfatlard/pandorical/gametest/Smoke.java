@@ -41,10 +41,17 @@ public final class Smoke {
 	 * is "is this mod broken", is meant to be run over the whole suite before a deploy, and has to
 	 * stay short enough that somebody actually does. A full run is "does this mod work", drives
 	 * screens and clicks, and is worth the minutes when the mod itself has changed.
+	 *
+	 * <p>So a smoke run reaches a world once, through the first {@link #run} it meets, and runs no
+	 * bodies; every body is the full run's. A test that makes its own world returns straight away
+	 * unless this is true.
 	 */
 	public static boolean full() {
 		return "full".equalsIgnoreCase(LEVEL);
 	}
+
+	/** Set once a smoke run has been into a world: one join answers "does it load" for the run. */
+	private static boolean reachedAtSmoke = false;
 
 	/** A world that is up, with a player in it, for the length of one test. */
 	public static final class Session {
@@ -99,6 +106,11 @@ public final class Smoke {
 	public static void run(ClientGameTestContext context, String modId, Consumer<Session> body) {
 		if (!FabricLoader.getInstance().isModLoaded(modId)) {
 			throw new AssertionError(modId + " is not loaded: the test is testing nothing");
+		}
+		if (!full()) {
+			if (reachedAtSmoke) return;
+			reachedAtSmoke = true;
+			body = session -> {};
 		}
 
 		try (TestSingleplayerContext world = context.worldBuilder().create()) {
