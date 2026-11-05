@@ -40,6 +40,8 @@ public class ContentRegistry implements ContentApi {
     private final Map<String, RegisteredBlock> blocks = new LinkedHashMap<>();
     private final Map<String, RegisteredItem> items = new LinkedHashMap<>();
     private final Map<String, byte[]> assets = new ConcurrentHashMap<>();
+    /** The namespaces under assets/ that hold at least one asset, kept as each asset arrives. */
+    private final Set<String> assetNamespaces = ConcurrentHashMap.newKeySet();
 
     private final Map<String, String> vanillaAssetOwners = new ConcurrentHashMap<>();
     /** Each mod's own copy of a vanilla lang file, by path then mod, merged into the one served. */
@@ -99,6 +101,10 @@ public class ContentRegistry implements ContentApi {
     @Override
     public void registerAsset(String path, byte[] data) {
         // Rescans put the same bytes back constantly; only a real change re-gzips.
+        if (path.startsWith("assets/")) {
+            int end = path.indexOf('/', "assets/".length());
+            if (end > 0) assetNamespaces.add(path.substring("assets/".length(), end));
+        }
         if (Arrays.equals(assets.put(path, data), data)) return;
         assetGeneration.incrementAndGet();
         cachedAssetChunks = null;
@@ -404,8 +410,7 @@ public class ContentRegistry implements ContentApi {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(baos);
 
-        // Sorted, so the hash clients cache the assets under follows the content alone and not
-        // the order mods happened to register it in.
+        // Sorted, so the cache hash depends only on content.
         for (var entry : new java.util.TreeMap<>(assets).entrySet()) {
             dos.writeUTF(entry.getKey());
             dos.writeInt(entry.getValue().length);
@@ -698,8 +703,7 @@ public class ContentRegistry implements ContentApi {
     public void autoScanAllModAssets() {
         for (String namespace : serverOnlyNamespaces) {
             if (!scannedNamespaces.add(namespace)) continue;
-            boolean hasAssets = assets.keySet().stream().anyMatch(k -> k.startsWith("assets/" + namespace + "/"));
-            if (hasAssets) continue;
+            if (assetNamespaces.contains(namespace)) continue;
 
             var modContainer = FabricLoader.getInstance().getModContainer(namespace);
             if (modContainer.isEmpty()) continue;
@@ -724,8 +728,7 @@ public class ContentRegistry implements ContentApi {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(baos);
 
-        // Sorted, so the hash clients cache the assets under follows the content alone and not
-        // the order mods happened to register it in.
+        // Sorted, so the cache hash depends only on content.
         for (var entry : new java.util.TreeMap<>(assets).entrySet()) {
             dos.writeUTF(entry.getKey());
             dos.writeInt(entry.getValue().length);
