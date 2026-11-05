@@ -46,6 +46,8 @@ public class ContentRegistry implements ContentApi {
     private final Map<String, Map<String, byte[]>> vanillaLangContributions = new ConcurrentHashMap<>();
     private volatile List<SyncAssetsS2C> cachedAssetChunks = null;
     private volatile ConfigAssets cachedConfigAssets = null;
+    /** Every login sends the same entries: built once, and again after a block registers or tags reload. */
+    private volatile List<SyncContentS2C.BlockEntry> cachedBlockEntries = null;
     /** Moves on every asset change, so a build that raced one is not kept. */
     private final java.util.concurrent.atomic.AtomicLong assetGeneration = new java.util.concurrent.atomic.AtomicLong();
     /** Namespaces whose jars were walked for assets: a jar has the same files on the second walk. */
@@ -65,6 +67,7 @@ public class ContentRegistry implements ContentApi {
     @Override
     public void registerBlock(String id, BlockRegistration registration) {
         blocks.put(id, new RegisteredBlock(id, registration));
+        cachedBlockEntries = null;
         trackNamespace(id);
         Pandorical.LOGGER.info("Registered custom block: {}", id);
     }
@@ -401,7 +404,9 @@ public class ContentRegistry implements ContentApi {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(baos);
 
-        for (var entry : assets.entrySet()) {
+        // Sorted, so the hash clients cache the assets under follows the content alone and not
+        // the order mods happened to register it in.
+        for (var entry : new java.util.TreeMap<>(assets).entrySet()) {
             dos.writeUTF(entry.getKey());
             dos.writeInt(entry.getValue().length);
             dos.write(entry.getValue());
@@ -493,7 +498,20 @@ public class ContentRegistry implements ContentApi {
         }
     }
 
+    /** Block tags decide which entries climb, so a data pack reload has them built again. */
+    public void forgetBlockEntries() {
+        cachedBlockEntries = null;
+    }
+
     public List<SyncContentS2C.BlockEntry> buildBlockEntries() {
+        List<SyncContentS2C.BlockEntry> cached = cachedBlockEntries;
+        if (cached != null) return cached;
+        List<SyncContentS2C.BlockEntry> built = List.copyOf(collectBlockEntries());
+        cachedBlockEntries = built;
+        return built;
+    }
+
+    private List<SyncContentS2C.BlockEntry> collectBlockEntries() {
         List<SyncContentS2C.BlockEntry> blockEntries = new ArrayList<>();
         List<String> inferred = new ArrayList<>();
         for (var entry : BuiltInRegistries.BLOCK.entrySet()) {
@@ -696,7 +714,7 @@ public class ContentRegistry implements ContentApi {
     }
 
     /** Built once and kept until an asset changes: every join sends the same bytes. */
-    public ConfigAssets buildConfigAssets() throws IOException {
+    public synchronized ConfigAssets buildConfigAssets() throws IOException {
         autoScanAllModAssets();
         ConfigAssets cached = cachedConfigAssets;
         if (cached != null) return cached;
@@ -706,7 +724,9 @@ public class ContentRegistry implements ContentApi {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(baos);
 
-        for (var entry : assets.entrySet()) {
+        // Sorted, so the hash clients cache the assets under follows the content alone and not
+        // the order mods happened to register it in.
+        for (var entry : new java.util.TreeMap<>(assets).entrySet()) {
             dos.writeUTF(entry.getKey());
             dos.writeInt(entry.getValue().length);
             dos.write(entry.getValue());

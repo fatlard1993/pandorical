@@ -4,6 +4,12 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.26.4": [
+      "Joining a server and starting the game are much faster with many modded blocks: loading the models of doors, trapdoors and fence gates no longer slows down every other block.",
+      "Rejoining a server in the same game skips reloading its textures and models when nothing on the server changed.",
+      "The first player to join after a server starts no longer waits while the server packs its content.",
+      "Every client downloads the server's textures once more after this update, then keeps them as before."
+    ],
     "15.26.3": [
       "Joining no longer hangs for five minutes and drops you when the game's resource reload fails or stalls: the join goes on without it."
     ],

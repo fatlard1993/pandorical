@@ -75,6 +75,15 @@ final class AssetCache {
         }
     }
 
+    /** Of the bytes as given, gzipped or not: tells one set of synced assets from another. */
+    static String sha256(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("every Java has SHA-256", e);
+        }
+    }
+
     /** Null when the data unpacks past {@code maxBytes} or is not gzip at all. */
     private static String unpackedSha(byte[] gz, long maxBytes) {
         MessageDigest digest;

@@ -125,6 +125,7 @@ public class ContentManager {
         expectedConfigContentChunks = -1;
         configAssetsToCache = null;
         reloadWaiter = null;
+        packContents = null;
 
         // The last server's assets stay in the atlases and Language table until the next join
         // reloads. Do not reload here: a reload on disconnect hangs the loading screen.
@@ -369,12 +370,14 @@ public class ContentManager {
             return;
         }
 
+        String assetsSha256 = null;
         if (expectedConfigAssetChunks > 0) {
+            byte[] gz = joined(configAssetChunks);
+            assetsSha256 = AssetCache.sha256(gz);
             unpackAssets(configAssetChunks, true);
             String toCache = configAssetsToCache;
             configAssetsToCache = null;
             if (toCache != null) {
-                byte[] gz = joined(configAssetChunks);
                 Util.ioPool().execute(() -> AssetCache.store(toCache, gz, MAX_ASSET_BYTES));
             }
         }
@@ -399,11 +402,24 @@ public class ContentManager {
             }
         }
 
+        Set<String> blockIds = new HashSet<>();
+        for (SyncContentS2C.BlockEntry entry : content.blocks()) blockIds.add(entry.id());
+        PackContents contents = assetsSha256 == null ? null : new PackContents(assetsSha256, Set.copyOf(blockIds));
+        packContents = contents;
+
         // Reload before a level exists, as vanilla does for a server resource pack: a reload
         // during level creation crashes some Windows OpenGL drivers (MC-311345). The ack waits
         // for it, so the server holds the login until then.
         if (virtualPack.hasResources()) {
-            Minecraft.getInstance().execute(() -> injectResourcePack(ContentManager::ackConfigReady));
+            Minecraft.getInstance().execute(() -> {
+                PackContents baked = bakedContents;
+                if (contents != null && packSourceInjected && baked != null && baked.covers(contents)) {
+                    reuseBakedPack();
+                    ackConfigReady();
+                } else {
+                    injectResourcePack(ContentManager::ackConfigReady);
+                }
+            });
         } else {
             ackConfigReady();
         }
@@ -411,8 +427,31 @@ public class ContentManager {
 
     private static volatile boolean configReloadDone = false;
 
+    /** What the virtual pack holds: the asset bytes and the blocks registered against them. */
+    private record PackContents(String assetsSha256, Set<String> blocks) {
+        boolean covers(PackContents wanted) {
+            return assetsSha256.equals(wanted.assetsSha256) && blocks.containsAll(wanted.blocks);
+        }
+    }
+
+    /** Null while the virtual pack holds anything other than one config-phase sync's assets. */
+    private static volatile PackContents packContents = null;
+    /** What the last reload to read the virtual pack found in it: the models and atlases it built. */
+    private static volatile PackContents bakedContents = null;
+
     public static boolean wasConfigReloadDone() {
         return configReloadDone;
+    }
+
+    /**
+     * The same assets and blocks as the last reload already built models and atlases for, as on
+     * a rejoin: everything a reload would add is already there, so the join skips it.
+     */
+    private static void reuseBakedPack() {
+        Minecraft client = Minecraft.getInstance();
+        registerBlockColors(client);
+        registerCreativeTabItems();
+        Pandorical.LOGGER.info("Config phase: these assets were loaded by the last reload; joining without another");
     }
 
     private static void ackConfigReady() {
@@ -555,7 +594,10 @@ public class ContentManager {
             Pandorical.LOGGER.debug("Play phase: skipping block/item/stub registration — already done in config phase");
         }
 
-        if (assetChunks.stream().anyMatch(Objects::nonNull)) unpackAssets(assetChunks, false);
+        if (assetChunks.stream().anyMatch(Objects::nonNull)) {
+            packContents = null;
+            unpackAssets(assetChunks, false);
+        }
         injectResourcePack();
 
         ClientPlayNetworking.send(new ContentReadyC2S());
@@ -642,7 +684,10 @@ public class ContentManager {
                         @Override
                         public PackMetadataResources openMetadata(PackLocationInfo info) { return virtualPack; }
                         @Override
-                        public Stream<PackResources> openResources(PackLocationInfo info, Pack.Metadata metadata) { return Stream.of(virtualPack); }
+                        public Stream<PackResources> openResources(PackLocationInfo info, Pack.Metadata metadata) {
+                            bakedContents = packContents;
+                            return Stream.of(virtualPack);
+                        }
                     };
 
                     var metadata = new Pack.Metadata(
@@ -686,7 +731,10 @@ public class ContentManager {
         ticksWithoutOverlay = 0;
         CompletableFuture<Void> reload = client.reloadResourcePacks();
         reload.whenComplete((unused, error) -> {
-            if (error != null) Pandorical.LOGGER.error("Resource reload failed: {}", error.toString());
+            if (error != null) {
+                Pandorical.LOGGER.error("Resource reload failed: {}", error.toString());
+                bakedContents = null;
+            }
             reloadWaiter = null;
             afterReload.run();
         });
@@ -744,6 +792,7 @@ public class ContentManager {
         if (ticksWithoutOverlay < ABANDONED_TICKS && waited < RELOAD_DEADLINE_MS) return;
 
         reloadWaiter = null;
+        bakedContents = null;
         Pandorical.LOGGER.error(ticksWithoutOverlay >= ABANDONED_TICKS
             ? "Resource reload was abandoned (Minecraft rolls back a failed reload without answering); going on without it"
             : "Resource reload still unfinished after {}s; going on without it", waited / 1000);

@@ -135,11 +135,14 @@ public class DynamicBlock extends Block {
         Map<BlockState, VoxelShape> outlineMap = new IdentityHashMap<>();
         Map<BlockState, VoxelShape> collisionMap = new IdentityHashMap<>();
 
+        // States mostly repeat a handful of shapes (a mixed slab's tens of thousands are all one
+        // full block), and joining the boxes is the cost: each distinct one is built once.
+        Map<java.nio.ByteBuffer, VoxelShape> built = new HashMap<>();
         try {
             DataInputStream dis = new DataInputStream(new ByteArrayInputStream(shapeData));
             for (BlockState state : states) {
-                outlineMap.put(state, readShape(dis));
-                collisionMap.put(state, readShape(dis));
+                outlineMap.put(state, readShape(dis, built));
+                collisionMap.put(state, readShape(dis, built));
             }
         } catch (IOException e) {
             Pandorical.LOGGER.warn("Failed to deserialize shapes for {}: {}",
@@ -184,10 +187,21 @@ public class DynamicBlock extends Block {
 
     private static final int BYTES_PER_BOX = 24;
 
-    private static VoxelShape readShape(DataInputStream dis) throws IOException {
+    private static VoxelShape readShape(DataInputStream dis, Map<java.nio.ByteBuffer, VoxelShape> built) throws IOException {
         int numBoxes = dis.readByte() & 0xFF;
         if (numBoxes == 0) return Shapes.empty();
 
+        byte[] boxes = new byte[numBoxes * BYTES_PER_BOX];
+        dis.readFully(boxes);
+        java.nio.ByteBuffer key = java.nio.ByteBuffer.wrap(boxes);
+        VoxelShape known = built.get(key);
+        if (known != null) return known;
+        VoxelShape shape = readBoxes(new DataInputStream(new ByteArrayInputStream(boxes)), numBoxes);
+        built.put(key, shape);
+        return shape;
+    }
+
+    private static VoxelShape readBoxes(DataInputStream dis, int numBoxes) throws IOException {
         VoxelShape shape = null;
         for (int i = 0; i < numBoxes; i++) {
             double minX = dis.readFloat();

@@ -17,6 +17,7 @@ import net.minecraft.client.renderer.block.dispatch.ModelState;
 import net.minecraft.client.resources.model.sprite.Material;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.RandomSource;
@@ -25,7 +26,10 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
@@ -61,6 +65,9 @@ public final class ContextModels {
 
 	private record Wanted(ExtraModelKey<BlockStateModel> key, Identifier model, ModelState state) {}
 
+	/** What the scans found: the models to load, and the blocks some provider draws by context. */
+	private record Scanned(List<Wanted> wanted, Set<Block> covered) {}
+
 	private static final List<Provider> PROVIDERS = new ArrayList<>();
 	public static void register(Provider provider) {
 		PROVIDERS.add(provider);
@@ -85,19 +92,30 @@ public final class ContextModels {
 						}
 					});
 				}
-				return wanted;
+				// Asked once per block here rather than once per state at bake: a provider's
+				// answer can cost a walk of everything it scanned, and there are far more states.
+				Set<Block> covered = Collections.newSetFromMap(new IdentityHashMap<>());
+				if (!wanted.isEmpty()) {
+					for (Block block : BuiltInRegistries.BLOCK) {
+						for (Provider provider : PROVIDERS) {
+							if (provider.covers(block)) {
+								covered.add(block);
+								break;
+							}
+						}
+					}
+				}
+				return new Scanned(wanted, covered);
 			}, executor),
-			(wanted, context) -> {
+			(scanned, context) -> {
+				List<Wanted> wanted = scanned.wanted();
+				Set<Block> covered = scanned.covered();
 				for (Wanted w : wanted) {
 					context.addModel(w.key(), SimpleUnbakedExtraModel.blockStateModel(w.model(), w.state()));
 				}
 				if (wanted.isEmpty()) return;
 				context.modifyBlockModelAfterBake().register((model, baked) -> {
-					Block block = baked.state().getBlock();
-					for (Provider provider : PROVIDERS) {
-						if (provider.covers(block)) return new Contextual(model);
-					}
-					return model;
+					return covered.contains(baked.state().getBlock()) ? new Contextual(model) : model;
 				});
 			});
 	}

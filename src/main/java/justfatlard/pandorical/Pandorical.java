@@ -557,13 +557,26 @@ public class Pandorical implements ModInitializer {
             });
         });
 
+        // The first login would otherwise pack the content on its own network thread and wait for it.
+        ServerLifecycleEvents.SERVER_STARTED.register(server ->
+            Thread.ofPlatform().daemon().name("pandorical-pack-content").start(() -> {
+                try {
+                    PandoricalApi.contentRegistry().buildBlockEntries();
+                    PandoricalApi.contentRegistry().buildConfigAssets();
+                } catch (Exception e) {
+                    LOGGER.debug("Packing the content ahead failed; the first login packs it", e);
+                }
+            }));
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             ModCommands.forget();
+            PandoricalApi.contentRegistry().forgetBlockEntries();
             PandoricalApi.blockMarksImpl().clear();
             PandoricalApi.structuresImpl().clear();
         });
-        ServerLifecycleEvents.END_DATA_PACK_RELOAD.register(
-            (server, resources, success) -> ModCommands.forget());
+        ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, resources, success) -> {
+            ModCommands.forget();
+            PandoricalApi.contentRegistry().forgetBlockEntries();
+        });
         ServerPlayNetworking.registerGlobalReceiver(
             KeybindBindingsC2S.TYPE, (payload, context) -> {
                 context.player().level().getServer().execute(() ->
