@@ -4,13 +4,13 @@ import justfatlard.pandorical.Pandorical;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
-import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
@@ -38,16 +38,20 @@ final class AssetCache {
         return FabricLoader.getInstance().getGameDir().resolve("pandorical").resolve("asset-cache");
     }
 
-    /** The gzipped assets named by {@code sha}, or null when they are missing or not what the name says. */
-    static byte[] load(String sha, long maxBytes) {
+    /** Cached assets as kept, and as they unpack: the check already unpacked them, so loading need not again. */
+    record Loaded(byte[] gz, byte[] unpacked) {}
+
+    /** The assets named by {@code sha}, or null when they are missing or not what the name says. */
+    static Loaded load(String sha, long maxBytes) {
         if (!SHA.matcher(sha).matches()) return null;
         Path file = dir().resolve(sha + ".gz");
         try {
             if (!Files.isRegularFile(file) || Files.size(file) > maxBytes) return null;
             byte[] gz = Files.readAllBytes(file);
-            if (sha.equals(unpackedSha(gz, maxBytes))) {
+            byte[] unpacked = unpack(gz, maxBytes);
+            if (unpacked != null && sha.equals(sha256(unpacked))) {
                 Files.setLastModifiedTime(file, FileTime.from(Instant.now()));
-                return gz;
+                return new Loaded(gz, unpacked);
             }
             Pandorical.LOGGER.warn("Cached assets {} do not unpack to their name; downloading them again", file.getFileName());
             Files.deleteIfExists(file);
@@ -86,23 +90,23 @@ final class AssetCache {
 
     /** Null when the data unpacks past {@code maxBytes} or is not gzip at all. */
     private static String unpackedSha(byte[] gz, long maxBytes) {
-        MessageDigest digest;
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("every Java has SHA-256", e);
-        }
-        try (InputStream in = new DigestInputStream(new GZIPInputStream(new ByteArrayInputStream(gz)), digest)) {
+        byte[] unpacked = unpack(gz, maxBytes);
+        return unpacked == null ? null : sha256(unpacked);
+    }
+
+    /** Null when the data unpacks past {@code maxBytes} or is not gzip at all. */
+    private static byte[] unpack(byte[] gz, long maxBytes) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(gz))) {
             byte[] buf = new byte[8192];
-            long total = 0;
             for (int read; (read = in.read(buf)) != -1; ) {
-                total += read;
-                if (total > maxBytes) return null;
+                if (out.size() + read > maxBytes) return null;
+                out.write(buf, 0, read);
             }
         } catch (IOException e) {
             return null;
         }
-        return HexFormat.of().formatHex(digest.digest());
+        return out.toByteArray();
     }
 
     private static void prune(Path dir) throws IOException {

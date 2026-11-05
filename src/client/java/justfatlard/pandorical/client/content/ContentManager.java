@@ -124,6 +124,7 @@ public class ContentManager {
         configContentChunks.clear();
         expectedConfigContentChunks = -1;
         configAssetsToCache = null;
+        configAssetsUnpacked = null;
         reloadWaiter = null;
         packContents = null;
 
@@ -145,6 +146,8 @@ public class ContentManager {
     private static volatile int expectedConfigAssetChunks = -1;
     /** The hash the server offered and this client is downloading, to cache once it has it all. */
     private static volatile String configAssetsToCache = null;
+    /** A cache hit's assets, already unpacked when the cache checked them. */
+    private static volatile byte[] configAssetsUnpacked = null;
 
     public static boolean isSyncing() { return syncing && !contentRegistered; }
 
@@ -324,7 +327,7 @@ public class ContentManager {
     public static void handleConfigAssetsOffer(AssetsOfferConfigS2C offer) {
         if (configPhaseSynced) return;
         String sha = offer.sha256();
-        byte[] cached = AssetCache.load(sha, MAX_ASSET_BYTES);
+        AssetCache.Loaded cached = AssetCache.load(sha, MAX_ASSET_BYTES);
         if (cached == null) {
             configAssetsToCache = sha;
             Pandorical.LOGGER.info("Config phase: assets {} not cached; downloading {} chunk(s)",
@@ -333,10 +336,11 @@ public class ContentManager {
             return;
         }
         Pandorical.LOGGER.info("Config phase: assets {} cached ({} bytes); skipping the download",
-            sha.substring(0, 12), cached.length);
+            sha.substring(0, 12), cached.gz().length);
         synchronized (ContentManager.class) {
             configAssetChunks.clear();
-            configAssetChunks.add(cached);
+            configAssetChunks.add(cached.gz());
+            configAssetsUnpacked = cached.unpacked();
             expectedConfigAssetChunks = 1;
         }
         ClientConfigurationNetworking.send(new AssetsWantConfigC2S(false));
@@ -374,7 +378,10 @@ public class ContentManager {
         if (expectedConfigAssetChunks > 0) {
             byte[] gz = joined(configAssetChunks);
             assetsSha256 = AssetCache.sha256(gz);
-            unpackAssets(configAssetChunks, true);
+            byte[] unpacked = configAssetsUnpacked;
+            configAssetsUnpacked = null;
+            if (unpacked != null) readAssets(unpacked, true);
+            else unpackAssets(configAssetChunks, true);
             String toCache = configAssetsToCache;
             configAssetsToCache = null;
             if (toCache != null) {
@@ -513,7 +520,18 @@ public class ContentManager {
                 }
             }
 
-            DataInputStream dis = new DataInputStream(new ByteArrayInputStream(decompressedBaos.toByteArray()));
+            readAssets(decompressedBaos.toByteArray(), configPhase);
+        } catch (IOException e) {
+            Pandorical.LOGGER.error(configPhase
+                ? "Config phase: failed to unpack assets: {}"
+                : "Failed to unpack assets: {}", e.getMessage(), e);
+        }
+    }
+
+    /** The unpacked assets, path by path, into the virtual pack. */
+    private static void readAssets(byte[] unpacked, boolean configPhase) {
+        try {
+            DataInputStream dis = new DataInputStream(new ByteArrayInputStream(unpacked));
             int count = 0;
             while (dis.available() > 0) {
                 String path = dis.readUTF();
