@@ -4,6 +4,11 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.26.5": [
+      "A server starts a few seconds sooner: block support is worked out once per shape, and mod assets are found without a scan per mod.",
+      "Joining a server whose textures are cached unpacks them once, not twice.",
+      "Its tests run faster: pictures only when asked for, a small window, and one world join at smoke level; nothing in play changes."
+    ],
     "15.26.4": [
       "Joining a server and starting the game are much faster with many modded blocks: loading the models of doors, trapdoors and fence gates no longer slows down every other block.",
       "Rejoining a server in the same game skips reloading its textures and models when nothing on the server changed.",
