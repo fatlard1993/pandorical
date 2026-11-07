@@ -12,6 +12,7 @@ Normally a modded server means every player installs every mod, matched version 
 - **Rebindable keys** the server defines. They appear in your normal controls screen under "Pandorical", and rebind like any other key.
 - **Moving structures**, like a ship built out of blocks that sails as one piece. One the server marks walkable is solid underfoot and carries you with it, so you can stand and walk on a ship's deck while it sails and turns, climb its ladders, and use its doors and chests, for blocks the mod tags `pandorical:usable_on_structures`. One can also keep the sea out of part of itself, so a ship's hold below the waterline is air you walk and breathe, not water you swim.
 - **Models a block across**: a structure drawn at a scale, so a whole build shows as a model on a shelf, and a block given a shape of its own where it stands, so the model is stood on, walked under and aimed at exactly where it is solid.
+- **Pointing at things**: press **Z** (or type `/point`) and whatever you are looking at, a block or a mob, is outlined for everyone nearby in your colour for a few seconds, with a line from you to it. Your colour is your team's, or the colour your name is shown in. Players without Pandorical see it too, and use `/point`.
 - **Camera control**, when a server wants to pull the view back.
 - **Cosmetic overlays** on particular mobs or chests, so you can tell one from another.
 - **Mobs in a different shape**: a server's mod can redraw a mob with its own model, or with its own parts resized and moved, and it still walks and fights as before.

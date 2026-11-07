@@ -803,6 +803,18 @@ keybind registration during client startup. Unclaimed slots are inert and send n
 older than the current pool reports how many slots it carries, and the server says in its log
 which claim falls off the end rather than binding a key nobody can press.
 
+## Pointing
+
+Pandorical's own: a player presses its key (Z by default, rebindable, under Pandorical) or runs
+`/point`, the server traces their look out to 64 blocks, and whatever it meets, a mob before the
+block behind it, is outlined in dust for everyone in range for three seconds, with a line from the
+player to it at first. All of it is particles every client draws. One point a second per player.
+The server setting `pointing` (on) turns it off.
+
+The colour is vanilla's: `Pointing.colorOf(player)` is the player's team colour, else the colour of
+their display name, else white. A mod that wants a player's colour for something of its own can
+call it rather than inventing a setting.
+
 ## Action menus
 
 A grid of buttons the player opens with one key. Your mod suggests a menu, or suggests single

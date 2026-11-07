@@ -128,6 +128,7 @@ public class Pandorical implements ModInitializer {
         DiagnosticMixinPlugin.reportUnmatched();
         // First, so the settings exist however far the rest of init gets.
         SettingsApi.Group settings = PandoricalApi.settings().serverGroup(MOD_ID, "Pandorical");
+        justfatlard.pandorical.point.Pointing.register(settings);
         settings.toggle("pairNetherPortals", "Nether portals go back the way they came", false)
             .describe("Each portal remembers the one its first traveller came out of, both ways round")
             .backedBy(player -> PortalPairing.enabled(player.level().getServer()),
@@ -648,7 +649,14 @@ public class Pandorical implements ModInitializer {
                 context.server().execute(() ->
                     Viewports.declare(context.player(), payload));
             });
+        ServerTickEvents.END_SERVER_TICK.register(justfatlard.pandorical.point.Pointing::tick);
+        CommandRegistrationCallback.EVENT.register((dispatcher, registry, environment) ->
+            dispatcher.register(net.minecraft.commands.Commands.literal("point").executes(context -> {
+                justfatlard.pandorical.point.Pointing.point(context.getSource().getPlayerOrException());
+                return 1;
+            })));
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            justfatlard.pandorical.point.Pointing.forget(handler.player.getUUID());
             ClientMods.forget(handler.player);
             Viewports.forget(handler.player);
             notUnderstood.remove(handler.player.getUUID());

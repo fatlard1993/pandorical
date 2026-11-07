@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.28.0": [
+      "Point at something: press Z, or type /point, and it is outlined for everyone nearby in your team's or your name's colour."
+    ],
     "15.27.0": [
       "Structures can be drawn at a scale: a whole build shown as a model a block across.",
       "A block can be given a shape of its own where it stands, so a model a block across is solid only where the model is.",
