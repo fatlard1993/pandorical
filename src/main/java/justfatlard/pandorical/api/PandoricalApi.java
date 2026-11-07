@@ -257,6 +257,9 @@ public final class PandoricalApi {
 
     public static BlockMarkApi blockMarks() { return BLOCK_MARKS; }
 
+    /** Shapes set position by position; see {@link BlockShapeApi}. */
+    public static BlockShapeApi blockShapes() { return justfatlard.pandorical.push.BlockShapes.INSTANCE; }
+
     public static BannerDecalApi bannerDecals() { return BANNER_DECALS; }
 
     public static ChestOverlayApi chestOverlays() { return CHEST_OVERLAYS; }

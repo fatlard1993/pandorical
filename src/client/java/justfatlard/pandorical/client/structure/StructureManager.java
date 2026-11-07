@@ -88,6 +88,12 @@ public final class StructureManager {
         structure.dry = new DryCells(payload.cells().stream().map(p -> new RelPos(p.x(), p.y(), p.z())).toList());
     }
 
+    public static void handleSetScale(justfatlard.pandorical.protocol.SetStructureScaleS2C payload) {
+        ClientStructure structure = structures.get(payload.structureId());
+        if (structure == null) return;
+        structure.scale = payload.scale();
+    }
+
     public static void handleDespawn(DespawnStructureS2C payload) {
         structures.remove(payload.structureId());
     }
@@ -137,6 +143,8 @@ public final class StructureManager {
         public boolean walkable;
         /** Where the sea is kept out; see {@link StructureHolds}. */
         public DryCells dry = new DryCells(java.util.List.of());
+        /** How large it is drawn; see {@link StructureRenderer}. */
+        public float scale = 1.0F;
 
         /** Ticks a hidden walkable structure stays solid; see {@link StructureDecks#hidden}. */
         int solidTicks;

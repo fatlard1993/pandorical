@@ -91,7 +91,8 @@ before anything else.
 
 `screens` · `content` · `camera` · `hud` · `structures` · `entity_overlays` ·
 `chest_overlays` · `keybinds` · `hud_elements` · `skins` · `render_policy` ·
-`animations` · `mount_policy` · `walkable_structures` · `dry_structures`
+`animations` · `mount_policy` · `walkable_structures` · `dry_structures` ·
+`scaled_structures` · `block_shapes`
 
 Pass the constant, `hasCapability(player, Capabilities.SCREENS)`, and a typo is a compile
 error. `hasCapability(player, "blockTints")` returns false forever, because `blockTints` is an
@@ -1091,12 +1092,27 @@ one.
 
 ## Traps in structures, tints and renderers
 
-`structures`, `playerInventory`, `blockTints` and built-in entity renderers work the same way,
-through `PandoricalApi`; read the javadoc on `StructureApi`, `PlayerInventoryApi`,
-`BlockTintApi` and `PandoricalApi#registerEntityRenderer` before wiring them up. Each carries a
-trap that nothing reports:
+`structures`, `blockShapes`, `playerInventory`, `blockTints` and built-in entity renderers work
+the same way, through `PandoricalApi`; read the javadoc on `StructureApi`, `BlockShapeApi`,
+`PlayerInventoryApi`, `BlockTintApi` and `PandoricalApi#registerEntityRenderer` before wiring
+them up. Each carries a trap that nothing reports:
 
 - **Structure ids are unique server-wide**, and a structure not despawned leaks its state.
+- **Structures and block shapes are kept in memory only.** A server that stops forgets both, and
+  nothing brings them back on its own. Rebuild a structure from `ServerEntityEvents.ENTITY_LOAD`
+  on its anchor (which also fires the first time the anchor is added) and despawn it from
+  `ENTITY_UNLOAD`; set a block's shape from whatever loads with it, and clear it when the block
+  goes, or a client collides with the old shape over whatever is built there next.
+- **A spawn starts a structure at full size.** `setScale` again after every spawn, including the
+  one that rebuilds it as its anchor loads. A scaled structure is drawn scaled and nothing else:
+  walking on it, using it and keeping it dry all take it at full size, so leave it neither walkable
+  nor dry.
+- **A block shape has to be answered by the server block too**, or the player rubber-bands: give
+  the block `dynamicShape()` so its shape is not cached by state, answer `getShape` and
+  `getCollisionShape` with the shape you set, and answer a player without the `block_shapes`
+  capability with a plain block, which is what their client takes it for. The client answers from
+  one mixin on a block state's shape and collision, which costs a single flag check while no shape
+  is set anywhere.
 - **Anything drawn on a moving structure blends by the structure's own rule**
   (`StructureInterpolationHandler`, over `StructureManager.INTERPOLATION_TICKS`). A vanilla blend
   sits a different distance behind the server, and the gap is what a rider sees. Server-only

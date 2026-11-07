@@ -4,6 +4,11 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.27.0": [
+      "Structures can be drawn at a scale: a whole build shown as a model a block across.",
+      "A block can be given a shape of its own where it stands, so a model a block across is solid only where the model is.",
+      "A block mark taken off while you were in another world no longer comes back with you."
+    ],
     "15.26.5": [
       "A server starts a few seconds sooner: block support is worked out once per shape, and mod assets are found without a scan per mod.",
       "Joining a server whose textures are cached unpacks them once, not twice.",

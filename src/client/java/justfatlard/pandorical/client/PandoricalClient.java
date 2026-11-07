@@ -312,6 +312,12 @@ public class PandoricalClient implements ClientModInitializer {
             BlockMarksS2C.TYPE, (payload, context) ->
                 context.client().execute(() -> ClientBlockMarks.apply(payload)));
         ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.BlockMarksV2S2C.TYPE, (payload, context) ->
+                context.client().execute(() -> ClientBlockMarks.apply(payload.dimension(), payload.replace(), payload.entries())));
+        ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.BlockShapesS2C.TYPE, (payload, context) ->
+                context.client().execute(() -> justfatlard.pandorical.client.renderer.ClientBlockShapes.apply(payload)));
+        ClientPlayNetworking.registerGlobalReceiver(
             BlockTintPositionsS2C.TYPE, (payload, context) ->
                 context.client().execute(() -> payload.entries().forEach(entry ->
                     PositionalTintStore.paint(
@@ -463,6 +469,9 @@ public class PandoricalClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(justfatlard.pandorical.protocol.SetStructureDryS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> StructureManager.handleSetDry(payload));
         });
+        ClientPlayNetworking.registerGlobalReceiver(justfatlard.pandorical.protocol.SetStructureScaleS2C.TYPE, (payload, context) -> {
+            context.client().execute(() -> StructureManager.handleSetScale(payload));
+        });
         ClientPlayNetworking.registerGlobalReceiver(DespawnStructureS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> StructureManager.handleDespawn(payload));
         });
@@ -562,6 +571,7 @@ public class PandoricalClient implements ClientModInitializer {
         ServerCapabilities.clear();
         ViewportReporter.clear();
         ClientBlockMarks.clear();
+        justfatlard.pandorical.client.renderer.ClientBlockShapes.clear();
         // Server state, and no use on the next one: left behind, it showed through as another
         // server's buttons, decals and painted blocks.
         ClientInventoryButtons.clear();

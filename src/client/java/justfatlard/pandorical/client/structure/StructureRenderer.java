@@ -63,6 +63,8 @@ public final class StructureRenderer {
         poseStack.pushPose();
         poseStack.translate(pose.x() - camPos.x, pose.y() - camPos.y, pose.z() - camPos.z);
         poseStack.rotateDegrees(Axis.YP, -pose.yaw());
+        float scale = structure.scale;
+        if (scale != 1.0F) poseStack.scale(scale, scale, scale);
 
         for (Map.Entry<StructureManager.RelPosKey, BlockState> entry : structure.blocks.entrySet()) {
             StructureManager.RelPosKey rel = entry.getKey();
@@ -76,7 +78,7 @@ public final class StructureRenderer {
             renderState.blockState = state;
             // Seeded by relative position, so model variants hold still while the structure moves.
             renderState.randomSeedPos = new BlockPos(rel.x(), rel.y(), rel.z());
-            renderState.blockPos = worldBlockPos(pose, rel, cos, sin);
+            renderState.blockPos = worldBlockPos(pose, rel, cos, sin, scale);
             renderState.biome = level.getBiome(renderState.blockPos);
             renderState.cardinalLighting = level.cardinalLighting();
             renderState.lightEngine = level.getLightEngine();
@@ -86,19 +88,23 @@ public final class StructureRenderer {
             poseStack.popPose();
         }
 
-        StructureFluids.submit(structure, level, poseStack, collector, rel -> worldBlockPos(pose, rel, cos, sin));
+        StructureFluids.submit(structure, level, poseStack, collector, rel -> worldBlockPos(pose, rel, cos, sin, scale));
         StructureHolds.submitMask(structure, poseStack, collector);
 
         poseStack.popPose();
     }
 
-    /** Approximate, for light and biome sampling only; the pose stack places the block. */
+    /**
+     * Approximate, for light and biome sampling only; the pose stack places the block. Scaled with
+     * the structure, so a model's blocks take their light from where they are drawn, not from where
+     * they would stand at full size.
+     */
     private static BlockPos worldBlockPos(StructureManager.StructurePoseSnapshot pose,
-                                           StructureManager.RelPosKey rel, double cos, double sin) {
-        double localX = rel.x() + 0.5;
-        double localZ = rel.z() + 0.5;
+                                           StructureManager.RelPosKey rel, double cos, double sin, float scale) {
+        double localX = (rel.x() + 0.5) * scale;
+        double localZ = (rel.z() + 0.5) * scale;
         double rotatedX = localX * cos - localZ * sin;
         double rotatedZ = localX * sin + localZ * cos;
-        return BlockPos.containing(pose.x() + rotatedX, pose.y() + rel.y() + 0.5, pose.z() + rotatedZ);
+        return BlockPos.containing(pose.x() + rotatedX, pose.y() + (rel.y() + 0.5) * scale, pose.z() + rotatedZ);
     }
 }

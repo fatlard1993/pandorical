@@ -42,6 +42,7 @@ public final class StructureRegistry implements StructureApi {
 		boolean visible;
 		boolean walkable;
 		DryCells dry = new DryCells(List.of());
+		float scale = 1.0F;
 
 		StructureState(Entity anchorEntity, Map<RelPos, BlockState> blocks, StructurePose pose, boolean visible) {
 			this.anchorEntity = anchorEntity;
@@ -271,6 +272,21 @@ public final class StructureRegistry implements StructureApi {
 		}
 	}
 
+	@Override
+	public void setScale(String structureId, float scale) {
+		if (!(scale > 0.0F) || Float.isInfinite(scale)) throw new IllegalArgumentException("a structure's scale must be above nought: " + scale);
+		StructureState state = structures.get(structureId);
+		if (state == null || state.scale == scale) return;
+		state.scale = scale;
+
+		justfatlard.pandorical.protocol.SetStructureScaleS2C packet = new justfatlard.pandorical.protocol.SetStructureScaleS2C(structureId, scale);
+		for (ServerPlayer player : PlayerLookup.tracking(state.anchorEntity)) {
+			if (PandoricalApi.hasCapability(player, Capabilities.SCALED_STRUCTURES)) {
+				ServerPlayNetworking.send(player, packet);
+			}
+		}
+	}
+
 	private static SetStructureDryS2C dryPacket(String structureId, DryCells dry) {
 		return new SetStructureDryS2C(structureId, dry.cells().stream()
 			.map(p -> new StructureRelPos(p.x(), p.y(), p.z()))
@@ -297,6 +313,9 @@ public final class StructureRegistry implements StructureApi {
 				}
 				if (!entry.getValue().dry.isEmpty() && PandoricalApi.hasCapability(player, Capabilities.DRY_STRUCTURES)) {
 					ServerPlayNetworking.send(player, dryPacket(entry.getKey(), entry.getValue().dry));
+				}
+				if (entry.getValue().scale != 1.0F && PandoricalApi.hasCapability(player, Capabilities.SCALED_STRUCTURES)) {
+					ServerPlayNetworking.send(player, new justfatlard.pandorical.protocol.SetStructureScaleS2C(entry.getKey(), entry.getValue().scale));
 				}
 			}
 		}

@@ -86,6 +86,23 @@ public interface StructureApi {
      */
     void setDry(String structureId, java.util.Collection<RelPos> cells);
 
+    /**
+     * Draw a structure at this scale about its pose: 1 is full size, and 1/8 draws every block an
+     * eighth of a block across, for a model of something rather than the thing itself. Sent to
+     * clients with the {@code "scaled_structures"} capability; one without it draws full size.
+     *
+     * <p>Only the drawing scales, about the pose's point: block (0, 0, 0) of the structure keeps
+     * its lowest corner there. Walking on it, using its blocks and keeping it dry all still take it
+     * at full size, so a scaled structure should be neither walkable nor dry. Each block takes its
+     * light from where it is drawn.
+     *
+     * <p>A {@link #spawn} starts the structure afresh at full size, so set the scale again after
+     * every spawn, including one that rebuilds a structure as its anchor loads.
+     *
+     * @param scale above nought; 1 is full size
+     */
+    void setScale(String structureId, float scale);
+
     /** Remove the structure for every tracker and forget its server-side state. */
     void despawn(String structureId);
 }

@@ -262,6 +262,9 @@ public class Pandorical implements ModInitializer {
             BlockMarksS2C.TYPE,
             BlockMarksS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.BlockMarksV2S2C.TYPE,
+            justfatlard.pandorical.protocol.BlockMarksV2S2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
             BannerDecalsS2C.TYPE,
             BannerDecalsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
@@ -309,7 +312,13 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(
             justfatlard.pandorical.protocol.SetStructureDryS2C.TYPE,
             justfatlard.pandorical.protocol.SetStructureDryS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.SetStructureScaleS2C.TYPE,
+            justfatlard.pandorical.protocol.SetStructureScaleS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(DespawnStructureS2C.TYPE, DespawnStructureS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.BlockShapesS2C.TYPE,
+            justfatlard.pandorical.protocol.BlockShapesS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(EntityOverlayS2C.TYPE, EntityOverlayS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
             ChestOverlayS2C.TYPE,
@@ -571,6 +580,7 @@ public class Pandorical implements ModInitializer {
             ModCommands.forget();
             PandoricalApi.contentRegistry().forgetBlockEntries();
             PandoricalApi.blockMarksImpl().clear();
+            justfatlard.pandorical.push.BlockShapes.INSTANCE.clear();
             PandoricalApi.structuresImpl().clear();
         });
         ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, resources, success) -> {
@@ -648,6 +658,9 @@ public class Pandorical implements ModInitializer {
         PandoricalApi.onPlayerReady(player -> PandoricalApi.blockMarksImpl().sendAll(player));
         ServerEntityLevelChangeEvents.AFTER_PLAYER_CHANGE_LEVEL.register(
             (player, origin, destination) -> PandoricalApi.blockMarksImpl().sendAll(player));
+        PandoricalApi.onPlayerReady(player -> justfatlard.pandorical.push.BlockShapes.INSTANCE.sendAll(player));
+        ServerEntityLevelChangeEvents.AFTER_PLAYER_CHANGE_LEVEL.register(
+            (player, origin, destination) -> justfatlard.pandorical.push.BlockShapes.INSTANCE.sendAll(player));
         CommandRegistrationCallback.EVENT.register(
             (dispatcher, registry, environment) ->
                 SettingsCommand.register(dispatcher, PandoricalApi.settingsImpl()));

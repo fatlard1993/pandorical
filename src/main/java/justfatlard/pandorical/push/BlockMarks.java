@@ -2,6 +2,7 @@ package justfatlard.pandorical.push;
 
 import justfatlard.pandorical.api.BlockMarkApi;
 import justfatlard.pandorical.protocol.BlockMarksS2C;
+import justfatlard.pandorical.protocol.BlockMarksV2S2C;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -52,22 +53,31 @@ public final class BlockMarks implements BlockMarkApi {
 		marks.clear();
 	}
 
+	/**
+	 * Every mark in the world this player is now in. A client with the second channel is told it is
+	 * the whole set, even when empty, and drops what it held; one with only the first is sent the
+	 * marks on top of whatever it has.
+	 */
 	public void sendAll(ServerPlayer player) {
 		Map<Long, Set<String>> inLevel = marks.get(player.level().dimension());
-		if (inLevel == null || inLevel.isEmpty()) return;
 		List<BlockMarksS2C.Entry> entries = new ArrayList<>();
-		for (var e : inLevel.entrySet()) {
-			for (String mark : e.getValue()) entries.add(new BlockMarksS2C.Entry(e.getKey(), mark, true));
+		if (inLevel != null) {
+			for (var e : inLevel.entrySet()) {
+				for (String mark : e.getValue()) entries.add(new BlockMarksS2C.Entry(e.getKey(), mark, true));
+			}
 		}
-		send(player, player.level(), entries);
+		send(player, player.level(), true, entries);
 	}
 
 	private void tell(ServerLevel level, List<BlockMarksS2C.Entry> entries) {
-		for (ServerPlayer player : level.players()) send(player, level, entries);
+		for (ServerPlayer player : level.players()) send(player, level, false, entries);
 	}
 
-	private void send(ServerPlayer player, ServerLevel level, List<BlockMarksS2C.Entry> entries) {
-		if (!ServerPlayNetworking.canSend(player, BlockMarksS2C.TYPE)) return;
-		ServerPlayNetworking.send(player, new BlockMarksS2C(level.dimension().identifier(), entries));
+	private void send(ServerPlayer player, ServerLevel level, boolean replace, List<BlockMarksS2C.Entry> entries) {
+		if (ServerPlayNetworking.canSend(player, BlockMarksV2S2C.TYPE)) {
+			ServerPlayNetworking.send(player, new BlockMarksV2S2C(level.dimension().identifier(), replace, entries));
+		} else if (ServerPlayNetworking.canSend(player, BlockMarksS2C.TYPE) && !entries.isEmpty()) {
+			ServerPlayNetworking.send(player, new BlockMarksS2C(level.dimension().identifier(), entries));
+		}
 	}
 }
