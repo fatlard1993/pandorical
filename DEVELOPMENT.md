@@ -922,6 +922,12 @@ PandoricalApi.changelog()
 Write it for the player, not for the commit log. *"Geodes you share now ask everyone before
 growing"* is worth reading; *"refactor GeodeCommands, bump deps"* is not.
 
+Note only what changes something in the game: behaviour, items, blocks, screens, text a player
+reads, a fix. A rebuild, a version bump, test or build changes, readme or description edits, the
+mod menu icon, store-page assets and rewording an earlier note change nothing a player can see, so
+they get no note. A release with nothing to say gets no entry, and Pandorical shows the two version
+numbers instead.
+
 Pandorical works out which mods a player has not seen by comparing what is running now against what
 was running the last time they joined, kept per player in the world save. A player away for three
 releases is shown all three notes, oldest first. Versions are compared as versions, so a note is
