@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.28.1": [
+      "Drop changelog notes for changes nothing in the game shows."
+    ],
     "15.28.0": [
       "Point at something: press Z, or type /point, and it is outlined for everyone nearby in your team's or your name's colour."
     ],
