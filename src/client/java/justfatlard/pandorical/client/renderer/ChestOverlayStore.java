@@ -6,8 +6,11 @@ import justfatlard.pandorical.client.ClientNotices;
 import justfatlard.pandorical.protocol.ChestOverlayS2C;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.minecraft.client.renderer.Sheets;
+import net.minecraft.client.resources.model.sprite.SpriteId;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.block.state.properties.ChestType;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,7 +50,23 @@ public final class ChestOverlayStore {
 		return overlays.isEmpty() ? null : overlays.get(pos.asLong());
 	}
 
+	/** Each overlay's sprites for a single chest and either half of a double one, made once. */
+	private static final Map<Identifier, SpriteId[]> sprites = new ConcurrentHashMap<>();
+
+	public static SpriteId sprite(Identifier base, ChestType type) {
+		SpriteId[] made = sprites.computeIfAbsent(base, id -> new SpriteId[] {
+			new SpriteId(Sheets.CHEST_SHEET, id),
+			new SpriteId(Sheets.CHEST_SHEET, id.withSuffix("_left")),
+			new SpriteId(Sheets.CHEST_SHEET, id.withSuffix("_right"))});
+		return switch (type) {
+			case LEFT -> made[1];
+			case RIGHT -> made[2];
+			default -> made[0];
+		};
+	}
+
 	public static void clear() {
 		overlays.clear();
+		sprites.clear();
 	}
 }

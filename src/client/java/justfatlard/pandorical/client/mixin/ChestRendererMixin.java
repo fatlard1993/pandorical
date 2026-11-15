@@ -44,14 +44,6 @@ public class ChestRendererMixin {
 			ChestRenderState state, PoseStack pose, SubmitNodeCollector collector, CameraRenderState camera) {
 		Identifier base = ((ChestOverlayHolder) state).pandorical$getChestOverlay();
 		if (base == null) return Sheets.chooseSprite(material, chestType);
-
-		String suffix = switch (chestType) {
-			case LEFT -> "_left";
-			case RIGHT -> "_right";
-			default -> "";
-		};
-
-		return new SpriteId(Sheets.CHEST_SHEET,
-			Identifier.fromNamespaceAndPath(base.getNamespace(), base.getPath() + suffix));
+		return ChestOverlayStore.sprite(base, chestType);
 	}
 }

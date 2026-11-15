@@ -13,11 +13,13 @@ import net.minecraft.client.model.object.banner.BannerFlagModel;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.LightCoordsUtil;
 import net.minecraft.world.level.block.entity.BannerPatternLayers;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -47,15 +49,18 @@ public final class BannerDecalRenderer {
 		if (level == null || BannerDecalStore.all().isEmpty()) return;
 
 		Vec3 cam = context.levelState().cameraRenderState.pos;
+		BlockPos camBlock = BlockPos.containing(cam);
+		Frustum frustum = context.levelState().cameraRenderState.cullFrustum;
 		PoseStack poseStack = context.poseStack();
 		SubmitNodeCollector collector = context.submitNodeCollector();
 		BannerFlagModel model = flagModel(mc);
 
 		for (BannerDecalsS2C.Entry decal : BannerDecalStore.all()) {
 			BlockPos pos = BlockPos.of(decal.pos());
+			if (pos.distSqr(camBlock) > 64 * 64) continue;
+			if (!frustum.isVisible(reach(pos, decal))) continue;
 			// The server clears a decal whose block is gone; until then it is not drawn.
 			if (!level.hasChunkAt(pos) || level.getBlockState(pos).isAir()) continue;
-			if (pos.distSqr(BlockPos.containing(cam)) > 64 * 64) continue;
 
 			Direction toHead = Direction.from3DDataValue(decal.toHead());
 			int light = LightCoordsUtil.getLightCoords(level, pos.above());
@@ -78,6 +83,14 @@ public final class BannerDecalRenderer {
 			}
 			poseStack.popPose();
 		}
+	}
+
+	/** Everywhere a decal can be drawn: it is laid out from the block's middle, at most its size and offsets away. */
+	private static AABB reach(BlockPos pos, BannerDecalsS2C.Entry decal) {
+		double out = Math.abs(decal.width()) + Math.abs(decal.length()) + Math.abs(decal.fromHead()) + 1;
+		double up = Math.abs(decal.lift()) + 1;
+		return new AABB(pos.getX() + 0.5 - out, pos.getY() - up, pos.getZ() + 0.5 - out,
+			pos.getX() + 0.5 + out, pos.getY() + up, pos.getZ() + 0.5 + out);
 	}
 
 	private static BannerFlagModel flagModel(Minecraft mc) {

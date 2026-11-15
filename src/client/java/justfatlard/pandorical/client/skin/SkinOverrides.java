@@ -25,7 +25,19 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class SkinOverrides {
 	private SkinOverrides() {}
 
-	private record Worn(Identifier texture, PlayerModelType model) {}
+	/** The skin a player's own was last patched into, kept: it is asked for every time they are drawn. */
+	private record Patched(PlayerSkin theirs, PlayerSkin worn) {}
+
+	private static final class Worn {
+		final Identifier texture;
+		final PlayerModelType model;
+		volatile Patched last;
+
+		Worn(Identifier texture, PlayerModelType model) {
+			this.texture = texture;
+			this.model = model;
+		}
+	}
 
 	private static final Map<UUID, Worn> WORN = new ConcurrentHashMap<>();
 
@@ -62,7 +74,7 @@ public final class SkinOverrides {
 	private static void remove(UUID subject) {
 		HEADS.remove(subject);
 		Worn worn = WORN.remove(subject);
-		if (worn != null) Minecraft.getInstance().getTextureManager().release(worn.texture());
+		if (worn != null) Minecraft.getInstance().getTextureManager().release(worn.texture);
 	}
 
 	/** Null when there is no override. */
@@ -70,13 +82,17 @@ public final class SkinOverrides {
 		Worn worn = WORN.get(subject);
 		if (worn == null) return null;
 
+		Patched last = worn.last;
+		if (last != null && last.theirs() == theirs) return last.worn();
 		// Patched, not rebuilt: the cape, elytra and secure flag stay the player's.
-		return theirs.with(PlayerSkin.Patch.create(
+		PlayerSkin patched = theirs.with(PlayerSkin.Patch.create(
 			// Both ids explicit: the one-argument form derives a resource pack path, which this lacks.
-			Optional.of(new ClientAsset.ResourceTexture(worn.texture(), worn.texture())),
+			Optional.of(new ClientAsset.ResourceTexture(worn.texture, worn.texture)),
 			Optional.empty(),
 			Optional.empty(),
-			Optional.of(worn.model())));
+			Optional.of(worn.model)));
+		worn.last = new Patched(theirs, patched);
+		return patched;
 	}
 
 	public static boolean dresses(ResolvableProfile profile) {
