@@ -67,6 +67,7 @@ public final class StructureManager {
             structure.blocks.put(new RelPosKey(entry.x(), entry.y(), entry.z()), entry.state());
         }
         structure.boundsStale = true;
+        structure.revision++;
     }
 
     public static void handleSetVisible(SetStructureVisibleS2C payload) {
@@ -152,6 +153,10 @@ public final class StructureManager {
         private boolean boundsStale = true;
         private int minX, minY, minZ, maxX, maxY, maxZ;
 
+        /** Counts changes to {@link #blocks}, so what is drawn of them is worked out once per change. */
+        private int revision;
+        private StructureRenderer.DrawList drawList;
+
         private StructurePoseSnapshot previousPose;
         private StructurePoseSnapshot targetPose;
         private int ticksSinceUpdate = INTERPOLATION_TICKS;
@@ -212,6 +217,14 @@ public final class StructureManager {
             thisTick = targetPose;
             ticksSinceUpdate = INTERPOLATION_TICKS;
             drawn.clear();
+        }
+
+        StructureRenderer.DrawList drawList(net.minecraft.client.multiplayer.ClientLevel level) {
+            StructureRenderer.DrawList now = drawList;
+            if (now == null || now.revision != revision || now.dry != dry || now.level != level) {
+                now = drawList = new StructureRenderer.DrawList(this, revision, level);
+            }
+            return now;
         }
 
         /** Whether any block lies in these relative bounds, inclusive. */
