@@ -25,10 +25,13 @@ public final class HudRegistry implements HudApi {
 
 	private HudRegistry() {}
 
+	/** Players already warned about, so a mod showing a HUD every tick warns once, not every tick. */
+	private final Set<UUID> warnedNoHud = ConcurrentHashMap.newKeySet();
+
 	@Override
 	public void show(ServerPlayer player, ShowHudS2C overlay) {
 		if (!PandoricalApi.hasCapability(player, Capabilities.HUD)) {
-			Pandorical.LOGGER.warn(
+			if (warnedNoHud.add(player.getUUID())) Pandorical.LOGGER.warn(
 				"Cannot show HUD for {} — client does not support HUD rendering (not yet implemented on client)",
 				player.getName().getString());
 			return;
@@ -80,5 +83,6 @@ public final class HudRegistry implements HudApi {
 
 	public void forgetPlayer(UUID uuid) {
 		hiddenVanillaElements.remove(uuid);
+		warnedNoHud.remove(uuid);
 	}
 }
