@@ -3,6 +3,7 @@ package justfatlard.pandorical.settings;
 import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.ComponentBuilder;
 import justfatlard.pandorical.api.ComponentType;
+import justfatlard.pandorical.api.ModPageApi;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.ScreenBuilder;
 import justfatlard.pandorical.api.SettingsApi;
@@ -17,6 +18,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.permissions.Permissions;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -326,13 +328,42 @@ public final class SettingsRegistry implements SettingsApi {
             "show_scrollbar", String.valueOf(y > at.listH)), names);
 
         if (selected != null) {
+            // Along the name's row, right to left: Disable outermost, then what other mods offer
+            // for this page. The name and authors are clipped short of them, not run underneath.
+            int right = at.paneX + at.paneW;
+            // A mod of the player's own can be switched off, and one they have switched off can be
+            // put back. Never a server mod: that jar is not on their machine and not theirs.
+            String file = fileOf(player, selected.id());
+            if (file != null) {
+                boolean on = !file.endsWith(".disabled");
+                screen.button("modfile:" + file, right - 66, TABS_Y - 24, 66, 20, Map.of(
+                    ComponentType.PROP_LABEL, on ? "Disable" : "Enable",
+                    ComponentType.PROP_TOOLTIP, on
+                        ? "Rename its jar to .disabled. Takes effect when you restart."
+                        : "Put its jar back. Takes effect when you restart."));
+                right -= 66 + 4;
+            }
+            List<ModPageApi.@Nullable Button> offered = ModPages.INSTANCE.buttonsFor(player, selected.id());
+            for (int i = 0; i < offered.size(); i++) {
+                ModPageApi.Button button = offered.get(i);
+                if (button == null) continue;
+                int w = Glyphs.width(button.label()) + 16;
+                // Half the row stays the name's, however many mods offer something.
+                if (right - w < at.paneX + at.paneW / 2) break;
+                Map<String, String> props = new HashMap<>();
+                props.put(ComponentType.PROP_LABEL, button.label());
+                if (!button.tooltip().isEmpty()) props.put(ComponentType.PROP_TOOLTIP, button.tooltip());
+                screen.button("page:" + i, right - w, TABS_Y - 24, w, 20, props);
+                right -= w + 4;
+            }
+            int nameW = right - at.paneX;
             screen.component(new ComponentBuilder("name", ComponentType.TEXT)
-                .bounds(at.paneX, 20, at.paneW, 12)
-                .prop(ComponentType.PROP_TEXT, Glyphs.clip(selected.name() + "  " + selected.version(), at.paneW))
+                .bounds(at.paneX, 20, nameW, 12)
+                .prop(ComponentType.PROP_TEXT, Glyphs.clip(selected.name() + "  " + selected.version(), nameW))
                 .prop(ComponentType.PROP_COLOR, HEADING_COLOR));
             screen.component(new ComponentBuilder("authors", ComponentType.TEXT)
-                .bounds(at.paneX, 32, at.paneW, 12)
-                .prop(ComponentType.PROP_TEXT, Glyphs.clip(selected.authors().isEmpty() ? selected.id() : selected.authors(), at.paneW))
+                .bounds(at.paneX, 32, nameW, 12)
+                .prop(ComponentType.PROP_TEXT, Glyphs.clip(selected.authors().isEmpty() ? selected.id() : selected.authors(), nameW))
                 .prop(ComponentType.PROP_COLOR, HINT_COLOR));
             int gap = 4;
             int tabW = Math.min(70, (at.paneW - gap * (tabs.size() - 1)) / Math.max(1, tabs.size()));
@@ -341,18 +372,6 @@ public final class SettingsRegistry implements SettingsApi {
                 screen.button("tab:" + name, at.paneX + i * (tabW + gap), TABS_Y, tabW, 20, Map.of(
                     ComponentType.PROP_LABEL_KEY, "pandorical.mods." + name,
                     ComponentType.PROP_STYLE, name.equals(at_tab) ? "pressed" : "default"));
-            }
-
-            // A mod of the player's own can be switched off, and one they have switched off can be
-            // put back. Never a server mod: that jar is not on their machine and not theirs.
-            String file = fileOf(player, selected.id());
-            if (file != null) {
-                boolean on = !file.endsWith(".disabled");
-                screen.button("modfile:" + file, at.paneX + at.paneW - 66, TABS_Y - 24, 66, 20, Map.of(
-                    ComponentType.PROP_LABEL, on ? "Disable" : "Enable",
-                    ComponentType.PROP_TOOLTIP, on
-                        ? "Rename its jar to .disabled. Takes effect when you restart."
-                        : "Put its jar back. Takes effect when you restart."));
             }
 
             List<ComponentDef> about = new ArrayList<>();
@@ -765,6 +784,23 @@ public final class SettingsRegistry implements SettingsApi {
             if (!reportedByClient(player, file)) return;
             ServerPlayNetworking.send(player,
                 new justfatlard.pandorical.protocol.ClientModToggleS2C(file));
+            return;
+        }
+        if (componentId.startsWith("page:")) {
+            // Looked up again for the page the server knows is open, never read off the press.
+            Shown was = shown.get(player.getUUID());
+            if (was == null || was.mod() == null) return;
+            int index;
+            try {
+                index = Integer.parseInt(componentId.substring("page:".length()));
+            } catch (NumberFormatException ignored) {
+                return;
+            }
+            ModPageApi.Button button = ModPages.INSTANCE.buttonFor(player, was.mod(), index);
+            if (button == null) return;
+            String id = openScreens.remove(player.getUUID());
+            if (id != null) PandoricalApi.screens().close(player, id);
+            ModPages.run(player, button);
             return;
         }
         if (componentId.startsWith("addcmd:")) {

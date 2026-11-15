@@ -863,6 +863,23 @@ fixed string and leaves nowhere to type the rest.
 An older client never registers the channel, so it is sent nothing and shows no Add button. There
 is no version to check and nothing to update.
 
+## Buttons on another mod's page
+
+A mod that has something to offer about other mods, such as a demo of each, puts a button on their
+pages of the mod menu, beside the mod's name. It is asked for every time a page is laid out, for the
+player looking at it, and answers null for a page it has nothing for:
+
+```java
+PandoricalApi.modPages().button((player, modId) -> hasDemo(modId)
+    ? new ModPageApi.Button("Play demo", "A small level of your own", "pvp demo " + modId)
+    : null);
+```
+
+Pressing it closes the mod menu and runs the command as the player, so the command's own checks
+decide. The command is asked for again on the server at the press, never read back from the client.
+Buttons line up right to left after Disable and give up before taking more than half the name's row.
+On a client without Pandorical's screens they are buttons on the mod's page form.
+
 ## Notices
 
 A question put to one player, waiting in a tray rather than scrolling past in chat. **This is not

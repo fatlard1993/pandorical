@@ -285,6 +285,11 @@ public final class PandoricalApi {
         return justfatlard.pandorical.actions.ActionMenuRegistry.INSTANCE;
     }
 
+    /** A button on a mod's page of the mod menu, offered by any mod. */
+    public static ModPageApi modPages() {
+        return justfatlard.pandorical.settings.ModPages.INSTANCE;
+    }
+
     /** Questions put to a player out of the way of the chat they are talking in. */
     public static NoticeApi notices() {
         return justfatlard.pandorical.notice.Notices.INSTANCE;

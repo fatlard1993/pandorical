@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.29.0": [
+      "A mod's page in the mod menu can carry a button from another mod, such as Play demo where PvP Dimensions has a demo of it."
+    ],
     "15.28.2": [
       "The readme shows pointing: a figure points at a sheep in a field, the sheep outlined in the team colour with the line running to it, pictured by a client gametest with -Ppictures."
     ],

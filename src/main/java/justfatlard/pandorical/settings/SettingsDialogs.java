@@ -18,6 +18,7 @@ final class SettingsDialogs {
 	private static final String REMOVE = "remove:";
 	private static final String BACK = "back";
 	private static final String SETTINGS = "settings";
+	private static final String PAGE = "page:";
 
 	private SettingsDialogs() {}
 
@@ -119,9 +120,19 @@ final class SettingsDialogs {
 		}
 		SettingsRegistry.GroupImpl group = own;
 		if (group != null) form.button(SETTINGS, "Settings");
+		var offered = ModPages.INSTANCE.buttonsFor(player, mod.id());
+		for (int i = 0; i < offered.size(); i++) {
+			if (offered.get(i) != null) form.button(PAGE + i, offered.get(i).label());
+		}
 		form.button(BACK, "Back").onAnswer(answer -> {
 			if (answer.button().equals(SETTINGS) && group != null && allowed(player, group)) {
 				group(player, settings, group);
+			} else if (answer.button().startsWith(PAGE)) {
+				try {
+					var button = ModPages.INSTANCE.buttonFor(player, mod.id(), Integer.parseInt(answer.button().substring(PAGE.length())));
+					if (button != null) ModPages.run(player, button);
+				} catch (NumberFormatException ignored) {
+				}
 			} else if (answer.button().equals(BACK)) {
 				mods(player, settings);
 			}
