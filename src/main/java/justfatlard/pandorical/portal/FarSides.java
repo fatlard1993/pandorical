@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -54,6 +55,20 @@ public final class FarSides {
 	private static final int SKYLESS_GLOW = 13;
 
 	private static final Map<UUID, Integer> sent = new HashMap<>();
+
+	/**
+	 * A portal's far side as worked out this pass, shared by everybody looking through to it, and
+	 * {@code hash} worked out once with it: what is compared to tell whether a viewer's view changed.
+	 */
+	private record FarSide(PortalViewS2C.Sheet sheet, Direction face, int sky, String biome, List<PortalViewS2C.Block> blocks, int hash) {
+		static final FarSide NONE = new FarSide(null, null, 0, "", List.of(), 0);
+	}
+
+	private record FarKey(GlobalPos portal, Direction face) {}
+
+	/** Only for the pass that fills them: the world goes on changing between passes. */
+	private static final Map<FarKey, FarSide> farSides = new HashMap<>();
+	private static final Map<GlobalPos, Optional<PortalViewS2C.Sheet>> nearSheets = new HashMap<>();
 	private static final List<PortalApi.LookThrough> answers = new CopyOnWriteArrayList<>();
 
 	public static void lookThrough(PortalApi.LookThrough answer) {
@@ -74,7 +89,12 @@ public final class FarSides {
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			if (server.getTickCount() % EVERY != 0) return;
 			boolean on = ImmersivePortals.enabled(server);
-			for (ServerPlayer player : server.getPlayerList().getPlayers()) update(server, player, on);
+			try {
+				for (ServerPlayer player : server.getPlayerList().getPlayers()) update(server, player, on);
+			} finally {
+				farSides.clear();
+				nearSheets.clear();
+			}
 		});
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> server.execute(() -> sent.remove(handler.player.getUUID())));
 	}
@@ -82,45 +102,62 @@ public final class FarSides {
 	private static void update(MinecraftServer server, ServerPlayer player, boolean on) {
 		if (!ServerPlayNetworking.canSend(player, PortalViewS2C.TYPE)) return;
 		Integer before = sent.get(player.getUUID());
-		PortalViewS2C view = on ? viewFor(server, player) : PortalViewS2C.NONE;
+		Look look = on ? viewFor(server, player) : Look.NONE;
 		// The far chunk is still loading: keep showing whatever was shown
-		if (view == null) return;
-		if (!view.shown()) {
+		if (look == null) return;
+		if (!look.view().shown()) {
 			if (before != null) ServerPlayNetworking.send(player, PortalViewS2C.NONE);
 			sent.remove(player.getUUID());
 			return;
 		}
-		int hash = view.hashCode();
-		if (before != null && before == hash) return;
-		ServerPlayNetworking.send(player, view);
-		sent.put(player.getUUID(), hash);
+		if (before != null && before == look.hash()) return;
+		ServerPlayNetworking.send(player, look.view());
+		sent.put(player.getUUID(), look.hash());
 	}
 
-	/** {@link PortalViewS2C#NONE} for no portal in reach, null to wait for the far side to load. */
-	private static PortalViewS2C viewFor(MinecraftServer server, ServerPlayer player) {
+	/** A view and its hash, for telling it from the one sent last without hashing every block again. */
+	private record Look(PortalViewS2C view, int hash) {
+		static final Look NONE = new Look(PortalViewS2C.NONE, 0);
+	}
+
+	/** {@link Look#NONE} for no portal in reach, null to wait for the far side to load. */
+	private static Look viewFor(MinecraftServer server, ServerPlayer player) {
 		ServerLevel level = player.level();
 		BlockPos near = level.getPoiManager()
 			.findClosest(type -> type.is(PoiTypes.NETHER_PORTAL), player.blockPosition(), SEARCH, PoiManager.Occupancy.ANY)
 			.orElse(null);
-		if (near == null) return PortalViewS2C.NONE;
+		if (near == null) return Look.NONE;
 		PortalApi.FarEnd farEnd = farEndOf(player, level, near);
-		if (farEnd == null) return PortalViewS2C.NONE;
+		if (farEnd == null) return Look.NONE;
 		GlobalPos partner = farEnd.portal();
 		ServerLevel farLevel = server.getLevel(partner.dimension());
-		if (farLevel == null) return PortalViewS2C.NONE;
+		if (farLevel == null) return Look.NONE;
 
 		// Held loaded while somebody looks, the way vanilla holds a portal's far end for a traveller
 		farLevel.getChunkSource().addTicketWithRadius(TicketType.PORTAL, ChunkPos.containing(partner.pos()), 2);
 		if (!farLevel.hasChunkAt(partner.pos())) return null;
 
-		PortalViewS2C.Sheet nearSheet = sheet(level, near);
-		PortalViewS2C.Sheet farSheet = sheet(farLevel, partner.pos());
-		if (nearSheet == null || farSheet == null) return PortalViewS2C.NONE;
-		Direction face = farEnd.face();
+		PortalViewS2C.Sheet nearSheet = nearSheets.computeIfAbsent(GlobalPos.of(level.dimension(), near.immutable()),
+			at -> Optional.ofNullable(sheet(level, near))).orElse(null);
+		if (nearSheet == null) return Look.NONE;
+		FarSide far = farSides.computeIfAbsent(new FarKey(partner, farEnd.face()), key -> farSide(farLevel, key));
+		if (far == FarSide.NONE) return Look.NONE;
+
+		PortalViewS2C view = new PortalViewS2C(nearSheet, far.sheet(), far.face(), far.sky(), far.biome(), far.blocks());
+		return new Look(view, 31 * nearSheet.hashCode() + far.hash());
+	}
+
+	private static FarSide farSide(ServerLevel farLevel, FarKey key) {
+		BlockPos partner = key.portal().pos();
+		PortalViewS2C.Sheet farSheet = sheet(farLevel, partner);
+		if (farSheet == null) return FarSide.NONE;
+		Direction face = key.face();
 		// A face the sheet does not have is no face: both sides, as vanilla would
 		if (face != null && (face.getAxis() == Direction.Axis.Y || (face.getAxis() == Direction.Axis.Z) != farSheet.alongX())) face = null;
-
-		return new PortalViewS2C(nearSheet, farSheet, face, sky(farLevel), biome(farLevel, partner.pos()), blocks(farLevel, farSheet, face));
+		int sky = sky(farLevel);
+		String biome = biome(farLevel, partner);
+		List<PortalViewS2C.Block> blocks = blocks(farLevel, farSheet, face);
+		return new FarSide(farSheet, face, sky, biome, blocks, java.util.Objects.hash(farSheet, face, sky, biome, blocks));
 	}
 
 	private static PortalViewS2C.Sheet sheet(ServerLevel level, BlockPos inside) {
