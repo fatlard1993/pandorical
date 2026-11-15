@@ -7,6 +7,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextColor;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBundlePacket;
+import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -22,8 +26,10 @@ import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -51,6 +57,8 @@ public final class Pointing {
 	/** Motes along an edge are this far apart, wider for a big target so no outline is a flood. */
 	private static final double STEP = 0.3;
 	private static final int MOST_PER_EDGE = 24;
+	/** How far off a player is still sent a mote drawn past the particle limit, as vanilla has it. */
+	private static final double FORCED_REACH = 512;
 
 	private static SettingsApi.Setting<Boolean> enabled;
 
@@ -150,26 +158,42 @@ public final class Pointing {
 		DustParticleOptions mote = new DustParticleOptions(point.color(), MOTE);
 		AABB box = point.entity() != null ? point.entity().getBoundingBox() : point.shape();
 		box = box.inflate(0.02);
+		List<ClientboundLevelParticlesPacket> motes = new ArrayList<>();
 		double[] xs = {box.minX, box.maxX}, ys = {box.minY, box.maxY}, zs = {box.minZ, box.maxZ};
-		for (double y : ys) for (double z : zs) edge(point.level(), mote, new Vec3(box.minX, y, z), new Vec3(box.maxX, y, z));
-		for (double x : xs) for (double z : zs) edge(point.level(), mote, new Vec3(x, box.minY, z), new Vec3(x, box.maxY, z));
-		for (double x : xs) for (double y : ys) edge(point.level(), mote, new Vec3(x, y, box.minZ), new Vec3(x, y, box.maxZ));
+		for (double y : ys) for (double z : zs) edge(motes, mote, new Vec3(box.minX, y, z), new Vec3(box.maxX, y, z));
+		for (double x : xs) for (double z : zs) edge(motes, mote, new Vec3(x, box.minY, z), new Vec3(x, box.maxY, z));
+		for (double x : xs) for (double y : ys) edge(motes, mote, new Vec3(x, y, box.minZ), new Vec3(x, y, box.maxZ));
 		if (line) {
 			Vec3 from = player.getEyePosition().subtract(0, 0.4, 0);
 			Vec3 to = box.getCenter();
-			int motes = (int) Math.min(48, from.distanceTo(to) / 0.8);
-			for (int i = 1; i < motes; i++) {
-				Vec3 at = from.lerp(to, i / (double) motes);
-				point.level().sendParticles(mote, true, false, at.x, at.y, at.z, 1, 0, 0, 0, 0);
-			}
+			int count = (int) Math.min(48, from.distanceTo(to) / 0.8);
+			for (int i = 1; i < count; i++) motes.add(mote(mote, from.lerp(to, i / (double) count)));
 		}
+		send(point.level(), motes);
 	}
 
-	private static void edge(ServerLevel level, DustParticleOptions mote, Vec3 from, Vec3 to) {
-		int motes = (int) Math.max(2, Math.min(MOST_PER_EDGE, Math.ceil(from.distanceTo(to) / STEP)));
-		for (int i = 0; i <= motes; i++) {
-			Vec3 at = from.lerp(to, i / (double) motes);
-			level.sendParticles(mote, true, false, at.x, at.y, at.z, 1, 0, 0, 0, 0);
+	private static void edge(List<ClientboundLevelParticlesPacket> motes, DustParticleOptions mote, Vec3 from, Vec3 to) {
+		int count = (int) Math.max(2, Math.min(MOST_PER_EDGE, Math.ceil(from.distanceTo(to) / STEP)));
+		for (int i = 0; i <= count; i++) motes.add(mote(mote, from.lerp(to, i / (double) count)));
+	}
+
+	/** One mote, drawn past the client's particle limit, as {@code sendParticles} with {@code overrideLimiter} sends it. */
+	private static ClientboundLevelParticlesPacket mote(DustParticleOptions mote, Vec3 at) {
+		return new ClientboundLevelParticlesPacket(mote, true, false, at.x, at.y, at.z, 0, 0, 0, 0, 1);
+	}
+
+	/**
+	 * Each player in the world is sent the motes {@code sendParticles} would send them, the ones
+	 * within its {@link #FORCED_REACH}, in one bundle rather than a packet at a time.
+	 */
+	private static void send(ServerLevel level, List<ClientboundLevelParticlesPacket> motes) {
+		for (ServerPlayer viewer : level.players()) {
+			BlockPos at = viewer.blockPosition();
+			List<Packet<? super ClientGamePacketListener>> near = new ArrayList<>();
+			for (ClientboundLevelParticlesPacket mote : motes) {
+				if (at.closerToCenterThan(new Vec3(mote.x(), mote.y(), mote.z()), FORCED_REACH)) near.add(mote);
+			}
+			if (!near.isEmpty()) viewer.connection.send(new ClientboundBundlePacket(near));
 		}
 	}
 }
