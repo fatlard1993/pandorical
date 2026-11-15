@@ -14,28 +14,28 @@ public final class RenderSettings {
 
 	private boolean cullLeaves = false;
 
-	private static RenderSettings instance = null;
+	/** Read as the class loads, which the JVM does once, whichever chunk builder asks first. */
+	private static final RenderSettings INSTANCE = load();
 
-	private static RenderSettings get() {
-		if (instance != null) return instance;
-
+	private static RenderSettings load() {
 		Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
 		try {
+			RenderSettings read = null;
 			if (Files.exists(path)) {
-				instance = GSON.fromJson(Files.readString(path), RenderSettings.class);
+				read = GSON.fromJson(Files.readString(path), RenderSettings.class);
 			}
-			if (instance == null) {
-				instance = new RenderSettings();
-				justfatlard.pandorical.ConfigFiles.write(path, GSON.toJson(instance));
+			if (read == null) {
+				read = new RenderSettings();
+				justfatlard.pandorical.ConfigFiles.write(path, GSON.toJson(read));
 			}
+			return read;
 		} catch (Exception e) {
 			Pandorical.LOGGER.warn("Could not read {} - using defaults", FILE_NAME, e);
-			instance = new RenderSettings();
+			return new RenderSettings();
 		}
-		return instance;
 	}
 
 	public static boolean cullLeaves() {
-		return get().cullLeaves;
+		return INSTANCE.cullLeaves;
 	}
 }
