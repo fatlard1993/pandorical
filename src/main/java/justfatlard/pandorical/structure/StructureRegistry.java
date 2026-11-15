@@ -43,6 +43,10 @@ public final class StructureRegistry implements StructureApi {
 		boolean walkable;
 		DryCells dry = new DryCells(List.of());
 		float scale = 1.0F;
+		/** How far from the pose's origin, across, and how low and high, any block reaches; see {@link #bound}. */
+		double reachSq;
+		int minY;
+		int maxY;
 
 		StructureState(Entity anchorEntity, Map<RelPos, BlockState> blocks, StructurePose pose, boolean visible) {
 			this.anchorEntity = anchorEntity;
@@ -50,6 +54,23 @@ public final class StructureRegistry implements StructureApi {
 			this.pose = pose;
 			this.recent.add(pose);
 			this.visible = visible;
+			bound();
+		}
+
+		/** Asked again whenever the blocks change: climbing skips a structure nobody stands within. */
+		void bound() {
+			double far = 0;
+			int low = Integer.MAX_VALUE, high = Integer.MIN_VALUE;
+			for (RelPos pos : blocks.keySet()) {
+				double x = Math.max(Math.abs(pos.x()), Math.abs(pos.x() + 1));
+				double z = Math.max(Math.abs(pos.z()), Math.abs(pos.z() + 1));
+				far = Math.max(far, x * x + z * z);
+				low = Math.min(low, pos.y());
+				high = Math.max(high, pos.y());
+			}
+			reachSq = far;
+			minY = low;
+			maxY = high;
 		}
 
 		void moveTo(StructurePose next) {
@@ -122,12 +143,15 @@ public final class StructureRegistry implements StructureApi {
 	 * their client draws, which on a moving ship is a little behind where the server has it.
 	 */
 	public boolean climbableAt(Entity entity) {
+		if (structures.isEmpty()) return false;
 		for (StructureState state : structures.values()) {
-			if (!state.walkable || !state.visible || state.anchorEntity.level() != entity.level()) continue;
+			if (!state.walkable || !state.visible || state.anchorEntity.isRemoved() || state.anchorEntity.level() != entity.level()) continue;
 			for (StructurePose pose : state.recent) {
-				double yaw = Math.toRadians(pose.yaw());
 				double dx = entity.getX() - pose.x();
 				double dz = entity.getZ() - pose.z();
+				double ly = entity.getY() - pose.y();
+				if (ly < state.minY || ly >= state.maxY + 1 || dx * dx + dz * dz > state.reachSq) continue;
+				double yaw = Math.toRadians(pose.yaw());
 				int x = net.minecraft.util.Mth.floor(dx * Math.cos(yaw) + dz * Math.sin(yaw));
 				int z = net.minecraft.util.Mth.floor(-dx * Math.sin(yaw) + dz * Math.cos(yaw));
 				int y = net.minecraft.util.Mth.floor(entity.getY() - pose.y());
@@ -139,12 +163,39 @@ public final class StructureRegistry implements StructureApi {
 	}
 
 	/**
+	 * {@link #dryAt(Entity, double, double, double)} at the point of this block nearest the entity's
+	 * middle, as {@link DryCells#pointFor} picks it: asked for every wet block around every entity.
+	 */
+	public boolean dryAt(Entity entity, net.minecraft.core.BlockPos pos) {
+		if (!anyDry) return false;
+		net.minecraft.world.phys.AABB box = entity.getBoundingBox();
+		return dryAt(entity,
+			net.minecraft.util.Mth.clamp((box.minX + box.maxX) * 0.5, pos.getX() + 1.0E-3, pos.getX() + 1 - 1.0E-3),
+			net.minecraft.util.Mth.clamp((box.minY + box.maxY) * 0.5, pos.getY() + 1.0E-3, pos.getY() + 1 - 1.0E-3),
+			net.minecraft.util.Mth.clamp((box.minZ + box.maxZ) * 0.5, pos.getZ() + 1.0E-3, pos.getZ() + 1 - 1.0E-3));
+	}
+
+	/** Whether any structure has dry cells at all; see {@link #noteDry}. */
+	private volatile boolean anyDry;
+
+	private void noteDry() {
+		boolean any = false;
+		for (StructureState state : structures.values()) {
+			if (!state.dry.isEmpty()) {
+				any = true;
+				break;
+			}
+		}
+		anyDry = any;
+	}
+
+	/**
 	 * Whether this point is in a dry cell of a structure in the entity's level, at any pose it has
 	 * held lately: a player is in the hold their client draws, a little behind the server's.
 	 */
 	public boolean dryAt(Entity entity, double x, double y, double z) {
 		for (StructureState state : structures.values()) {
-			if (state.dry.isEmpty() || !state.visible || state.anchorEntity.level() != entity.level()) continue;
+			if (state.dry.isEmpty() || !state.visible || state.anchorEntity.isRemoved() || state.anchorEntity.level() != entity.level()) continue;
 			for (StructurePose pose : state.recent) {
 				if (state.dry.holds(pose.x(), pose.y(), pose.z(), pose.yaw(), x, y, z)) return true;
 			}
@@ -158,7 +209,8 @@ public final class StructureRegistry implements StructureApi {
 		for (BlockEntry entry : blocks) blockMap.put(entry.pos(), entry.state());
 
 		StructureState state = new StructureState(anchorEntity, blockMap, initialPose, true);
-		structures.put(structureId, state);
+		StructureState replaced = structures.put(structureId, state);
+		if (replaced != null && !replaced.dry.isEmpty()) noteDry();
 
 		SpawnStructureS2C packet = buildSpawnPacket(structureId, state);
 		broadcastToTrackers(state.anchorEntity, packet);
@@ -168,6 +220,7 @@ public final class StructureRegistry implements StructureApi {
 	public void clear() {
 		structures.clear();
 		pendingPoses.clear();
+		anyDry = false;
 	}
 
 	/** Poses held for the tracker pass; see {@link #flushPoses}. */
@@ -177,8 +230,9 @@ public final class StructureRegistry implements StructureApi {
 	public void updatePose(String structureId, StructurePose pose) {
 		StructureState state = structures.get(structureId);
 		if (state == null) return;
+		boolean moved = !pose.equals(state.pose);
 		state.moveTo(pose);
-		pendingPoses.add(structureId);
+		if (moved) pendingPoses.add(structureId);
 	}
 
 	/**
@@ -187,6 +241,7 @@ public final class StructureRegistry implements StructureApi {
 	 * mid-tick runs a tick ahead of its riders.
 	 */
 	public void flushPoses(ServerLevel level) {
+		forgetUnloaded(level);
 		if (pendingPoses.isEmpty()) return;
 		for (Iterator<String> it = pendingPoses.iterator(); it.hasNext();) {
 			String structureId = it.next();
@@ -199,6 +254,25 @@ public final class StructureRegistry implements StructureApi {
 			it.remove();
 			sendPose(structureId, state);
 		}
+	}
+
+	/**
+	 * A structure whose anchor has left the world - unloaded with its chunk, gone to another
+	 * dimension, killed - is gone from every client already, and its anchor never comes back: the
+	 * owning mod spawns it again on a fresh one.
+	 */
+	private void forgetUnloaded(ServerLevel level) {
+		if (structures.isEmpty()) return;
+		boolean dropped = false;
+		for (Iterator<Map.Entry<String, StructureState>> it = structures.entrySet().iterator(); it.hasNext();) {
+			Map.Entry<String, StructureState> entry = it.next();
+			Entity anchor = entry.getValue().anchorEntity;
+			if (!anchor.isRemoved() || anchor.level() != level) continue;
+			it.remove();
+			pendingPoses.remove(entry.getKey());
+			dropped = true;
+		}
+		if (dropped) noteDry();
 	}
 
 	/** An update that cannot wait for the tracker pass sends the held pose first. */
@@ -221,6 +295,7 @@ public final class StructureRegistry implements StructureApi {
 		for (BlockEntry entry : added) state.blocks.put(entry.pos(), entry.state());
 		for (RelPos pos : removed) state.blocks.remove(pos);
 		for (Map.Entry<RelPos, BlockState> entry : changed.entrySet()) state.blocks.put(entry.getKey(), entry.getValue());
+		state.bound();
 
 		List<StructureBlockEntry> addedWire = toWireEntries(added);
 		List<StructureRelPos> removedWire = removed.stream()
@@ -237,7 +312,7 @@ public final class StructureRegistry implements StructureApi {
 	@Override
 	public void setVisible(String structureId, boolean visible) {
 		StructureState state = structures.get(structureId);
-		if (state == null) return;
+		if (state == null || state.visible == visible) return;
 		sendPendingPose(structureId, state);
 		state.visible = visible;
 
@@ -263,6 +338,7 @@ public final class StructureRegistry implements StructureApi {
 		StructureState state = structures.get(structureId);
 		if (state == null) return;
 		state.dry = new DryCells(cells);
+		noteDry();
 
 		SetStructureDryS2C packet = dryPacket(structureId, state.dry);
 		for (ServerPlayer player : PlayerLookup.tracking(state.anchorEntity)) {
@@ -298,6 +374,7 @@ public final class StructureRegistry implements StructureApi {
 		StructureState state = structures.remove(structureId);
 		if (state == null) return;
 		pendingPoses.remove(structureId);
+		if (!state.dry.isEmpty()) noteDry();
 
 		broadcastToTrackers(state.anchorEntity, new DespawnStructureS2C(structureId));
 	}
