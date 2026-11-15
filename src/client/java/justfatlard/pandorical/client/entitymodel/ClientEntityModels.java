@@ -3,8 +3,10 @@ package justfatlard.pandorical.client.entitymodel;
 import java.io.Reader;
 import java.lang.reflect.Constructor;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -18,6 +20,8 @@ import justfatlard.pandorical.client.renderer.EntityModelHolder;
 import justfatlard.pandorical.protocol.EntityModelS2C;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
+import net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.model.Model;
@@ -25,6 +29,8 @@ import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.PackType;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.LivingEntity;
 import org.jspecify.annotations.Nullable;
@@ -49,8 +55,13 @@ public final class ClientEntityModels {
 
     /** Entity id to its assignment. Ids are not reused within a session. */
     private static final Map<Integer, Assignment> ASSIGNED = new ConcurrentHashMap<>();
-    /** Read once each; only successes are kept, so one asked for before the pack arrived is asked again. */
+    /** Read once each. */
     private static final Map<Identifier, EntityModelDefinition> DEFINITIONS = new HashMap<>();
+    /**
+     * Models that were missing or unreadable, not looked for again until the resources reload: one
+     * asked for before the server's pack arrived is found once the pack is in.
+     */
+    private static final Set<Identifier> MISSING = new HashSet<>();
     /** New geometry, built per renderer, because it is built into that renderer's model class. */
     private static final Map<LivingEntityRenderer<?, ?, ?>, Map<Identifier, Optional<EntityModel<?>>>> BUILT = new WeakHashMap<>();
 
@@ -59,6 +70,17 @@ public final class ClientEntityModels {
             (payload, context) -> context.client().execute(() -> apply(payload)));
         // The server sends it again when the entity comes back into view.
         ClientEntityEvents.ENTITY_UNLOAD.register((entity, level) -> ASSIGNED.remove(entity.getId()));
+        ResourceManagerHelper.get(PackType.CLIENT_RESOURCES).registerReloadListener(new SimpleSynchronousResourceReloadListener() {
+            @Override
+            public Identifier getFabricId() {
+                return Identifier.fromNamespaceAndPath("pandorical", "entity_models");
+            }
+
+            @Override
+            public void onResourceManagerReload(ResourceManager manager) {
+                MISSING.clear();
+            }
+        });
     }
 
     public static void apply(EntityModelS2C payload) {
@@ -80,6 +102,7 @@ public final class ClientEntityModels {
     public static void clear() {
         ASSIGNED.clear();
         DEFINITIONS.clear();
+        MISSING.clear();
         BUILT.clear();
     }
 
@@ -91,8 +114,10 @@ public final class ClientEntityModels {
     public static @Nullable EntityModelDefinition definition(Identifier model) {
         EntityModelDefinition known = DEFINITIONS.get(model);
         if (known != null) return known;
+        if (MISSING.contains(model)) return null;
         var resource = Minecraft.getInstance().getResourceManager().getResource(file(model));
         if (resource.isEmpty()) {
+            MISSING.add(model);
             ClientNotices.report(NotUnderstood.ENTITY_MODEL, model.toString());
             return null;
         }
@@ -102,6 +127,7 @@ public final class ClientEntityModels {
             DEFINITIONS.put(model, definition);
             return definition;
         } catch (Exception e) {
+            MISSING.add(model);
             Pandorical.LOGGER.warn("Entity model {} could not be read: {}", model, e.getMessage());
             ClientNotices.report(NotUnderstood.ENTITY_MODEL, model.toString());
             return null;
