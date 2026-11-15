@@ -124,8 +124,17 @@ public final class DropsPolicy implements DropsApi {
 		Integer mergeTenths;
 		Integer trackingBlocks;
 
+		/** The running server's, held weakly: asked for every dropped item and orb, every tick. */
+		private record Held(java.lang.ref.WeakReference<MinecraftServer> server, Choices choices) {}
+
+		private static volatile Held held;
+
 		static Choices get(MinecraftServer server) {
-			return server.overworld().getDataStorage().computeIfAbsent(TYPE);
+			Held now = held;
+			if (now != null && now.server().get() == server) return now.choices();
+			Choices choices = server.overworld().getDataStorage().computeIfAbsent(TYPE);
+			held = new Held(new java.lang.ref.WeakReference<>(server), choices);
+			return choices;
 		}
 
 		private static Choices fromStored(Stored stored) {

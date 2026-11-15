@@ -2,11 +2,14 @@ package justfatlard.pandorical.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import justfatlard.pandorical.drops.DropsPolicy;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -32,8 +35,13 @@ public abstract class ItemMergeRadiusMixin {
 		ItemEntity self = (ItemEntity) (Object) this;
 		if (!(self.level() instanceof ServerLevel level) || !DropsPolicy.widerMerge(level.getServer())) return;
 		if (!ItemEntity.areMergable(self.getItem(), other.getItem())) return;
-		ClipContext between = new ClipContext(self.getBoundingBox().getCenter(), other.getBoundingBox().getCenter(),
-			ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, self);
+		Vec3 from = self.getBoundingBox().getCenter();
+		Vec3 to = other.getBoundingBox().getCenter();
+		// Both in one open cell, as two stacks on the same floor mostly are: nothing can stand between.
+		CollisionContext context = CollisionContext.of(self);
+		BlockPos cell = BlockPos.containing(from);
+		if (cell.equals(BlockPos.containing(to)) && level.getBlockState(cell).getCollisionShape(level, cell, context).isEmpty()) return;
+		ClipContext between = new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, context);
 		if (level.clip(between).getType() != HitResult.Type.MISS) ci.cancel();
 	}
 }
