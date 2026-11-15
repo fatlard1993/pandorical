@@ -15,6 +15,8 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 /**
  * Walkable structures: solid to the local player, and carrying them while they stand on one.
@@ -206,7 +208,7 @@ public final class StructureDecks {
 					VoxelShape shape = state.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
 					if (shape.isEmpty()) continue;
 
-					for (AABB part : shape.toAabbs()) {
+					for (AABB part : boxes(shape)) {
 						double cx = x + (part.minX + part.maxX) / 2;
 						double cz = z + (part.minZ + part.maxZ) / 2;
 						double hx = (part.maxX - part.minX) / 2;
@@ -230,6 +232,13 @@ public final class StructureDecks {
 		return into;
 	}
 
+	/** A shape's boxes, kept per shape: shapes are shared and never change, and are asked for every tick. */
+	private static final Map<VoxelShape, List<AABB>> BOXES = new WeakHashMap<>();
+
+	private static List<AABB> boxes(VoxelShape shape) {
+		return BOXES.computeIfAbsent(shape, s -> List.copyOf(s.toAabbs()));
+	}
+
 	/**
 	 * Whether a walkable structure has a ladder, vine or anything else climbable at this entity's
 	 * feet: on a ship at sea there is no block in the world to climb, only the one drawn.
@@ -244,6 +253,7 @@ public final class StructureDecks {
 			int x = Mth.floor(dx * Math.cos(yaw) + dz * Math.sin(yaw));
 			int z = Mth.floor(-dx * Math.sin(yaw) + dz * Math.cos(yaw));
 			int y = Mth.floor(entity.getY() - pose.y());
+			if (!structure.mayHold(x, y, z, x, y, z)) continue;
 			BlockState state = structure.blocks.get(new RelPosKey(x, y, z));
 			if (state != null && (state.is(net.minecraft.tags.BlockTags.CLIMBABLE)
 					|| justfatlard.pandorical.client.content.ContentManager.isClimbable(state))) {
