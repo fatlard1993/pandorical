@@ -69,6 +69,31 @@ public final class BlockShapes implements BlockShapeApi {
 		// The capability, not just the channel: it is what the server block asks before giving a
 		// player the shape, and the two must agree or the player rubber-bands.
 		if (!PandoricalApi.hasCapability(player, Capabilities.BLOCK_SHAPES) || !ServerPlayNetworking.canSend(player, BlockShapesS2C.TYPE)) return;
-		ServerPlayNetworking.send(player, new BlockShapesS2C(level.dimension().identifier(), replace, entries));
+		// Only the first part replaces; the rest add to it.
+		boolean first = true;
+		for (List<BlockShapesS2C.Entry> part : parts(entries)) {
+			ServerPlayNetworking.send(player, new BlockShapesS2C(level.dimension().identifier(), replace && first, part));
+			first = false;
+		}
+	}
+
+	/** Roughly this many bytes a packet, well under the most a payload may be: a whole world's shapes can be more. */
+	private static final int PART_BYTES = 256 * 1024;
+
+	/** The entries in runs that each fit a packet; one empty run for none, so a replace still goes. */
+	private static List<List<BlockShapesS2C.Entry>> parts(List<BlockShapesS2C.Entry> entries) {
+		List<List<BlockShapesS2C.Entry>> parts = new ArrayList<>();
+		int from = 0, bytes = 0;
+		for (int i = 0; i < entries.size(); i++) {
+			int size = 16 + entries.get(i).boxes().size() * 24;
+			if (bytes + size > PART_BYTES && i > from) {
+				parts.add(entries.subList(from, i));
+				from = i;
+				bytes = 0;
+			}
+			bytes += size;
+		}
+		parts.add(entries.subList(from, entries.size()));
+		return parts;
 	}
 }
