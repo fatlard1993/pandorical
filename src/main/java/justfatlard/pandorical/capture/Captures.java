@@ -9,7 +9,9 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Util;
 import net.minecraft.world.phys.Vec3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
+import javax.imageio.stream.MemoryCacheImageInputStream;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -133,12 +136,20 @@ public final class Captures implements CaptureApi {
         ByteArrayOutputStream whole = new ByteArrayOutputStream();
         for (byte[] bytes : asked.parts) whole.writeBytes(bytes);
         byte[] png = whole.toByteArray();
-        int[] argb = decode(png, asked.side);
-        if (argb == null) {
-            refuse(player, "a capture that is not a " + asked.side + " square PNG");
-            return;
-        }
-        finish(player.getUUID(), new Capture(asked.side, argb, png));
+        // Up to a megapixel to unpack: off the server thread, and back on it to finish, if the
+        // request is still the one waiting by then.
+        MinecraftServer server = player.level().getServer();
+        UUID id = player.getUUID();
+        String name = player.getName().getString();
+        CompletableFuture.supplyAsync(() -> decode(png, asked.side), Util.backgroundExecutor())
+            .thenAcceptAsync(argb -> {
+                if (pending.get(id) != asked) return;
+                if (argb == null) {
+                    refuse(id, name, "a capture that is not a " + asked.side + " square PNG");
+                    return;
+                }
+                finish(id, new Capture(asked.side, argb, png));
+            }, server);
     }
 
     /** Worst case for a PNG is about its raw pixels; more than that is not a picture. */
@@ -149,9 +160,10 @@ public final class Captures implements CaptureApi {
 
     /** The size is read from the header before anything is decoded, so a lying header costs nothing. */
     private static int[] decode(byte[] png, int side) {
-        try (ImageInputStream stream = ImageIO.createImageInputStream(new ByteArrayInputStream(png))) {
+        // In memory: ImageIO's default stream caches through a temporary file on disk.
+        try (ImageInputStream stream = new MemoryCacheImageInputStream(new ByteArrayInputStream(png))) {
             Iterator<ImageReader> readers = ImageIO.getImageReadersByFormatName("png");
-            if (stream == null || !readers.hasNext()) return null;
+            if (!readers.hasNext()) return null;
             ImageReader reader = readers.next();
             try {
                 reader.setInput(stream, true, true);
@@ -169,8 +181,12 @@ public final class Captures implements CaptureApi {
     }
 
     private void refuse(ServerPlayer player, String what) {
-        LOGGER.warn("[Pandorical] {} sent {}; the capture is dropped", player.getName().getString(), what);
-        finish(player.getUUID(), null);
+        refuse(player.getUUID(), player.getName().getString(), what);
+    }
+
+    private void refuse(UUID player, String name, String what) {
+        LOGGER.warn("[Pandorical] {} sent {}; the capture is dropped", name, what);
+        finish(player, null);
     }
 
     private void finish(UUID player, Capture capture) {
@@ -180,6 +196,7 @@ public final class Captures implements CaptureApi {
 
     private void expire() {
         tick++;
+        if (pending.isEmpty()) return;
         // Gathered first: completing runs the caller's code, which may ask again.
         List<UUID> late = new ArrayList<>();
         pending.forEach((player, asked) -> {
