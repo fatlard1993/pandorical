@@ -1,5 +1,6 @@
 package justfatlard.pandorical.client.renderer;
 
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import justfatlard.pandorical.client.mixin.SingleQuadParticleAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockTintSource;
@@ -12,18 +13,28 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.locks.StampedLock;
 
 public final class PositionalTintStore {
 	private PositionalTintStore() {}
 
 	private static final int UNTINTED = -1;
 
-	private static final Map<Long, Integer> painted = new HashMap<>();
+	/** Written on the client thread, read by the chunk builders as they mesh; zero is unpainted. */
+	private static final Long2IntOpenHashMap painted = new Long2IntOpenHashMap();
+	private static final StampedLock lock = new StampedLock();
+
+	private static int paintedAt(long pos) {
+		long stamp = lock.readLock();
+		try {
+			return painted.get(pos);
+		} finally {
+			lock.unlockRead(stamp);
+		}
+	}
 
 	/** A zero fallback means untinted. */
 	public static BlockTintSource source(int fallback) {
@@ -36,8 +47,8 @@ public final class PositionalTintStore {
 
 			@Override
 			public int colorInWorld(BlockState state, BlockAndTintGetter level, BlockPos pos) {
-				Integer argb = painted.get(pos.asLong());
-				return argb == null ? unpainted : argb;
+				int argb = paintedAt(pos.asLong());
+				return argb == 0 ? unpainted : argb;
 			}
 		};
 	}
@@ -53,7 +64,7 @@ public final class PositionalTintStore {
 	private static int emitting;
 
 	public static void emitFrom(BlockState state, BlockPos pos) {
-		emitting = positional.contains(state.getBlock()) ? painted.getOrDefault(pos.asLong(), 0) : 0;
+		emitting = positional.contains(state.getBlock()) ? paintedAt(pos.asLong()) : 0;
 	}
 
 	public static void doneEmitting() {
@@ -73,16 +84,26 @@ public final class PositionalTintStore {
 
 	/** Zero removes. Chunk meshes keep the colour they were baked with until redrawn. */
 	public static void paint(long pos, int argb) {
-		if (argb == 0) {
-			painted.remove(pos);
-		} else {
-			painted.put(pos, argb);
+		long stamp = lock.writeLock();
+		try {
+			if (argb == 0) {
+				painted.remove(pos);
+			} else {
+				painted.put(pos, argb);
+			}
+		} finally {
+			lock.unlockWrite(stamp);
 		}
 		redraw(BlockPos.of(pos));
 	}
 
 	public static void clear() {
-		painted.clear();
+		long stamp = lock.writeLock();
+		try {
+			painted.clear();
+		} finally {
+			lock.unlockWrite(stamp);
+		}
 		// The blocks tracked came from one server's tint groups and mean nothing on the next.
 		positional.clear();
 	}
