@@ -46,6 +46,14 @@ public final class ModCatalog {
         return cached;
     }
 
+    /**
+     * Reads every mod's readme now, on a thread of its own, rather than on the server thread when
+     * the first player arrives and is offered what's new.
+     */
+    public static void warmUp() {
+        Thread.ofPlatform().daemon().name("pandorical-mod-catalog").start(ModCatalog::all);
+    }
+
     public static ModInfo find(String id) {
         for (ModInfo mod : all()) {
             if (mod.id().equals(id)) return mod;

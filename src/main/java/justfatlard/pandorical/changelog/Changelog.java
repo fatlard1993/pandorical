@@ -333,6 +333,8 @@ public final class Changelog implements ChangelogApi {
 
 	/** Wired once, from Pandorical's own init. */
 	public static void register() {
+		// Read at every arrival, to tell what changed since the player's last.
+		ModCatalog.warmUp();
 		PandoricalApi.notices().onChoice(KIND, (player, noticeId, choiceId) -> {
 			if ("show".equals(choiceId)) {
 				WhatsNewScreen.open(player);
