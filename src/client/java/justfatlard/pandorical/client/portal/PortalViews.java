@@ -32,6 +32,7 @@ import net.minecraft.client.renderer.BindGroupLayouts;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.block.MovingBlockRenderState;
+import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
 import net.minecraft.client.renderer.rendertype.RenderSetup;
@@ -49,6 +50,7 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4fStack;
 import org.joml.Vector4f;
@@ -96,13 +98,18 @@ public final class PortalViews {
             .withTexture("Sampler0", TEXTURE, () -> RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR))
             .createRenderSetup());
 
-    /** A far block, and where its middle stands behind the near sheet. */
-    private record Shown(BlockPos far, BlockState state, double x, double y, double z) {}
+    /**
+     * A far block, where its middle stands behind the near sheet, the room its model can take up
+     * there, and its render state, filled once for every frame it is drawn in.
+     */
+    private record Shown(BlockPos far, BlockState state, double x, double y, double z, AABB reach, FarBlock block) {}
 
     /** One portal's far side, laid out behind its near sheet. */
     private static final class View {
         final ClientLevel level;
         final PortalViewS2C.Sheet near;
+        /** The near sheet's blocks, as a box in this world. */
+        final AABB sheetBounds;
         final Vector4f sky;
         final Holder<Biome> biome;
         /** What an eye on the near sheet's low side sees past it, and an eye on its high side. */
@@ -115,6 +122,9 @@ public final class PortalViews {
         View(ClientLevel level, PortalViewS2C view) {
             this.level = level;
             this.near = view.near();
+            BlockPos corner0 = near.corner();
+            BlockPos corner1 = near.alongX() ? corner0.offset(near.width(), near.height(), 1) : corner0.offset(1, near.height(), near.width());
+            this.sheetBounds = new AABB(Vec3.atLowerCornerOf(corner0), Vec3.atLowerCornerOf(corner1));
             this.sky = new Vector4f(((view.sky() >> 16) & 0xFF) / 255.0F, ((view.sky() >> 8) & 0xFF) / 255.0F, (view.sky() & 0xFF) / 255.0F, 1.0F);
             this.biome = biome(level, view.biome(), view.near().corner());
             light.defaultReturnValue(0);
@@ -126,8 +136,8 @@ public final class PortalViews {
                 light.put(far.asLong(), block.light());
             }
             Direction lowNormal = near.alongX() ? Direction.SOUTH : Direction.EAST;
-            fromLow = new Layout(view, lowNormal, states);
-            fromHigh = new Layout(view, lowNormal.getOpposite(), states);
+            fromLow = new Layout(this, view, lowNormal, states);
+            fromHigh = new Layout(this, view, lowNormal.getOpposite(), states);
             for (PortalViewS2C.Block block : view.blocks()) {
                 BlockPos far = corner.offset(block.dx(), block.dy(), block.dz());
                 for (Direction side : Direction.values()) {
@@ -180,7 +190,7 @@ public final class PortalViews {
         final int degrees;
         final List<Shown> shown = new ArrayList<>();
 
-        Layout(PortalViewS2C view, Direction in, Long2ObjectOpenHashMap<BlockState> states) {
+        Layout(View owner, PortalViewS2C view, Direction in, Long2ObjectOpenHashMap<BlockState> states) {
             Direction out = view.face() != null ? view.face()
                 : view.near().alongX() == view.far().alongX() ? in : in.getClockWise();
             int turn = 0;
@@ -196,7 +206,16 @@ public final class PortalViews {
                 // Only past the far sheet, out of the face: the sheet's own row would stand in front of the near one
                 if (cx * out.getStepX() + cz * out.getStepZ() < 0.5) continue;
                 double[] at = turn(cx, cz, degrees);
-                shown.add(new Shown(far, states.get(far.asLong()), nearMiddle.x + at[0], nearMiddle.y + cy, nearMiddle.z + at[1]));
+                double x = nearMiddle.x + at[0], y = nearMiddle.y + cy, z = nearMiddle.z + at[1];
+                BlockState state = states.get(far.asLong());
+                FarBlock farBlock = new FarBlock(owner);
+                farBlock.blockState = state;
+                farBlock.randomSeedPos = far;
+                farBlock.blockPos = far;
+                farBlock.biome = owner.biome;
+                farBlock.cardinalLighting = owner.level.cardinalLighting();
+                // A model reaches at most a block past its own cell
+                shown.add(new Shown(far, state, x, y, z, new AABB(x - 1.5, y - 1.5, z - 1.5, x + 1.5, y + 1.5, z + 1.5), farBlock));
             }
         }
 
@@ -282,22 +301,21 @@ public final class PortalViews {
         RenderTarget main = client.gameRenderer.mainRenderTarget();
         texture.fit(main.width, main.height);
 
+        // The far side shows only through the sheet, and only what is on screen through that
+        Frustum frustum = camera.cullFrustum;
+        if (!frustum.isVisible(now.sheetBounds)) return;
+
         Vec3 eye = camera.pos;
         Layout layout = now.seenFrom(eye);
 
         PoseStack pose = new PoseStack();
         for (Shown shown : layout.shown) {
+            if (!frustum.isVisible(shown.reach())) continue;
             pose.pushPose();
             pose.translate(shown.x() - eye.x, shown.y() - eye.y, shown.z() - eye.z);
             if (layout.degrees != 0) pose.rotateDegrees(Axis.YP, layout.degrees);
             pose.translate(-0.5F, -0.5F, -0.5F);
-            FarBlock block = new FarBlock(now);
-            block.blockState = shown.state();
-            block.randomSeedPos = shown.far();
-            block.blockPos = shown.far();
-            block.biome = now.biome;
-            block.cardinalLighting = now.level.cardinalLighting();
-            submits.submitMovingBlock(pose, block, EntityRenderState.NO_OUTLINE);
+            submits.submitMovingBlock(pose, shown.block(), EntityRenderState.NO_OUTLINE);
             pose.popPose();
         }
 
