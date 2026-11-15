@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.28.2": [
+      "The readme shows pointing: a figure points at a sheep in a field, the sheep outlined in the team colour with the line running to it, pictured by a client gametest with -Ppictures."
+    ],
     "15.28.1": [
       "Drop changelog notes for changes nothing in the game shows."
     ],
