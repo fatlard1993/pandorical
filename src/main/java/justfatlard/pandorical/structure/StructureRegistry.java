@@ -2,11 +2,14 @@ package justfatlard.pandorical.structure;
 
 import justfatlard.pandorical.api.BlockEntry;
 import justfatlard.pandorical.api.Capabilities;
+import justfatlard.pandorical.api.CellsDrawing;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.RelPos;
 import justfatlard.pandorical.api.StructureApi;
+import justfatlard.pandorical.api.StructureDrawings;
 import justfatlard.pandorical.api.StructurePose;
 import justfatlard.pandorical.protocol.DespawnStructureS2C;
+import justfatlard.pandorical.protocol.SetStructureDrawingsS2C;
 import justfatlard.pandorical.protocol.SetStructureDryS2C;
 import justfatlard.pandorical.protocol.SetStructureVisibleS2C;
 import justfatlard.pandorical.protocol.SetStructureWalkableS2C;
@@ -36,6 +39,8 @@ public final class StructureRegistry implements StructureApi {
 	private static final class StructureState {
 		final Entity anchorEntity;
 		final Map<RelPos, BlockState> blocks;
+		/** The blocks drawn as a build in their place; see {@link StructureRegistry#drawings()}. */
+		final Map<RelPos, CellsDrawing> drawings = new java.util.HashMap<>();
 		StructurePose pose;
 		/** The poses it has held lately, newest last: what a client may still be drawing. */
 		final java.util.ArrayDeque<StructurePose> recent = new java.util.ArrayDeque<>();
@@ -209,11 +214,84 @@ public final class StructureRegistry implements StructureApi {
 		for (BlockEntry entry : blocks) blockMap.put(entry.pos(), entry.state());
 
 		StructureState state = new StructureState(anchorEntity, blockMap, initialPose, true);
+		for (BlockEntry entry : blocks) {
+			if (entry.drawing() != null) state.drawings.put(entry.pos(), entry.drawing());
+			else state.drawings.remove(entry.pos());
+		}
 		StructureState replaced = structures.put(structureId, state);
 		if (replaced != null && !replaced.dry.isEmpty()) noteDry();
 
 		SpawnStructureS2C packet = buildSpawnPacket(structureId, state);
 		broadcastToTrackers(state.anchorEntity, packet);
+		sendDrawings(state.anchorEntity, structureId, state.drawings);
+	}
+
+	private final Drawings drawings = new Drawings();
+
+	@Override
+	public StructureDrawings drawings() {
+		return drawings;
+	}
+
+	/** The providers, asked in the order they came. */
+	private static final class Drawings implements StructureDrawings {
+		private final List<StructureDrawings.Provider> providers = new java.util.concurrent.CopyOnWriteArrayList<>();
+		private final Set<StructureDrawings.Provider> failed = ConcurrentHashMap.newKeySet();
+
+		@Override
+		public void register(StructureDrawings.Provider provider) {
+			providers.add(java.util.Objects.requireNonNull(provider, "provider"));
+		}
+
+		@Override
+		public java.util.Optional<CellsDrawing> find(BlockState state, net.minecraft.nbt.@org.jspecify.annotations.Nullable CompoundTag blockEntityData) {
+			for (StructureDrawings.Provider provider : providers) {
+				java.util.Optional<CellsDrawing> found;
+				try {
+					found = provider.draw(state, blockEntityData);
+				} catch (RuntimeException e) {
+					if (failed.add(provider)) justfatlard.pandorical.Pandorical.LOGGER.error("A structure drawing provider failed on {}; it is skipped wherever it fails", state, e);
+					continue;
+				}
+				if (found != null && found.isPresent()) return found;
+			}
+			return java.util.Optional.empty();
+		}
+	}
+
+	/** About a quarter of what one payload may carry: drawings past it go in another. */
+	private static final int DRAWINGS_PER_PAYLOAD = 256 * 1024;
+
+	/** These drawings to every tracker that draws them, split so no one payload is too large to send. */
+	private void sendDrawings(Entity anchorEntity, String structureId, Map<RelPos, CellsDrawing> drawn) {
+		if (drawn.isEmpty()) return;
+		List<ServerPlayer> drawers = new java.util.ArrayList<>();
+		for (ServerPlayer player : PlayerLookup.tracking(anchorEntity)) {
+			if (PandoricalApi.hasCapability(player, Capabilities.STRUCTURES) && PandoricalApi.hasCapability(player, Capabilities.STRUCTURE_CELLS)) drawers.add(player);
+		}
+		if (drawers.isEmpty()) return;
+		for (SetStructureDrawingsS2C packet : drawingPackets(structureId, drawn)) {
+			for (ServerPlayer player : drawers) ServerPlayNetworking.send(player, packet);
+		}
+	}
+
+	private static List<SetStructureDrawingsS2C> drawingPackets(String structureId, Map<RelPos, CellsDrawing> drawn) {
+		List<SetStructureDrawingsS2C> out = new java.util.ArrayList<>();
+		List<SetStructureDrawingsS2C.Entry> batch = new java.util.ArrayList<>();
+		int weight = 0;
+		for (Map.Entry<RelPos, CellsDrawing> entry : drawn.entrySet()) {
+			int next = entry.getValue().weight();
+			if (!batch.isEmpty() && weight + next > DRAWINGS_PER_PAYLOAD) {
+				out.add(new SetStructureDrawingsS2C(structureId, batch));
+				batch = new java.util.ArrayList<>();
+				weight = 0;
+			}
+			RelPos pos = entry.getKey();
+			batch.add(SetStructureDrawingsS2C.Entry.of(pos.x(), pos.y(), pos.z(), entry.getValue()));
+			weight += next;
+		}
+		if (!batch.isEmpty()) out.add(new SetStructureDrawingsS2C(structureId, batch));
+		return out;
 	}
 
 	/** @hidden */
@@ -292,8 +370,22 @@ public final class StructureRegistry implements StructureApi {
 		if (state == null) return;
 		sendPendingPose(structureId, state);
 
-		for (BlockEntry entry : added) state.blocks.put(entry.pos(), entry.state());
-		for (RelPos pos : removed) state.blocks.remove(pos);
+		Map<RelPos, CellsDrawing> drawn = new LinkedHashMap<>();
+		for (BlockEntry entry : added) {
+			state.blocks.put(entry.pos(), entry.state());
+			if (entry.drawing() != null) {
+				state.drawings.put(entry.pos(), entry.drawing());
+				drawn.put(entry.pos(), entry.drawing());
+			} else {
+				state.drawings.remove(entry.pos());
+				drawn.remove(entry.pos());
+			}
+		}
+		for (RelPos pos : removed) {
+			state.blocks.remove(pos);
+			state.drawings.remove(pos);
+			drawn.remove(pos);
+		}
 		for (Map.Entry<RelPos, BlockState> entry : changed.entrySet()) state.blocks.put(entry.getKey(), entry.getValue());
 		state.bound();
 
@@ -307,6 +399,7 @@ public final class StructureRegistry implements StructureApi {
 
 		broadcastToTrackers(state.anchorEntity, new UpdateStructureBlocksS2C(
 			structureId, addedWire, removedWire, changedWire));
+		sendDrawings(state.anchorEntity, structureId, drawn);
 	}
 
 	@Override
@@ -385,6 +478,9 @@ public final class StructureRegistry implements StructureApi {
 		for (Map.Entry<String, StructureState> entry : structures.entrySet()) {
 			if (entry.getValue().anchorEntity == entity) {
 				ServerPlayNetworking.send(player, buildSpawnPacket(entry.getKey(), entry.getValue()));
+				if (!entry.getValue().drawings.isEmpty() && PandoricalApi.hasCapability(player, Capabilities.STRUCTURE_CELLS)) {
+					for (SetStructureDrawingsS2C packet : drawingPackets(entry.getKey(), entry.getValue().drawings)) ServerPlayNetworking.send(player, packet);
+				}
 				if (entry.getValue().walkable && PandoricalApi.hasCapability(player, Capabilities.WALKABLE_STRUCTURES)) {
 					ServerPlayNetworking.send(player, new SetStructureWalkableS2C(entry.getKey(), true));
 				}

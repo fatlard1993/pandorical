@@ -92,7 +92,7 @@ before anything else.
 `screens` · `content` · `camera` · `hud` · `structures` · `entity_overlays` ·
 `chest_overlays` · `keybinds` · `hud_elements` · `skins` · `render_policy` ·
 `animations` · `mount_policy` · `walkable_structures` · `dry_structures` ·
-`scaled_structures` · `block_shapes` · `block_materials`
+`scaled_structures` · `block_shapes` · `block_materials` · `structure_cells`
 
 Pass the constant, `hasCapability(player, Capabilities.SCREENS)`, and a typo is a compile
 error. `hasCapability(player, "blockTints")` returns false forever, because `blockTints` is an
@@ -1192,6 +1192,30 @@ renderers work the same way, through `PandoricalApi`; read the javadoc on `Struc
   the block loads and clear it when the block goes. The client holds a material until the server
   clears it, which is what lets the breaker's own break, played before the server hears of it, still
   find it; a material left behind sounds over whatever is built there next. New in 15.30.
+- **A block of a structure can be drawn as a build instead of itself**, such as a miniature aboard
+  a ship drawn as its little build rather than its stand-in block. A `BlockEntry` carries an
+  optional `CellsDrawing`: `n` to a side, a `height`, a palette of block states and one byte per
+  cell indexing it from 1 (0 for air, x fastest, then z, then y: the `pandorical:cells` item
+  layout), plus a `lift` in blocks (a top slab's half) and quarter `turns` clockwise. A client
+  with `structure_cells` draws the build at 1/n inside that block, turned and scaled with the
+  structure and lit where the block is; every other client draws the block. Only the drawing
+  changes: walking on it, using it and keeping it dry still take the block. The mod that owns the
+  block answers for it, so the mod building the structure needs to know nothing about it:
+
+  ```java
+  // The block's mod, at init: its saved block entity data says what it draws as.
+  PandoricalApi.structures().drawings().register((state, data) ->
+      state.is(MY_BLOCK) && data != null ? MyBuild.read(data) : Optional.empty());
+
+  // The structure's mod, for each block it carries: the entry comes with any drawing attached.
+  BlockEntry entry = PandoricalApi.structures().drawings().entry(pos, state, savedNbt);
+  ```
+
+  Providers are asked once per entry made, on the server; the client culls and turns a drawing
+  once as it arrives. A drawing goes with its block: an entry passed again in `updateBlocks`'s
+  `added` replaces it (or clears it, passed without one), a block in `changed` keeps it, and a
+  removed block takes it along. So a drawing that changes is sent again as that one entry. New in
+  15.31.
 - **Anything drawn on a moving structure blends by the structure's own rule**
   (`StructureInterpolationHandler`, over `StructureManager.INTERPOLATION_TICKS`). A vanilla blend
   sits a different distance behind the server, and the gap is what a rider sees. Server-only

@@ -41,8 +41,9 @@ public interface StructureApi {
     /**
      * Pass an empty list or map for what isn't changing.
      *
-     * @param added   a {@link RelPos} already present is overwritten
-     * @param changed positions that must already exist
+     * @param added   a {@link RelPos} already present is overwritten, drawing and all, so passing
+     *                an entry here is how a block's {@link BlockEntry#drawing} is changed
+     * @param changed positions that must already exist; each keeps the drawing it has
      */
     void updateBlocks(String structureId, List<BlockEntry> added, List<RelPos> removed, Map<RelPos, BlockState> changed);
 
@@ -102,6 +103,15 @@ public interface StructureApi {
      * @param scale above nought; 1 is full size
      */
     void setScale(String structureId, float scale);
+
+    /**
+     * Who draws which blocks as a build: register a provider for blocks your mod owns, or make
+     * entries through it for blocks your structure carries. A {@link BlockEntry} with a drawing
+     * reaches clients with the {@code "structure_cells"} capability as that build, at 1/n of its
+     * block, turned and scaled with the structure and lit where it stands; every other client
+     * draws the block. Walking on it, using it and keeping it dry take the block either way.
+     */
+    StructureDrawings drawings();
 
     /** Remove the structure for every tracker and forget its server-side state. */
     void despawn(String structureId);

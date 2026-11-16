@@ -476,6 +476,9 @@ public class PandoricalClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(justfatlard.pandorical.protocol.SetStructureScaleS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> StructureManager.handleSetScale(payload));
         });
+        ClientPlayNetworking.registerGlobalReceiver(justfatlard.pandorical.protocol.SetStructureDrawingsS2C.TYPE, (payload, context) -> {
+            context.client().execute(() -> StructureManager.handleSetDrawings(payload));
+        });
         ClientPlayNetworking.registerGlobalReceiver(DespawnStructureS2C.TYPE, (payload, context) -> {
             context.client().execute(() -> StructureManager.handleDespawn(payload));
         });

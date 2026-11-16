@@ -144,6 +144,10 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 						net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X))))));
 		out.put("set_structure_scale", encode(justfatlard.pandorical.protocol.SetStructureScaleS2C.STREAM_CODEC,
 			new justfatlard.pandorical.protocol.SetStructureScaleS2C("mymod:ship", 0.5F)));
+		out.put("structure_drawings", encode(justfatlard.pandorical.protocol.SetStructureDrawingsS2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.SetStructureDrawingsS2C("mymod:ship", List.of(
+				new justfatlard.pandorical.protocol.SetStructureDrawingsS2C.Entry(1, -2, 3, 2, 1,
+					List.of(net.minecraft.world.level.block.Blocks.STONE.defaultBlockState()), new byte[] {1, 0, 0, 1}, 0.5F, 3)))));
 		out.put("key_press", encode(KeyPressC2S.STREAM_CODEC, new KeyPressC2S(3)));
 		out.put("keybind_rebind", encode(KeybindRebindS2C.STREAM_CODEC, new KeybindRebindS2C(3)));
 		out.put("keybind_declarations", encode(KeybindDeclarationsS2C.STREAM_CODEC,

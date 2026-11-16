@@ -316,6 +316,9 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(
             justfatlard.pandorical.protocol.SetStructureScaleS2C.TYPE,
             justfatlard.pandorical.protocol.SetStructureScaleS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.SetStructureDrawingsS2C.TYPE,
+            justfatlard.pandorical.protocol.SetStructureDrawingsS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(DespawnStructureS2C.TYPE, DespawnStructureS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
             justfatlard.pandorical.protocol.BlockShapesS2C.TYPE,

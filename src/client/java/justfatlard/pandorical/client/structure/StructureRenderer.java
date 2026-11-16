@@ -30,7 +30,8 @@ import java.util.Map;
  * pose per structure. A moving block sees nothing around it, so faces between blocks of the same
  * structure are not culled; a block that cannot be seen at all, opaque and walled in on every side
  * by opaque full blocks of its own structure, is left out. A structure wholly off screen is not
- * drawn.
+ * drawn. A block carrying a drawing is drawn as its build instead, each showing cell a moving block
+ * at 1/n of the block, lit where the block is; it is never left out, and never walls in another.
  */
 public final class StructureRenderer {
     private StructureRenderer() {}
@@ -85,10 +86,15 @@ public final class StructureRenderer {
         poseStack.rotateDegrees(Axis.YP, -pose.yaw());
         if (scale != 1.0F) poseStack.scale(scale, scale, scale);
 
+        for (Spot spot : drawn.spots) spot.place(level, pose, cos, sin, scale);
         for (Shown shown : drawn.blocks) {
             poseStack.pushPose();
-            poseStack.translate(shown.x, shown.y, shown.z);
-            shown.place(level, pose, cos, sin, scale);
+            poseStack.translate(shown.spot.x, shown.spot.y + shown.lift, shown.spot.z);
+            if (shown.cell != 1.0F) {
+                poseStack.scale(shown.cell, shown.cell, shown.cell);
+                poseStack.translate(shown.cellX, shown.cellY, shown.cellZ);
+            }
+            shown.lit(level);
             collector.submitMovingBlock(poseStack, shown.state, EntityRenderState.NO_OUTLINE);
             poseStack.popPose();
         }
@@ -114,31 +120,63 @@ public final class StructureRenderer {
     }
 
     /**
-     * One drawn block, kept from frame to frame: its render state is filled once, and only its
-     * place in the world, and the biome there, follow the structure about.
+     * One block of a structure where something is drawn, kept from frame to frame: only its place in
+     * the world, and the biome there, follow the structure about, worked out once a frame however
+     * many cells of a drawing stand in it.
      */
-    private static final class Shown {
+    private static final class Spot {
         final int x, y, z;
-        final MovingBlockRenderState state = new MovingBlockRenderState();
-        private final BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
+        final BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
         private final BlockPos.MutableBlockPos next = new BlockPos.MutableBlockPos();
+        net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome;
 
-        Shown(StructureManager.RelPosKey rel, BlockState block) {
+        Spot(StructureManager.RelPosKey rel) {
             this.x = rel.x();
             this.y = rel.y();
             this.z = rel.z();
-            state.blockState = block;
-            // Seeded by relative position, so model variants hold still while the structure moves.
-            state.randomSeedPos = new BlockPos(x, y, z);
-            state.blockPos = at;
         }
 
         void place(ClientLevel level, StructureManager.StructurePoseSnapshot pose, double cos, double sin, float scale) {
             worldBlockPos(pose, x, y, z, cos, sin, scale, next);
-            if (state.biome == null || !next.equals(at)) {
+            if (biome == null || !next.equals(at)) {
                 at.set(next);
-                state.biome = level.getBiome(at);
+                biome = level.getBiome(at);
             }
+        }
+    }
+
+    /**
+     * One drawn block, or one cell of a drawing, kept from frame to frame: its render state is filled
+     * once, and takes its light and biome from its {@link Spot}.
+     */
+    private static final class Shown {
+        final Spot spot;
+        final MovingBlockRenderState state = new MovingBlockRenderState();
+        /** 1 for a block; 1/n for a cell, which stands at {@link #cellX} and so on in cells. */
+        final float cell;
+        final float lift;
+        final int cellX, cellY, cellZ;
+
+        Shown(Spot spot, BlockState block) {
+            this(spot, block, 1.0F, 0.0F, 0, 0, 0);
+            // Seeded by relative position, so model variants hold still while the structure moves.
+            state.randomSeedPos = new BlockPos(spot.x, spot.y, spot.z);
+        }
+
+        Shown(Spot spot, BlockState block, float cell, float lift, int cellX, int cellY, int cellZ) {
+            this.spot = spot;
+            this.cell = cell;
+            this.lift = lift;
+            this.cellX = cellX;
+            this.cellY = cellY;
+            this.cellZ = cellZ;
+            state.blockState = block;
+            state.randomSeedPos = new BlockPos(spot.x * 16 + cellX, spot.y * 16 + cellY, spot.z * 16 + cellZ);
+            state.blockPos = spot.at;
+        }
+
+        void lit(ClientLevel level) {
+            state.biome = spot.biome;
             state.cardinalLighting = level.cardinalLighting();
             state.lightEngine = level.getLightEngine();
         }
@@ -150,6 +188,7 @@ public final class StructureRenderer {
         final DryCells dry;
         final ClientLevel level;
         final List<Shown> blocks;
+        final List<Spot> spots;
         final List<StructureFluids.Wet> fluids;
         /** Relative bounds of everything drawn, models' reach included; min > max when nothing is. */
         private final double minX, minY, minZ, maxX, maxY, maxZ;
@@ -159,7 +198,9 @@ public final class StructureRenderer {
             this.dry = structure.dry;
             this.level = level;
             Map<StructureManager.RelPosKey, BlockState> all = structure.blocks;
+            Map<StructureManager.RelPosKey, StructureDrawing> drawings = structure.drawings;
             List<Shown> shown = new ArrayList<>();
+            List<Spot> spots = new ArrayList<>();
             int x0 = Integer.MAX_VALUE, y0 = Integer.MAX_VALUE, z0 = Integer.MAX_VALUE;
             int x1 = Integer.MIN_VALUE, y1 = Integer.MIN_VALUE, z1 = Integer.MIN_VALUE;
             for (Map.Entry<StructureManager.RelPosKey, BlockState> entry : all.entrySet()) {
@@ -168,13 +209,27 @@ public final class StructureRenderer {
                 StructureManager.RelPosKey rel = entry.getKey();
                 x0 = Math.min(x0, rel.x()); y0 = Math.min(y0, rel.y()); z0 = Math.min(z0, rel.z());
                 x1 = Math.max(x1, rel.x()); y1 = Math.max(y1, rel.y()); z1 = Math.max(z1, rel.z());
-                if (!walledIn(all, rel, state)) shown.add(new Shown(rel, state));
+                StructureDrawing drawing = drawings.isEmpty() ? null : drawings.get(rel);
+                if (drawing != null) {
+                    if (drawing.showing().isEmpty()) continue;
+                    Spot spot = new Spot(rel);
+                    spots.add(spot);
+                    float cell = 1.0F / drawing.n();
+                    for (justfatlard.pandorical.client.item.CellsItemRenderer.Cell at : drawing.showing()) {
+                        shown.add(new Shown(spot, at.state(), cell, drawing.lift(), at.x(), at.y(), at.z()));
+                    }
+                } else if (!walledIn(all, drawings, rel, state)) {
+                    Spot spot = new Spot(rel);
+                    spots.add(spot);
+                    shown.add(new Shown(spot, state));
+                }
             }
             for (RelPos cell : dry.tops()) {
                 x0 = Math.min(x0, cell.x()); y0 = Math.min(y0, cell.y()); z0 = Math.min(z0, cell.z());
                 x1 = Math.max(x1, cell.x()); y1 = Math.max(y1, cell.y()); z1 = Math.max(z1, cell.z());
             }
             this.blocks = shown;
+            this.spots = spots;
             this.fluids = StructureFluids.wet(all);
             this.minX = x0 - MODEL_REACH; this.minY = y0 - MODEL_REACH; this.minZ = z0 - MODEL_REACH;
             this.maxX = x1 + 1 + MODEL_REACH; this.maxY = y1 + 1 + MODEL_REACH; this.maxZ = z1 + 1 + MODEL_REACH;
@@ -200,12 +255,14 @@ public final class StructureRenderer {
         }
 
         private static boolean walledIn(Map<StructureManager.RelPosKey, BlockState> blocks,
+                                        Map<StructureManager.RelPosKey, StructureDrawing> drawings,
                                         StructureManager.RelPosKey rel, BlockState state) {
             if (!state.isSolidRender()) return false;
             for (Direction side : Direction.values()) {
-                BlockState next = blocks.get(new StructureManager.RelPosKey(
-                    rel.x() + side.getStepX(), rel.y() + side.getStepY(), rel.z() + side.getStepZ()));
-                if (next == null || !next.isSolidRender()) return false;
+                StructureManager.RelPosKey beside = new StructureManager.RelPosKey(
+                    rel.x() + side.getStepX(), rel.y() + side.getStepY(), rel.z() + side.getStepZ());
+                BlockState next = blocks.get(beside);
+                if (next == null || !next.isSolidRender() || drawings.containsKey(beside)) return false;
             }
             return true;
         }

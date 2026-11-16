@@ -38,7 +38,7 @@ import java.util.function.Consumer;
  * draws nothing; wrap the model in a {@code minecraft:condition} to give it a fallback.
  */
 public final class CellsItemRenderer implements SpecialModelRenderer<CellsItemRenderer.Cells> {
-    public static final int MAX_SIZE = 16;
+    public static final int MAX_SIZE = justfatlard.pandorical.api.CellsDrawing.MAX_SIZE;
 
     private static final BlockDisplayContext DISPLAY = BlockDisplayContext.create();
 
@@ -116,14 +116,22 @@ public final class CellsItemRenderer implements SpecialModelRenderer<CellsItemRe
     private static Cells parse(@Nullable Tag tag) {
         if (tag == null) return NONE;
         Raw raw = RAW.parse(NbtOps.INSTANCE, tag).result().orElse(null);
-        if (raw == null || raw.cells().length != raw.n() * raw.height() * raw.n()) return NONE;
+        if (raw == null) return NONE;
+        Cells cells = cull(raw.n(), raw.height(), raw.palette(), raw.cells());
+        return cells == null ? NONE : cells;
+    }
 
-        int n = raw.n();
-        int height = raw.height();
-        BlockState[] grid = new BlockState[raw.cells().length];
+    /**
+     * The cells of a build laid out as an item model's data is, less those walled in on every side
+     * by solid cells; null for a layout that does not add up or a build with nothing showing. Also
+     * what a structure block drawn as a build is drawn from.
+     */
+    public static @Nullable Cells cull(int n, int height, List<BlockState> palette, byte[] cells) {
+        if (n < 1 || height < 1 || n > MAX_SIZE || height > MAX_SIZE || cells.length != n * height * n) return null;
+        BlockState[] grid = new BlockState[cells.length];
         for (int i = 0; i < grid.length; i++) {
-            int index = raw.cells()[i] & 0xFF;
-            grid[i] = index == 0 || index > raw.palette().size() ? null : raw.palette().get(index - 1);
+            int index = cells[i] & 0xFF;
+            grid[i] = index == 0 || index > palette.size() ? null : palette.get(index - 1);
         }
 
         List<Cell> showing = new ArrayList<>();
@@ -135,7 +143,7 @@ public final class CellsItemRenderer implements SpecialModelRenderer<CellsItemRe
                 && hides(grid, n, height, x, y, z + 1) && hides(grid, n, height, x, y, z - 1)) continue;
             showing.add(new Cell(x, y, z, state));
         }
-        return showing.isEmpty() ? NONE : new Cells(n, List.copyOf(showing));
+        return showing.isEmpty() ? null : new Cells(n, List.copyOf(showing));
     }
 
     private static boolean hides(BlockState[] grid, int n, int height, int x, int y, int z) {

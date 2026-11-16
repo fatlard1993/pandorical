@@ -58,10 +58,14 @@ public final class StructureManager {
         if (structure == null) return;
 
         for (StructureBlockEntry entry : payload.added()) {
-            structure.blocks.put(new RelPosKey(entry.x(), entry.y(), entry.z()), entry.state());
+            RelPosKey key = new RelPosKey(entry.x(), entry.y(), entry.z());
+            structure.blocks.put(key, entry.state());
+            structure.drawings.remove(key);
         }
         for (StructureRelPos pos : payload.removed()) {
-            structure.blocks.remove(new RelPosKey(pos.x(), pos.y(), pos.z()));
+            RelPosKey key = new RelPosKey(pos.x(), pos.y(), pos.z());
+            structure.blocks.remove(key);
+            structure.drawings.remove(key);
         }
         for (StructureBlockEntry entry : payload.changed()) {
             structure.blocks.put(new RelPosKey(entry.x(), entry.y(), entry.z()), entry.state());
@@ -93,6 +97,17 @@ public final class StructureManager {
         ClientStructure structure = structures.get(payload.structureId());
         if (structure == null) return;
         structure.scale = payload.scale();
+    }
+
+    /** Each drawing culled and turned here, once, not as it is drawn. */
+    public static void handleSetDrawings(justfatlard.pandorical.protocol.SetStructureDrawingsS2C payload) {
+        ClientStructure structure = structures.get(payload.structureId());
+        if (structure == null) return;
+        for (justfatlard.pandorical.protocol.SetStructureDrawingsS2C.Entry entry : payload.entries()) {
+            RelPosKey key = new RelPosKey(entry.x(), entry.y(), entry.z());
+            if (structure.blocks.containsKey(key)) structure.drawings.put(key, StructureDrawing.of(entry));
+        }
+        structure.revision++;
     }
 
     public static void handleDespawn(DespawnStructureS2C payload) {
@@ -140,6 +155,8 @@ public final class StructureManager {
 
     public static final class ClientStructure {
         public final Map<RelPosKey, BlockState> blocks;
+        /** Blocks drawn as a build in their place, until the block is replaced or removed; see {@link StructureRenderer}. */
+        final Map<RelPosKey, StructureDrawing> drawings = new java.util.HashMap<>();
         public boolean visible;
         public boolean walkable;
         /** Where the sea is kept out; see {@link StructureHolds}. */
@@ -242,6 +259,16 @@ public final class StructureManager {
                 minZ = Math.min(minZ, key.z()); maxZ = Math.max(maxZ, key.z());
             }
             boundsStale = false;
+        }
+
+        /** What this block is drawn as instead of itself, or null. */
+        public StructureDrawing drawingAt(int x, int y, int z) {
+            return drawings.get(new RelPosKey(x, y, z));
+        }
+
+        /** How many blocks are drawn as a build. */
+        public int drawingCount() {
+            return drawings.size();
         }
 
         public StructurePoseSnapshot interpolated(float partialTick) {
