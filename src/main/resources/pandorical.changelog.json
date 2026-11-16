@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.32.0": [
+      "Mobs, dropped items and anything else the server moves stand on a walkable moving structure, on each of its blocks as shaped - a slab at a slab's height - so a ship at sea needs no hidden entities to hold up her deck."
+    ],
     "15.31.0": [
       "A block on a moving structure can be drawn as the build it holds, such as a miniature on a ship at sea showing its little build rather than a plain block."
     ],

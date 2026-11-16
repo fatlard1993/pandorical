@@ -3,6 +3,7 @@ package justfatlard.pandorical.client.structure;
 import justfatlard.pandorical.client.structure.StructureManager.ClientStructure;
 import justfatlard.pandorical.client.structure.StructureManager.RelPosKey;
 import justfatlard.pandorical.client.structure.StructureManager.StructurePoseSnapshot;
+import justfatlard.pandorical.structure.StructureCollisions;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
@@ -10,13 +11,9 @@ import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 /**
  * Walkable structures: solid to the local player, and carrying them while they stand on one.
@@ -175,68 +172,17 @@ public final class StructureDecks {
 
 	private static List<VoxelShape> addCollisions(ClientStructure structure, StructurePoseSnapshot pose,
 												   AABB area, List<VoxelShape> into) {
-		double yaw = Math.toRadians(pose.yaw());
-		double cos = Math.cos(yaw);
-		double sin = Math.sin(yaw);
-
-		// The area's footprint in the structure's frame: its four corners turned back.
-		double minX = Double.MAX_VALUE, minZ = Double.MAX_VALUE;
-		double maxX = -Double.MAX_VALUE, maxZ = -Double.MAX_VALUE;
-		for (int corner = 0; corner < 4; corner++) {
-			double dx = ((corner & 1) == 0 ? area.minX : area.maxX) - pose.x();
-			double dz = ((corner & 2) == 0 ? area.minZ : area.maxZ) - pose.z();
-			double lx = dx * cos + dz * sin;
-			double lz = -dx * sin + dz * cos;
-			minX = Math.min(minX, lx); maxX = Math.max(maxX, lx);
-			minZ = Math.min(minZ, lz); maxZ = Math.max(maxZ, lz);
-		}
-		// A block reaches at most a cell past its own (a fence's collision is 1.5 tall).
-		int x0 = Mth.floor(minX) - 1, x1 = Mth.floor(maxX) + 1;
-		int z0 = Mth.floor(minZ) - 1, z1 = Mth.floor(maxZ) + 1;
-		int y0 = Mth.floor(area.minY - pose.y()) - 1, y1 = Mth.floor(area.maxY - pose.y());
-		if (!structure.mayHold(x0, y0, z0, x1, y1, z1)) return into;
-
-		// Turned to the nearest quarter so a slab stays a slab and a stair keeps its step; exact
-		// on the four headings a structure comes to rest on, and close enough between them.
-		boolean swapped = (Math.floorMod(Math.round(pose.yaw() / 90.0f), 4) & 1) == 1;
-
-		for (int x = x0; x <= x1; x++) {
-			for (int z = z0; z <= z1; z++) {
-				for (int y = y0; y <= y1; y++) {
-					BlockState state = structure.blocks.get(new RelPosKey(x, y, z));
-					if (state == null || state.isAir()) continue;
-					VoxelShape shape = state.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
-					if (shape.isEmpty()) continue;
-
-					for (AABB part : boxes(shape)) {
-						double cx = x + (part.minX + part.maxX) / 2;
-						double cz = z + (part.minZ + part.maxZ) / 2;
-						double hx = (part.maxX - part.minX) / 2;
-						double hz = (part.maxZ - part.minZ) / 2;
-						if (swapped) {
-							double t = hx;
-							hx = hz;
-							hz = t;
-						}
-						double wx = pose.x() + cx * cos - cz * sin;
-						double wz = pose.z() + cx * sin + cz * cos;
-						AABB box = new AABB(wx - hx, pose.y() + y + part.minY, wz - hz,
-							wx + hx, pose.y() + y + part.maxY, wz + hz);
-						if (!box.intersects(area)) continue;
-						if (into == null) into = new ArrayList<>();
-						into.add(Shapes.create(box));
-					}
-				}
+		return StructureCollisions.add(new StructureCollisions.Cells() {
+			@Override
+			public BlockState at(int x, int y, int z) {
+				return structure.blocks.get(new RelPosKey(x, y, z));
 			}
-		}
-		return into;
-	}
 
-	/** A shape's boxes, kept per shape: shapes are shared and never change, and are asked for every tick. */
-	private static final Map<VoxelShape, List<AABB>> BOXES = new WeakHashMap<>();
-
-	private static List<AABB> boxes(VoxelShape shape) {
-		return BOXES.computeIfAbsent(shape, s -> List.copyOf(s.toAabbs()));
+			@Override
+			public boolean mayHold(int x0, int y0, int z0, int x1, int y1, int z1) {
+				return structure.mayHold(x0, y0, z0, x1, y1, z1);
+			}
+		}, pose.x(), pose.y(), pose.z(), pose.yaw(), area, into);
 	}
 
 	/**

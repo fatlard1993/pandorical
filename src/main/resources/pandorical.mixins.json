@@ -27,6 +27,7 @@
 		"TntProjectileTrustMixin",
 		"StructureClimbMixin",
 		"StructureDryMixin",
+		"StructureCollisionMixin",
 		"SynchedEntityDataAccessor",
 		"EntityKindTrackingMixin",
 		"EntityKindPairingMixin",

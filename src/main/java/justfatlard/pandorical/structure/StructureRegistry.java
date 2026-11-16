@@ -36,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class StructureRegistry implements StructureApi {
 	public static final StructureRegistry INSTANCE = new StructureRegistry();
 
-	private static final class StructureState {
+	private static final class StructureState implements StructureCollisions.Cells {
 		final Entity anchorEntity;
 		final Map<RelPos, BlockState> blocks;
 		/** The blocks drawn as a build in their place; see {@link StructureRegistry#drawings()}. */
@@ -52,6 +52,7 @@ public final class StructureRegistry implements StructureApi {
 		double reachSq;
 		int minY;
 		int maxY;
+		int minX, maxX, minZ, maxZ;
 
 		StructureState(Entity anchorEntity, Map<RelPos, BlockState> blocks, StructurePose pose, boolean visible) {
 			this.anchorEntity = anchorEntity;
@@ -66,16 +67,30 @@ public final class StructureRegistry implements StructureApi {
 		void bound() {
 			double far = 0;
 			int low = Integer.MAX_VALUE, high = Integer.MIN_VALUE;
+			minX = minZ = Integer.MAX_VALUE;
+			maxX = maxZ = Integer.MIN_VALUE;
 			for (RelPos pos : blocks.keySet()) {
 				double x = Math.max(Math.abs(pos.x()), Math.abs(pos.x() + 1));
 				double z = Math.max(Math.abs(pos.z()), Math.abs(pos.z() + 1));
 				far = Math.max(far, x * x + z * z);
 				low = Math.min(low, pos.y());
 				high = Math.max(high, pos.y());
+				minX = Math.min(minX, pos.x()); maxX = Math.max(maxX, pos.x());
+				minZ = Math.min(minZ, pos.z()); maxZ = Math.max(maxZ, pos.z());
 			}
 			reachSq = far;
 			minY = low;
 			maxY = high;
+		}
+
+		@Override
+		public BlockState at(int x, int y, int z) {
+			return blocks.get(new RelPos(x, y, z));
+		}
+
+		@Override
+		public boolean mayHold(int x0, int y0, int z0, int x1, int y1, int z1) {
+			return x1 >= minX && x0 <= maxX && y1 >= minY && y0 <= maxY && z1 >= minZ && z0 <= maxZ;
 		}
 
 		void moveTo(StructurePose next) {
@@ -168,6 +183,43 @@ public final class StructureRegistry implements StructureApi {
 	}
 
 	/**
+	 * What walkable structures put inside {@code area} in this level, for something the server
+	 * moves: a mob, an item, a falling block, or nothing in particular when it asks whether there is
+	 * room. Players are left out. One whose client walks structures stands on the deck it draws,
+	 * which on a moving structure is a little behind this one, and a step judged against this deck
+	 * as well is sent back; one whose client does not cannot stand on a moving deck it is never
+	 * shown, and holding them up here would only fight the fall their client sees.
+	 */
+	public List<net.minecraft.world.phys.shapes.VoxelShape> collisions(net.minecraft.world.level.Level level,
+			@org.jspecify.annotations.Nullable Entity source, net.minecraft.world.phys.AABB area) {
+		if (!anyWalkable || source instanceof net.minecraft.world.entity.player.Player) return List.of();
+		List<net.minecraft.world.phys.shapes.VoxelShape> shapes = null;
+		for (StructureState state : structures.values()) {
+			if (!state.walkable || !state.visible || state.scale != 1.0F) continue;
+			Entity anchor = state.anchorEntity;
+			if (anchor.isRemoved() || anchor.level() != level) continue;
+			if (source != null && (source == anchor || source.getRootVehicle() == anchor)) continue;
+			StructurePose pose = state.pose;
+			shapes = StructureCollisions.add(state, pose.x(), pose.y(), pose.z(), pose.yaw(), area, shapes);
+		}
+		return shapes == null ? List.of() : shapes;
+	}
+
+	/** Whether any structure is walkable at all; see {@link #noteWalkable}. */
+	private volatile boolean anyWalkable;
+
+	private void noteWalkable() {
+		boolean any = false;
+		for (StructureState state : structures.values()) {
+			if (state.walkable) {
+				any = true;
+				break;
+			}
+		}
+		anyWalkable = any;
+	}
+
+	/**
 	 * {@link #dryAt(Entity, double, double, double)} at the point of this block nearest the entity's
 	 * middle, as {@link DryCells#pointFor} picks it: asked for every wet block around every entity.
 	 */
@@ -220,6 +272,7 @@ public final class StructureRegistry implements StructureApi {
 		}
 		StructureState replaced = structures.put(structureId, state);
 		if (replaced != null && !replaced.dry.isEmpty()) noteDry();
+		if (replaced != null && replaced.walkable) noteWalkable();
 
 		SpawnStructureS2C packet = buildSpawnPacket(structureId, state);
 		broadcastToTrackers(state.anchorEntity, packet);
@@ -299,6 +352,7 @@ public final class StructureRegistry implements StructureApi {
 		structures.clear();
 		pendingPoses.clear();
 		anyDry = false;
+		anyWalkable = false;
 	}
 
 	/** Poses held for the tracker pass; see {@link #flushPoses}. */
@@ -350,7 +404,10 @@ public final class StructureRegistry implements StructureApi {
 			pendingPoses.remove(entry.getKey());
 			dropped = true;
 		}
-		if (dropped) noteDry();
+		if (dropped) {
+			noteDry();
+			noteWalkable();
+		}
 	}
 
 	/** An update that cannot wait for the tracker pass sends the held pose first. */
@@ -417,6 +474,7 @@ public final class StructureRegistry implements StructureApi {
 		StructureState state = structures.get(structureId);
 		if (state == null || state.walkable == walkable) return;
 		state.walkable = walkable;
+		noteWalkable();
 
 		SetStructureWalkableS2C packet = new SetStructureWalkableS2C(structureId, walkable);
 		for (ServerPlayer player : PlayerLookup.tracking(state.anchorEntity)) {
@@ -468,6 +526,7 @@ public final class StructureRegistry implements StructureApi {
 		if (state == null) return;
 		pendingPoses.remove(structureId);
 		if (!state.dry.isEmpty()) noteDry();
+		if (state.walkable) noteWalkable();
 
 		broadcastToTrackers(state.anchorEntity, new DespawnStructureS2C(structureId));
 	}
