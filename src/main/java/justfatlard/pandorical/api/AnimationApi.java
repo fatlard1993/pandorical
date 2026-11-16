@@ -14,7 +14,8 @@ import net.minecraft.world.entity.Entity;
 public interface AnimationApi {
 
 	/**
-	 * For everyone who can see the entity.
+	 * For everyone who can see the entity, and anyone who comes into view of it later, part way
+	 * through.
 	 *
 	 * @param animationId {@code namespace:name}, matching the shipped asset
 	 * @param looping     whether it repeats, or plays once and holds its final pose

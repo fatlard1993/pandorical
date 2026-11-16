@@ -26,9 +26,10 @@ import java.util.List;
  * return theShapeYouSet;
  * }</pre>
  *
- * <p>Kept in memory only, per world, and told to every player in that world: set it again as the
- * block loads (from whatever loads with it), and clear it when the block goes, or the client goes
- * on colliding with the shape over whatever is built there next.
+ * <p>Kept in memory only, per world, and told to every player who has the block's chunk, as the
+ * chunk reaches them and as the shape changes: set it again as the block loads (from whatever
+ * loads with it), and clear it when the block goes, or the client goes on colliding with the
+ * shape over whatever is built there next.
  */
 public interface BlockShapeApi {
     /** @param boxes at least one, in the block's own space, each within 0 to 1 on every axis */

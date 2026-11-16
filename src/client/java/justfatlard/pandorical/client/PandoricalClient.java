@@ -316,8 +316,18 @@ public class PandoricalClient implements ClientModInitializer {
             justfatlard.pandorical.protocol.BlockMarksV2S2C.TYPE, (payload, context) ->
                 context.client().execute(() -> ClientBlockMarks.apply(payload.dimension(), payload.replace(), payload.entries())));
         ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.BlockMarksV3S2C.TYPE, (payload, context) ->
+                context.client().execute(() -> ClientBlockMarks.apply(payload)));
+        ClientPlayNetworking.registerGlobalReceiver(
             justfatlard.pandorical.protocol.BlockShapesS2C.TYPE, (payload, context) ->
                 context.client().execute(() -> justfatlard.pandorical.client.renderer.ClientBlockShapes.apply(payload)));
+        ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.BlockShapesV2S2C.TYPE, (payload, context) ->
+                context.client().execute(() -> justfatlard.pandorical.client.renderer.ClientBlockShapes.apply(payload)));
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> {
+            ClientBlockMarks.forgetWorlds();
+            justfatlard.pandorical.client.renderer.ClientBlockShapes.forgetWorlds();
+        });
         ClientPlayNetworking.registerGlobalReceiver(
             justfatlard.pandorical.protocol.BlockMaterialsS2C.TYPE, (payload, context) ->
                 context.client().execute(() -> justfatlard.pandorical.client.renderer.ClientBlockMaterials.apply(payload)));
@@ -440,6 +450,21 @@ public class PandoricalClient implements ClientModInitializer {
             });
 
         ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.PlayAnimationV2S2C.TYPE, (payload, context) -> {
+                context.client().execute(() -> {
+                    if (payload.animation().isEmpty()) {
+                        EntityAnimations.stop(payload.entityId());
+                    } else {
+                        EntityAnimations.play(
+                            payload.entityId(),
+                            Identifier.parse(payload.animation()),
+                            payload.looping(),
+                            payload.elapsedMillis());
+                    }
+                });
+            });
+
+        ClientPlayNetworking.registerGlobalReceiver(
             RenderPolicyS2C.TYPE, (payload, context) -> {
                 context.client().execute(() ->
                     LeafCulling.setEnforced(payload.cullLeaves()));
@@ -488,7 +513,10 @@ public class PandoricalClient implements ClientModInitializer {
                 EntityOverlayStore.handle(payload));
         });
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents.ENTITY_UNLOAD.register(
-            (entity, level) -> EntityOverlayStore.forget(entity.getId()));
+            (entity, level) -> {
+                EntityOverlayStore.forget(entity.getId());
+                EntityAnimations.forget(entity.getId());
+            });
 
         ClientPlayNetworking.registerGlobalReceiver(
             ChestOverlayS2C.TYPE, (payload, context) -> {

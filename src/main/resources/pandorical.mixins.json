@@ -13,6 +13,7 @@
 		"HorsePillionMixin",
 		"MountCapacityMixin",
 		"TrackerPoseFlushMixin",
+		"ChunkSentMixin",
 		"FencePostMixin",
 		"WallPostMixin",
 		"ConnectionChannelAccessor",

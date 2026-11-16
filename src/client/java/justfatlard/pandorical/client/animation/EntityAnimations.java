@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -25,16 +26,31 @@ public final class EntityAnimations {
 	public record Active(Identifier animation, boolean looping, long startedAt) {}
 
 	private static final Map<Integer, Active> PLAYING = new ConcurrentHashMap<>();
+	/** Those the server tells again as the entity comes back into view, so dropped as it goes. */
+	private static final Set<Integer> RETOLD = ConcurrentHashMap.newKeySet();
 
 	private static final Map<ModelPart, Map<Identifier, KeyframeAnimation>> BAKED =
 		Collections.synchronizedMap(new WeakHashMap<>());
 
 	public static void play(int entityId, Identifier animation, boolean looping) {
+		RETOLD.remove(entityId);
 		PLAYING.put(entityId, new Active(animation, looping, System.currentTimeMillis()));
+	}
+
+	/** Picked up {@code elapsedMillis} in, from a server that tells it again whenever the entity comes into view. */
+	public static void play(int entityId, Identifier animation, boolean looping, long elapsedMillis) {
+		RETOLD.add(entityId);
+		PLAYING.put(entityId, new Active(animation, looping, System.currentTimeMillis() - elapsedMillis));
 	}
 
 	public static void stop(int entityId) {
 		PLAYING.remove(entityId);
+		RETOLD.remove(entityId);
+	}
+
+	/** The entity left this client's world: forgotten if the server will say it again. */
+	public static void forget(int entityId) {
+		if (RETOLD.remove(entityId)) PLAYING.remove(entityId);
 	}
 
 	public static Active playing(int entityId) {
@@ -43,6 +59,7 @@ public final class EntityAnimations {
 
 	public static void clearAll() {
 		PLAYING.clear();
+		RETOLD.clear();
 		BAKED.clear();
 	}
 

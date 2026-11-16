@@ -137,6 +137,15 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 			new justfatlard.pandorical.protocol.BlockShapesS2C(net.minecraft.resources.Identifier.parse("mymod:d"), false,
 				List.of(new justfatlard.pandorical.protocol.BlockShapesS2C.Entry(5L,
 					List.of(new justfatlard.pandorical.protocol.BlockShapesS2C.Box(0F, 0F, 0F, 1F, 0.5F, 1F)))))));
+		out.put("block_marks_v3", encode(justfatlard.pandorical.protocol.BlockMarksV3S2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.BlockMarksV3S2C(net.minecraft.resources.Identifier.parse("mymod:d"), 5L, false,
+				List.of(new justfatlard.pandorical.protocol.BlockMarksS2C.Entry(5L, "mymod:post", true)))));
+		out.put("block_shapes_v2", encode(justfatlard.pandorical.protocol.BlockShapesV2S2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.BlockShapesV2S2C(net.minecraft.resources.Identifier.parse("mymod:d"), 5L, false,
+				List.of(new justfatlard.pandorical.protocol.BlockShapesS2C.Entry(5L,
+					List.of(new justfatlard.pandorical.protocol.BlockShapesS2C.Box(0F, 0F, 0F, 1F, 0.5F, 1F)))))));
+		out.put("play_animation_v2", encode(justfatlard.pandorical.protocol.PlayAnimationV2S2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.PlayAnimationV2S2C(7, "mymod:wave", true, 1500L)));
 		out.put("block_materials", encode(justfatlard.pandorical.protocol.BlockMaterialsS2C.STREAM_CODEC,
 			new justfatlard.pandorical.protocol.BlockMaterialsS2C(net.minecraft.resources.Identifier.parse("mymod:d"), false,
 				List.of(new justfatlard.pandorical.protocol.BlockMaterialsS2C.Entry(5L,

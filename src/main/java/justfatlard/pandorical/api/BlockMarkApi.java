@@ -6,8 +6,8 @@ import net.minecraft.server.level.ServerLevel;
 /**
  * A word on a block position that every client can read, for what a block's state cannot carry.
  *
- * <p>Kept in memory per level, pushed to everyone in the level as marks change, and sent whole to
- * anyone who arrives or changes level. Not saved: to keep a mark across a restart, keep your own
+ * <p>Kept in memory per level and told to every player who has the block's chunk, as the chunk
+ * reaches them and as marks change. Not saved: to keep a mark across a restart, keep your own
  * record and mark again when the level loads.
  */
 public interface BlockMarkApi {
