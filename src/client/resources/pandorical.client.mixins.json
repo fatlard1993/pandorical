@@ -6,6 +6,11 @@
   "mixins": [],
   "client": [
     "BlockShapeMixin",
+    "BlockMaterialStepMixin",
+    "BlockMaterialFallMixin",
+    "BlockMaterialBreakingMixin",
+    "BlockMaterialDestroyMixin",
+    "PandoricalItemModelsMixin",
     "EntityKindAttributesMixin",
     "EntityTypeAccessor",
     "SynchedEntityDataBuilderAccessor",

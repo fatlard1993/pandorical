@@ -92,7 +92,7 @@ before anything else.
 `screens` · `content` · `camera` · `hud` · `structures` · `entity_overlays` ·
 `chest_overlays` · `keybinds` · `hud_elements` · `skins` · `render_policy` ·
 `animations` · `mount_policy` · `walkable_structures` · `dry_structures` ·
-`scaled_structures` · `block_shapes`
+`scaled_structures` · `block_shapes` · `block_materials`
 
 Pass the constant, `hasCapability(player, Capabilities.SCREENS)`, and a typo is a compile
 error. `hasCapability(player, "blockTints")` returns false forever, because `blockTints` is an
@@ -467,6 +467,41 @@ content.overrideVanillaItem("minecraft:rabbit_hide", new VanillaItemOverride(...
 `registerModAssets` is the usual call. Anything your mod draws (textures for entity
 overlays, chest overlays, custom blocks) must be registered here or the client has
 nothing to load.
+
+### Item models only Pandorical can draw
+
+Ship the plain item model at `assets/<yourmod>/items/<name>.json`, as usual, and the one that
+needs Pandorical at `assets/<yourmod>/pandorical/items/<name>.json`. A Pandorical client loads
+the second in place of the first; an older one, or one without Pandorical, never looks there and
+keeps the plain model, instead of failing to load a model type it has never heard of. This holds
+in singleplayer too, where your mod's own jar supplies the assets. New in 15.30.
+
+The model type Pandorical adds is `pandorical:cells`: an item drawn as a build its custom data
+holds, a cube cut `n` to a side, scaled into one block. `data` names the custom data key, and
+under it go `n` (1 to 16), an optional `height` (default `n`, for a build shorter than it is
+wide), `palette`, a list of block states, and `cells`, a byte array of `n * height * n` indices
+into the palette from 1, 0 for air, x fastest, then z, then y. Cells hidden behind solid
+neighbours are left out, and each stack's data is read once, not every frame. Fluids draw
+nothing, as in a block model. A stack without the data draws nothing, so give it a fallback:
+
+```json
+{
+  "model": {
+    "type": "minecraft:condition",
+    "property": "minecraft:has_component",
+    "component": "minecraft:custom_data",
+    "on_true": {
+      "type": "minecraft:special",
+      "base": "mymod:item/model_block",
+      "model": { "type": "pandorical:cells", "data": "build" }
+    },
+    "on_false": { "type": "minecraft:model", "model": "mymod:item/model" }
+  }
+}
+```
+
+`base` is the model the item's display transforms and particle come from: one whose parent is
+`minecraft:block/block` shows the build at the angle a block item takes.
 
 ### Entities
 
@@ -1127,10 +1162,10 @@ one.
 
 ## Traps in structures, tints and renderers
 
-`structures`, `blockShapes`, `playerInventory`, `blockTints` and built-in entity renderers work
-the same way, through `PandoricalApi`; read the javadoc on `StructureApi`, `BlockShapeApi`,
-`PlayerInventoryApi`, `BlockTintApi` and `PandoricalApi#registerEntityRenderer` before wiring
-them up. Each carries a trap that nothing reports:
+`structures`, `blockShapes`, `blockMaterials`, `playerInventory`, `blockTints` and built-in entity
+renderers work the same way, through `PandoricalApi`; read the javadoc on `StructureApi`,
+`BlockShapeApi`, `BlockMaterialApi`, `PlayerInventoryApi`, `BlockTintApi` and
+`PandoricalApi#registerEntityRenderer` before wiring them up. Each carries a trap that nothing reports:
 
 - **Structure ids are unique server-wide**, and a structure not despawned leaks its state.
 - **Structures and block shapes are kept in memory only.** A server that stops forgets both, and
@@ -1148,6 +1183,15 @@ them up. Each carries a trap that nothing reports:
   capability with a plain block, which is what their client takes it for. The client answers from
   one mixin on a block state's shape and collision, which costs a single flag check while no shape
   is set anywhere.
+- **A block material covers only what the client plays itself.** `blockMaterials().setMaterial(level,
+  pos, state)` makes a client with `block_materials` sound and crumble that position as `state`: its
+  own player's steps and hard landings, the hits and cracks while anyone mines it (the server's mining
+  events name only the position), and the break, the breaker's own included. A sound the server
+  plays is already a sound when it arrives, so steps and landings of everyone else, landing dust, and
+  the placer's sound are yours to play from the server. Kept in memory only, like a shape: set it as
+  the block loads and clear it when the block goes. The client holds a material until the server
+  clears it, which is what lets the breaker's own break, played before the server hears of it, still
+  find it; a material left behind sounds over whatever is built there next. New in 15.30.
 - **Anything drawn on a moving structure blends by the structure's own rule**
   (`StructureInterpolationHandler`, over `StructureManager.INTERPOLATION_TICKS`). A vanilla blend
   sits a different distance behind the server, and the gap is what a rider sees. Server-only

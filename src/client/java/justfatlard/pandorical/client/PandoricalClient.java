@@ -167,6 +167,7 @@ public class PandoricalClient implements ClientModInitializer {
 
         if (!skipped("hud")) HudRenderer.register();
         if (!skipped("structures")) StructureRenderer.register();
+        if (!skipped("itemmodels")) justfatlard.pandorical.client.item.PandoricalItemModels.register();
         if (!skipped("decals")) BannerDecalRenderer.register();
         if (!skipped("pictures")) ClientPictures.register();
         if (!skipped("entitymodels")) justfatlard.pandorical.client.entitymodel.ClientEntityModels.register();
@@ -317,6 +318,9 @@ public class PandoricalClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(
             justfatlard.pandorical.protocol.BlockShapesS2C.TYPE, (payload, context) ->
                 context.client().execute(() -> justfatlard.pandorical.client.renderer.ClientBlockShapes.apply(payload)));
+        ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.BlockMaterialsS2C.TYPE, (payload, context) ->
+                context.client().execute(() -> justfatlard.pandorical.client.renderer.ClientBlockMaterials.apply(payload)));
         ClientPlayNetworking.registerGlobalReceiver(
             BlockTintPositionsS2C.TYPE, (payload, context) ->
                 context.client().execute(() -> payload.entries().forEach(entry ->
@@ -572,6 +576,7 @@ public class PandoricalClient implements ClientModInitializer {
         ViewportReporter.clear();
         ClientBlockMarks.clear();
         justfatlard.pandorical.client.renderer.ClientBlockShapes.clear();
+        justfatlard.pandorical.client.renderer.ClientBlockMaterials.clear();
         // Server state, and no use on the next one: left behind, it showed through as another
         // server's buttons, decals and painted blocks.
         ClientInventoryButtons.clear();

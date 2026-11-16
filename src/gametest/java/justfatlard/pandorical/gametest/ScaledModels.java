@@ -5,6 +5,7 @@ import justfatlard.pandorical.api.Capabilities;
 import justfatlard.pandorical.api.PandoricalApi;
 import justfatlard.pandorical.api.RelPos;
 import justfatlard.pandorical.api.StructurePose;
+import justfatlard.pandorical.client.renderer.ClientBlockMaterials;
 import justfatlard.pandorical.client.structure.StructureManager;
 import justfatlard.pandorical.client.structure.StructureManager.ClientStructure;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -17,6 +18,8 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
 import java.util.HashSet;
@@ -29,7 +32,10 @@ import java.util.UUID;
  * takes them, each check paired with the way it could go wrong: the scale refused when it is no
  * scale at all and reset by a spawn; a shape refused with no boxes, never given to air, gone when
  * it was cleared while the player was in another world, and sent to no client that did not
- * declare it. A block mark taken off while the player is away is gone on their return too.
+ * declare it. A block mark taken off while the player is away is gone on their return too. A
+ * material is refused as air, heard at its position and nowhere else, kept through the block's
+ * own removal until the server clears it, gone when cleared while the player was away, and sent
+ * to no client that did not declare it.
  */
 public final class ScaledModels implements FabricClientGameTest {
 	private static final String ID = "pandorical-gametest:model";
@@ -50,6 +56,7 @@ public final class ScaledModels implements FabricClientGameTest {
 			scale(context, server, at.north(3));
 			shapes(context, server, connection, at);
 			unasked(context, server, connection, at.north(3), at.south(3));
+			materials(context, server, connection, at.east(3));
 		}
 	}
 
@@ -134,26 +141,81 @@ public final class ScaledModels implements FabricClientGameTest {
 			"a mark taken off while the player was away came back with them");
 	}
 
-	/** A client that did not declare the two capabilities is sent neither: the scale and the shape are left alone. */
+	private static void materials(ClientGameTestContext context, TestServerContext server, TestServerConnection connection, BlockPos at) {
+		boolean refused = server.computeOnServer(s -> {
+			try {
+				PandoricalApi.blockMaterials().setMaterial(s.overworld(), at, Blocks.AIR.defaultBlockState());
+				return false;
+			} catch (IllegalArgumentException expected) {
+				return true;
+			}
+		});
+		check(refused, "air was taken as a material");
+
+		BlockState planks = Blocks.OAK_PLANKS.defaultBlockState();
+		server.runOnServer(s -> {
+			s.overworld().setBlockAndUpdate(at, Blocks.GLASS.defaultBlockState());
+			s.overworld().setBlockAndUpdate(at.north(), Blocks.GLASS.defaultBlockState());
+			PandoricalApi.blockMaterials().setMaterial(s.overworld(), at, planks);
+		});
+		context.waitFor(client -> ClientBlockMaterials.at(at) == planks && client.level.getBlockState(at.north()).is(Blocks.GLASS));
+
+		// What a step, a hit and a break ask for the sound: the material's here, the block's own next door.
+		check(context.computeOnClient(client -> ClientBlockMaterials.soundType(client.level.getBlockState(at), at)) == SoundType.WOOD,
+			"glass given planks as its material does not sound like wood");
+		check(context.computeOnClient(client -> ClientBlockMaterials.soundType(client.level.getBlockState(at.north()), at.north())) == SoundType.GLASS,
+			"glass with no material set does not sound like glass");
+		check(context.computeOnClient(client -> ClientBlockMaterials.as(Blocks.AIR.defaultBlockState(), at)).isAir(),
+			"air took the material set where a block had been");
+
+		// The block goes first and the clear after, as when a player breaks it: the material waits for the clear.
+		server.runOnServer(s -> s.overworld().setBlockAndUpdate(at, Blocks.AIR.defaultBlockState()));
+		context.waitFor(client -> client.level.getBlockState(at).isAir());
+		check(context.computeOnClient(client -> ClientBlockMaterials.at(at)) == planks, "the material went with the block, before the server cleared it");
+		server.runOnServer(s -> s.overworld().setBlockAndUpdate(at, Blocks.GLASS.defaultBlockState()));
+
+		// Cleared while the player is in another world, it is gone when they come back; one still set comes back with them.
+		server.runOnServer(s -> PandoricalApi.blockMaterials().setMaterial(s.overworld(), at.north(), planks));
+		context.waitFor(client -> ClientBlockMaterials.at(at.north()) == planks);
+		BlockPos home = server.computeOnServer(s -> connection.getServerPlayer().blockPosition());
+		server.runCommand("execute in minecraft:the_nether run tp @a " + home.getX() + " 100 " + home.getZ());
+		context.waitFor(client -> client.level.dimension().equals(net.minecraft.world.level.Level.NETHER));
+		check(context.computeOnClient(client -> ClientBlockMaterials.at(at)) == null, "the overworld's material is heard in the nether");
+		server.runOnServer(s -> PandoricalApi.blockMaterials().clearMaterial(s.overworld(), at));
+		server.runCommand("execute in minecraft:overworld run tp @a " + home.getX() + " " + home.getY() + " " + home.getZ());
+		context.waitFor(client -> client.level.dimension().equals(net.minecraft.world.level.Level.OVERWORLD));
+		connection.waitForChunksRender();
+		context.waitTicks(10);
+		check(context.computeOnClient(client -> ClientBlockMaterials.at(at.north())) == planks, "a material still set did not come back with the player");
+		check(context.computeOnClient(client -> ClientBlockMaterials.at(at)) == null, "a material cleared while the player was away came back with them");
+		server.runOnServer(s -> PandoricalApi.blockMaterials().clearMaterial(s.overworld(), at.north()));
+		context.waitFor(client -> ClientBlockMaterials.at(at.north()) == null);
+	}
+
+	/** A client that did not declare the capabilities is sent none of them: the scale, the shape and the material are left alone. */
 	private static void unasked(ClientGameTestContext context, TestServerContext server, TestServerConnection connection, BlockPos model, BlockPos block) {
 		UUID player = server.computeOnServer(s -> connection.getServerPlayer().getUUID());
 		Set<String> without = new HashSet<>(Capabilities.CLIENT);
 		without.remove(Capabilities.SCALED_STRUCTURES);
 		without.remove(Capabilities.BLOCK_SHAPES);
+		without.remove(Capabilities.BLOCK_MATERIALS);
 		server.runOnServer(s -> PandoricalApi.registerPlayerCapabilities(player, without));
 		try {
 			server.runOnServer(s -> {
 				s.overworld().setBlockAndUpdate(block, Blocks.GLASS.defaultBlockState());
 				PandoricalApi.blockShapes().setShape(s.overworld(), block, List.of(new AABB(0, 0, 0, 1, 0.5, 1)));
 				PandoricalApi.structures().setScale(ID, 0.5F);
+				PandoricalApi.blockMaterials().setMaterial(s.overworld(), block, Blocks.OAK_PLANKS.defaultBlockState());
 			});
 			context.waitTicks(10);
 			check(context.computeOnClient(client -> model().scale) == QUARTER, "a client without scaled_structures was sent a scale");
 			check(context.computeOnClient(client -> top(client, block)) == 1.0, "a client without block_shapes was sent a shape");
+			check(context.computeOnClient(client -> ClientBlockMaterials.at(block)) == null, "a client without block_materials was sent a material");
 		} finally {
 			server.runOnServer(s -> PandoricalApi.registerPlayerCapabilities(player, new HashSet<>(Capabilities.CLIENT)));
 			server.runOnServer(s -> {
 				PandoricalApi.blockShapes().clearShape(s.overworld(), block);
+				PandoricalApi.blockMaterials().clearMaterial(s.overworld(), block);
 				PandoricalApi.structures().despawn(ID);
 			});
 		}

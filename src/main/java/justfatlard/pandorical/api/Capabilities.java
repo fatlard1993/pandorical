@@ -27,6 +27,8 @@ public final class Capabilities {
     public static final String SCALED_STRUCTURES = "scaled_structures";
     /** The client takes the shapes the server sets by position; see {@link BlockShapeApi}. */
     public static final String BLOCK_SHAPES = "block_shapes";
+    /** The client sounds and crumbles a position like the material the server sets; see {@link BlockMaterialApi}. */
+    public static final String BLOCK_MATERIALS = "block_materials";
 
     /**
      * What a server announces about itself, for its clients to read. These are not client
@@ -45,12 +47,12 @@ public final class Capabilities {
     /** What a Pandorical client of this version declares. */
     public static final List<String> CLIENT = List.of(SCREENS, CONTENT, HUD, CAMERA, STRUCTURES, ENTITY_OVERLAYS,
         CHEST_OVERLAYS, KEYBINDS, HUD_ELEMENTS, SKINS, RENDER_POLICY, ANIMATIONS, MOUNT_POLICY, WALKABLE_STRUCTURES,
-        DRY_STRUCTURES, SCALED_STRUCTURES, BLOCK_SHAPES);
+        DRY_STRUCTURES, SCALED_STRUCTURES, BLOCK_SHAPES, BLOCK_MATERIALS);
 
     /** What a Pandorical server of this version announces. */
     public static final List<String> SERVER = List.of(SCREENS, CONTENT, CAMERA, HUD, STRUCTURES, ENTITY_OVERLAYS,
         CHEST_OVERLAYS, KEYBINDS, HUD_ELEMENTS, SKINS, RENDER_POLICY, ANIMATIONS, MOUNT_POLICY, Server.SETTINGS,
-        Server.BLOCK_MARKS, WALKABLE_STRUCTURES, DRY_STRUCTURES, SCALED_STRUCTURES, BLOCK_SHAPES);
+        Server.BLOCK_MARKS, WALKABLE_STRUCTURES, DRY_STRUCTURES, SCALED_STRUCTURES, BLOCK_SHAPES, BLOCK_MATERIALS);
 
     /** True for a string only a server announces, which no client can ever declare. */
     static boolean isServerOnly(String capability) {

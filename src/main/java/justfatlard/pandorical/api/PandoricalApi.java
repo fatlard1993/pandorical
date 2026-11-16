@@ -260,6 +260,9 @@ public final class PandoricalApi {
     /** Shapes set position by position; see {@link BlockShapeApi}. */
     public static BlockShapeApi blockShapes() { return justfatlard.pandorical.push.BlockShapes.INSTANCE; }
 
+    /** What a block sounds and crumbles like, set position by position; see {@link BlockMaterialApi}. New in 15.30. */
+    public static BlockMaterialApi blockMaterials() { return justfatlard.pandorical.push.BlockMaterials.INSTANCE; }
+
     public static BannerDecalApi bannerDecals() { return BANNER_DECALS; }
 
     public static ChestOverlayApi chestOverlays() { return CHEST_OVERLAYS; }

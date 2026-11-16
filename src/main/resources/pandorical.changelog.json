@@ -4,6 +4,10 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.30.0": [
+      "An item can be drawn as the build it holds, such as a miniature showing its own build rather than a picture shared by all of them.",
+      "A block can sound and crumble like what it is made of where it stands, so a miniature of stone clicks like stone underfoot and breaks into stone crumbs, for the player breaking it too."
+    ],
     "15.29.0": [
       "A mod's page in the mod menu can carry a button from another mod, such as Play demo where PvP Dimensions has a demo of it."
     ],
