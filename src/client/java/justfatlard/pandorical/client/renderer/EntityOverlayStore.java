@@ -9,7 +9,7 @@ import net.minecraft.resources.Identifier;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Entries left by despawned entities are harmless: network ids are not reused in a server run. */
+/** Dropped as an entity leaves the client's world: the server sends it again when tracking starts again. */
 @Environment(EnvType.CLIENT)
 public final class EntityOverlayStore {
 	private EntityOverlayStore() {}
@@ -31,6 +31,10 @@ public final class EntityOverlayStore {
 
 	public static Identifier get(int entityId) {
 		return overlays.get(entityId);
+	}
+
+	public static void forget(int entityId) {
+		overlays.remove(entityId);
 	}
 
 	public static void clear() {

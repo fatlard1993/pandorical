@@ -487,6 +487,8 @@ public class PandoricalClient implements ClientModInitializer {
             context.client().execute(() ->
                 EntityOverlayStore.handle(payload));
         });
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents.ENTITY_UNLOAD.register(
+            (entity, level) -> EntityOverlayStore.forget(entity.getId()));
 
         ClientPlayNetworking.registerGlobalReceiver(
             ChestOverlayS2C.TYPE, (payload, context) -> {
