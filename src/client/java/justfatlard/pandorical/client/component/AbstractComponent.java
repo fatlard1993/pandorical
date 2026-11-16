@@ -37,6 +37,12 @@ public abstract class AbstractComponent implements PandoricalComponent {
     private GeometrySnapshot targetGeom;
     private int geomTicksSinceUpdate = INTERPOLATION_TICKS;
 
+    /** From {@link ComponentType#PROP_TURN_RATE}, degrees per tick; 0 blends rotation like the rest. */
+    private float turnRate;
+    /** Where the rotation was drawn when it was last set, and the ticks since, for a turn at {@link #turnRate}. */
+    private float turnFrom;
+    private int turnTicks;
+
     public record GeometrySnapshot(float x, float y, float width, float height, float scale, float rotation) {}
 
     private final Map<String, ColorAnim> colorAnims = new HashMap<>();
@@ -63,6 +69,7 @@ public abstract class AbstractComponent implements PandoricalComponent {
         GeometrySnapshot initial = currentGeometrySnapshot();
         this.previousGeom = initial;
         this.targetGeom = initial;
+        this.turnFrom = rotation;
     }
 
     @Override
@@ -83,10 +90,20 @@ public abstract class AbstractComponent implements PandoricalComponent {
         this.previousGeom = before;
         this.targetGeom = currentGeometrySnapshot();
         this.geomTicksSinceUpdate = 0;
+        this.turnFrom = before.rotation();
+        this.turnTicks = 0;
         if (x != wasX || y != wasY) {
             moved();
             for (PandoricalComponent child : children) child.shiftOrigin(x - wasX, y - wasY);
         }
+    }
+
+    /** A turn under way goes on from where it was drawn, rather than starting again from where it was built. */
+    @Override
+    public void carryOverFrom(PandoricalComponent previous) {
+        if (turnRate <= 0f || !(previous instanceof AbstractComponent old)) return;
+        turnFrom = old.interpolatedGeometry(0f).rotation();
+        turnTicks = 0;
     }
 
     @Override
@@ -115,6 +132,7 @@ public abstract class AbstractComponent implements PandoricalComponent {
     private void parseGeometryStyle() {
         scale = parseFloat(ComponentType.PROP_SCALE, 1f);
         rotation = parseFloat(ComponentType.PROP_ROTATION, 0f);
+        turnRate = Math.max(0f, parseFloat(ComponentType.PROP_TURN_RATE, 0f));
         visible = parseBool(ComponentType.PROP_VISIBLE, true);
     }
 
@@ -128,6 +146,7 @@ public abstract class AbstractComponent implements PandoricalComponent {
     @Override
     public void tick() {
         if (geomTicksSinceUpdate < interpolationTicks) geomTicksSinceUpdate++;
+        if (turnTicks < Integer.MAX_VALUE) turnTicks++;
         for (ColorAnim anim : colorAnims.values()) {
             if (anim.ticksSinceUpdate < interpolationTicks) anim.ticksSinceUpdate++;
         }
@@ -148,15 +167,31 @@ public abstract class AbstractComponent implements PandoricalComponent {
 
     public GeometrySnapshot interpolatedGeometry(float partialTick) {
         float t = geometryBlend(partialTick);
-        if (t >= 1f) return targetGeom;
-        if (t <= 0f) return previousGeom;
-        float ix = lerp(t, previousGeom.x(), targetGeom.x());
-        float iy = lerp(t, previousGeom.y(), targetGeom.y());
-        float iw = lerp(t, previousGeom.width(), targetGeom.width());
-        float ih = lerp(t, previousGeom.height(), targetGeom.height());
-        float is = lerp(t, previousGeom.scale(), targetGeom.scale());
-        float ir = lerpAngle(t, previousGeom.rotation(), targetGeom.rotation());
-        return new GeometrySnapshot(ix, iy, iw, ih, is, ir);
+        GeometrySnapshot blended;
+        if (t >= 1f) {
+            blended = targetGeom;
+        } else if (t <= 0f) {
+            blended = previousGeom;
+        } else {
+            float ix = lerp(t, previousGeom.x(), targetGeom.x());
+            float iy = lerp(t, previousGeom.y(), targetGeom.y());
+            float iw = lerp(t, previousGeom.width(), targetGeom.width());
+            float ih = lerp(t, previousGeom.height(), targetGeom.height());
+            float is = lerp(t, previousGeom.scale(), targetGeom.scale());
+            float ir = lerpAngle(t, previousGeom.rotation(), targetGeom.rotation());
+            blended = new GeometrySnapshot(ix, iy, iw, ih, is, ir);
+        }
+        if (turnRate <= 0f) return blended;
+        return new GeometrySnapshot(blended.x(), blended.y(), blended.width(), blended.height(), blended.scale(),
+            turnedRotation(partialTick));
+    }
+
+    /** From {@link #turnFrom} toward the set rotation at {@link #turnRate}, stopping on it. */
+    private float turnedRotation(float partialTick) {
+        float left = rotation - turnFrom;
+        float travelled = turnRate * (turnTicks + partialTick);
+        if (travelled >= Math.abs(left)) return rotation;
+        return turnFrom + Math.copySign(travelled, left);
     }
 
     /**

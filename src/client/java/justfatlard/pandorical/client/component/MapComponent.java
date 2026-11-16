@@ -1,5 +1,6 @@
 package justfatlard.pandorical.client.component;
 
+import justfatlard.pandorical.api.ComponentType;
 import justfatlard.pandorical.protocol.ComponentDef;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -14,6 +15,7 @@ import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import org.joml.Matrix3x2fStack;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -41,9 +43,12 @@ public class MapComponent extends AbstractComponent {
     private byte selfDecY = 0;
     private byte compassDecX = 0;
     private byte compassDecY = 0;
-    private record Dot(int decX, int decZ, int color, boolean person) {}
+    /** {@code fromX}, {@code fromZ}: where it glides from, its own place when it does not glide. */
+    private record Dot(int decX, int decZ, int color, boolean person, String key, float fromX, float fromZ) {}
 
     private List<Dot> dots = List.of();
+    /** Client ticks since {@link #dots} last changed, for the glide from each dot's {@code from}. */
+    private int dotTicks;
     private float zoom = 1.0f;
     private boolean showCoords = true;
     private boolean showHostile = true;
@@ -55,12 +60,51 @@ public class MapComponent extends AbstractComponent {
     public void init(ComponentDef def, ComponentContext context) {
         super.init(def, context);
         parseProps();
+        dots = parseDots(Map.of());
     }
 
     @Override
     public void updateProps(Map<String, String> changedProps) {
+        boolean dotsChanged = changedProps.containsKey(ComponentType.PROP_MAP_DOTS)
+            || changedProps.containsKey(ComponentType.PROP_MAP_DOT_KEYS);
+        List<Dot> was = dots;
+        float blend = dotBlend(0f);
         super.updateProps(changedProps);
         parseProps();
+        if (!dotsChanged) return;
+        Map<String, float[]> drawn = new HashMap<>();
+        for (Dot dot : was) {
+            if (!dot.key().isEmpty()) drawn.put(dot.key(), new float[] {drawnX(dot, blend), drawnZ(dot, blend)});
+        }
+        dots = parseDots(drawn);
+        dotTicks = 0;
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        if (dotTicks < interpolationTicks) dotTicks++;
+    }
+
+    private float dotBlend(float partialTick) {
+        return Math.min(1f, (dotTicks + partialTick) / interpolationTicks);
+    }
+
+    private static float drawnX(Dot dot, float blend) {
+        return dot.fromX() + (dot.decX() - dot.fromX()) * blend;
+    }
+
+    private static float drawnZ(Dot dot, float blend) {
+        return dot.fromZ() + (dot.decZ() - dot.fromZ()) * blend;
+    }
+
+    /** Where the dot with this key is drawn, in map decoration units, or null for none. */
+    public float[] drawnDot(String key, float partialTick) {
+        float blend = dotBlend(partialTick);
+        for (Dot dot : dots) {
+            if (dot.key().equals(key)) return new float[] {drawnX(dot, blend), drawnZ(dot, blend)};
+        }
+        return null;
     }
 
     private void parseProps() {
@@ -72,7 +116,6 @@ public class MapComponent extends AbstractComponent {
         selfDecY = parseByte("self_dec_y");
         compassDecX = parseByte("compass_dec_x");
         compassDecY = parseByte("compass_dec_y");
-        dots = parseDots(props.getOrDefault("mobs", ""));
         needleTexture = Identifier.tryParse(props.getOrDefault("needle", ""));
         compassOffMap = parseBool("compass_off_map", false);
         zoom = parseFloat("zoom", 1.0f);
@@ -81,16 +124,27 @@ public class MapComponent extends AbstractComponent {
         showPassive = parseBool("show_passive", true);
     }
 
-    /** {@code decX,decZ,colorARGB,entityTypeId} entries, semicolon-separated; the type id may itself hold a colon. */
-    private static List<Dot> parseDots(String raw) {
+    /**
+     * {@code decX,decZ,colorARGB,entityTypeId} entries, semicolon-separated; the type id may itself
+     * hold a colon. A keyed dot drawn somewhere already glides from there.
+     */
+    private List<Dot> parseDots(Map<String, float[]> drawn) {
+        String raw = props.getOrDefault(ComponentType.PROP_MAP_DOTS, "");
         if (raw.isEmpty()) return List.of();
-        List<Dot> out = new ArrayList<>();
-        for (String entry : raw.split(";")) {
-            String[] parts = entry.split(",", 4);
+        String[] keys = props.getOrDefault(ComponentType.PROP_MAP_DOT_KEYS, "").split(",", -1);
+        String[] entries = raw.split(";");
+        List<Dot> out = new ArrayList<>(entries.length);
+        for (int i = 0; i < entries.length; i++) {
+            String[] parts = entries[i].split(",", 4);
             if (parts.length < 3) continue;
             try {
-                out.add(new Dot(Integer.parseInt(parts[0]), Integer.parseInt(parts[1]), Integer.parseInt(parts[2]),
-                    parts.length > 3 && parts[3].equals("minecraft:player")));
+                int decX = Integer.parseInt(parts[0]);
+                int decZ = Integer.parseInt(parts[1]);
+                String key = i < keys.length ? keys[i] : "";
+                float[] from = key.isEmpty() ? null : drawn.get(key);
+                out.add(new Dot(decX, decZ, Integer.parseInt(parts[2]),
+                    parts.length > 3 && parts[3].equals("minecraft:player"), key,
+                    from == null ? decX : from[0], from == null ? decZ : from[1]));
             } catch (NumberFormatException ignored) {
             }
         }
@@ -190,14 +244,17 @@ public class MapComponent extends AbstractComponent {
         graphics.map(renderState);
         pose.popMatrix();
 
+        float blend = dotBlend(delta);
         for (Dot dot : dots) {
             // Filtered by the server's colour. A person's is their locator bar colour, any colour.
             if (!dot.person() && !showHostile && dot.color() == 0xFFFF3333) continue;
             if (!dot.person() && !showPassive && (dot.color() == 0xFF33FF33 || dot.color() == 0xFFFFAA00)) continue;
 
-            if (Math.abs(dot.decX() - clampedSelfDecX) <= 1 && Math.abs(dot.decZ() - clampedSelfDecY) <= 1) continue;
-            int sx = Math.round(originX + (dot.decX() / 2.0f + 64f) * zoomScale);
-            int sy = Math.round(originY + (dot.decZ() / 2.0f + 64f) * zoomScale);
+            float decX = drawnX(dot, blend);
+            float decZ = drawnZ(dot, blend);
+            if (Math.abs(decX - clampedSelfDecX) <= 1 && Math.abs(decZ - clampedSelfDecY) <= 1) continue;
+            int sx = Math.round(originX + (decX / 2.0f + 64f) * zoomScale);
+            int sy = Math.round(originY + (decZ / 2.0f + 64f) * zoomScale);
             if (sx < mapX || sx >= mapX + mapSize || sy < mapY || sy >= mapY + mapSize) continue;
             if (dot.person()) {
                 diamond(graphics, sx, sy, dot.color());

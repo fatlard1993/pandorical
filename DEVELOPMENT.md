@@ -92,7 +92,7 @@ before anything else.
 `screens` · `content` · `camera` · `hud` · `structures` · `entity_overlays` ·
 `chest_overlays` · `keybinds` · `hud_elements` · `skins` · `render_policy` ·
 `animations` · `mount_policy` · `walkable_structures` · `dry_structures` ·
-`scaled_structures` · `block_shapes` · `block_materials` · `structure_cells`
+`scaled_structures` · `block_shapes` · `block_materials` · `structure_cells` · `declared_motion`
 
 Pass the constant, `hasCapability(player, Capabilities.SCREENS)`, and a typo is a compile
 error. `hasCapability(player, "blockTints")` returns false forever, because `blockTints` is an
@@ -336,6 +336,38 @@ replayed over them, so a swapped-in control stays swapped in. What a component k
 no prop holds - the text typed into a field, strokes painted ahead of the server - is carried
 over to the rebuilt component.
 
+### Declaring motion
+
+Something that moves at a known pace is sent once, where it is heading and how fast, and the
+client moves it; an update every tick is what this replaces. Only a client with
+`Capabilities.DECLARED_MOTION` does this, so keep sending steps to the rest.
+
+**A rotation turning at a rate.** With `turn_rate` (`PROP_TURN_RATE`, degrees per tick) set, a new
+`rotation` is turned toward from wherever the component is drawn, at that rate, and held there.
+It goes the way the numbers go, not the short way round: 350 to 10 is 340 degrees back, 370 is 20
+forward. Send the next target when the motion changes, such as a cylinder jamming.
+
+```java
+boolean declared = PandoricalApi.hasCapability(player, Capabilities.DECLARED_MOTION);
+screens.update(player, screenId, List.of(new ComponentUpdateBuilder("cylinder")
+    .rotation(declared ? degreesAtFullTurn : degreesNow)
+    .prop(ComponentType.PROP_TURN_RATE, declared ? degreesPerTick : 0f).build()));
+```
+
+**Map dots that glide.** `mob_keys` (`PROP_MAP_DOT_KEYS`) gives each entry of a map's `mobs`
+(`PROP_MAP_DOTS`) a key, comma-separated in the same order. A dot whose key was there last time
+glides from where it is drawn to its new place over `interp_ticks`, so dots sent every ten ticks
+with `interp_ticks` 10 move smoothly. An empty key, or a new one, is drawn where it lands.
+
+```java
+hud.update(player, OVERLAY, List.of(new ComponentUpdateBuilder("map")
+    .prop(ComponentType.PROP_MAP_DOTS, "12,-4,-52429,minecraft:zombie;30,8,-13369549,minecraft:cow")
+    .prop(ComponentType.PROP_MAP_DOT_KEYS, zombie.getId() + "," + cow.getId())
+    .prop(ComponentType.PROP_INTERP_TICKS, 10).build()));
+```
+
+An orbit is `particle_burst`, already declared: count, radius and speed, and the client turns it.
+
 ### Painting by hand
 
 `pixel_canvas` is a grid of palette-coloured cells the player paints with the mouse: drag
@@ -566,6 +598,34 @@ PandoricalApi.entityOverlays().clear(entity);
 Broadcast to every current and future tracker of the entity, so there is no player
 argument. State is in-memory only and dropped when the entity unloads: re-call `set`
 when your entity loads, from a tick hook reading your own persisted flag.
+
+## Display spins
+
+A display entity can turn by itself on the client: say once how fast, instead of sending a new
+transformation every tick. It is drawn as its own transformation and then turned about a pivot
+round an axis, both in the display's frame after that transformation, where a block display's
+block spans 0 to 1 and an item display's item is centred on 0. The transformation can still glide
+between poses as usual and the turn rides on it, so a wheel goes on turning on a car that drives,
+and only the car's poses are sent.
+
+```java
+DisplaySpinApi spins = PandoricalApi.displaySpins();
+
+// A quarter of a turn every tick, round its own middle, for 24 ticks: six turns, ending as it began.
+spins.spin(display, new Vector3f(0.5f), new Vector3f(1, 0, 0), 90f, 24);
+spins.spin(display, pivot, axis, degreesPerTick, 0);  // until stopped
+spins.stop(display);
+```
+
+After its ticks it holds the angle reached, so a whole number of turns ends looking as it started.
+It reaches the players tracking the display, and anyone who comes into view later sees it as far
+round as it has got. In memory only, dropped when the display unloads.
+
+A client that cannot take it, `spins.canSpin(player)` false, draws the transformation alone. If
+those players need to see it turn, key the transformation as before. Vanilla's own glide is no
+substitute: it takes the short way round, so one glide can never pass half a turn, and it moves the
+translation in a straight line, so anything turning about a point off the display's origin cuts the
+corner between poses.
 
 ## Entity models
 

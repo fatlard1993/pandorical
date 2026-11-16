@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.34.0": [
+      "Dials and gauges that turn at a steady pace, mob dots on a map, and spinning parts of things in the world move smoothly on your screen from a single word from the server, rather than being sent a step at a time, so they stay smooth on a busy server."
+    ],
     "15.33.0": [
       "Block marks, block shapes and creature animations are sent only for what is near you, as you come near it, so arriving in a big world is lighter, and an animation already playing when you come into view carries on where it is instead of starting over."
     ],

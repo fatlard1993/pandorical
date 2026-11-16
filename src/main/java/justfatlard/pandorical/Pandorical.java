@@ -287,7 +287,10 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(CameraHintS2C.TYPE, CameraHintS2C.STREAM_CODEC);
         // Otherwise the playing table only grows, and all of it is re-sent to every joiner.
         ServerEntityEvents.ENTITY_UNLOAD.register(
-            (entity, level) -> PlayingAnimations.forget(entity));
+            (entity, level) -> {
+                PlayingAnimations.forget(entity);
+                justfatlard.pandorical.push.DisplaySpins.forget(entity);
+            });
 
         PayloadTypeRegistry.clientboundPlay().register(
             MountPolicyS2C.TYPE,
@@ -304,6 +307,9 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(
             justfatlard.pandorical.protocol.PlayAnimationV2S2C.TYPE,
             justfatlard.pandorical.protocol.PlayAnimationV2S2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.DisplaySpinS2C.TYPE,
+            justfatlard.pandorical.protocol.DisplaySpinS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
             RenderPolicyS2C.TYPE,
             RenderPolicyS2C.STREAM_CODEC);
@@ -574,6 +580,7 @@ public class Pandorical implements ModInitializer {
                 SkinOverrides.sendAllTo(player);
                 DeclaredRenderPolicy.sendTo(player);
                 PlayingAnimations.sendAllTo(player);
+                justfatlard.pandorical.push.DisplaySpins.sendAllTo(player);
                 DeclaredMountPolicy.sendTo(player);
                 ImmersivePortals.sendTo(player);
 
@@ -840,6 +847,7 @@ public class Pandorical implements ModInitializer {
                 PandoricalApi.structuresImpl().handleStartTracking(entity, player);
                 PandoricalApi.entityOverlaysImpl().handleStartTracking(entity, player);
                 PlayingAnimations.handleStartTracking(entity, player);
+                justfatlard.pandorical.push.DisplaySpins.handleStartTracking(entity, player);
             });
         EntityTrackingEvents.STOP_TRACKING.register(
             (entity, player) -> PandoricalApi.structuresImpl().handleStopTracking(entity, player));

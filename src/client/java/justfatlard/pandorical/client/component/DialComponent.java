@@ -55,6 +55,7 @@ public class DialComponent extends SpriteComponent {
 
     @Override
     public void carryOverFrom(PandoricalComponent previous) {
+        super.carryOverFrom(previous);
         angle = Math.clamp(((DialComponent) previous).angle, -sweep / 2F, sweep / 2F);
     }
 

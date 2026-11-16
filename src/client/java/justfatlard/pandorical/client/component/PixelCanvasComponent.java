@@ -302,6 +302,7 @@ public class PixelCanvasComponent extends AbstractComponent {
 
     @Override
     public void carryOverFrom(PandoricalComponent previous) {
+        super.carryOverFrom(previous);
         PixelCanvasComponent old = (PixelCanvasComponent) previous;
         confirmed = old.confirmed;
         confirmedSupply = old.confirmedSupply;

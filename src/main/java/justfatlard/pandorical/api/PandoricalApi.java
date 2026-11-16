@@ -248,6 +248,8 @@ public final class PandoricalApi {
 
     public static AnimationApi animations() { return ANIMATIONS; }
 
+    public static DisplaySpinApi displaySpins() { return justfatlard.pandorical.push.DisplaySpins.INSTANCE; }
+
     public static EntityOverlayApi entityOverlays() { return ENTITY_OVERLAYS; }
 
     /** Entities drawn with a model a mod ships, for a client that can. New in 15.16. */

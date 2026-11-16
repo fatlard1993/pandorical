@@ -35,6 +35,7 @@ public class ScrollPanelComponent extends AbstractComponent {
 
     @Override
     public void carryOverFrom(PandoricalComponent previous) {
+        super.carryOverFrom(previous);
         ScrollPanelComponent old = (ScrollPanelComponent) previous;
         scrollOffset = Math.clamp(old.scrollOffset, 0, Math.max(0, totalItems - visibleItems));
     }

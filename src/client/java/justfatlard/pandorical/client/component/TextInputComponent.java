@@ -116,6 +116,7 @@ public class TextInputComponent extends AbstractComponent {
 
     @Override
     public void carryOverFrom(PandoricalComponent previous) {
+        super.carryOverFrom(previous);
         TextInputComponent old = (TextInputComponent) previous;
         if (editBox == null || old.editBox == null) return;
         editBox.setValue(old.editBox.getValue());

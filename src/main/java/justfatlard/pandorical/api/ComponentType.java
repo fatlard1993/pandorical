@@ -154,6 +154,15 @@ public final class ComponentType {
     public static final String PROP_SCALE = "scale";
     /** Degrees about the centre. Used by: sprite, text */
     public static final String PROP_ROTATION = "rotation";
+    /**
+     * Degrees per tick. Set, a changed {@link #PROP_ROTATION} is not blended in over
+     * {@link #PROP_INTERP_TICKS} but turned toward at this rate from wherever it is drawn, and held
+     * there: send the rotation it is heading for once, not a step every tick. It turns the way the
+     * numbers go, not the short way round, so 350 to 10 is 340 degrees back and 370 is 20 forward.
+     * Only a client with {@link Capabilities#DECLARED_MOTION} turns; an older one blends to the
+     * target as usual. Used by: sprite, text, dial
+     */
+    public static final String PROP_TURN_RATE = "turn_rate";
 
     // Panel props
     /** Border style: "beveled" (default) or "flat". */
@@ -270,6 +279,19 @@ public final class ComponentType {
     public static final String PROP_MAP_SHOW_HOSTILE = "show_hostile";
     /** "true"/"false": passive and other mob dots, the green and orange ones. Default true. */
     public static final String PROP_MAP_SHOW_PASSIVE = "show_passive";
+    /**
+     * The mob dots: {@code decX,decZ,colourARGB,entityTypeId} entries separated by semicolons, in
+     * map decoration units; a type of {@code minecraft:player} is drawn as a diamond.
+     */
+    public static final String PROP_MAP_DOTS = "mobs";
+    /**
+     * A key for each of {@link #PROP_MAP_DOTS}, in the same order, separated by commas: an entity's
+     * id, say. A dot whose key was in the last update glides from where it is drawn to its new place
+     * over {@link #PROP_INTERP_TICKS}, so dots sent every few ticks, with interp_ticks set to match,
+     * move smoothly. A dot with an empty key, or a new one, is drawn where it is. Only a client with
+     * {@link Capabilities#DECLARED_MOTION} glides; an older one draws each update where it lands.
+     */
+    public static final String PROP_MAP_DOT_KEYS = "mob_keys";
 
     // ParticleBurst props
     /** Number of particles in the burst. Default 8. */

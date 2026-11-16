@@ -31,6 +31,12 @@ public final class Capabilities {
     public static final String BLOCK_MATERIALS = "block_materials";
     /** The client draws a structure block carrying a drawing as that build; see {@link StructureDrawings}. */
     public static final String STRUCTURE_CELLS = "structure_cells";
+    /**
+     * The client moves what a component declares rather than what it is last told: map dots glide
+     * by {@link ComponentType#PROP_MAP_DOT_KEYS}, and a rotation with {@link ComponentType#PROP_TURN_RATE}
+     * turns at that rate.
+     */
+    public static final String DECLARED_MOTION = "declared_motion";
 
     /**
      * What a server announces about itself, for its clients to read. These are not client
@@ -49,13 +55,13 @@ public final class Capabilities {
     /** What a Pandorical client of this version declares. */
     public static final List<String> CLIENT = List.of(SCREENS, CONTENT, HUD, CAMERA, STRUCTURES, ENTITY_OVERLAYS,
         CHEST_OVERLAYS, KEYBINDS, HUD_ELEMENTS, SKINS, RENDER_POLICY, ANIMATIONS, MOUNT_POLICY, WALKABLE_STRUCTURES,
-        DRY_STRUCTURES, SCALED_STRUCTURES, BLOCK_SHAPES, BLOCK_MATERIALS, STRUCTURE_CELLS);
+        DRY_STRUCTURES, SCALED_STRUCTURES, BLOCK_SHAPES, BLOCK_MATERIALS, STRUCTURE_CELLS, DECLARED_MOTION);
 
     /** What a Pandorical server of this version announces. */
     public static final List<String> SERVER = List.of(SCREENS, CONTENT, CAMERA, HUD, STRUCTURES, ENTITY_OVERLAYS,
         CHEST_OVERLAYS, KEYBINDS, HUD_ELEMENTS, SKINS, RENDER_POLICY, ANIMATIONS, MOUNT_POLICY, Server.SETTINGS,
         Server.BLOCK_MARKS, WALKABLE_STRUCTURES, DRY_STRUCTURES, SCALED_STRUCTURES, BLOCK_SHAPES, BLOCK_MATERIALS,
-        STRUCTURE_CELLS);
+        STRUCTURE_CELLS, DECLARED_MOTION);
 
     /** True for a string only a server announces, which no client can ever declare. */
     static boolean isServerOnly(String capability) {
