@@ -93,6 +93,31 @@ public final class ToldWhenInView implements FabricClientGameTest {
 				check(!context.computeOnClient(client -> ClientBlockMarks.has(far, MARK)), "a mark taken off while the player was away came back");
 				check(context.computeOnClient(client -> ClientBlockShapes.at(far)) == null, "a shape cleared while the player was away came back");
 				check(context.computeOnClient(client -> EntityAnimations.playing(standId)) == null, "an animation stopped while the player was away came back");
+
+				// Died there and respawned far off, which forgets no chunk: still nothing stale on return.
+				server.runOnServer(s -> {
+					PandoricalApi.blockMarks().mark(s.overworld(), far, MARK);
+					PandoricalApi.blockShapes().setShape(s.overworld(), far, List.of(new AABB(0, 0, 0, 1, 0.5, 1)));
+				});
+				context.waitFor(client -> ClientBlockMarks.has(far, MARK) && ClientBlockShapes.at(far) != null, ARRIVAL);
+				server.runCommand("gamerule immediate_respawn true");
+				server.runCommand("gamemode survival @a");
+				server.runCommand("kill @a");
+				context.waitFor(client -> client.player != null && client.player.isAlive()
+					&& client.player.blockPosition().distManhattan(far) > 1024, ARRIVAL);
+				server.waitFor(s -> s.getPlayerList().getPlayers().stream()
+					.allMatch(p -> p.isAlive() && p.blockPosition().distManhattan(far) > 1024));
+				server.runCommand("gamemode spectator @a");
+				server.runOnServer(s -> {
+					PandoricalApi.blockMarks().unmark(s.overworld(), far, MARK);
+					PandoricalApi.blockShapes().clearShape(s.overworld(), far);
+				});
+				tp(server, far);
+				context.waitFor(client -> client.level.getEntity(standId) != null, ARRIVAL);
+				connection.waitForChunksRender();
+				context.waitTicks(10);
+				check(!context.computeOnClient(client -> ClientBlockMarks.has(far, MARK)), "a mark taken off after the player died there came back");
+				check(context.computeOnClient(client -> ClientBlockShapes.at(far)) == null, "a shape cleared after the player died there came back");
 			} finally {
 				server.runOnServer(s -> {
 					PandoricalApi.blockMarks().unmark(s.overworld(), far, MARK);

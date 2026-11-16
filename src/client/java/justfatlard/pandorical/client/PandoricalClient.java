@@ -316,14 +316,17 @@ public class PandoricalClient implements ClientModInitializer {
             justfatlard.pandorical.protocol.BlockMarksV2S2C.TYPE, (payload, context) ->
                 context.client().execute(() -> ClientBlockMarks.apply(payload.dimension(), payload.replace(), payload.entries())));
         ClientPlayNetworking.registerGlobalReceiver(
+            // Handled as it comes rather than deferred, so it stays in order with the chunk packets
+            // around it: a forget handled first would leave the chunk's marks held after it.
             justfatlard.pandorical.protocol.BlockMarksV3S2C.TYPE, (payload, context) ->
-                context.client().execute(() -> ClientBlockMarks.apply(payload)));
+                ClientBlockMarks.apply(payload));
         ClientPlayNetworking.registerGlobalReceiver(
             justfatlard.pandorical.protocol.BlockShapesS2C.TYPE, (payload, context) ->
                 context.client().execute(() -> justfatlard.pandorical.client.renderer.ClientBlockShapes.apply(payload)));
         ClientPlayNetworking.registerGlobalReceiver(
+            // In order with the chunk packets, as block_marks_v3.
             justfatlard.pandorical.protocol.BlockShapesV2S2C.TYPE, (payload, context) ->
-                context.client().execute(() -> justfatlard.pandorical.client.renderer.ClientBlockShapes.apply(payload)));
+                justfatlard.pandorical.client.renderer.ClientBlockShapes.apply(payload));
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> {
             ClientBlockMarks.forgetWorlds();
             justfatlard.pandorical.client.renderer.ClientBlockShapes.forgetWorlds();
@@ -450,18 +453,18 @@ public class PandoricalClient implements ClientModInitializer {
             });
 
         ClientPlayNetworking.registerGlobalReceiver(
+            // Handled as it comes, in order with the entity's own packets: deferred past its
+            // removal, it would be held after the entity is forgotten and play on its return.
             justfatlard.pandorical.protocol.PlayAnimationV2S2C.TYPE, (payload, context) -> {
-                context.client().execute(() -> {
-                    if (payload.animation().isEmpty()) {
-                        EntityAnimations.stop(payload.entityId());
-                    } else {
-                        EntityAnimations.play(
-                            payload.entityId(),
-                            Identifier.parse(payload.animation()),
-                            payload.looping(),
-                            payload.elapsedMillis());
-                    }
-                });
+                if (payload.animation().isEmpty()) {
+                    EntityAnimations.stop(payload.entityId());
+                } else {
+                    EntityAnimations.play(
+                        payload.entityId(),
+                        Identifier.parse(payload.animation()),
+                        payload.looping(),
+                        payload.elapsedMillis());
+                }
             });
 
         ClientPlayNetworking.registerGlobalReceiver(
