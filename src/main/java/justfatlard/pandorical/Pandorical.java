@@ -440,6 +440,11 @@ public class Pandorical implements ModInitializer {
             ConfigPatience.forget(handler);
             PandoricalSyncTask.forget(handler);
         });
+        // Instead, an ack whose connection never reached play is let go as that player next connects.
+        ServerConfigurationConnectionEvents.BEFORE_CONFIGURE.register((handler, server) -> {
+            var profile = handler.getOwner();
+            if (profile != null) configPhaseSyncedPlayers.remove(profile.id());
+        });
         ServerTickEvents.END_SERVER_TICK.register(server -> ConfigPatience.expire());
         ServerTickEvents.END_SERVER_TICK.register(justfatlard.pandorical.notice.Notices::tick);
         ServerTickEvents.END_SERVER_TICK.register(Arrivals::tick);
