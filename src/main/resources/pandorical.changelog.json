@@ -4,6 +4,10 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.35.0": [
+      "An item picture on a screen or the HUD can show one particular item as it is, such as a miniature as its own build or an enchanted sword glinting.",
+      "A mod can say a player's things are on loan, such as a builder's materials at a bench, and trading and other mods that move items refuse while they are."
+    ],
     "15.34.0": [
       "Dials and gauges that turn at a steady pace, mob dots on a map, and spinning parts of things in the world move smoothly on your screen from a single word from the server, rather than being sent a step at a time, so they stay smooth on a busy server."
     ],

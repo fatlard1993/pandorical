@@ -1,5 +1,7 @@
 package justfatlard.pandorical.client.component;
 
+import justfatlard.pandorical.api.ComponentType;
+import justfatlard.pandorical.api.ItemIcons;
 import justfatlard.pandorical.protocol.ComponentDef;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -28,9 +30,15 @@ public class ItemIconComponent extends AbstractComponent {
         parseStack();
     }
 
+    /** What the stack was made from, so an update to some other prop does not unpack it again. */
+    private String parsedFrom;
+
     private void parseStack() {
         String itemId = parseString("item_id", "");
         int count = parseInt("item_count", 1);
+        String from = itemId + "\n" + count + "\n" + parseString(ComponentType.PROP_ITEM_COMPONENTS, "");
+        if (from.equals(parsedFrom)) return;
+        parsedFrom = from;
         if (itemId.isEmpty()) {
             stack = ItemStack.EMPTY;
             return;
@@ -43,6 +51,13 @@ public class ItemIconComponent extends AbstractComponent {
         Optional<Item> found = BuiltInRegistries.ITEM.getOptional(loc);
         Item item = found.orElse(Items.AIR);
         stack = new ItemStack(item, Math.max(1, count));
+        String components = parseString(ComponentType.PROP_ITEM_COMPONENTS, "");
+        var level = net.minecraft.client.Minecraft.getInstance().level;
+        if (!components.isEmpty() && level != null && !stack.isEmpty()) {
+            ItemIcons.read(components, level.registryAccess()).ifPresent(stack::applyComponents);
+        } else if (!components.isEmpty() && level == null) {
+            parsedFrom = null;
+        }
     }
 
     @Override

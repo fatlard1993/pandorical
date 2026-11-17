@@ -316,6 +316,8 @@ public final class PandoricalApi {
 
     public static KeepsakeApi keepsakes() { return Keepsakes.INSTANCE; }
 
+    public static LoanApi loans() { return justfatlard.pandorical.loan.Loans.INSTANCE; }
+
     // --- Internal methods (used by Pandorical core, not for consuming mods) ---
 
     /** @hidden */

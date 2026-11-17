@@ -500,6 +500,16 @@ content.overrideVanillaItem("minecraft:rabbit_hide", new VanillaItemOverride(...
 overlays, chest overlays, custom blocks) must be registered here or the client has
 nothing to load.
 
+### An item icon drawn as one stack
+
+`item_icon` takes an item id, which draws the plain item. To draw one particular stack, with
+what makes it look like itself (a build in its custom data, a glint, a dyed colour), also set
+`item_components` to `ItemIcons.components(stack, registries)`: the stack's own components,
+packed. A client older than 15.35 ignores it and draws the plain item, and so does one that
+cannot read it. Components too large for one prop (32767 characters, packed) come back empty
+rather than failing to send. Send only what the player may see: a shulker box's contents ride
+along if you pack its stack. New in 15.35.
+
 ### Item models only Pandorical can draw
 
 Ship the plain item model at `assets/<yourmod>/items/<name>.json`, as usual, and the one that
@@ -1096,6 +1106,29 @@ it down is not an invitation to ask again tomorrow.
 Mods are listed in the same order the mods screen uses, which is alphabetical by name. There is no
 way to rank them, deliberately: a new player has no idea yet what matters to them, so an order
 claiming to know is guessing.
+
+## A pack on loan
+
+Some mods put a player's own things aside and hand them a pack that is not theirs: a builder's
+materials that are only a view of a shared supply, an arena loadout. While that lasts, say so:
+
+```java
+PandoricalApi.loans().register(player -> inMyArena(player)
+    ? Component.literal("fighting in an arena") : null);
+```
+
+And a mod that moves things into or out of a player's pack some way the game itself does not (a
+trade, a parcel, a command that gives or takes, a teleport that brings someone to them) asks first
+and refuses with the answer, put to someone: "You can't trade while building at a Miniature Bench."
+
+```java
+Component why = PandoricalApi.loans().onLoan(player);
+if (why != null) { /* refuse, and say why */ }
+```
+
+Anything taken out of a pack on loan is made from nothing, and anything put in is lost when the
+loan ends. Lenders are asked often, so answer cheaply; one that throws is logged once and skipped.
+New in 15.35.
 
 ## Gating play
 

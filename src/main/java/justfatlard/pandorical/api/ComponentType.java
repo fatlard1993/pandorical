@@ -233,6 +233,12 @@ public final class ComponentType {
     public static final String PROP_ITEM_ID = "item_id";
     /** Stack count to display in the decoration overlay (defaults to 1, hidden if 1). */
     public static final String PROP_ITEM_COUNT = "item_count";
+    /**
+     * The stack's own components, from {@link ItemIcons#components}, so it is drawn as that stack:
+     * a miniature as its build, an enchanted item glinting. Empty or unreadable draws the plain item.
+     * Used by: item_icon
+     */
+    public static final String PROP_ITEM_COMPONENTS = "item_components";
 
     // ItemSlot props
     public static final String PROP_SLOT_INDEX = "slot_index";

@@ -56,6 +56,33 @@ public final class CellsItems implements FabricClientGameTest {
 			context.setScreen(() -> new net.minecraft.client.gui.screens.inventory.InventoryScreen(context.computeOnClient(client -> client.player)));
 			context.waitTicks(5);
 			context.takeScreenshot("cells-items");
+			context.setScreen(() -> null);
+
+			// An item icon told the stack's components draws that stack, here as its build.
+			context.runOnClient(client -> {
+				var registries = client.level.registryAccess();
+				String packed = justfatlard.pandorical.api.ItemIcons.components(built, registries);
+				if (packed.isEmpty()) throw new AssertionError("a stack with cells packed to nothing");
+				ItemStack back = new ItemStack(Items.PAPER);
+				justfatlard.pandorical.api.ItemIcons.read(packed, registries).ifPresent(back::applyComponents);
+				if (!ItemStack.isSameItemSameComponents(back, built)) throw new AssertionError("a packed stack did not read back as itself: " + back.getComponentsPatch());
+				if (!justfatlard.pandorical.api.ItemIcons.components(new ItemStack(Items.PAPER), registries).isEmpty()) throw new AssertionError("a plain stack packed to something");
+				if (justfatlard.pandorical.api.ItemIcons.read("not packed", registries).isPresent()) throw new AssertionError("nonsense read as components");
+			});
+			world.getServer().runOnServer(s -> {
+				var player = connection.getServerPlayer();
+				String packed = justfatlard.pandorical.api.ItemIcons.components(built, s.registryAccess());
+				justfatlard.pandorical.api.PandoricalApi.screens().open(player, new justfatlard.pandorical.api.ScreenBuilder("pandorical-gametest:cells_icons")
+					.size(60, 32).panel("frame", 0, 0, 60, 32, java.util.Map.of())
+					.component(new justfatlard.pandorical.api.ComponentBuilder("built", justfatlard.pandorical.api.ComponentType.ITEM_ICON).bounds(8, 8, 16, 16)
+						.prop(justfatlard.pandorical.api.ComponentType.PROP_ITEM_ID, "minecraft:paper")
+						.prop(justfatlard.pandorical.api.ComponentType.PROP_ITEM_COMPONENTS, packed))
+					.component(new justfatlard.pandorical.api.ComponentBuilder("plain", justfatlard.pandorical.api.ComponentType.ITEM_ICON).bounds(36, 8, 16, 16)
+						.prop(justfatlard.pandorical.api.ComponentType.PROP_ITEM_ID, "minecraft:paper"))
+					.build());
+			});
+			context.waitTicks(5);
+			context.takeScreenshot("cells-icons");
 		}
 	}
 
