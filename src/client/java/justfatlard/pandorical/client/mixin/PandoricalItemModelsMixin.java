@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.At;
 
 import java.util.Map;
 
-/** Item models under {@code pandorical/items/} load in place of their plain ones. */
+/** Item models under {@code pandorical/items/} and {@code pandorical/items_v2/} load in place of their plain ones. */
 @Mixin(ClientItemInfoLoader.class)
 public class PandoricalItemModelsMixin {
     @WrapOperation(

@@ -1,0 +1,13 @@
+{
+  "model": {
+    "type": "minecraft:composite",
+    "models": [
+      { "type": "minecraft:model", "model": "minecraft:item/map" },
+      {
+        "type": "minecraft:special",
+        "base": "minecraft:item/map",
+        "model": { "type": "pandorical:picture", "data": "picture", "from": [2, 2], "to": [14, 14] }
+      }
+    ]
+  }
+}

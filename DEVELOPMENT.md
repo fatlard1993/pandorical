@@ -545,6 +545,35 @@ nothing, as in a block model. A stack without the data draws nothing, so give it
 `base` is the model the item's display transforms and particle come from: one whose parent is
 `minecraft:block/block` shows the build at the angle a block item takes.
 
+`pandorical:picture` draws a picture its custom data holds flat over a sprite, as a map's colours
+lie on a map: `data` names the key, and `from` and `to` (default `[0, 0]` and `[16, 16]`) the
+corners it covers, in the sprite's own pixels from the top left. Under the key go `columns` and
+`rows` (1 to 64), `palette`, ARGB colours as an int array, and `cells`, a byte array of
+`columns * rows` indices into the palette from 0, row-major from the top left, as a `Picture`
+holds them. It draws unshaded, a hair in front of an `item/generated` sprite's face. A stack
+without the data draws nothing, so lay it over the plain model:
+
+```json
+{
+  "model": {
+    "type": "minecraft:composite",
+    "models": [
+      { "type": "minecraft:model", "model": "mymod:item/print" },
+      {
+        "type": "minecraft:special",
+        "base": "mymod:item/print",
+        "model": { "type": "pandorical:picture", "data": "picture", "from": [2, 2], "to": [14, 14] }
+      }
+    ]
+  }
+}
+```
+
+**A model using it goes under `assets/<yourmod>/pandorical/items_v2/`**, not `pandorical/items/`:
+a client from 15.30 to 15.35 reads the older folder but has never heard of the type, and would
+draw the item as a missing model. A client from 15.36 prefers `items_v2` where both are shipped,
+so a mod can give the older folder a model those clients can draw. New in 15.36.
+
 ### Entities
 
 A new mob is a real entity type with its own class, goals, attributes, spawns and loot, which
