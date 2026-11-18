@@ -571,8 +571,8 @@ without the data draws nothing, so lay it over the plain model:
 
 **A model using it goes under `assets/<yourmod>/pandorical/items_v2/`**, not `pandorical/items/`:
 a client from 15.30 to 15.35 reads the older folder but has never heard of the type, and would
-draw the item as a missing model. A client from 15.36 prefers `items_v2` where both are shipped,
-so a mod can give the older folder a model those clients can draw. New in 15.36.
+draw the item as a missing model. A client from 15.35.1 prefers `items_v2` where both are shipped,
+so a mod can give the older folder a model those clients can draw. New in 15.35.1.
 
 ### Entities
 
