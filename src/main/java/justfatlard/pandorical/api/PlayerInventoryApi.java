@@ -12,7 +12,8 @@ import java.util.function.Predicate;
 
 /**
  * Extra slots and buttons in the vanilla inventory screen. The slots are real container slots,
- * synced by vanilla.
+ * synced by vanilla. Shift-click treats them as equipment: an item from the pack or hotbar goes,
+ * one at a time, into the first empty slot whose validator takes it.
  *
  * <p>Slot contents persist across restarts and are carried across death: a mod that takes them
  * on death empties the slots itself.

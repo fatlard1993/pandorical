@@ -9,6 +9,7 @@ import net.minecraft.core.NonNullList;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -19,6 +20,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -91,6 +93,45 @@ public abstract class InventoryMenuMixin extends AbstractContainerMenu {
                     }
                 });
             }
+        }
+    }
+
+    /** Vanilla's own slots: result, crafting grid, armour, pack, hotbar, offhand. The extra ones follow. */
+    private static final int VANILLA_SLOTS = 46;
+    private static final int PACK_START = 9, HOTBAR_END = 45;
+
+    /**
+     * Shift-click from the pack or hotbar puts one of the item in an empty extra slot that takes
+     * it, the way a helmet goes to the head: a stack of compasses equips one and keeps the rest.
+     * Empty armour and offhand slots still come first, as vanilla has them. Out of an extra slot needs nothing: vanilla's last branch moves anything else to the pack.
+     *
+     * <p>Server only. The client's copies of the slots take anything, not knowing the validators,
+     * so its prediction would put every item in the first one; it predicts vanilla's move instead
+     * and the server's answer corrects it.
+     */
+    @Inject(method = "quickMoveStack", at = @At("HEAD"), cancellable = true)
+    private void pandorical$quickMoveToExtraSlot(Player player, int slotIndex, CallbackInfoReturnable<ItemStack> cir) {
+        if (!(player instanceof ServerPlayer) || this.slots.size() <= VANILLA_SLOTS) return;
+        if (slotIndex < PACK_START || slotIndex >= HOTBAR_END) return;
+        Slot from = this.slots.get(slotIndex);
+        if (!from.hasItem()) return;
+        ItemStack stack = from.getItem();
+
+        EquipmentSlot equips = player.getEquipmentSlotForItem(stack);
+        if (equips.getType() == EquipmentSlot.Type.HUMANOID_ARMOR && !this.slots.get(8 - equips.getIndex()).hasItem()) return;
+        if (equips == EquipmentSlot.OFFHAND && !this.slots.get(45).hasItem()) return;
+
+        for (int i = VANILLA_SLOTS; i < this.slots.size(); i++) {
+            Slot to = this.slots.get(i);
+            if (to.hasItem() || !to.mayPlace(stack)) continue;
+            ItemStack before = stack.copy();
+            to.setByPlayer(stack.split(1));
+            if (stack.isEmpty()) from.setByPlayer(ItemStack.EMPTY, before);
+            else from.setChanged();
+            from.onTake(player, to.getItem());
+            // Empty, so vanilla's caller does not shift-click the rest of the stack in after it
+            cir.setReturnValue(ItemStack.EMPTY);
+            return;
         }
     }
 
