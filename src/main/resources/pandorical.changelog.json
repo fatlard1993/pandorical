@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.35.3": [
+      "Joining a server sends each block shape once, not once per block state."
+    ],
     "15.35.2": [
       "Shift-click puts an item in an empty extra inventory slot that takes it, one at a time like armour."
     ],
