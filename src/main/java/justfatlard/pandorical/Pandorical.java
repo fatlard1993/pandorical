@@ -220,6 +220,9 @@ public class Pandorical implements ModInitializer {
     private void registerPayloads() {
         PayloadTypeRegistry.clientboundConfiguration().register(SyncContentConfigS2C.TYPE, SyncContentConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(
+            justfatlard.pandorical.protocol.SyncContentConfigV2S2C.TYPE,
+            justfatlard.pandorical.protocol.SyncContentConfigV2S2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundConfiguration().register(
             justfatlard.pandorical.protocol.EntityKindsConfigS2C.TYPE,
             justfatlard.pandorical.protocol.EntityKindsConfigS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundConfiguration().register(
@@ -503,7 +506,9 @@ public class Pandorical implements ModInitializer {
                             justfatlard.pandorical.entitykind.EntityKinds.understood(handler.getOwner().id(),
                                 tellsKinds, tellsBodies);
                         }
-                        var task = new PandoricalSyncTask(handler, blocks, items, assets,
+                        boolean packed = ServerConfigurationNetworking.canSend(handler,
+                            justfatlard.pandorical.protocol.SyncContentConfigV2S2C.TYPE);
+                        var task = new PandoricalSyncTask(handler, packed, blocks, items, assets,
                             entityTypes, blockEntityTypes, villagerProfessions,
                             poiTypes, menuTypes, recipeBookCategories, contentRegistry.railsSolid(),
                             tellsKinds && justfatlard.pandorical.entitykind.EntityKinds.any()

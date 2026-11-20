@@ -958,7 +958,7 @@ public class ContentManager {
             if (BuiltInRegistries.BLOCK.containsKey(id)) {
                 Block existing = BuiltInRegistries.BLOCK.getValue(id);
                 registeredBlocks.put(id, existing);
-                DynamicBlock.applyShapeData(existing, entry.shapeData());
+                DynamicBlock.applyShapeData(existing, entry.shapes());
                 if (entry.climbable()) climbable.add(existing);
                 if (entry.interactive()) interactive.add(existing);
                 if (configPhase) {
@@ -984,7 +984,7 @@ public class ContentManager {
                 props = BlockBehaviour.Properties.of();
             }
 
-            if (!DynamicBlock.declaresCollision(entry.shapeData())) props.noCollision();
+            if (!DynamicBlock.declaresCollision(entry.shapes())) props.noCollision();
 
             applyMiningProperties(props, entry);
 
@@ -1018,7 +1018,7 @@ public class ContentManager {
             if (entry.climbable()) climbable.add(block);
             if (entry.interactive()) interactive.add(block);
 
-            DynamicBlock.applyShapeData(block, entry.shapeData());
+            DynamicBlock.applyShapeData(block, entry.shapes());
 
             if (stateIds == StateIds.AT_JOIN) {
                 Pandorical.LOGGER.debug("Config phase: registered block {} (base: {}, class: {}, states: {})",

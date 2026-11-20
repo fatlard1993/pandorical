@@ -8,6 +8,7 @@ import justfatlard.pandorical.api.ContentApi;
 import justfatlard.pandorical.api.EntityRegistration;
 import justfatlard.pandorical.api.ItemRegistration;
 import justfatlard.pandorical.api.VanillaItemOverride;
+import justfatlard.pandorical.protocol.BlockShapeTable;
 import justfatlard.pandorical.protocol.StatePropertySpec;
 import justfatlard.pandorical.protocol.SyncAssetsConfigS2C;
 import justfatlard.pandorical.protocol.SyncAssetsS2C;
@@ -474,7 +475,10 @@ public class ContentRegistry implements ContentApi {
         }
     }
 
-    /** Over the payload limit the play-phase content sync fails to send, so its size is logged. */
+    /**
+     * Over the payload limit the play-phase content sync fails to send, so its size is logged. That
+     * fallback carries every state's shapes in full, which is most of its weight.
+     */
     private static boolean loggedContentScale = false;
 
     private static void logContentScale(List<SyncContentS2C.BlockEntry> entries) {
@@ -482,24 +486,26 @@ public class ContentRegistry implements ContentApi {
         loggedContentScale = true;
 
         int states = 0;
-        int approximateBytes = 0;
+        long approximateBytes = 0;
         SyncContentS2C.BlockEntry largest = null;
 
         for (SyncContentS2C.BlockEntry entry : entries) {
             states += entry.stateIds().size();
             // A state id is a var-int of about three bytes at this suite's size.
-            approximateBytes += entry.stateIds().size() * 3 + entry.id().length() + 64;
+            approximateBytes += entry.stateIds().size() * 3L + entry.id().length() + 64;
+            approximateBytes += entry.shapes().perStateByteCount() + entry.lightData().length;
             for (String property : entry.stateProperties()) approximateBytes += property.length();
 
             if (largest == null || entry.stateIds().size() > largest.stateIds().size()) largest = entry;
         }
 
-        Pandorical.LOGGER.info("Content sync: {} blocks, {} block states, ~{} KB of the 1024 KB packet{}",
+        Pandorical.LOGGER.info("Content sync: {} blocks, {} block states, ~{} KB of the play-phase fallback's 1024 KB packet{}",
             entries.size(), states, approximateBytes / 1024,
             largest == null ? "" : " (largest: " + largest.id() + " at " + largest.stateIds().size() + " states)");
 
         if (approximateBytes > 700_000) {
-            Pandorical.LOGGER.warn("Content sync is nearing the payload limit; past it nothing syncs at all.");
+            Pandorical.LOGGER.warn("Content sync is nearing the play-phase payload limit; a client that falls back"
+                + " to it past the limit gets no content at all.");
         }
     }
 
@@ -569,14 +575,14 @@ public class ContentRegistry implements ContentApi {
                 inferred.add(id);
             }
 
-            byte[] shapeData = serializeBlockShapes(block);
+            BlockShapeTable shapes = shapeTableOf(block);
             byte[] lightData = serializeBlockLight(block);
 
             // No vanilla climbable varies climbability by state.
             boolean climbable = block.defaultBlockState().is(BlockTags.CLIMBABLE);
 
             blockEntries.add(new SyncContentS2C.BlockEntry(
-                id, baseBlockId, stateProps, modelId, stateIds, shapeData, lightData, climbable, interactive,
+                id, baseBlockId, stateProps, modelId, stateIds, shapes, lightData, climbable, interactive,
                 destroyTime, requiresCorrectTool));
         }
 
@@ -605,44 +611,37 @@ public class ContentRegistry implements ContentApi {
         return light;
     }
 
-    /**
-     * Per state: [outlineBoxCount:byte][boxes][collisionBoxCount:byte][boxes], each box six floats,
-     * min x, y, z then max x, y, z.
-     */
-    private static byte[] serializeBlockShapes(Block block) {
+    private static BlockShapeTable shapeTableOf(Block block) {
         try {
-            var baos = new ByteArrayOutputStream();
-            var dos = new DataOutputStream(baos);
             var emptyGetter = EmptyBlockGetter.INSTANCE;
             var origin = BlockPos.ZERO;
             var ctx = CollisionContext.empty();
-
+            var table = new BlockShapeTable.Builder();
             for (var state : block.getStateDefinition().getPossibleStates()) {
-                var outline = state.getShape(emptyGetter, origin, ctx);
-                writeShape(dos, outline);
-                var collision = state.getCollisionShape(emptyGetter, origin, ctx);
-                writeShape(dos, collision);
+                table.add(shapeOf(state.getShape(emptyGetter, origin, ctx)),
+                    shapeOf(state.getCollisionShape(emptyGetter, origin, ctx)));
             }
-
-            dos.flush();
-            return baos.toByteArray();
+            return table.build();
         } catch (Exception e) {
-            Pandorical.LOGGER.warn("Failed to serialize shapes for {}: {}", block, e.getMessage());
-            return new byte[0];
+            Pandorical.LOGGER.warn("Failed to read shapes for {}: {}", block, e.getMessage());
+            return BlockShapeTable.NONE;
         }
     }
 
-    private static void writeShape(DataOutputStream dos, VoxelShape shape) throws IOException {
+    private static BlockShapeTable.Shape shapeOf(VoxelShape shape) {
         var boxes = shape.toAabbs();
-        dos.writeByte(boxes.size());
+        if (boxes.isEmpty()) return BlockShapeTable.Shape.EMPTY;
+        float[] out = new float[boxes.size() * 6];
+        int i = 0;
         for (var box : boxes) {
-            dos.writeFloat((float) box.minX);
-            dos.writeFloat((float) box.minY);
-            dos.writeFloat((float) box.minZ);
-            dos.writeFloat((float) box.maxX);
-            dos.writeFloat((float) box.maxY);
-            dos.writeFloat((float) box.maxZ);
+            out[i++] = (float) box.minX;
+            out[i++] = (float) box.minY;
+            out[i++] = (float) box.minZ;
+            out[i++] = (float) box.maxX;
+            out[i++] = (float) box.maxY;
+            out[i++] = (float) box.maxZ;
         }
+        return new BlockShapeTable.Shape(out);
     }
 
     public List<SyncContentS2C.ItemEntry> buildItemEntries() {

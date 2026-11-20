@@ -227,11 +227,11 @@ public class PandoricalClient implements ClientModInitializer {
             justfatlard.pandorical.protocol.EntityBodiesConfigS2C.TYPE,
             (payload, context) -> justfatlard.pandorical.client.entitykind.ClientEntityKinds.receive(payload));
 
-        ClientConfigurationNetworking.registerGlobalReceiver(SyncContentConfigS2C.TYPE, (payload, context) -> {
-            Pandorical.LOGGER.info("Config phase: received content sync — {} blocks, {} items, {} expected asset chunks",
-                payload.blocks().size(), payload.items().size(), payload.expectedAssetChunks());
-            ContentManager.handleConfigSyncContent(payload);
-        });
+        ClientConfigurationNetworking.registerGlobalReceiver(SyncContentConfigS2C.TYPE,
+            (payload, context) -> receiveContent(payload));
+        ClientConfigurationNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.SyncContentConfigV2S2C.TYPE,
+            (payload, context) -> receiveContent(payload.content()));
 
         ClientConfigurationNetworking.registerGlobalReceiver(AssetsOfferConfigS2C.TYPE,
             (payload, context) -> ContentManager.handleConfigAssetsOffer(payload));
@@ -281,6 +281,12 @@ public class PandoricalClient implements ClientModInitializer {
             BannerDecalStore.clear();
             payload.entries().forEach(PandoricalClient::applyBlockTints);
         });
+    }
+
+    private static void receiveContent(SyncContentConfigS2C payload) {
+        Pandorical.LOGGER.info("Config phase: received content sync — {} blocks, {} items, {} expected asset chunks",
+            payload.blocks().size(), payload.items().size(), payload.expectedAssetChunks());
+        ContentManager.handleConfigSyncContent(payload);
     }
 
     private static void applyBlockTints(BlockTintsConfigS2C.Entry entry) {

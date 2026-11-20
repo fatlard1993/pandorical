@@ -475,6 +475,13 @@ A synced block's light is the server's: each state's emission travels with the b
 the client stand-in is built with it, so a torch on a slab glows on every client that has
 Pandorical. Nothing to declare; the block's own `lightLevel` is what gets sent.
 
+Its outline and collision shapes ride the same way, read from the real block state by state, so
+the stand-in is aimed at and stood on where the server says. They travel as a table: each distinct
+shape once, and per state an index into it, and a block whose table matches an earlier block's (a
+set of dyed copies, say) names that one rather than sending it again. A state costs a byte or two
+however many there are; what costs is distinct shapes. A client older than the packed layout
+(`sync_content_config_v2`) is sent every state's boxes in full, as before.
+
 Register during `onInitialize`. Content syncs to clients in the configuration phase,
 before Fabric's registry sync.
 

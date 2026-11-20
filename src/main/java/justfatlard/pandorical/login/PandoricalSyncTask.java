@@ -7,6 +7,7 @@ import justfatlard.pandorical.content.ContentRegistry;
 import justfatlard.pandorical.protocol.AssetsOfferConfigS2C;
 import justfatlard.pandorical.protocol.SyncAssetsConfigS2C;
 import justfatlard.pandorical.protocol.SyncContentConfigS2C;
+import justfatlard.pandorical.protocol.SyncContentConfigV2S2C;
 import justfatlard.pandorical.protocol.SyncContentS2C;
 import net.fabricmc.fabric.api.networking.v1.ServerConfigurationNetworking;
 import net.minecraft.network.codec.StreamCodec;
@@ -27,6 +28,8 @@ public class PandoricalSyncTask implements ConfigurationTask {
     private final List<SyncContentS2C.BlockEntry> blocks;
     private final List<SyncContentS2C.ItemEntry> items;
     private final ServerConfigurationPacketListenerImpl handler;
+    /** Whether the client reads {@link SyncContentConfigV2S2C}. */
+    private final boolean packed;
     private final ContentRegistry.ConfigAssets assets;
     private final List<String> entityTypes;
     private final List<String> blockEntityTypes;
@@ -46,6 +49,7 @@ public class PandoricalSyncTask implements ConfigurationTask {
 
     public PandoricalSyncTask(
             ServerConfigurationPacketListenerImpl handler,
+            boolean packed,
             List<SyncContentS2C.BlockEntry> blocks,
             List<SyncContentS2C.ItemEntry> items,
             ContentRegistry.ConfigAssets assets,
@@ -60,6 +64,7 @@ public class PandoricalSyncTask implements ConfigurationTask {
         this.blocks = blocks;
         this.items = items;
         this.handler = handler;
+        this.packed = packed;
         this.assets = assets;
         this.entityTypes = entityTypes;
         this.blockEntityTypes = blockEntityTypes;
@@ -116,7 +121,7 @@ public class PandoricalSyncTask implements ConfigurationTask {
         int expectedChunks = assetChunks.size();
 
         List<List<SyncContentS2C.BlockEntry>> blockChunks =
-            intoChunks(blocks, SyncContentS2C.BlockEntry.STREAM_CODEC);
+            intoChunks(blocks, packed ? SyncContentConfigV2S2C.BLOCK_ENTRY_ALONE : SyncContentS2C.BlockEntry.STREAM_CODEC);
         List<List<SyncContentS2C.ItemEntry>> itemChunks =
             intoChunks(items, SyncContentS2C.ItemEntry.STREAM_CODEC);
 
@@ -134,13 +139,14 @@ public class PandoricalSyncTask implements ConfigurationTask {
                 i, total, expectedChunks,
                 entityTypes, blockEntityTypes, villagerProfessions, poiTypes, menuTypes,
                 recipeBookCategories, solidRails);
-            sender.accept(ServerConfigurationNetworking.createClientboundPacket(contentPacket));
+            sender.accept(ServerConfigurationNetworking.createClientboundPacket(
+                packed ? new SyncContentConfigV2S2C(contentPacket) : contentPacket));
         }
 
-        Pandorical.LOGGER.info("Sending config-phase content sync: {} blocks, {} items in {} chunk(s), " +
+        Pandorical.LOGGER.info("Sending config-phase content sync ({}): {} blocks, {} items in {} chunk(s), " +
             "{} entity types, {} block entity types, {} villager professions, {} POI types, " +
             "{} menu types, {} recipe book categories, {} asset chunks",
-            blocks.size(), items.size(), total, entityTypes.size(), blockEntityTypes.size(),
+            packed ? "packed" : "per state", blocks.size(), items.size(), total, entityTypes.size(), blockEntityTypes.size(),
             villagerProfessions.size(), poiTypes.size(), menuTypes.size(),
             recipeBookCategories.size(), expectedChunks);
 

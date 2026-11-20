@@ -92,8 +92,39 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 		"map_relief_v2", "mount_policy", "open_settings", "pictures",
 		"play_animation", "player_inv_registrations", "render_policy", "set_structure_visible",
 		"set_structure_walkable", "set_vanilla_hud_elements", "skin_override", "spawn_structure",
-		"sync_assets", "sync_assets_config", "sync_content", "sync_content_config",
+		"sync_assets", "sync_assets_config",
 		"update_structure_blocks", "update_structure_pose", "viewport");
+
+	/** A post, six pixels through the middle of the block. */
+	private static final float[] POST = {0.375F, 0F, 0.375F, 0.625F, 1F, 0.625F};
+
+	/** Two states: a post that is solid, and the same post walked through. */
+	private static justfatlard.pandorical.protocol.BlockShapeTable postShapes() {
+		var post = new justfatlard.pandorical.protocol.BlockShapeTable.Shape(POST);
+		return new justfatlard.pandorical.protocol.BlockShapeTable.Builder()
+			.add(post, post)
+			.add(post, justfatlard.pandorical.protocol.BlockShapeTable.Shape.EMPTY)
+			.build();
+	}
+
+	/**
+	 * Two blocks with the same shapes and runs of state ids, and one with none and ids out of
+	 * order: what a later layout may pack, so the layouts before it are pinned on the same cases.
+	 */
+	private static final List<justfatlard.pandorical.protocol.SyncContentS2C.BlockEntry> CONTENT_BLOCKS = List.of(
+		new justfatlard.pandorical.protocol.SyncContentS2C.BlockEntry("mymod:panel", "minecraft:white_wool",
+			List.of("solid:b"), "mymod:block/panel", List.of(100, 101), postShapes(), new byte[] {0, 0},
+			false, false, 1F, -1),
+		new justfatlard.pandorical.protocol.SyncContentS2C.BlockEntry("mymod:red_panel", "minecraft:red_wool",
+			List.of("solid:b"), "mymod:block/red_panel", List.of(102, 103), postShapes(), new byte[] {0, 0},
+			false, false, 1F, -1),
+		new justfatlard.pandorical.protocol.SyncContentS2C.BlockEntry("mymod:lamp", "minecraft:glowstone",
+			List.of("lit:b"), "", List.of(9, 7), justfatlard.pandorical.protocol.BlockShapeTable.NONE, new byte[] {15, 0},
+			true, true, -1F, 0));
+
+	private static final justfatlard.pandorical.protocol.SyncContentS2C.ItemEntry CONTENT_ITEM =
+		new justfatlard.pandorical.protocol.SyncContentS2C.ItemEntry("mymod:panel", "mymod:item/panel", 64, 0,
+			false, "", "", "");
 
 	/** One fixed value per frozen channel. Never edit these: new bytes here mean a changed layout. */
 	private static Map<String, byte[]> samples() {
@@ -192,6 +223,19 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 			List.of(new SettingPreviewsC2S.Entry("mymod", "shape", "dot", "mymod:textures/dot.png")))));
 		out.put("capture_request", encode(CaptureRequestS2C.STREAM_CODEC, new CaptureRequestS2C(3, 512)));
 		out.put("capture_part", encode(CapturePartC2S.STREAM_CODEC, new CapturePartC2S(3, 0, 1, new byte[] {1, 2, 3})));
+		out.put("sync_content", encode(justfatlard.pandorical.protocol.SyncContentS2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.SyncContentS2C(CONTENT_BLOCKS, List.of(CONTENT_ITEM), 2,
+				List.of("mymod:shark"), List.of("mymod:crate"), List.of("mymod:weaver"), List.of("mymod:loom"),
+				List.of("mymod:press"), List.of("mymod:pressing"), true)));
+		out.put("sync_content_config", encode(justfatlard.pandorical.protocol.SyncContentConfigS2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.SyncContentConfigS2C(CONTENT_BLOCKS, List.of(CONTENT_ITEM), 0, 1, 2,
+				List.of("mymod:shark"), List.of("mymod:crate"), List.of("mymod:weaver"), List.of("mymod:loom"),
+				List.of("mymod:press"), List.of("mymod:pressing"), true)));
+		out.put("sync_content_config_v2", encode(justfatlard.pandorical.protocol.SyncContentConfigV2S2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.SyncContentConfigV2S2C(
+				new justfatlard.pandorical.protocol.SyncContentConfigS2C(CONTENT_BLOCKS, List.of(CONTENT_ITEM), 0, 1, 2,
+					List.of("mymod:shark"), List.of("mymod:crate"), List.of("mymod:weaver"), List.of("mymod:loom"),
+					List.of("mymod:press"), List.of("mymod:pressing"), true))));
 		out.put("not_understood", encode(NotUnderstoodC2S.STREAM_CODEC,
 			new NotUnderstoodC2S("component_type", "mymod:not_invented_yet")));
 		return out;
@@ -283,7 +327,7 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 		}
 	}
 
-	private static <T> byte[] encode(StreamCodec<ByteBuf, T> codec, T value) {
+	static <T> byte[] encode(StreamCodec<ByteBuf, T> codec, T value) {
 		ByteBuf buf = Unpooled.buffer();
 		try {
 			codec.encode(buf, value);

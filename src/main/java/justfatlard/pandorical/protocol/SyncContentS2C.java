@@ -30,7 +30,7 @@ public record SyncContentS2C(
         List<String> stateProperties,
         String modelId,
         List<Integer> stateIds,
-        byte[] shapeData,
+        BlockShapeTable shapes,
         /*
          * Light emitted, one byte per state in the block's own state order. The client computes
          * light from its stand-in, which otherwise emits what its base block does.
@@ -59,13 +59,13 @@ public record SyncContentS2C(
                 var stateProperties = ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list()).decode(buf);
                 String modelId = ByteBufCodecs.STRING_UTF8.decode(buf);
                 var stateIds = ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list()).decode(buf);
-                var shapeData = ByteBufCodecs.BYTE_ARRAY.decode(buf);
+                var shapes = BlockShapeTable.fromPerStateBytes(ByteBufCodecs.BYTE_ARRAY.decode(buf));
                 var lightData = ByteBufCodecs.BYTE_ARRAY.decode(buf);
                 boolean climbable = ByteBufCodecs.BOOL.decode(buf);
                 boolean interactive = ByteBufCodecs.BOOL.decode(buf);
                 float destroyTime = ByteBufCodecs.FLOAT.decode(buf);
                 int requiresCorrectTool = ByteBufCodecs.VAR_INT.decode(buf) - 1;
-                return new BlockEntry(id, baseBlockId, stateProperties, modelId, stateIds, shapeData,
+                return new BlockEntry(id, baseBlockId, stateProperties, modelId, stateIds, shapes,
                     lightData, climbable, interactive, destroyTime, requiresCorrectTool);
             }
 
@@ -76,7 +76,7 @@ public record SyncContentS2C(
                 ByteBufCodecs.STRING_UTF8.apply(ByteBufCodecs.list()).encode(buf, value.stateProperties());
                 ByteBufCodecs.STRING_UTF8.encode(buf, value.modelId());
                 ByteBufCodecs.VAR_INT.apply(ByteBufCodecs.list()).encode(buf, value.stateIds());
-                ByteBufCodecs.BYTE_ARRAY.encode(buf, value.shapeData());
+                ByteBufCodecs.BYTE_ARRAY.encode(buf, value.shapes().perStateBytes());
                 ByteBufCodecs.BYTE_ARRAY.encode(buf, value.lightData());
                 ByteBufCodecs.BOOL.encode(buf, value.climbable());
                 ByteBufCodecs.BOOL.encode(buf, value.interactive());

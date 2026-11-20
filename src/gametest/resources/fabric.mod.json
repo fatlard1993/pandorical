@@ -13,6 +13,7 @@
 		],
 		"fabric-client-gametest": [
 			"justfatlard.pandorical.gametest.LaunchGate",
+			"justfatlard.pandorical.gametest.PackedContent",
 			"justfatlard.pandorical.gametest.NoticesAnswer",
 			"justfatlard.pandorical.gametest.DropsFixes",
 			"justfatlard.pandorical.gametest.WalkableDecks",

@@ -1,6 +1,7 @@
 package justfatlard.pandorical.client.content;
 
 import justfatlard.pandorical.Pandorical;
+import justfatlard.pandorical.protocol.BlockShapeTable;
 import justfatlard.pandorical.rail.RailCollision;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
@@ -127,27 +128,26 @@ public class DynamicBlock extends Block {
         return index < light.length ? light[index] & 0xFF : 0;
     }
 
-    public static void applyShapeData(Block block, byte[] shapeData) {
-        if (shapeData == null || shapeData.length == 0) return;
+    public static void applyShapeData(Block block, BlockShapeTable shapes) {
+        if (shapes == null || shapes.isEmpty()) return;
         if (VanillaShapedBlocks.isOne(block)) return;
 
         var states = block.getStateDefinition().getPossibleStates();
+        if (shapes.stateCount() != states.size()) {
+            Pandorical.LOGGER.warn("Shapes for {} cover {} states, not its {}: it keeps stand-in geometry",
+                block, shapes.stateCount(), states.size());
+            return;
+        }
+
+        // Joining the boxes is the cost, and the table already holds each distinct shape once.
+        VoxelShape[] built = new VoxelShape[shapes.distinct().size()];
+        for (int i = 0; i < built.length; i++) built[i] = build(shapes.distinct().get(i));
+
         Map<BlockState, VoxelShape> outlineMap = new IdentityHashMap<>();
         Map<BlockState, VoxelShape> collisionMap = new IdentityHashMap<>();
-
-        // States mostly repeat a handful of shapes (a mixed slab's tens of thousands are all one
-        // full block), and joining the boxes is the cost: each distinct one is built once.
-        Map<java.nio.ByteBuffer, VoxelShape> built = new HashMap<>();
-        try {
-            DataInputStream dis = new DataInputStream(new ByteArrayInputStream(shapeData));
-            for (BlockState state : states) {
-                outlineMap.put(state, readShape(dis, built));
-                collisionMap.put(state, readShape(dis, built));
-            }
-        } catch (IOException e) {
-            Pandorical.LOGGER.warn("Failed to deserialize shapes for {}: {}",
-                block, e.getMessage());
-            return;
+        for (int i = 0; i < states.size(); i++) {
+            outlineMap.put(states.get(i), built[shapes.outline()[i]]);
+            collisionMap.put(states.get(i), built[shapes.collision()[i]]);
         }
 
         if (block instanceof DynamicBlock db) {
@@ -171,49 +171,19 @@ public class DynamicBlock extends Block {
      * base block and fixed when the state cache is built during registration. The first state
      * speaks for the block.
      */
-    public static boolean declaresCollision(byte[] shapeData) {
-        if (shapeData == null || shapeData.length == 0) return true;
-
-        try {
-            DataInputStream dis = new DataInputStream(new ByteArrayInputStream(shapeData));
-            int outlineBoxes = dis.readByte() & 0xFF;
-            dis.skipBytes(outlineBoxes * BYTES_PER_BOX);
-            return (dis.readByte() & 0xFF) > 0;
-        } catch (IOException e) {
-            // Unknown is solid: a block you fall through is worse than one you bump into.
-            return true;
-        }
+    public static boolean declaresCollision(BlockShapeTable shapes) {
+        if (shapes == null || shapes.isEmpty()) return true;
+        return shapes.collisionOf(0).boxCount() > 0;
     }
 
-    private static final int BYTES_PER_BOX = 24;
-
-    private static VoxelShape readShape(DataInputStream dis, Map<java.nio.ByteBuffer, VoxelShape> built) throws IOException {
-        int numBoxes = dis.readByte() & 0xFF;
-        if (numBoxes == 0) return Shapes.empty();
-
-        byte[] boxes = new byte[numBoxes * BYTES_PER_BOX];
-        dis.readFully(boxes);
-        java.nio.ByteBuffer key = java.nio.ByteBuffer.wrap(boxes);
-        VoxelShape known = built.get(key);
-        if (known != null) return known;
-        VoxelShape shape = readBoxes(new DataInputStream(new ByteArrayInputStream(boxes)), numBoxes);
-        built.put(key, shape);
-        return shape;
-    }
-
-    private static VoxelShape readBoxes(DataInputStream dis, int numBoxes) throws IOException {
-        VoxelShape shape = null;
-        for (int i = 0; i < numBoxes; i++) {
-            double minX = dis.readFloat();
-            double minY = dis.readFloat();
-            double minZ = dis.readFloat();
-            double maxX = dis.readFloat();
-            double maxY = dis.readFloat();
-            double maxZ = dis.readFloat();
-            VoxelShape box = Shapes.box(minX, minY, minZ, maxX, maxY, maxZ);
-            shape = (shape == null) ? box : Shapes.or(shape, box);
+    private static VoxelShape build(BlockShapeTable.Shape shape) {
+        float[] b = shape.boxes();
+        if (b.length == 0) return Shapes.empty();
+        VoxelShape joined = Shapes.empty();
+        for (int i = 0; i < b.length; i += 6) {
+            joined = Shapes.or(joined, Shapes.box(b[i], b[i + 1], b[i + 2], b[i + 3], b[i + 4], b[i + 5]));
         }
-        return shape.optimize();
+        return joined.optimize();
     }
 
     public static Property<?> resolveProperty(String name, Block baseBlock, int valueCount, String propType) {
