@@ -3,7 +3,7 @@
 	"id": "pandorical",
 	"version": "${version}",
 	"name": "Pandorical",
-	"description": "One install lets a server show you custom screens, HUD, blocks and keys. Required by servers that use it, harmless everywhere else.",
+	"description": "Lets a server show custom screens, HUD, blocks and keys; harmless anywhere else",
 	"authors": [
 		"justfatlard"
 	],
