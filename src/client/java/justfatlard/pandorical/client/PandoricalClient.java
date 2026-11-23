@@ -19,6 +19,7 @@ import justfatlard.pandorical.client.contextmodel.DoorJambs;
 import justfatlard.pandorical.client.contextmodel.FenceGateJoins;
 import justfatlard.pandorical.client.contextmodel.RailDiagonals;
 import justfatlard.pandorical.client.contextmodel.SlabHung;
+import justfatlard.pandorical.client.contextmodel.Strands;
 import justfatlard.pandorical.client.contextmodel.TrapdoorBanks;
 import justfatlard.pandorical.client.decal.BannerDecalRenderer;
 import justfatlard.pandorical.client.decal.BannerDecalStore;
@@ -145,6 +146,7 @@ public class PandoricalClient implements ClientModInitializer {
             ContextModels.register(new DoorJambs());
             ContextModels.register(new SlabHung());
             ContextModels.register(new ConnectedFaces());
+            ContextModels.register(new Strands());
             ContextModels.init();
         }
 

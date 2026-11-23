@@ -7,15 +7,12 @@ import net.fabricmc.fabric.api.client.model.loading.v1.ExtraModelKey;
 import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.client.renderer.block.dispatch.BlockModelRotation;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModel;
-import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.block.dispatch.ModelState;
-import net.minecraft.client.resources.model.sprite.Material;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.IronBarsBlock;
 import net.minecraft.world.level.block.PipeBlock;
@@ -264,25 +261,5 @@ public final class ConnectedFaces implements ContextModels.Provider {
 		if (model == null) return false;
 		pieces.add(model);
 		return true;
-	}
-
-	/** Pieces drawn in order, so a frame laid over the same face as the sheet lands on top of it. */
-	private record Assembled(List<BlockStateModel> pieces) implements BlockStateModel {
-		@Override
-		public void collectParts(RandomSource random, List<BlockStateModelPart> parts) {
-			for (BlockStateModel piece : pieces) piece.collectParts(random, parts);
-		}
-
-		@Override
-		public Material.Baked particleMaterial() {
-			return pieces.getFirst().particleMaterial();
-		}
-
-		@Override
-		public int materialFlags() {
-			int flags = 0;
-			for (BlockStateModel piece : pieces) flags |= piece.materialFlags();
-			return flags;
-		}
 	}
 }

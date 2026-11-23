@@ -863,7 +863,7 @@ which blocks it covers, and picks one at render time. A covered block's model is
 wrapper picks as the Fabric renderer asks it for its quads with the world and position in hand,
 so it works under any renderer that implements that, vanilla's and Sodium's alike; a hook into
 vanilla's own chunk compiler would be passed over by Sodium, which builds chunks its own way.
-Seven ship today.
+Eight ship today.
 
 **Rail diagonals.** A run of alternating curved rails is drawn as the straight diagonal it stands for. The
 client swaps a curve's model for a chord when a connected neighbour is the same bend turned half
@@ -919,6 +919,25 @@ may also ship `_bare`, the same without its streaks: a joined sheet draws that o
 in five, spread a knight's move apart, while a block standing alone keeps its streaks everywhere. A
 frame piece must repeat the faces it lies on exactly, vertex for vertex, or it fights them for depth
 instead of landing on top. Better Glass ships them for every vanilla glass and pane.
+
+**Strands.** A web strung between whatever holds it. A side holds the block when the same block
+carries on beyond it, or when what stands there is anything solid (a face, a fence post, a wall,
+bars); a block held on no side keeps its own model. Held on one side only
+it is small: a tuft hanging from above, `<block>_strand_tuft_<x|z>`, or a web lying flat against
+the floor or wall holding it, `<block>_strand_hug_<side>`. Tucked into a corner, two solid sides at
+right angles and nothing else holding it but more web along that corner, it is one sheet across
+the corner at 45 degrees, `<block>_strand_corner_<a>_<b>`, so a run of webs along the foot of a wall
+is one sheet. Filling an open rectangle up to four blocks a side, clear in front and behind and
+held from outside along at least two edges, a web is its share of one orb across the rectangle:
+`<block>_strand_orb_<x|y|z>_<width>x<height>_<across>_<up>`, counted from the rectangle's low corner
+along the sheet's two axes (z then y facing x, x then y facing z, x then z facing y); every block of
+one orb takes the variant its corner picks. Otherwise it is one flat sheet through its middle, upright wherever an upright
+sheet has two sides to hang between and level only where none has (a level sheet sits at eye height,
+and seen edge on it is a streak), drawn whole for those sides:
+`<block>_strand_sheet_<x|y|z>_<sides>`, the sides named in `Direction` order, such as
+`cobweb_strand_sheet_z_down_west_east`. Held from above and not below it hangs, and takes
+`..._hanging` instead where shipped. Any piece may ship `_2`, `_3` and on, one picked per block by
+position, so a big web does not repeat. Better Webs ships them for the cobweb.
 
 ## Keybinds
 
