@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.36.0": [
+      "A web can be drawn strung between whatever holds it, rather than the same cross in every block: one orb web across a doorway or window full of them, a sheet across a corner, a tangle carried on from web to web that frays where it hangs, and a small clump on a floor or wall holding it alone."
+    ],
     "15.35.4": [
       "Describes itself in one short line of what it adds."
     ],
