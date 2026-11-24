@@ -37,11 +37,20 @@
 		"java": ">=25",
 		"fabric-api": "${fabricApiVersion}"
 	},
+	"conflicts": {
+		"clumps": "*",
+		"getittogetherdrops": "*",
+		"lambdynlights": "*",
+		"sleepwarp": "*"
+	},
 	"custom": {
 		"modmenu": {
 			"links": {
 				"modmenu.donate": "https://github.com/sponsors/fatlard1993"
 			}
+		},
+		"lithium:options": {
+			"mixin.ai.poi.fast_portals": false
 		}
 	}
 }
