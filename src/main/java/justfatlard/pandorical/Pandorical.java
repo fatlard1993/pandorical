@@ -142,6 +142,17 @@ public class Pandorical implements ModInitializer {
             .shownWhen(player -> !DropsPolicy.clumpsInstalled())
             .backedBy(player -> DropsPolicy.clumping(player.level().getServer()),
                 (player, on) -> DropsPolicy.chooseClumping(player.level().getServer(), on));
+        settings.toggle("sleepSpeedsNight", "Sleeping speeds the night up instead of skipping it", false)
+            .describe("The more players asleep the faster; a thunderstorm is still slept through the vanilla way")
+            .shownWhen(player -> !justfatlard.pandorical.sleep.SleepSpeed.sleepWarpInstalled())
+            .backedBy(player -> justfatlard.pandorical.sleep.SleepSpeed.enabled(player.level().getServer()),
+                (player, on) -> justfatlard.pandorical.sleep.SleepSpeed.choose(player.level().getServer(), on));
+        settings.number("sleepSpeed", "How many times faster the night runs with everyone asleep",
+                2, justfatlard.pandorical.sleep.SleepSpeed.MOST_FASTEST, 2, justfatlard.pandorical.sleep.SleepSpeed.DEFAULT_FASTEST)
+            .describe("With some players asleep it runs that share of the way there")
+            .shownWhen(player -> !justfatlard.pandorical.sleep.SleepSpeed.sleepWarpInstalled())
+            .backedBy(player -> justfatlard.pandorical.sleep.SleepSpeed.fastest(player.level().getServer()),
+                (player, fastest) -> justfatlard.pandorical.sleep.SleepSpeed.chooseFastest(player.level().getServer(), fastest));
         settings.number("itemMergeRadius", "Dropped stacks merge this far apart, in tenths of a block",
                 DropsPolicy.VANILLA_MERGE_TENTHS, DropsPolicy.MOST_MERGE_TENTHS, 5, DropsPolicy.VANILLA_MERGE_TENTHS)
             .describe("5 is vanilla's. Stacks never merge through a block, or past a full stack")
@@ -172,6 +183,7 @@ public class Pandorical implements ModInitializer {
         registerConfigPhase();
         registerServerHandlers();
         registerStructureTracking();
+        justfatlard.pandorical.sleep.SleepSpeed.register();
         FarSides.register();
         justfatlard.pandorical.entitykind.EntityKinds.registerCheck();
 

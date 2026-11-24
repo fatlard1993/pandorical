@@ -6,6 +6,7 @@
 	"mixins": [
 		"SupportTypeMemoMixin",
 		"NetherPortalWaitMixin",
+		"NightSkipMixin",
 		"RailCollisionMixin",
 		"SlotMixin",
 		"InventoryMenuMixin",
