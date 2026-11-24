@@ -107,7 +107,7 @@ Mods ask through `PandoricalApi.trust()`: `may(player, what)` before doing one o
 
 ## Works with other mods
 
-Where another mod already does one of Pandorical's jobs, Pandorical leaves the job to it: Clumps (clumping XP orbs), Get It Together, Drops! (how far dropped stacks merge), SleepWarp (speeding the night up) and LambDynamicLights (dynamic lights). Its manifest lists them as conflicts, so the loader says so at startup; nothing breaks, and the setting each stands in for is hidden.
+Where another mod already does one of Pandorical's jobs, Pandorical leaves the job to it: Clumps (clumping XP orbs), Get It Together, Drops! (how far dropped stacks merge), SleepWarp (speeding the night up), LambDynamicLights (dynamic lights) and Mod Menu (the mods list on the title screen). Its manifest lists them as conflicts, so the loader says so at startup; nothing breaks, and the setting each stands in for is hidden.
 
 Lithium's faster portal search (`mixin.ai.poi.fast_portals`) replaces the code Pandorical's portal pairing builds on, and with both the server stops at startup. Pandorical turns that one Lithium option off itself, through `lithium:options` in its `fabric.mod.json`, so there is nothing to configure and the rest of Lithium stays on. Player Portals and PvP Dimensions build on the same search and do the same.
 

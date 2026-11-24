@@ -9,6 +9,7 @@
       "A Mods folder button opens your own mods folder.",
       "The Mods button also works on the title screen and on servers without Pandorical, opening your game's own list of mods, unless Mod Menu is installed.",
       "A mod that declared a config screen for Mod Menu gets a Configure button on either mods screen, with or without Mod Menu installed.",
+      "Mod Menu is listed as overlapping Pandorical, so the game notes it at startup; the two still run side by side.",
       "The mods screen lists up to 256 of your own mods, not 64. Past a generous total, the rest are listed without their readmes rather than not at all."
     ],
     "15.37.0": [
