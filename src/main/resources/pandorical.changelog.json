@@ -5,6 +5,7 @@
   ],
   "versions": {
     "15.38.0": [
+      "Server settings can be listed and changed from the server console and over RCON with /pandorical settings, so a server's choices can be scripted.",
       "Chat shows the sender's face beside each message a player sends: a client setting, on unless you turn it off, left to Chat Heads when it is installed.",
       "The mods screen has a search box, shows your own mods' icons, and opens each mod's readme with its licence, contributors, the mods bundled inside it, and links: homepage, issues, source and any it gave Mod Menu. A link asks before it opens.",
       "A Mods folder button opens your own mods folder.",

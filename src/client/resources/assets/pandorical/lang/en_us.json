@@ -18,6 +18,8 @@
   "key.pandorical.action9": "Pandorical Action 9",
   "key.pandorical.menus": "Open action menus",
   "pandorical.mods.button": "Mods",
+  "pandorical.settings.console_server_only": "Only server settings can be changed from the console; a player's own settings belong to them.",
+  "pandorical.settings.console_kept": "Kept, though it does nothing on this server as it is now; it takes effect when the setting does.",
   "pandorical.mods.changes": "Changes",
   "pandorical.mods.commands": "Commands",
   "pandorical.mods.disable_message": "This server is asking to switch %s off in your mods folder. It stays on your disk, renamed, and you can switch it back on from this screen. Nothing changes until you restart the game.",

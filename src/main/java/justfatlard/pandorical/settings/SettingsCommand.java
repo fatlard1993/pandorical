@@ -70,6 +70,7 @@ public final class SettingsCommand {
     }
 
     private static int open(CommandSourceStack source, SettingsRegistry settings) throws CommandSyntaxException {
+        if (source.getPlayer() == null) return list(source, settings);
         ServerPlayer player = source.getPlayerOrException();
         if (Forms.wanted(player)) {
             SettingsDialogs.open(player, settings);
@@ -114,15 +115,25 @@ public final class SettingsCommand {
         }
     }
 
+    /**
+     * The player a setting is read and written through. From the server console or RCON there is
+     * none, so server settings, which read only the player's server, are reached through a stand-in.
+     */
+    private static ServerPlayer actor(CommandSourceStack source) {
+        ServerPlayer player = source.getPlayer();
+        return player != null ? player : net.fabricmc.fabric.api.entity.FakePlayer.get(source.getServer().overworld());
+    }
+
     private static int list(CommandSourceStack source, SettingsRegistry settings) throws CommandSyntaxException {
-        ServerPlayer player = source.getPlayerOrException();
+        boolean console = source.getPlayer() == null;
+        ServerPlayer player = actor(source);
         if (settings.isEmpty()) {
             source.sendSuccess(() -> text("pandorical.settings.none"), false);
             return 0;
         }
         int count = 0;
         for (SettingsRegistry.GroupImpl group : settings.groups()) {
-            if (group.server && !SettingsRegistry.isOp(player)) continue;
+            if (console ? !group.server : group.server && !SettingsRegistry.isOp(player)) continue;
             String heading = switch (group.kind) {
                 case PLAYER -> group.modName;
                 case CLIENT -> group.modName + " (your client)";
@@ -141,18 +152,26 @@ public final class SettingsCommand {
 
     private static <T> int set(CommandSourceStack source, SettingsRegistry settings, String mod, String key, String value)
             throws CommandSyntaxException {
-        ServerPlayer player = source.getPlayerOrException();
+        boolean console = source.getPlayer() == null;
+        ServerPlayer player = actor(source);
         @SuppressWarnings("unchecked")
         SettingsRegistry.SettingImpl<T> setting = (SettingsRegistry.SettingImpl<T>) settings.find(mod, key);
         if (setting == null) {
             source.sendFailure(text("pandorical.settings.unknown", mod + " " + key));
             return 0;
         }
-        if (settings.groupIsServer(setting) && !SettingsRegistry.isOp(player)) {
+        if (console && !settings.groupIsServer(setting)) {
+            source.sendFailure(text("pandorical.settings.console_server_only"));
+            return 0;
+        }
+        if (!console && settings.groupIsServer(setting) && !SettingsRegistry.isOp(player)) {
             source.sendFailure(text("pandorical.settings.ops_only"));
             return 0;
         }
-        if (!setting.visible(player)) {
+        // The console may set one that is hidden now, such as a choice that waits for another mod
+        // to be removed: it is kept, and takes effect when the setting does
+        boolean hidden = !setting.visible(player);
+        if (hidden && !console) {
             source.sendFailure(text("pandorical.settings.hidden"));
             return 0;
         }
@@ -165,7 +184,9 @@ public final class SettingsCommand {
             return 0;
         }
         setting.set(player, parsed);
-        source.sendSuccess(() -> text("pandorical.settings.set", setting.label(), setting.shown(player)), false);
+        source.sendSuccess(() -> hidden
+            ? text("pandorical.settings.console_kept")
+            : text("pandorical.settings.set", setting.label(), setting.shown(player)), false);
         return 1;
     }
 
