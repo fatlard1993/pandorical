@@ -181,6 +181,7 @@ public class PandoricalClient implements ClientModInitializer {
         if (!skipped("portalviews")) justfatlard.pandorical.client.portal.PortalViews.register();
         justfatlard.pandorical.client.portal.Crossing.register();
         justfatlard.pandorical.client.render.DynamicLights.register();
+        justfatlard.pandorical.client.chat.ChatFaces.register();
 
         ClientTickEvents.START_CLIENT_TICK.register(client -> StructureManager.tick());
         ClientTickEvents.END_CLIENT_TICK.register(client -> {

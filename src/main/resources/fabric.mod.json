@@ -38,6 +38,7 @@
 		"fabric-api": "${fabricApiVersion}"
 	},
 	"conflicts": {
+		"chat_heads": "*",
 		"clumps": "*",
 		"getittogetherdrops": "*",
 		"lambdynlights": "*",

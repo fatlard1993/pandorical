@@ -48,7 +48,7 @@ Pandorical's own page has these server settings, each leaving the game as vanill
 
 Each player has one setting of their own here, `showOnMaps` (on): turned off, they are left off every map that asks, the minimap and the web map, their home included.
 
-Its client settings are the container habits above (on), immersive portals (on, and only ever doing anything on a server that has them), dynamic lights (on, so a torch in hand, a glowing item on the ground or a burning mob lights what is around it, left to LambDynamicLights when that is installed), and on Windows a load guard (on): for the first three minutes after launch and the first ninety seconds of each join it keeps the JVM's own log and samples its threads, which stopped a native crash some Windows players hit while loading. It is kept in `config/pandorical/load-guard.properties` as `enabled`.
+Its client settings are the container habits above (on), immersive portals (on, and only ever doing anything on a server that has them), dynamic lights (on, so a torch in hand, a glowing item on the ground or a burning mob lights what is around it, left to LambDynamicLights when that is installed), faces in chat (on, the sender's face beside each message a player sends, left to Chat Heads when that is installed), and on Windows a load guard (on): for the first three minutes after launch and the first ninety seconds of each join it keeps the JVM's own log and samples its threads, which stopped a native crash some Windows players hit while loading. It is kept in `config/pandorical/load-guard.properties` as `enabled`.
 
 ### The mods screen
 
@@ -107,7 +107,7 @@ Mods ask through `PandoricalApi.trust()`: `may(player, what)` before doing one o
 
 ## Works with other mods
 
-Where another mod already does one of Pandorical's jobs, Pandorical leaves the job to it: Clumps (clumping XP orbs), Get It Together, Drops! (how far dropped stacks merge), SleepWarp (speeding the night up), LambDynamicLights (dynamic lights) and Mod Menu (the mods list on the title screen). Its manifest lists them as conflicts, so the loader says so at startup; nothing breaks. The setting each stands in for is hidden, and for Mod Menu, Pandorical's title screen button.
+Where another mod already does one of Pandorical's jobs, Pandorical leaves the job to it: Clumps (clumping XP orbs), Get It Together, Drops! (how far dropped stacks merge), SleepWarp (speeding the night up), LambDynamicLights (dynamic lights), Chat Heads (faces in chat) and Mod Menu (the mods list on the title screen). Its manifest lists them as conflicts, so the loader says so at startup; nothing breaks. The setting each stands in for is hidden, and for Mod Menu, Pandorical's title screen button.
 
 Lithium's faster portal search (`mixin.ai.poi.fast_portals`) replaces the code Pandorical's portal pairing builds on, and with both the server stops at startup. Pandorical turns that one Lithium option off itself, through `lithium:options` in its `fabric.mod.json`, so there is nothing to configure and the rest of Lithium stays on. Player Portals and PvP Dimensions build on the same search and do the same.
 

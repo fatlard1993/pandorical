@@ -74,7 +74,13 @@
     "StackValidationMixin",
     "StructureDeckCarryMixin",
     "StructureDeckCollisionMixin",
-    "StructureDeckWalkMixin"
+    "StructureDeckWalkMixin",
+    "ChatFacesListenerMixin",
+    "ChatFacesMessageMixin",
+    "ChatFacesSplitMixin",
+    "ChatFacesLineMixin",
+    "ChatDrawingAccessor",
+    "ChatFocusedAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
