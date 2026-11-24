@@ -33,6 +33,8 @@ public final class SleepSpeeds implements FabricClientGameTest {
 			TestServerConnection connection = world.getConnection();
 			connection.waitForChunksRender();
 			server.runCommand("difficulty peaceful");
+			// A test world stops the clock for determinism; the night only passes with it running
+			server.runCommand("gamerule advance_time true");
 			BlockPos bed = server.computeOnServer(s -> connection.getServerPlayer().blockPosition().east(3));
 			server.runOnServer(s -> placeBed(s, bed));
 
@@ -45,14 +47,14 @@ public final class SleepSpeeds implements FabricClientGameTest {
 			context.waitTicks(110);
 			check(server.computeOnServer(s -> rate(s)) == FASTEST, "with everyone asleep, the clock runs " + FASTEST + " times faster");
 			check(server.computeOnServer(s -> connection.getServerPlayer().isSleeping()), "the night was skipped rather than sped up");
-			context.waitFor(client -> server.computeOnServer(s -> !connection.getServerPlayer().isSleeping()), 2400);
+			check(awake(context, server, connection, 2400), "the sleeper never woke");
 			context.waitTicks(5);
 			check(server.computeOnServer(s -> rate(s)) == 1.0F, "once the sleeper woke, the clock runs at its own speed again");
 
 			server.runOnServer(s -> SleepSpeed.choose(s, false));
 			server.runCommand("time set midnight");
 			sleep(server, connection, bed);
-			context.waitFor(client -> server.computeOnServer(s -> !connection.getServerPlayer().isSleeping()), 400);
+			check(awake(context, server, connection, 400), "with the option off, the sleeper never woke");
 			check(server.computeOnServer(s -> rate(s)) == 1.0F, "with the option off, the clock was sped up");
 
 			// Sped up and recorded, then the sleeper gone with no tick between: what a crash mid-night leaves
@@ -78,7 +80,18 @@ public final class SleepSpeeds implements FabricClientGameTest {
 		server.runOnServer(s -> {
 			ServerPlayer player = connection.getServerPlayer();
 			check(player.startSleeping(foot.east()), "the player lay down in the bed");
+			// Lying down this way skips the count vanilla skips the night by; without it no night is ever skipped
+			player.level().updateSleepingPlayerList();
 		});
+	}
+
+	/** Asked of the server between ticks: {@code waitFor} asks on the client thread, which may not reach the server. */
+	private static boolean awake(ClientGameTestContext context, TestServerContext server, TestServerConnection connection, int ticks) {
+		for (int i = 0; i < ticks; i++) {
+			if (server.computeOnServer(s -> !connection.getServerPlayer().isSleeping())) return true;
+			context.waitTick();
+		}
+		return false;
 	}
 
 	private static Holder<WorldClock> clock(MinecraftServer server) {
