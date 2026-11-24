@@ -1059,6 +1059,10 @@ PandoricalApi.notices().onChoice("mymod:trade", (who, id, choice) -> settle(who,
 PandoricalApi.notices().onExpiry("mymod:trade", (who, id) -> cancel(who, id));
 ```
 
+A request from one player to another, a teleport or a follow, should stand as long as every other
+mod's do: pass `PandoricalApi.notices().requestSeconds(server)` as its seconds, which is one setting
+on Pandorical's page rather than one per mod.
+
 Register `onExpiry` if a notice going unanswered means anything to your mod. A notice leaves
 without an answer three ways - it runs out of time, it is pushed out by newer ones once a player
 has more than eight waiting, or the player logs off - and all three call that handler. Without it
@@ -1267,6 +1271,23 @@ which is what makes a patterned bed read as a bed. A decal is described from its
 with `clear(player, positions)`, which sends each position with no layers. Clients skip a decal whose chunk is not loaded or whose block is gone. Vanilla clients
 see nothing; a mod keeping an item display as their fallback marks the displayed item's custom
 data with `BannerDecalApi.HIDDEN_ITEM_KEY` and Pandorical clients leave that display undrawn.
+
+## World rules, blasts and maps
+
+```java
+// Ask for a rule of the world on; an op's choice on Pandorical's page outranks it.
+PandoricalApi.rules().rainGrowth(true);
+PandoricalApi.rules().unattendedKillXp(true);
+
+// Spare one block in one place from explosions: asked as the blast is about to break what it
+// found, so a block put down after it chose its area is asked about too. Keep it cheap.
+PandoricalApi.blasts().protect((level, pos) -> MyMarks.get(level).isProtected(pos));
+
+// Whether a player wants to be on maps, their position and their home; works while they are offline.
+if (!PandoricalApi.maps().shown(server, player.getUUID())) return;
+```
+
+A map should also leave off spectators and invisible players, which `maps()` does not decide.
 
 ## Settings
 
