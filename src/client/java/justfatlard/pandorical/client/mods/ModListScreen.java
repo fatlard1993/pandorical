@@ -202,6 +202,7 @@ public final class ModListScreen extends Screen {
 		if (entry.about() != null) {
 			if (!entry.about().license().isEmpty()) wrap(out, "License: " + entry.about().license(), GREY, 0, w);
 			if (!entry.about().contributors().isEmpty()) wrap(out, "Contributors: " + entry.about().contributors(), GREY, 0, w);
+			if (!entry.about().bundled().isEmpty()) wrap(out, "Includes: " + entry.about().bundled(), GREY, 0, w);
 		}
 		List<ModCatalog.Line> readme = entry.readme();
 		int first = !readme.isEmpty() && readme.get(0).kind() == ModCatalog.Kind.HEADING && readme.get(0).level() == 1 ? 1 : 0;

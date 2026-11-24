@@ -24,13 +24,15 @@ public record ClientModAboutC2S(List<About> mods) implements CustomPacketPayload
             Link::new);
     }
 
-    public record About(String id, String license, String contributors, String icon, List<Link> links) {
+    /** {@code bundled} is the mods packed inside this one, each as its name and version, comma-separated. */
+    public record About(String id, String license, String contributors, String icon, List<Link> links, String bundled) {
         static final StreamCodec<ByteBuf, About> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.stringUtf8(64), About::id,
             ByteBufCodecs.stringUtf8(256), About::license,
             ByteBufCodecs.stringUtf8(1024), About::contributors,
             ByteBufCodecs.stringUtf8(256), About::icon,
             Link.STREAM_CODEC.apply(ByteBufCodecs.list(16)), About::links,
+            ByteBufCodecs.stringUtf8(2048), About::bundled,
             About::new);
     }
 

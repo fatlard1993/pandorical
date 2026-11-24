@@ -91,8 +91,14 @@ public final class ModCatalog {
         }
         List<String> contributors = new ArrayList<>();
         for (Person person : meta.getContributors()) contributors.add(person.getName());
+        List<String> bundled = new ArrayList<>();
+        for (ModContainer inner : container.getContainedMods()) {
+            bundled.add(inner.getMetadata().getName() + " " + inner.getMetadata().getVersion().getFriendlyString());
+        }
+        bundled.sort(String.CASE_INSENSITIVE_ORDER);
         return new ClientModAboutC2S.About(clip(meta.getId(), 64), clip(String.join(", ", meta.getLicense()), 256),
-            clip(String.join(", ", contributors), 1024), iconTexture(meta.getIconPath(32).orElse("")), list);
+            clip(String.join(", ", contributors), 1024), iconTexture(meta.getIconPath(32).orElse("")), list,
+            clip(String.join(", ", bundled), 2048));
     }
 
     /** By url, so a link given both as a contact and to Mod Menu is listed once, under its first name. */

@@ -726,6 +726,7 @@ public final class SettingsRegistry implements SettingsApi {
         if (facts != null) {
             if (!facts.license().isEmpty()) readme.paragraph("License: " + facts.license(), HINT_COLOR, 0);
             if (!facts.contributors().isEmpty()) readme.paragraph("Contributors: " + facts.contributors(), HINT_COLOR, 0);
+            if (!facts.bundled().isEmpty()) readme.paragraph("Includes: " + facts.bundled(), HINT_COLOR, 0);
             // Links as buttons, wrapping onto a new row when one would run past the pane.
             int x = 0;
             for (int i = 0; i < facts.links().size(); i++) {
