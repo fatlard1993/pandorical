@@ -130,6 +130,9 @@ public final class SleepSpeed {
 	 * stay fast through every day after. Put back at each start and each stop.
 	 */
 	public static void restoreLeftOver(MinecraftServer server) {
+		// A server that failed to start still stops, with no world to read; throwing here would
+		// skip every stop handler after this one
+		if (server.overworld() == null) return;
 		Choices choices = Choices.get(server);
 		if (choices.sped.isEmpty()) return;
 		var clocks = server.registryAccess().lookupOrThrow(Registries.WORLD_CLOCK);
