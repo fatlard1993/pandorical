@@ -240,6 +240,12 @@ public final class PandoricalApi {
 
     public static DropsApi drops() { return DROPS; }
 
+    public static WorldRulesApi rules() { return justfatlard.pandorical.rules.WorldRules.INSTANCE; }
+
+    public static BlastApi blasts() { return justfatlard.pandorical.blast.BlastGuards.INSTANCE; }
+
+    public static MapsApi maps() { return justfatlard.pandorical.maps.MapVisibility.INSTANCE; }
+
     public static MapReliefApi mapReliefs() { return MapReliefRegistry.INSTANCE; }
 
     public static PictureApi pictures() { return PictureRegistry.INSTANCE; }

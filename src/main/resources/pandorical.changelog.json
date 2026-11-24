@@ -4,6 +4,14 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.37.0": [
+      "Sleeping can speed the night up instead of skipping it: the clock runs faster the more players are asleep, smoothly on any client, an op's choice, left out when SleepWarp is installed.",
+      "Rain can grow crops, and mobs dying on their own can drop a share of their XP: two rules of the world, off until a mod asks or an op turns them on.",
+      "One setting for how long every mod's requests between players last.",
+      "Each player can choose not to be shown on maps, their position or their home, on Pandorical's page of their settings.",
+      "Mods can spare blocks from explosions through one hook, rather than each patching explosions their own way.",
+      "Clumps, Get It Together, Drops!, SleepWarp and LambDynamicLights are listed as conflicts, since Pandorical leaves their jobs to them, and Lithium's faster portal search, which portal pairing cannot run beside, is switched off from Pandorical's own manifest."
+    ],
     "15.36.1": [
       "Dynamic lights: a torch in hand, a glowing item on the ground or a burning mob lights what is around it, a client setting that steps aside for LambDynamicLights."
     ],

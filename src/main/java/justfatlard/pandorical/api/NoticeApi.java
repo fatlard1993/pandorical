@@ -115,4 +115,12 @@ public interface NoticeApi {
 
 	/** How many are waiting for this player, for a mod that wants to know before adding another. */
 	int waiting(ServerPlayer player);
+
+	/**
+	 * How long a request between players stands before it withdraws itself, a teleport or a follow say:
+	 * one setting for every mod's requests, on Pandorical's page of the mod menu. 60 until an op changes it.
+	 */
+	default int requestSeconds(net.minecraft.server.MinecraftServer server) {
+		return justfatlard.pandorical.rules.WorldRules.requestSeconds(server);
+	}
 }

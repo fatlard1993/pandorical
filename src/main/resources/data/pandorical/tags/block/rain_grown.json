@@ -1,0 +1,12 @@
+{
+	"replace": false,
+	"values": [
+		"#minecraft:crops",
+		"minecraft:sugar_cane",
+		"minecraft:bamboo",
+		"minecraft:bamboo_sapling",
+		"minecraft:sweet_berry_bush",
+		"minecraft:cocoa",
+		{ "id": "#useful-hoe:rain_grown", "required": false }
+	]
+}

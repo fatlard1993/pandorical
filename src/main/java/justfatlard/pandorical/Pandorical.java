@@ -153,6 +153,32 @@ public class Pandorical implements ModInitializer {
             .shownWhen(player -> !justfatlard.pandorical.sleep.SleepSpeed.sleepWarpInstalled())
             .backedBy(player -> justfatlard.pandorical.sleep.SleepSpeed.fastest(player.level().getServer()),
                 (player, fastest) -> justfatlard.pandorical.sleep.SleepSpeed.chooseFastest(player.level().getServer(), fastest));
+        settings.toggle("rainGrowth", "Rain grows crops", false)
+            .describe("A crop under open sky in the rain gets extra growth ticks; light and moisture still decide")
+            .backedBy(player -> justfatlard.pandorical.rules.WorldRules.rainGrowth(player.level().getServer()),
+                (player, on) -> justfatlard.pandorical.rules.WorldRules.chooseRainGrowth(player.level().getServer(), on));
+        settings.number("rainGrowthTicks", "Extra growth ticks in the rain", 0, justfatlard.pandorical.rules.WorldRules.MOST_RAIN_TICKS, 1,
+                justfatlard.pandorical.rules.WorldRules.DEFAULT_RAIN_TICKS)
+            .backedBy(player -> justfatlard.pandorical.rules.WorldRules.rainTicks(player.level().getServer()),
+                (player, ticks) -> justfatlard.pandorical.rules.WorldRules.chooseRainTicks(player.level().getServer(), ticks));
+        settings.toggle("unattendedKillXp", "Mobs dying on their own drop XP", false)
+            .describe("To a fall, lava, a golem or a trapdoor: a share of what a player's kill would drop")
+            .backedBy(player -> justfatlard.pandorical.rules.WorldRules.unattendedKillXp(player.level().getServer()),
+                (player, on) -> justfatlard.pandorical.rules.WorldRules.chooseUnattendedKillXp(player.level().getServer(), on));
+        settings.number("unattendedKillPercent", "Of a player kill's XP, percent", 0, 100, 5,
+                justfatlard.pandorical.rules.WorldRules.DEFAULT_UNATTENDED_PERCENT)
+            .backedBy(player -> justfatlard.pandorical.rules.WorldRules.unattendedPercent(player.level().getServer()),
+                (player, percent) -> justfatlard.pandorical.rules.WorldRules.chooseUnattendedPercent(player.level().getServer(), percent));
+        settings.number("requestSeconds", "Requests between players last, seconds",
+                justfatlard.pandorical.rules.WorldRules.FEWEST_REQUEST_SECONDS, justfatlard.pandorical.rules.WorldRules.MOST_REQUEST_SECONDS, 10,
+                justfatlard.pandorical.rules.WorldRules.DEFAULT_REQUEST_SECONDS)
+            .describe("A teleport, a follow or any other request a mod sends, before it withdraws itself")
+            .backedBy(player -> justfatlard.pandorical.rules.WorldRules.requestSeconds(player.level().getServer()),
+                (player, seconds) -> justfatlard.pandorical.rules.WorldRules.chooseRequestSeconds(player.level().getServer(), seconds));
+        PandoricalApi.settings().group(MOD_ID, "Pandorical")
+            .toggle("showOnMaps", "Show me on maps", true)
+            .describe("Where you are and where your home is, on the minimap, the web map and any other map")
+            .backedBy(justfatlard.pandorical.maps.MapVisibility::shown, justfatlard.pandorical.maps.MapVisibility::show);
         settings.number("itemMergeRadius", "Dropped stacks merge this far apart, in tenths of a block",
                 DropsPolicy.VANILLA_MERGE_TENTHS, DropsPolicy.MOST_MERGE_TENTHS, 5, DropsPolicy.VANILLA_MERGE_TENTHS)
             .describe("5 is vanilla's. Stacks never merge through a block, or past a full stack")
