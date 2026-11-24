@@ -138,7 +138,7 @@ public final class SettingsRegistry implements SettingsApi {
      * A search matches a mod's name, id, authors or description, ignoring case.
      */
     private static Placed place(List<Row> rows, String query) {
-        String q = query.trim().toLowerCase(java.util.Locale.ROOT);
+        String q = query.strip().toLowerCase(java.util.Locale.ROOT);
         int[] rowY = new int[rows.size()];
         int[] headY = {-1, -1, -1};
         int y = 0;

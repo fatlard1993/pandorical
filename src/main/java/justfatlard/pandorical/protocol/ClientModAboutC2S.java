@@ -36,7 +36,7 @@ public record ClientModAboutC2S(List<About> mods) implements CustomPacketPayload
     }
 
     public static final StreamCodec<ByteBuf, ClientModAboutC2S> STREAM_CODEC =
-        About.STREAM_CODEC.apply(ByteBufCodecs.list(512)).map(ClientModAboutC2S::new, ClientModAboutC2S::mods);
+        About.STREAM_CODEC.apply(ByteBufCodecs.list(256)).map(ClientModAboutC2S::new, ClientModAboutC2S::mods);
 
     @Override
     public Type<? extends CustomPacketPayload> type() { return TYPE; }

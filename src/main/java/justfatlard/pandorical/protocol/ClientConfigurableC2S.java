@@ -14,7 +14,7 @@ public record ClientConfigurableC2S(List<String> mods) implements CustomPacketPa
         new Type<>(Identifier.fromNamespaceAndPath("pandorical", "client_configurable"));
 
     public static final StreamCodec<ByteBuf, ClientConfigurableC2S> STREAM_CODEC =
-        ByteBufCodecs.stringUtf8(64).apply(ByteBufCodecs.list(512)).map(ClientConfigurableC2S::new, ClientConfigurableC2S::mods);
+        ByteBufCodecs.stringUtf8(64).apply(ByteBufCodecs.list(256)).map(ClientConfigurableC2S::new, ClientConfigurableC2S::mods);
 
     @Override
     public Type<? extends CustomPacketPayload> type() { return TYPE; }

@@ -49,7 +49,7 @@ public final class ClientSettings implements ClientSettingsApi {
      * Characters of readme sent in all. A readme that would pass it is left out and its mod still
      * listed, so a big pack's report stays small enough to send.
      */
-    private static final int MOST_README_CHARS = 400_000;
+    private static final int MOST_README_CHARS = 250_000;
 
     /** Every declared preview, across every group; its own channel, so its own list. */
     private static final List<SettingPreviewsC2S.Entry> shapes = new ArrayList<>();
