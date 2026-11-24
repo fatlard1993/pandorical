@@ -48,6 +48,22 @@ public final class ClientMods {
         return aboutByPlayer.getOrDefault(player.getUUID(), Map.of()).get(id);
     }
 
+    private static final Map<UUID, java.util.Set<String>> configurableByPlayer = new ConcurrentHashMap<>();
+
+    /** Whether one of the player's own mods has a config screen their client can open. */
+    public static boolean configurable(ServerPlayer player, String id) {
+        return configurableByPlayer.getOrDefault(player.getUUID(), java.util.Set.of()).contains(id);
+    }
+
+    public static void declareConfigurable(ServerPlayer player, justfatlard.pandorical.protocol.ClientConfigurableC2S payload) {
+        java.util.Set<String> mine = new java.util.HashSet<>();
+        for (String id : payload.mods()) {
+            if (mine.size() >= MOST_MODS) break;
+            if (MOD_ID.matcher(id).matches()) mine.add(id);
+        }
+        configurableByPlayer.put(player.getUUID(), java.util.Set.copyOf(mine));
+    }
+
     public static void declareAbout(ServerPlayer player, justfatlard.pandorical.protocol.ClientModAboutC2S payload) {
         Map<String, justfatlard.pandorical.protocol.ClientModAboutC2S.About> mine = new java.util.HashMap<>();
         for (var about : payload.mods()) {
@@ -93,6 +109,7 @@ public final class ClientMods {
         values.remove(player.getUUID());
         filesByPlayer.remove(player.getUUID());
         aboutByPlayer.remove(player.getUUID());
+        configurableByPlayer.remove(player.getUUID());
         previews.remove(player.getUUID());
     }
 

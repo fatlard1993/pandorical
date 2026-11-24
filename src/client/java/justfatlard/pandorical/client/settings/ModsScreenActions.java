@@ -37,6 +37,15 @@ public final class ModsScreenActions {
         ConfirmLinkScreen.confirmLinkNow(client.gui.screen(), uri);
     }
 
+    /** Over the mods screen, which the config screen returns to when it closes. */
+    public static void openConfig(String mod) {
+        Minecraft client = Minecraft.getInstance();
+        if (!modsScreenOpen(client)) return;
+        net.minecraft.client.gui.screens.Screen config =
+            justfatlard.pandorical.client.mods.ModConfigScreens.create(mod, client.gui.screen());
+        if (config != null) client.gui.setScreen(config);
+    }
+
     /** At most once a second, however often it is asked. */
     public static void openModsFolder() {
         Minecraft client = Minecraft.getInstance();

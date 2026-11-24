@@ -30,6 +30,7 @@
   "pandorical.mods.readme": "Readme",
   "pandorical.mods.settings": "Settings",
   "pandorical.mods.title": "Server Mods",
+  "pandorical.mods.client_title": "Mods",
   "pandorical.notices.open": "Press N",
   "pandorical.notices.open.controller": "Press [notices]",
   "pandorical.notices.unbound": "Set a key in Controls",

@@ -227,6 +227,10 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 			new justfatlard.pandorical.protocol.OpenLinkS2C("https://x")));
 		out.put("open_mods_folder", encode(justfatlard.pandorical.protocol.OpenModsFolderS2C.STREAM_CODEC,
 			new justfatlard.pandorical.protocol.OpenModsFolderS2C()));
+		out.put("client_configurable", encode(justfatlard.pandorical.protocol.ClientConfigurableC2S.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.ClientConfigurableC2S(List.of("mymod"))));
+		out.put("open_mod_config", encode(justfatlard.pandorical.protocol.OpenModConfigS2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.OpenModConfigS2C("mymod")));
 		out.put("setting_previews", encode(SettingPreviewsC2S.STREAM_CODEC, new SettingPreviewsC2S(
 			List.of(new SettingPreviewsC2S.Entry("mymod", "shape", "dot", "mymod:textures/dot.png")))));
 		out.put("capture_request", encode(CaptureRequestS2C.STREAM_CODEC, new CaptureRequestS2C(3, 512)));

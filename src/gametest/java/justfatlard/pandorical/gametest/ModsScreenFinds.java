@@ -49,6 +49,20 @@ public final class ModsScreenFinds implements FabricClientGameTest {
 			check(regions(context).contains("mod:pandorical"), "searching for Pandorical by part of its name did not list it");
 			check(regions(context).contains("folder"), "the mods screen had no button for the mods folder");
 
+			// A mod of the player's own with a config screen declared for Mod Menu: Configure opens it
+			click(context, "search");
+			for (int i = 0; i < "pandor".length(); i++) context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_BACKSPACE);
+			session.waitTicks(10);
+			click(context, "mod:pandorical-gametest");
+			session.waitTicks(10);
+			check(regions(context).contains("configure"), "the test mod's page has no Configure button: " + regions(context));
+			click(context, "configure");
+			session.waitTicks(10);
+			check(context.computeOnClient(client -> client.gui.screen() instanceof GametestModMenu.Config),
+				"Configure on the server's mods screen did not open the mod's config screen");
+			context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_ESCAPE);
+			session.waitTicks(10);
+
 			click(context, "mod:pandorical");
 			session.waitTicks(10);
 			click(context, "tab:readme");

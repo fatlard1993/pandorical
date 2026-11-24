@@ -11,6 +11,9 @@
 			"justfatlard.pandorical.gametest.GateContent",
 			"justfatlard.pandorical.gametest.ActionMenuProbe"
 		],
+		"modmenu": [
+			"justfatlard.pandorical.gametest.GametestModMenu"
+		],
 		"fabric-client-gametest": [
 			"justfatlard.pandorical.gametest.LaunchGate",
 			"justfatlard.pandorical.gametest.PackedContent",
@@ -18,6 +21,7 @@
 			"justfatlard.pandorical.gametest.DropsFixes",
 			"justfatlard.pandorical.gametest.SleepSpeeds",
 			"justfatlard.pandorical.gametest.ModsScreenFinds",
+			"justfatlard.pandorical.gametest.ModListOffline",
 			"justfatlard.pandorical.gametest.WalkableDecks",
 			"justfatlard.pandorical.gametest.SolidDecks",
 			"justfatlard.pandorical.gametest.DryHolds",

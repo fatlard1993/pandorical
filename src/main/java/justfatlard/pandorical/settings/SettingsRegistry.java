@@ -424,6 +424,13 @@ public final class SettingsRegistry implements SettingsApi {
                         : "Put its jar back. Takes effect when you restart."));
                 right -= 66 + 4;
             }
+            if (ClientMods.configurable(player, selected.id())
+                    && ServerPlayNetworking.canSend(player, justfatlard.pandorical.protocol.OpenModConfigS2C.TYPE)) {
+                screen.button("configure", right - 66, TABS_Y - 24, 66, 20, Map.of(
+                    ComponentType.PROP_LABEL, "Configure",
+                    ComponentType.PROP_TOOLTIP, "Open this mod's own settings screen"));
+                right -= 66 + 4;
+            }
             List<ModPageApi.@Nullable Button> offered = ModPages.INSTANCE.buttonsFor(player, selected.id());
             for (int i = 0; i < offered.size(); i++) {
                 ModPageApi.Button button = offered.get(i);
@@ -935,6 +942,13 @@ public final class SettingsRegistry implements SettingsApi {
         }
         if (componentId.equals("search")) {
             search(player, data.get("text"));
+            return;
+        }
+        if (componentId.equals("configure")) {
+            // For the page the server knows is open, and only a mod the client said it can configure
+            Shown was = shown.get(player.getUUID());
+            if (was == null || was.mod() == null || !ClientMods.configurable(player, was.mod())) return;
+            ServerPlayNetworking.send(player, new justfatlard.pandorical.protocol.OpenModConfigS2C(was.mod()));
             return;
         }
         if (componentId.equals("folder")) {

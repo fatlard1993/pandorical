@@ -82,6 +82,14 @@ public final class ClientModFiles {
 
 	/** Tell the server what is in the folder, on joining and after every change. */
 	public static void report() {
+		List<ClientModFilesC2S.Entry> entries = scan();
+		if (ClientPlayNetworking.canSend(ClientModFilesC2S.TYPE)) {
+			ClientPlayNetworking.send(new ClientModFilesC2S(entries));
+		}
+	}
+
+	/** What is in the folder, switched-off jars included; also what {@link #ask} will act on. */
+	public static List<ClientModFilesC2S.Entry> scan() {
 		List<ClientModFilesC2S.Entry> entries = new ArrayList<>();
 		reported.clear();
 		locked.clear();
@@ -109,10 +117,7 @@ public final class ClientModFiles {
 		} catch (Exception e) {
 			Pandorical.LOGGER.debug("[pandorical] could not list the mods folder", e);
 		}
-
-		if (ClientPlayNetworking.canSend(ClientModFilesC2S.TYPE)) {
-			ClientPlayNetworking.send(new ClientModFilesC2S(entries));
-		}
+		return entries;
 	}
 
 	/** Its own metadata, out of the jar the loader skipped. */

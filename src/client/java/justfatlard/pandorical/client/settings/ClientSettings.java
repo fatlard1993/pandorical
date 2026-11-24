@@ -110,6 +110,11 @@ public final class ClientSettings implements ClientSettingsApi {
 
         ClientPlayNetworking.send(new ClientSettingsC2S(mods));
         if (ClientPlayNetworking.canSend(ClientModAboutC2S.TYPE)) ClientPlayNetworking.send(new ClientModAboutC2S(abouts));
+        if (ClientPlayNetworking.canSend(justfatlard.pandorical.protocol.ClientConfigurableC2S.TYPE)) {
+            List<String> configurable = new ArrayList<>(justfatlard.pandorical.client.mods.ModConfigScreens.configurable());
+            if (configurable.size() > MOST_MODS) configurable = configurable.subList(0, MOST_MODS);
+            ClientPlayNetworking.send(new justfatlard.pandorical.protocol.ClientConfigurableC2S(configurable));
+        }
     }
 
     public void apply(ClientSettingS2C payload) {
