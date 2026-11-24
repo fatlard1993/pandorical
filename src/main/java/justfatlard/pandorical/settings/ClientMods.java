@@ -43,7 +43,7 @@ public final class ClientMods {
     private static final Map<UUID, Map<String, justfatlard.pandorical.protocol.ClientModAboutC2S.About>> aboutByPlayer =
         new ConcurrentHashMap<>();
 
-    /** Licence, contributors, icon and links of one of the player's own mods, or null. */
+    /** What one of the player's own mods says about itself, as their client reported it, or null. */
     public static justfatlard.pandorical.protocol.ClientModAboutC2S.About aboutOf(ServerPlayer player, String id) {
         return aboutByPlayer.getOrDefault(player.getUUID(), Map.of()).get(id);
     }

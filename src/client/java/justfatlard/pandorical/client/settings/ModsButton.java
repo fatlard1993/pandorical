@@ -21,8 +21,8 @@ import net.minecraft.network.chat.Component;
  * installed and has put its own button there.
  */
 @Environment(EnvType.CLIENT)
-public final class ServerSettingsButton {
-    private ServerSettingsButton() {}
+public final class ModsButton {
+    private ModsButton() {}
 
     private static final int WIDTH = 110;
     private static final int HEIGHT = 20;

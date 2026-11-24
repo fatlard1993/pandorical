@@ -276,8 +276,11 @@ public final class SettingsRegistry implements SettingsApi {
         int serverCount = onServer.size();
 
         List<ModCatalog.ModInfo> off = new ArrayList<>();
+        java.util.Set<String> listed = new java.util.HashSet<>();
+        for (ModCatalog.ModInfo mod : mods) listed.add(mod.id());
         for (var entry : ClientMods.filesOf(player)) {
-            if (entry.enabled()) continue;
+            // Switched off but still running until a restart: listed once, where it runs, with Enable
+            if (entry.enabled() || listed.contains(entry.id())) continue;
             off.add(new ModCatalog.ModInfo(entry.id(), entry.name(), entry.version(),
                 "", "Switched off on your client.", List.of()));
         }
@@ -483,7 +486,7 @@ public final class SettingsRegistry implements SettingsApi {
 
         screen.button("close", at.width / 2 - 40, at.height - 26, 80, 20,
             Map.of(ComponentType.PROP_LABEL_KEY, "pandorical.settings.close"));
-        // Only for a client that can open it: one from before has no such channel.
+        // An older client has no such channel.
         if (ServerPlayNetworking.canSend(player, justfatlard.pandorical.protocol.OpenModsFolderS2C.TYPE)) {
             screen.button("folder", LIST_X, at.height - 26, Math.min(at.listW, at.width / 2 - 44 - LIST_X), 20, Map.of(
                 ComponentType.PROP_LABEL, "Mods folder",
@@ -592,12 +595,18 @@ public final class SettingsRegistry implements SettingsApi {
         return false;
     }
 
-    /** This player's own jar for a mod, or null where the mod is the server's rather than theirs. */
+    /**
+     * This player's own jar for a mod as it is on disk now, a switched-off one over the name it was
+     * loaded from; null where the mod is the server's rather than theirs.
+     */
     private static String fileOf(ServerPlayer player, String modId) {
+        String found = null;
         for (var entry : ClientMods.filesOf(player)) {
-            if (entry.id().equals(modId)) return entry.file();
+            if (!entry.id().equals(modId)) continue;
+            if (!entry.enabled()) return entry.file();
+            found = entry.file();
         }
-        return null;
+        return found;
     }
 
     private static int badgeWidth(int count) {
@@ -727,7 +736,6 @@ public final class SettingsRegistry implements SettingsApi {
             if (!facts.license().isEmpty()) readme.paragraph("License: " + facts.license(), HINT_COLOR, 0);
             if (!facts.contributors().isEmpty()) readme.paragraph("Contributors: " + facts.contributors(), HINT_COLOR, 0);
             if (!facts.bundled().isEmpty()) readme.paragraph("Includes: " + facts.bundled(), HINT_COLOR, 0);
-            // Links as buttons, wrapping onto a new row when one would run past the pane.
             int x = 0;
             for (int i = 0; i < facts.links().size(); i++) {
                 String label = facts.links().get(i).label();
@@ -780,10 +788,7 @@ public final class SettingsRegistry implements SettingsApi {
         return Math.max(readme.y, 1);
     }
 
-    /**
-     * A mod's licence, contributors, links and icon: the server's own reading for a mod installed
-     * here, else what the player's client reported for one of theirs.
-     */
+    /** What a mod says about itself: the server's own reading where it is installed here, else the player's client's. */
     private static justfatlard.pandorical.protocol.ClientModAboutC2S.@Nullable About factsOf(ServerPlayer player, String id) {
         var ours = ModCatalog.about(id);
         return ours != null ? ours : ClientMods.aboutOf(player, id);
@@ -946,7 +951,6 @@ public final class SettingsRegistry implements SettingsApi {
             return;
         }
         if (componentId.equals("configure")) {
-            // For the page the server knows is open, and only a mod the client said it can configure
             Shown was = shown.get(player.getUUID());
             if (was == null || was.mod() == null || !ClientMods.configurable(player, was.mod())) return;
             ServerPlayNetworking.send(player, new justfatlard.pandorical.protocol.OpenModConfigS2C(was.mod()));

@@ -47,7 +47,7 @@ import justfatlard.pandorical.client.screen.PandoricalScreen;
 import justfatlard.pandorical.client.settings.ClientSettings;
 import justfatlard.pandorical.client.settings.ContainerHabits;
 import justfatlard.pandorical.client.settings.ServerCapabilities;
-import justfatlard.pandorical.client.settings.ServerSettingsButton;
+import justfatlard.pandorical.client.settings.ModsButton;
 import justfatlard.pandorical.client.settings.ViewportReporter;
 import justfatlard.pandorical.client.skin.SkinOverrides;
 import justfatlard.pandorical.client.structure.StructureManager;
@@ -561,7 +561,7 @@ public class PandoricalClient implements ClientModInitializer {
                 KeybindManager.applyDefaults(payload));
         });
 
-        ServerSettingsButton.register();
+        ModsButton.register();
 
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             // There is nobody to tell when the file is read at startup, so it is said here.

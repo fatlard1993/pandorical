@@ -1,8 +1,8 @@
 package justfatlard.pandorical.client.mods;
 
-import com.mojang.blaze3d.Blaze3D;
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.client.settings.ClientModFiles;
+import justfatlard.pandorical.client.settings.ModsScreenActions;
 import justfatlard.pandorical.protocol.ClientModAboutC2S;
 import justfatlard.pandorical.protocol.ClientModFilesC2S;
 import justfatlard.pandorical.settings.ModCatalog;
@@ -14,14 +14,12 @@ import net.fabricmc.loader.api.metadata.Person;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import org.jspecify.annotations.Nullable;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -55,6 +53,8 @@ public final class ModListScreen extends Screen {
 	private int paneOffset;
 	private List<Shown> lines = List.of();
 	private int paneTop;
+	/** Typing rebuilds the screen, and a rebuild drops focus; this puts it back in the box. */
+	private boolean searching;
 
 	public ModListScreen(Screen parent) {
 		super(Component.translatable("pandorical.mods.client_title"));
@@ -68,7 +68,7 @@ public final class ModListScreen extends Screen {
 	private int bottom() { return height - 32; }
 
 	private void load() {
-		List<ClientModFilesC2S.Entry> files = ClientModFiles.scan();
+		List<ClientModFilesC2S.Entry> files = ClientModFiles.rescan();
 		List<Entry> out = new ArrayList<>();
 		for (ModContainer container : FabricLoader.getInstance().getAllMods()) {
 			var meta = container.getMetadata();
@@ -76,14 +76,21 @@ public final class ModListScreen extends Screen {
 			List<String> names = new ArrayList<>();
 			for (Person person : meta.getAuthors()) names.add(person.getName());
 			String file = null;
-			for (var f : files) if (f.enabled() && f.id().equals(meta.getId())) file = f.file();
+			boolean switchedOff = false;
+			for (var f : files) {
+				if (!f.id().equals(meta.getId())) continue;
+				if (f.enabled()) file = f.file();
+				else switchedOff = true;
+			}
+			// Switched off since launch: still running, but listed once, as off, where Enable is
+			if (file == null && switchedOff) continue;
 			out.add(new Entry(meta.getId(), meta.getName(), meta.getVersion().getFriendlyString(), String.join(", ", names),
 				meta.getDescription(), ModCatalog.readmeOf(container), ModCatalog.aboutOf(container), file, true));
 		}
 		out.sort(Comparator.comparing(entry -> entry.name().toLowerCase(Locale.ROOT)));
 		List<Entry> off = new ArrayList<>();
 		for (var f : files) {
-			if (!f.enabled()) off.add(new Entry(f.id(), f.name(), f.version(), "", "Switched off.", List.of(), null, f.file(), false));
+			if (!f.enabled()) off.add(new Entry(f.id(), f.name(), f.version(), "", "", List.of(), null, f.file(), false));
 		}
 		off.sort(Comparator.comparing(entry -> entry.name().toLowerCase(Locale.ROOT)));
 		out.addAll(off);
@@ -102,7 +109,7 @@ public final class ModListScreen extends Screen {
 	}
 
 	private @Nullable Entry chosen() {
-		for (Entry entry : entries) if (entry.id().equals(selected) && (entry.on() || entry.file() != null)) return entry;
+		for (Entry entry : entries) if (entry.id().equals(selected)) return entry;
 		return null;
 	}
 
@@ -119,22 +126,24 @@ public final class ModListScreen extends Screen {
 			if (value.equals(query)) return;
 			query = value;
 			listOffset = 0;
+			searching = true;
 			rebuildWidgets();
 		});
 		addRenderableWidget(search);
+		if (searching) setFocused(search);
 
 		List<Entry> shown = matching();
 		int rows = Math.max(1, (bottom() - listTop()) / ROW);
 		listOffset = Math.clamp(listOffset, 0, Math.max(0, shown.size() - rows));
 		for (int i = 0; i < rows && listOffset + i < shown.size(); i++) {
 			Entry entry = shown.get(listOffset + i);
-			Button row = Button.builder(Component.literal(entry.on() ? entry.name() : entry.name() + " (off)"), b -> {
+			String label = (entry.id().equals(selected) ? "\u25B6 " : "") + entry.name() + (entry.on() ? "" : " (off)");
+			addRenderableWidget(Button.builder(Component.literal(font.plainSubstrByWidth(label, listW() - 8)), b -> {
 				selected = entry.id();
 				paneOffset = 0;
+				searching = false;
 				rebuildWidgets();
-			}).bounds(8, listTop() + i * ROW, listW(), 20).build();
-			row.active = !entry.id().equals(selected);
-			addRenderableWidget(row);
+			}).bounds(8, listTop() + i * ROW, listW(), 20).build());
 		}
 
 		Entry entry = chosen();
@@ -142,25 +151,25 @@ public final class ModListScreen extends Screen {
 		if (entry != null) {
 			int x = paneX();
 			if (entry.on() && ModConfigScreens.has(entry.id())) {
-				x = button(x, y, "Configure", () -> {
-					Screen config = ModConfigScreens.create(entry.id(), this);
-					if (config != null) minecraft.gui.setScreen(config);
-				});
+				x = button(x, y, "Configure", () -> ModsScreenActions.openConfigOver(this, entry.id()));
 			}
 			if (entry.file() != null && !entry.id().equals(Pandorical.MOD_ID)) {
 				x = button(x, y, entry.on() ? "Disable" : "Enable", () -> {
-					ClientModFiles.ask(entry.file());
+					ClientModFiles.ask(entry.file(), false);
 					entries = List.of();
 				});
 			}
 			if (entry.about() != null) {
+				// Two rows of buttons at most, so the readme keeps the pane
+				int lastRow = y + 22;
 				for (var link : entry.about().links()) {
 					int w = font.width(link.label()) + 12;
 					if (x > paneX() && x + w > paneX() + paneW()) {
+						if (y >= lastRow) break;
 						x = paneX();
 						y += 22;
 					}
-					x = button(x, y, link.label(), () -> open(link.url()));
+					x = button(x, y, link.label(), () -> ModsScreenActions.openLinkFrom(this, link.url()));
 				}
 			}
 			if (x > paneX()) y += 24;
@@ -168,13 +177,7 @@ public final class ModListScreen extends Screen {
 		paneTop = y;
 		lines = entry == null ? List.of() : describe(entry);
 
-		addRenderableWidget(Button.builder(Component.literal("Mods folder"), b -> {
-			try {
-				Blaze3D.openPath(FabricLoader.getInstance().getGameDir().resolve("mods"));
-			} catch (RuntimeException e) {
-				Pandorical.LOGGER.warn("[pandorical] could not open the mods folder", e);
-			}
-		}).bounds(8, height - 26, Math.min(listW(), width / 2 - 58), 20).build());
+		addRenderableWidget(Button.builder(Component.literal("Mods folder"), b -> ModsScreenActions.openModsFolderNow()).bounds(8, height - 26, Math.min(listW(), width / 2 - 58), 20).build());
 		addRenderableWidget(Button.builder(Component.translatable("gui.done"), b -> onClose())
 			.bounds(width / 2 - 50, height - 26, 100, 20).build());
 	}
@@ -185,19 +188,11 @@ public final class ModListScreen extends Screen {
 		return x + w + 4;
 	}
 
-	private void open(String url) {
-		String lower = url.toLowerCase(Locale.ROOT);
-		if (!lower.startsWith("https://") && !lower.startsWith("http://")) return;
-		try {
-			ConfirmLinkScreen.confirmLinkNow(this, new URI(url));
-		} catch (Exception ignored) {
-		}
-	}
-
 	/** Description, licence, contributors and readme, wrapped to the pane. */
 	private List<Shown> describe(Entry entry) {
 		List<Shown> out = new ArrayList<>();
 		int w = paneW() - 8;
+		if (!entry.on()) wrap(out, "Switched off. Enable it, then restart the game.", GREY, 0, w);
 		if (!entry.description().isEmpty()) wrap(out, entry.description(), WHITE, 0, w);
 		if (entry.about() != null) {
 			if (!entry.about().license().isEmpty()) wrap(out, "License: " + entry.about().license(), GREY, 0, w);
@@ -255,6 +250,15 @@ public final class ModListScreen extends Screen {
 	public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
 		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 		graphics.centeredText(font, title, width / 2, 8, WHITE);
+		int rows = Math.max(1, (bottom() - listTop()) / ROW);
+		int count = matching().size();
+		if (count > rows) {
+			// Where in the list the shown rows are, beside it
+			int track = rows * ROW - 2;
+			int thumb = Math.max(8, track * rows / count);
+			int top = listTop() + (track - thumb) * listOffset / Math.max(1, count - rows);
+			graphics.fill(8 + listW() + 2, top, 8 + listW() + 4, top + thumb, GREY);
+		}
 		Entry entry = chosen();
 		if (entry == null) return;
 		int x = paneX();
@@ -263,8 +267,9 @@ public final class ModListScreen extends Screen {
 			graphics.blit(RenderPipelines.GUI_TEXTURED, icon, x, 24, 0.0F, 0.0F, ICON, ICON, ICON, ICON);
 			x += ICON + 6;
 		}
-		graphics.text(font, entry.name() + "  " + entry.version(), x, 28, WHITE);
-		graphics.text(font, entry.authors().isEmpty() ? entry.id() : entry.authors(), x, 42, GREY);
+		int room = paneX() + paneW() - x;
+		graphics.text(font, font.plainSubstrByWidth(entry.name() + "  " + entry.version(), room), x, 28, WHITE);
+		graphics.text(font, font.plainSubstrByWidth(entry.authors().isEmpty() ? entry.id() : entry.authors(), room), x, 42, GREY);
 		graphics.enableScissor(paneX(), paneTop, paneX() + paneW(), bottom());
 		int y = paneTop;
 		for (int i = paneOffset; i < lines.size() && y < bottom(); i++) {

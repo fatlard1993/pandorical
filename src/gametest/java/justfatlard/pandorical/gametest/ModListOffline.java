@@ -20,26 +20,33 @@ public final class ModListOffline implements FabricClientGameTest {
 	public void runTest(ClientGameTestContext context) {
 		context.setScreen(TitleScreen::new);
 		context.waitTicks(2);
-		// With Mod Menu installed its own button is there and Pandorical's stays away
-		if (!net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("modmenu")) {
-			String mods = Component.translatable("pandorical.mods.button").getString();
-			check(widget(context, mods) != null, "the title screen has no " + mods + " button");
-		} else {
+		boolean modMenu = net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("modmenu");
+		check(pandoricalsButton(context) != modMenu, modMenu
+			? "with Mod Menu installed, Pandorical still put its Mods button on the title screen"
+			: "the title screen has no Mods button");
+		if (modMenu) {
 			System.out.println("[pandorical test] Mod Menu installed; its API loaded from "
 				+ com.terraformersmc.modmenu.api.ModMenuApi.class.getProtectionDomain().getCodeSource().getLocation());
 		}
-		if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("modmenu") && Smoke.full()) {
-			// Mod Menu itself still works on whichever copy of its API the game loaded: its list
-			// opens, and it finds the config screen a mod declared to it
+		if (modMenu && Smoke.full()) {
+			// By reflection: Mod Menu is not on the compile classpath
 			String verdict = context.computeOnClient(client -> {
 				try {
-					Class<?> modMenu = Class.forName("com.terraformersmc.modmenu.ModMenu");
-					Object config = modMenu.getMethod("getConfigScreen", String.class, net.minecraft.client.gui.screens.Screen.class)
+					Class<?> modMenuClass = Class.forName("com.terraformersmc.modmenu.ModMenu");
+					Object config = modMenuClass.getMethod("getConfigScreen", String.class, net.minecraft.client.gui.screens.Screen.class)
 						.invoke(null, "pandorical-gametest", new TitleScreen());
 					if (!(config instanceof GametestModMenu.Config)) return "Mod Menu did not find the test mod's config screen, got " + config;
-					Object list = Class.forName("com.terraformersmc.modmenu.gui.ModsScreen")
-						.getConstructor(net.minecraft.client.gui.screens.Screen.class).newInstance(new TitleScreen());
-					client.gui.setScreen((net.minecraft.client.gui.screens.Screen) list);
+					// Whichever copy of the API loaded answers as Mod Menu would
+					var bare = new com.terraformersmc.modmenu.api.ModMenuApi() {}.getModConfigScreenFactory();
+					if (!bare.getClass().getName().equals("com.terraformersmc.modmenu.util.NullScreenFactory"))
+						return "a mod with no config screen gets " + bare.getClass().getName() + ", which Mod Menu offers as one";
+					Object text = modMenuClass.getMethod("createModsButtonText", boolean.class).invoke(null, true);
+					if (!com.terraformersmc.modmenu.api.ModMenuApi.createModsButtonText().getString().equals(((Component) text).getString()))
+						return "the Mods button text is not Mod Menu's";
+					var list = com.terraformersmc.modmenu.api.ModMenuApi.createModsScreen(new TitleScreen());
+					if (!list.getClass().getName().equals("com.terraformersmc.modmenu.gui.ModsScreen"))
+						return "createModsScreen gave " + list.getClass().getName() + ", not Mod Menu's list";
+					client.gui.setScreen(list);
 					return null;
 				} catch (ReflectiveOperationException | LinkageError e) {
 					return "Mod Menu broke on Pandorical's copy of its API: " + e;
@@ -57,7 +64,6 @@ public final class ModListOffline implements FabricClientGameTest {
 		}
 		if (!Smoke.full()) return;
 
-		// The icon the list draws for Pandorical is a texture the game actually has, not a checkerboard
 		check(context.computeOnClient(client -> {
 			var about = justfatlard.pandorical.settings.ModCatalog.aboutOf(
 				net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("pandorical").orElseThrow());
@@ -77,25 +83,46 @@ public final class ModListOffline implements FabricClientGameTest {
 		check(context.computeOnClient(client -> client.gui.screen() instanceof ModListScreen),
 			"closing the config screen did not come back to the mod list");
 
-		search(context, "no mod is called this");
+		click(context, searchBoxCentre(context));
+		context.getInput().typeChars("no mod is called this");
 		context.waitTicks(2);
 		check(widget(context, TEST_MOD) == null, "a search matching nothing still listed " + TEST_MOD);
-		search(context, "launch");
+		for (int i = 0; i < "no mod is called this".length(); i++) {
+			context.getInput().pressKey(com.mojang.blaze3d.platform.InputConstants.KEY_BACKSPACE);
+		}
+		context.getInput().typeChars("launch");
 		context.waitTicks(2);
 		check(widget(context, TEST_MOD) != null, "searching part of its name did not list " + TEST_MOD);
 		context.setScreen(TitleScreen::new);
 	}
 
-	/** Found first and typed into after: typing rebuilds the screen, which the loop would be walking. */
-	private static void search(ClientGameTestContext context, String text) {
-		context.runOnClient(client -> {
-			EditBox found = null;
-			for (var child : client.gui.screen().children()) {
-				if (child instanceof EditBox box) found = box;
+	/** Pandorical's own Mods button, in the title screen's top right corner. */
+	private static boolean pandoricalsButton(ClientGameTestContext context) {
+		return context.computeOnClient(client -> {
+			var screen = client.gui.screen();
+			for (var child : screen.children()) {
+				if (child instanceof AbstractWidget w && w.getX() == screen.width - 116 && w.getY() == 6) return true;
 			}
-			if (found == null) throw new AssertionError("the mod list has no search box");
-			found.setValue(text);
+			return false;
 		});
+	}
+
+	private static double[] searchBoxCentre(ClientGameTestContext context) {
+		return context.computeOnClient(client -> {
+			for (var child : client.gui.screen().children()) {
+				if (child instanceof EditBox box) {
+					double scale = client.getWindow().getGuiScale();
+					return new double[] {(box.getX() + box.getWidth() / 2.0) * scale, (box.getY() + box.getHeight() / 2.0) * scale};
+				}
+			}
+			throw new AssertionError("the mod list has no search box");
+		});
+	}
+
+	private static void click(ClientGameTestContext context, double[] at) {
+		context.getInput().setCursorPos(at[0], at[1]);
+		context.waitTick();
+		context.getInput().pressMouse(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT);
 	}
 
 	private static double[] widget(ClientGameTestContext context, String label) {

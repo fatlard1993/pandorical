@@ -54,7 +54,7 @@ public final class ModCatalog {
         return cached;
     }
 
-    /** Licence, contributors and links of a mod on this side, or null for one not installed here. */
+    /** What a mod installed on this side says about itself, or null for one that is not. */
     public static synchronized ClientModAboutC2S.About about(String id) {
         all();
         return abouts.get(id);
@@ -103,10 +103,14 @@ public final class ModCatalog {
 
     /** By url, so a link given both as a contact and to Mod Menu is listed once, under its first name. */
     private static void link(Map<String, String> links, String label, String url) {
-        if (url == null || url.length() > 512) return;
-        String lower = url.toLowerCase(Locale.ROOT);
-        if (!lower.startsWith("https://") && !lower.startsWith("http://")) return;
+        if (url == null || url.length() > 512 || !isWebLink(url)) return;
         links.putIfAbsent(url, label);
+    }
+
+    /** The only links the mods screens offer to open. */
+    public static boolean isWebLink(String url) {
+        String lower = url.toLowerCase(Locale.ROOT);
+        return lower.startsWith("https://") || lower.startsWith("http://");
     }
 
     /** {@code modmenu.donate} is Donate; Mod Menu's own keys carry its prefix. */

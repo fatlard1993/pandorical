@@ -179,6 +179,7 @@ public final class ScreenHelper {
     }
 
     public static void sendAction(String screenId, String componentId, Map<String, String> data) {
+        justfatlard.pandorical.client.settings.ModsScreenActions.pressed(componentId);
         ClientPlayNetworking.send(new ScreenActionC2S(
             screenId, componentId,
             componentId.equals("_screen") ? "close" : "click",

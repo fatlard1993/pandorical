@@ -46,8 +46,8 @@ public final class ClientSettings implements ClientSettingsApi {
     /** Enough for a large pack, and a bound on what one client can make the server hold. */
     private static final int MOST_MODS = 256;
     /**
-     * Characters of readme sent in all. Past it the rest of the mods are still listed, without
-     * their readmes, rather than a big pack making a report too large to send.
+     * Characters of readme sent in all. A readme that would pass it is left out and its mod still
+     * listed, so a big pack's report stays small enough to send.
      */
     private static final int MOST_README_CHARS = 400_000;
 

@@ -9,6 +9,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
@@ -82,14 +83,17 @@ public final class ClientModFiles {
 
 	/** Tell the server what is in the folder, on joining and after every change. */
 	public static void report() {
-		List<ClientModFilesC2S.Entry> entries = scan();
+		List<ClientModFilesC2S.Entry> entries = rescan();
 		if (ClientPlayNetworking.canSend(ClientModFilesC2S.TYPE)) {
 			ClientPlayNetworking.send(new ClientModFilesC2S(entries));
 		}
 	}
 
-	/** What is in the folder, switched-off jars included; also what {@link #ask} will act on. */
-	public static List<ClientModFilesC2S.Entry> scan() {
+	/**
+	 * Reads the folder again, switched-off jars included, without telling the server. Also resets
+	 * which files {@link #ask} will act on, to these.
+	 */
+	public static List<ClientModFilesC2S.Entry> rescan() {
 		List<ClientModFilesC2S.Entry> entries = new ArrayList<>();
 		reported.clear();
 		locked.clear();
@@ -170,6 +174,11 @@ public final class ClientModFiles {
 	 * is always the operation that runs.
 	 */
 	public static void ask(String file) {
+		ask(file, true);
+	}
+
+	/** {@code byServer} names the server as the one asking; false for the player's own mod list. */
+	public static void ask(String file, boolean byServer) {
 		if (reported.get(file) == null) {
 			say("Pandorical did not recognise that mod file, so nothing was changed.");
 			return;
@@ -193,7 +202,8 @@ public final class ClientModFiles {
 				client.gui.setScreen(previous);
 			},
 			Component.translatable(enable ? "pandorical.mods.enable_title" : "pandorical.mods.disable_title"),
-			Component.translatable(enable ? "pandorical.mods.enable_message" : "pandorical.mods.disable_message", file),
+			Component.translatable((enable ? "pandorical.mods.enable_message" : "pandorical.mods.disable_message")
+				+ (byServer ? "" : "_local"), file),
 			Component.translatable(enable ? "pandorical.mods.enable_yes" : "pandorical.mods.disable_yes"),
 			CommonComponents.GUI_CANCEL);
 		// The server chooses the moment this appears, and it can appear under a click already on
@@ -247,9 +257,18 @@ public final class ClientModFiles {
 		asking = null;
 	}
 
+	/** In chat while in a world; as a toast on the title screen, where there is no chat. */
 	private static void say(String message) {
 		Minecraft client = Minecraft.getInstance();
 		if (client.player != null) client.player.sendSystemMessage(Component.literal(message));
+		else toast("Mods folder", message);
 		Pandorical.LOGGER.info("[pandorical] {}", message);
+	}
+
+	private static final SystemToast.SystemToastId TOAST = new SystemToast.SystemToastId();
+
+	public static void toast(String title, String message) {
+		SystemToast.addOrUpdate(Minecraft.getInstance().gui.toastManager(), TOAST,
+			Component.literal(title), Component.literal(message));
 	}
 }
