@@ -128,7 +128,8 @@ public final class ModListOffline implements FabricClientGameTest {
 	private static double[] widget(ClientGameTestContext context, String label) {
 		return context.computeOnClient(client -> {
 			for (var child : client.gui.screen().children()) {
-				if (child instanceof AbstractWidget w && w.visible && w.getMessage().getString().equals(label)) {
+				// The selected row is marked ahead of its name
+				if (child instanceof AbstractWidget w && w.visible && w.getMessage().getString().replace("\u25B6 ", "").equals(label)) {
 					double scale = client.getWindow().getGuiScale();
 					return new double[] {(w.getX() + w.getWidth() / 2.0) * scale, (w.getY() + w.getHeight() / 2.0) * scale};
 				}
