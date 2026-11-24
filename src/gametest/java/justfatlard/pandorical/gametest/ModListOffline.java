@@ -28,6 +28,29 @@ public final class ModListOffline implements FabricClientGameTest {
 			System.out.println("[pandorical test] Mod Menu installed; its API loaded from "
 				+ com.terraformersmc.modmenu.api.ModMenuApi.class.getProtectionDomain().getCodeSource().getLocation());
 		}
+		if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("modmenu") && Smoke.full()) {
+			// Mod Menu itself still works on whichever copy of its API the game loaded: its list
+			// opens, and it finds the config screen a mod declared to it
+			String verdict = context.computeOnClient(client -> {
+				try {
+					Class<?> modMenu = Class.forName("com.terraformersmc.modmenu.ModMenu");
+					Object config = modMenu.getMethod("getConfigScreen", String.class, net.minecraft.client.gui.screens.Screen.class)
+						.invoke(null, "pandorical-gametest", new TitleScreen());
+					if (!(config instanceof GametestModMenu.Config)) return "Mod Menu did not find the test mod's config screen, got " + config;
+					Object list = Class.forName("com.terraformersmc.modmenu.gui.ModsScreen")
+						.getConstructor(net.minecraft.client.gui.screens.Screen.class).newInstance(new TitleScreen());
+					client.gui.setScreen((net.minecraft.client.gui.screens.Screen) list);
+					return null;
+				} catch (ReflectiveOperationException | LinkageError e) {
+					return "Mod Menu broke on Pandorical's copy of its API: " + e;
+				}
+			});
+			check(verdict == null, verdict);
+			context.waitTicks(5);
+			check(context.computeOnClient(client -> client.gui.screen() != null
+				&& client.gui.screen().getClass().getName().equals("com.terraformersmc.modmenu.gui.ModsScreen")),
+				"Mod Menu's own list did not stay open");
+		}
 		if (!Smoke.full()) return;
 
 		context.setScreen(() -> new ModListScreen(new TitleScreen()));
