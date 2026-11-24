@@ -129,7 +129,7 @@ public final class SleepSpeed {
 	 * A clock's rate is kept with the world, so one sped up when the server stopped, or crashed, would
 	 * stay fast through every day after. Put back at each start and each stop.
 	 */
-	private static void restoreLeftOver(MinecraftServer server) {
+	public static void restoreLeftOver(MinecraftServer server) {
 		Choices choices = Choices.get(server);
 		if (choices.sped.isEmpty()) return;
 		var clocks = server.registryAccess().lookupOrThrow(Registries.WORLD_CLOCK);
