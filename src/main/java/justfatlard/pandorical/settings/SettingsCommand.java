@@ -132,6 +132,13 @@ public final class SettingsCommand {
             return 0;
         }
         int count = 0;
+        // The console and RCON show each message as it comes, with nothing between them, so there
+        // the whole listing is one message of lines
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        java.util.function.Consumer<String> say = line -> {
+            if (console) lines.add(line);
+            else source.sendSuccess(() -> Component.literal(line), false);
+        };
         for (SettingsRegistry.GroupImpl group : settings.groups()) {
             if (console ? !group.server : group.server && !SettingsRegistry.isOp(player)) continue;
             String heading = switch (group.kind) {
@@ -139,14 +146,17 @@ public final class SettingsCommand {
                 case CLIENT -> group.modName + " (your client)";
                 case SERVER -> group.modName + " (server, ops only)";
             };
-            source.sendSuccess(() -> Component.literal(heading), false);
+            say.accept(heading);
             for (SettingsRegistry.SettingImpl<?> setting : group.settings) {
-                if (!setting.visible(player)) continue;
-                String line = "  " + group.modId + " " + setting.key + " = " + setting.shown(player) + "   (" + setting.label() + ")";
-                source.sendSuccess(() -> Component.literal(line), false);
+                boolean hidden = !setting.visible(player);
+                // The console can set a hidden one, so it sees them, marked
+                if (hidden && !console) continue;
+                say.accept("  " + group.modId + " " + setting.key + " = " + setting.shown(player) + "   (" + setting.label() + ")"
+                    + (hidden ? "   [does nothing on this server now]" : ""));
                 count++;
             }
         }
+        if (console) source.sendSuccess(() -> Component.literal(String.join("\n", lines)), false);
         return count;
     }
 

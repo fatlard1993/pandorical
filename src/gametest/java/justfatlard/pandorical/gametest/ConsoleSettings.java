@@ -38,6 +38,8 @@ public final class ConsoleSettings implements FabricClientGameTest {
 			check(all.contains("Only server settings can be changed from the console"),
 				"the console was not refused a player's own setting; it said: " + all);
 			check(all.contains("(server, ops only)"), "listing from the console showed no server settings; it said: " + all);
+			check(said.stream().anyMatch(m -> m.contains("(server, ops only)") && m.contains("\n")),
+				"the console's listing came as separate messages, which RCON runs together: " + all);
 			session.onServer(server -> SleepSpeed.choose(server, false));
 		});
 	}
