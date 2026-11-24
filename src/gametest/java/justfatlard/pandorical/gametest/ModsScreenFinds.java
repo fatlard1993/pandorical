@@ -68,6 +68,11 @@ public final class ModsScreenFinds implements FabricClientGameTest {
 			click(context, "tab:readme");
 			session.waitTicks(10);
 			check(regions(context).contains("link:0"), "Pandorical's readme tab shows no links: " + regions(context));
+			// A server can send any link; one that is not the web is never offered, prompt or not
+			context.runOnClient(client -> justfatlard.pandorical.client.settings.ModsScreenActions.openLink("file:///etc/passwd"));
+			session.waitTicks(5);
+			check(!context.computeOnClient(client -> client.gui.screen() instanceof ConfirmLinkScreen),
+				"a file: link was offered to open");
 			click(context, "link:0");
 			session.waitTicks(10);
 			check(context.computeOnClient(client -> client.gui.screen() instanceof ConfirmLinkScreen),
