@@ -9,9 +9,8 @@ import net.minecraft.resources.Identifier;
 import java.util.List;
 
 /**
- * What the mods screen shows about each of a client's own mods beyond its name: licence, who
- * else worked on it, its icon's path inside its jar, and its links. A channel of its own beside
- * {@link ClientSettingsC2S}, whose layout is frozen.
+ * What the mods screen shows about each of a client's own mods beyond its name. A channel of its
+ * own beside {@link ClientSettingsC2S}, whose layout is frozen.
  */
 public record ClientModAboutC2S(List<About> mods) implements CustomPacketPayload {
     public static final Type<ClientModAboutC2S> TYPE =

@@ -105,8 +105,8 @@ public final class ComponentType {
     public static final String PROP_BACKGROUND = "background";
     /**
      * Full texture id including extension, e.g. {@code "mymod:textures/gui/my_icon.png"},
-     * stretched to the bounds. Absent or unresolvable, the sprite draws its colour fill, as older
-     * clients do. Used by: sprite
+     * stretched to the bounds. Absent or not a valid id, the sprite draws its colour fill; a valid
+     * id the client has no texture for draws the missing-texture checkerboard. Used by: sprite
      */
     public static final String PROP_TEXTURE = "texture";
     /**
@@ -124,7 +124,7 @@ public final class ComponentType {
      */
     public static final String PROP_TEXTURE_U = "texture_u";
     public static final String PROP_TEXTURE_V = "texture_v";
-    /** Text color. Accepts #RRGGBB or #AARRGGBB. Used by: text, button, particle_burst */
+    /** Text color, or a sprite's fill. Accepts #RRGGBB or #AARRGGBB. Used by: text, button, particle_burst, sprite */
     public static final String PROP_COLOR = "color";
 
     /**
