@@ -219,6 +219,14 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 			new ClientModToggleS2C("mymod.jar")));
 		out.put("client_mod_files", encode(ClientModFilesC2S.STREAM_CODEC, new ClientModFilesC2S(
 			List.of(new ClientModFilesC2S.Entry("mymod", "My Mod", "1.0", "mymod.jar", true)))));
+		out.put("client_mod_about", encode(justfatlard.pandorical.protocol.ClientModAboutC2S.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.ClientModAboutC2S(List.of(new justfatlard.pandorical.protocol.ClientModAboutC2S.About(
+				"mymod", "MIT", "Ann", "mymod:icon.png",
+				List.of(new justfatlard.pandorical.protocol.ClientModAboutC2S.Link("Homepage", "https://x")))))));
+		out.put("open_link", encode(justfatlard.pandorical.protocol.OpenLinkS2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.OpenLinkS2C("https://x")));
+		out.put("open_mods_folder", encode(justfatlard.pandorical.protocol.OpenModsFolderS2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.OpenModsFolderS2C()));
 		out.put("setting_previews", encode(SettingPreviewsC2S.STREAM_CODEC, new SettingPreviewsC2S(
 			List.of(new SettingPreviewsC2S.Entry("mymod", "shape", "dot", "mymod:textures/dot.png")))));
 		out.put("capture_request", encode(CaptureRequestS2C.STREAM_CODEC, new CaptureRequestS2C(3, 512)));

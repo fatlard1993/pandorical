@@ -589,6 +589,17 @@ public class PandoricalClient implements ClientModInitializer {
                     justfatlard.pandorical.client.settings.ClientModFiles.ask(payload.file()));
             });
 
+        ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.OpenLinkS2C.TYPE, (payload, context) -> {
+                context.client().execute(() ->
+                    justfatlard.pandorical.client.settings.ModsScreenActions.openLink(payload.url()));
+            });
+
+        ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.OpenModsFolderS2C.TYPE, (payload, context) -> {
+                context.client().execute(justfatlard.pandorical.client.settings.ModsScreenActions::openModsFolder);
+            });
+
         ClientConfigurationConnectionEvents.INIT.register((handler, client) -> forgetConnection());
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> forgetConnection());
     }

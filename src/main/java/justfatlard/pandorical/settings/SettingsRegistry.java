@@ -118,8 +118,52 @@ public final class SettingsRegistry implements SettingsApi {
     /** The client reports every scroll, so a rebuilt list comes back at the same place. */
     private final Map<UUID, Integer> listScroll = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> paneScroll = new ConcurrentHashMap<>();
+    /** What the player has typed in the search box, kept while they open one mod after another. */
+    private final Map<UUID, String> searches = new ConcurrentHashMap<>();
+    /** The list as last built, so a search can hide and move its rows without rebuilding the screen. */
+    private final Map<UUID, ListState> lists = new ConcurrentHashMap<>();
+
+    /** One mod's row: which group it is in, what a search matches, and its components with their offsets. */
+    private record Row(int group, String haystack, List<String> ids, List<Integer> dys) {}
+
+    private record ListState(String screenId, List<Row> rows, int listH) {}
+
+    /** Where each row and group heading sits for a search; -1 is hidden. */
+    private record Placed(int[] rowY, int[] headY, int height) {}
+
+    private static final String[] GROUP_HEADINGS = {"Only on your client", "On this server", "Switched off"};
+
+    /**
+     * Each group headed only when a row of it is shown, the shown rows packed below their heading.
+     * A search matches a mod's name, id, authors or description, ignoring case.
+     */
+    private static Placed place(List<Row> rows, String query) {
+        String q = query.trim().toLowerCase(java.util.Locale.ROOT);
+        int[] rowY = new int[rows.size()];
+        int[] headY = {-1, -1, -1};
+        int y = 0;
+        for (int g = 0; g < GROUP_HEADINGS.length; g++) {
+            for (int i = 0; i < rows.size(); i++) {
+                Row row = rows.get(i);
+                if (row.group() != g) continue;
+                if (!q.isEmpty() && !row.haystack().contains(q)) {
+                    rowY[i] = -1;
+                    continue;
+                }
+                if (headY[g] < 0) {
+                    headY[g] = y + 4;
+                    y += LINE + 4;
+                }
+                rowY[i] = y;
+                y += LIST_ROW;
+            }
+        }
+        return new Placed(rowY, headY, y);
+    }
 
     public void forget(UUID player) {
+        searches.remove(player);
+        lists.remove(player);
         openScreens.remove(player);
         rebinding.remove(player);
         shown.remove(player);
@@ -266,28 +310,57 @@ public final class SettingsRegistry implements SettingsApi {
 
         ScreenBuilder screen = new ScreenBuilder(SCREEN_TYPE).size(at.width, at.height).title("Mods");
         screen.panel("frame", 0, 0, at.width, at.height, Map.of());
-        screen.component(new ComponentBuilder("title", ComponentType.TEXT)
-            .bounds(LIST_X, 6, at.listW, 12)
-            .prop(ComponentType.PROP_TEXT_KEY, "pandorical.mods.title")
-            .prop(ComponentType.PROP_COLOR, HEADING_COLOR));
+        String query = searches.getOrDefault(player.getUUID(), "");
+        screen.component(new ComponentBuilder("search", ComponentType.TEXT_INPUT)
+            .bounds(LIST_X, 3, at.listW, 14)
+            .prop(ComponentType.PROP_PLACEHOLDER, "Search mods")
+            .prop(ComponentType.PROP_MAX_LENGTH, "64")
+            .prop(ComponentType.PROP_VALUE, query));
+
+        List<Row> rows = new ArrayList<>();
+        for (int i = 0; i < mods.size(); i++) {
+            ModCatalog.ModInfo mod = mods.get(i);
+            int group = i < clientCount ? 0 : i < clientCount + serverCount ? 1 : 2;
+            String haystack = (mod.name() + "\n" + mod.id() + "\n" + mod.authors() + "\n" + mod.description())
+                .toLowerCase(java.util.Locale.ROOT);
+            rows.add(new Row(group, haystack, new ArrayList<>(), new ArrayList<>()));
+        }
+        Placed placed = place(rows, query);
 
         List<ComponentDef> names = new ArrayList<>();
-        int buttonW = at.listW - 8;
-        int y = 0;
+        // A heading before the first shown of each kind, so the three groups read as three groups
+        // without every row having to repeat which one it is in. All three are built, so a search
+        // can bring one back.
+        for (int g = 0; g < GROUP_HEADINGS.length; g++) {
+            names.add(new ComponentBuilder("head:" + g, ComponentType.TEXT)
+                .bounds(0, Math.max(0, placed.headY()[g]), at.listW - 8, LINE)
+                .prop(ComponentType.PROP_TEXT, GROUP_HEADINGS[g])
+                .prop(ComponentType.PROP_VISIBLE, String.valueOf(placed.headY()[g] >= 0))
+                .prop(ComponentType.PROP_COLOR, HINT_COLOR).build());
+        }
+        // Icons only for the player's own mods, whose textures their game has: a texture it lacks
+        // is drawn as the missing-texture checkerboard. Room is kept for them on every row, so the
+        // names line up, whenever any row has one.
+        List<String> icons = new ArrayList<>();
+        boolean anyIcon = false;
+        for (ModCatalog.ModInfo mod : mods) {
+            var mine = ClientMods.aboutOf(player, mod.id());
+            String icon = mine == null ? "" : mine.icon();
+            icons.add(icon);
+            anyIcon |= !icon.isEmpty();
+        }
+        int iconW = anyIcon ? 18 : 0;
+        int buttonW = at.listW - 8 - iconW;
         int index = -1;
         for (ModCatalog.ModInfo mod : mods) {
             index++;
-            // A heading before the first of each kind, so the three groups read as three groups
-            // without every row having to repeat which one it is in.
-            String heading = index == 0 && clientCount > 0 ? "Only on your client"
-                : index == clientCount ? "On this server"
-                : index == clientCount + serverCount ? "Switched off" : null;
-            if (heading != null) {
-                names.add(new ComponentBuilder("head:" + index, ComponentType.TEXT)
-                    .bounds(0, y + 4, buttonW, LINE)
-                    .prop(ComponentType.PROP_TEXT, heading)
-                    .prop(ComponentType.PROP_COLOR, HINT_COLOR).build());
-                y += LINE + 4;
+            int y = Math.max(0, placed.rowY()[index]);
+            int first = names.size();
+            if (!icons.get(index).isEmpty()) {
+                names.add(new ComponentBuilder("icon:" + index, ComponentType.SPRITE)
+                    .bounds(0, y + 2, 16, 16)
+                    .prop(ComponentType.PROP_TEXTURE, icons.get(index))
+                    .prop(ComponentType.PROP_COLOR, "#00000000").build());
             }
             boolean lit = selected != null && mod.id().equals(selected.id());
             // Counted apart, because they are not the same thing to the person reading them:
@@ -303,16 +376,24 @@ public final class SettingsRegistry implements SettingsApi {
             int badgesW = badgeWidth(yours) + badgeWidth(theirs);
             if (yours > 0 && theirs > 0) badgesW += 2;
             names.add(new ComponentBuilder("mod:" + mod.id(), ComponentType.BUTTON)
-                .bounds(0, y, badgesW > 0 ? buttonW - badgesW - 4 : buttonW, 20)
+                .bounds(iconW, y, badgesW > 0 ? buttonW - badgesW - 4 : buttonW, 20)
                 .prop(ComponentType.PROP_LABEL, mod.name())
                 .prop(ComponentType.PROP_STYLE, lit ? "pressed" : "default").build());
             // Ops on the outside, yours nearer the name: the one you can act on sits closer.
-            int opsX = buttonW - badgeWidth(theirs);
+            int opsX = iconW + buttonW - badgeWidth(theirs);
             badge(names, "ops:" + mod.id(), opsX, y, theirs, OPS_BADGE_COLOR);
-            int yoursX = (theirs > 0 ? opsX - 2 : buttonW) - badgeWidth(yours);
+            int yoursX = (theirs > 0 ? opsX - 2 : iconW + buttonW) - badgeWidth(yours);
             badge(names, "own:" + mod.id(), yoursX, y, yours, BADGE_COLOR);
-            y += LIST_ROW;
+            boolean shownRow = placed.rowY()[index] >= 0;
+            Row row = rows.get(index);
+            for (int k = first; k < names.size(); k++) {
+                ComponentDef def = names.get(k);
+                row.ids().add(def.id());
+                row.dys().add(def.y() - y);
+                if (!shownRow) names.set(k, hidden(def));
+            }
         }
+        int y = placed.height();
         // Measured, not counted. The panel scrolls in rows, and the three group headings are not
         // rows: telling it there were only as many rows as mods left the last heading's worth of
         // height below the floor, and what sat there was the end of "Switched off" - the mods
@@ -380,7 +461,7 @@ public final class SettingsRegistry implements SettingsApi {
                 case "commands" -> commandsPane(player, selected, about, at);
                 case "keybinds" -> keybindsPane(player, selected, about, at);
                 case "changes" -> changesPane(selected, about, at);
-                default -> readmePane(selected, about, at);
+                default -> readmePane(player, selected, about, at);
             };
             int lines = (height + LINE - 1) / LINE;
             int paneOffset = Math.max(0, Math.min(paneScroll.getOrDefault(player.getUUID(), 0), lines - at.paneH / LINE));
@@ -395,6 +476,13 @@ public final class SettingsRegistry implements SettingsApi {
 
         screen.button("close", at.width / 2 - 40, at.height - 26, 80, 20,
             Map.of(ComponentType.PROP_LABEL_KEY, "pandorical.settings.close"));
+        // Only for a client that can open it: one from before has no such channel.
+        if (ServerPlayNetworking.canSend(player, justfatlard.pandorical.protocol.OpenModsFolderS2C.TYPE)) {
+            screen.button("folder", LIST_X, at.height - 26, Math.min(at.listW, at.width / 2 - 44 - LIST_X), 20, Map.of(
+                ComponentType.PROP_LABEL, "Mods folder",
+                ComponentType.PROP_TOOLTIP, "Open your mods folder"));
+        }
+        lists.put(player.getUUID(), new ListState(screen.screenId(), rows, at.listH));
 
         openScreens.put(player.getUUID(), screen.screenId());
         shown.put(player.getUUID(), new Shown(selected == null ? null : selected.id(), at_tab));
@@ -624,9 +712,30 @@ public final class SettingsRegistry implements SettingsApi {
         return Math.max(readme.y, 1);
     }
 
-    private int readmePane(ModCatalog.ModInfo mod, List<ComponentDef> out, Layout at) {
+    private int readmePane(ServerPlayer player, ModCatalog.ModInfo mod, List<ComponentDef> out, Layout at) {
         Readme readme = new Readme(out, at);
         if (!mod.description().isEmpty()) readme.paragraph(mod.description(), LABEL_COLOR, 0);
+        var facts = factsOf(player, mod.id());
+        if (facts != null) {
+            if (!facts.license().isEmpty()) readme.paragraph("License: " + facts.license(), HINT_COLOR, 0);
+            if (!facts.contributors().isEmpty()) readme.paragraph("Contributors: " + facts.contributors(), HINT_COLOR, 0);
+            // Links as buttons, wrapping onto a new row when one would run past the pane.
+            int x = 0;
+            for (int i = 0; i < facts.links().size(); i++) {
+                String label = facts.links().get(i).label();
+                int w = Math.min(Glyphs.width(label) + 16, at.proseW());
+                if (x > 0 && x + w > at.proseW()) {
+                    x = 0;
+                    readme.y += 22;
+                }
+                out.add(new ComponentBuilder("link:" + i, ComponentType.BUTTON)
+                    .bounds(x, readme.y, w, 20)
+                    .prop(ComponentType.PROP_LABEL, Glyphs.clip(label, w - 8))
+                    .prop(ComponentType.PROP_TOOLTIP, facts.links().get(i).url()).build());
+                x += w + 4;
+            }
+            if (!facts.links().isEmpty()) readme.y += 26;
+        }
         List<ModCatalog.Line> lines = mod.readme();
         // A level-1 title repeats the mod name shown above the pane.
         int first = !lines.isEmpty() && lines.get(0).kind() == ModCatalog.Kind.HEADING && lines.get(0).level() == 1 ? 1 : 0;
@@ -661,6 +770,53 @@ public final class SettingsRegistry implements SettingsApi {
             readme.y = LINE + 2;
         }
         return Math.max(readme.y, 1);
+    }
+
+    /**
+     * A mod's licence, contributors, links and icon: the server's own reading for a mod installed
+     * here, else what the player's client reported for one of theirs.
+     */
+    private static justfatlard.pandorical.protocol.ClientModAboutC2S.@Nullable About factsOf(ServerPlayer player, String id) {
+        var ours = ModCatalog.about(id);
+        return ours != null ? ours : ClientMods.aboutOf(player, id);
+    }
+
+    private static ComponentDef hidden(ComponentDef def) {
+        Map<String, String> props = new HashMap<>(def.props());
+        props.put(ComponentType.PROP_VISIBLE, "false");
+        return new ComponentDef(def.id(), def.type(), def.x(), def.y(), def.width(), def.height(), props, def.children());
+    }
+
+    /** Hides and moves the rows in place: rebuilding the screen on every key would fight the typing. */
+    private void search(ServerPlayer player, String text) {
+        String query = text == null ? "" : text.length() > 64 ? text.substring(0, 64) : text;
+        searches.put(player.getUUID(), query);
+        ListState state = lists.get(player.getUUID());
+        String screenId = openScreens.get(player.getUUID());
+        if (state == null || screenId == null || !screenId.equals(state.screenId())) return;
+        Placed placed = place(state.rows(), query);
+        List<ComponentUpdate> updates = new ArrayList<>();
+        for (int g = 0; g < GROUP_HEADINGS.length; g++) {
+            int y = placed.headY()[g];
+            updates.add(new ComponentUpdate("head:" + g, y >= 0
+                ? Map.of(ComponentType.PROP_VISIBLE, "true", ComponentType.PROP_Y, String.valueOf(y))
+                : Map.of(ComponentType.PROP_VISIBLE, "false")));
+        }
+        for (int i = 0; i < state.rows().size(); i++) {
+            Row row = state.rows().get(i);
+            int y = placed.rowY()[i];
+            for (int k = 0; k < row.ids().size(); k++) {
+                updates.add(new ComponentUpdate(row.ids().get(k), y >= 0
+                    ? Map.of(ComponentType.PROP_VISIBLE, "true", ComponentType.PROP_Y, String.valueOf(y + row.dys().get(k)))
+                    : Map.of(ComponentType.PROP_VISIBLE, "false")));
+            }
+        }
+        updates.add(new ComponentUpdate("mods", Map.of(
+            "total_items", String.valueOf((placed.height() + LIST_ROW - 1) / LIST_ROW),
+            "scroll_offset", "0",
+            "show_scrollbar", String.valueOf(placed.height() > state.listH()))));
+        listScroll.put(player.getUUID(), 0);
+        PandoricalApi.screens().update(player, screenId, updates);
     }
 
     private final class Readme {
@@ -773,6 +929,41 @@ public final class SettingsRegistry implements SettingsApi {
                 try {
                     (componentId.equals("mods") ? listScroll : paneScroll).put(player.getUUID(), Integer.parseInt(scrolled));
                 } catch (NumberFormatException ignored) {
+                }
+            }
+            return;
+        }
+        if (componentId.equals("search")) {
+            search(player, data.get("text"));
+            return;
+        }
+        if (componentId.equals("folder")) {
+            if (ServerPlayNetworking.canSend(player, justfatlard.pandorical.protocol.OpenModsFolderS2C.TYPE)) {
+                ServerPlayNetworking.send(player, new justfatlard.pandorical.protocol.OpenModsFolderS2C());
+            }
+            return;
+        }
+        if (componentId.startsWith("link:")) {
+            // Looked up again for the page the server knows is open, never read off the press.
+            Shown was = shown.get(player.getUUID());
+            if (was == null || was.mod() == null) return;
+            var facts = factsOf(player, was.mod());
+            int index;
+            try {
+                index = Integer.parseInt(componentId.substring("link:".length()));
+            } catch (NumberFormatException ignored) {
+                return;
+            }
+            if (facts == null || index < 0 || index >= facts.links().size()) return;
+            String url = facts.links().get(index).url();
+            if (ServerPlayNetworking.canSend(player, justfatlard.pandorical.protocol.OpenLinkS2C.TYPE)) {
+                ServerPlayNetworking.send(player, new justfatlard.pandorical.protocol.OpenLinkS2C(url));
+            } else {
+                try {
+                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal(url).withStyle(style -> style
+                        .withUnderlined(true)
+                        .withClickEvent(new net.minecraft.network.chat.ClickEvent.OpenUrl(java.net.URI.create(url)))));
+                } catch (IllegalArgumentException ignored) {
                 }
             }
             return;

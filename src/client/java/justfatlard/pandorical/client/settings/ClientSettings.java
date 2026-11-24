@@ -2,6 +2,7 @@ package justfatlard.pandorical.client.settings;
 
 import justfatlard.pandorical.Pandorical;
 import justfatlard.pandorical.client.api.ClientSettingsApi;
+import justfatlard.pandorical.protocol.ClientModAboutC2S;
 import justfatlard.pandorical.protocol.ClientSettingS2C;
 import justfatlard.pandorical.protocol.ClientSettingsC2S;
 import justfatlard.pandorical.protocol.SettingPreviewsC2S;
@@ -42,8 +43,13 @@ public final class ClientSettings implements ClientSettingsApi {
         send();
     }
 
-    /** Enough for any sane mods folder, and a bound on what one client can make the server hold. */
-    private static final int MOST_MODS = 64;
+    /** Enough for a large pack, and a bound on what one client can make the server hold. */
+    private static final int MOST_MODS = 256;
+    /**
+     * Characters of readme sent in all. Past it the rest of the mods are still listed, without
+     * their readmes, rather than a big pack making a report too large to send.
+     */
+    private static final int MOST_README_CHARS = 400_000;
 
     /** Every declared preview, across every group; its own channel, so its own list. */
     private static final List<SettingPreviewsC2S.Entry> shapes = new ArrayList<>();
@@ -75,6 +81,8 @@ public final class ClientSettings implements ClientSettingsApi {
         for (GroupImpl group : groups) byMod.put(group.modId, group);
 
         List<ClientSettingsC2S.Mod> mods = new ArrayList<>();
+        List<ClientModAboutC2S.About> abouts = new ArrayList<>();
+        int readmeChars = 0;
         for (ModContainer container : FabricLoader.getInstance().getAllMods()) {
             if (mods.size() >= MOST_MODS) break;
             ModMetadata meta = container.getMetadata();
@@ -87,14 +95,21 @@ public final class ClientSettings implements ClientSettingsApi {
                 group == null ? List.of() : group.describe().settings();
             List<String> names = new ArrayList<>();
             for (Person person : meta.getAuthors()) names.add(person.getName());
+            List<ModCatalog.Line> readme = ModCatalog.readmeOf(container);
+            int chars = 0;
+            for (ModCatalog.Line line : readme) chars += line.text().length();
+            if (readmeChars + chars > MOST_README_CHARS) readme = List.of();
+            else readmeChars += chars;
             mods.add(new ClientSettingsC2S.Mod(meta.getId(), meta.getName(),
                 meta.getVersion().getFriendlyString(), String.join(", ", names),
-                meta.getDescription(), ModCatalog.readmeOf(container), settings));
+                meta.getDescription(), readme, settings));
+            abouts.add(ModCatalog.aboutOf(container));
         }
         // A group whose mod the loader does not know about: keep it rather than lose its settings.
         for (GroupImpl group : byMod.values()) mods.add(group.describe());
 
         ClientPlayNetworking.send(new ClientSettingsC2S(mods));
+        if (ClientPlayNetworking.canSend(ClientModAboutC2S.TYPE)) ClientPlayNetworking.send(new ClientModAboutC2S(abouts));
     }
 
     public void apply(ClientSettingS2C payload) {

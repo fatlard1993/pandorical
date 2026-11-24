@@ -76,7 +76,7 @@ public final class ClientModFiles {
 		return isOff(file) ? file.substring(0, file.length() - OFF.length()) : file + OFF;
 	}
 
-	private static Path modsDir() {
+	static Path modsDir() {
 		return FabricLoader.getInstance().getGameDir().resolve("mods");
 	}
 

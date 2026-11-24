@@ -2,8 +2,11 @@ package justfatlard.pandorical.settings;
 
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
+import justfatlard.pandorical.protocol.ClientModAboutC2S;
+import net.fabricmc.loader.api.metadata.CustomValue;
 import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.fabricmc.loader.api.metadata.Person;
+import net.minecraft.resources.Identifier;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -11,7 +14,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Stream;
 
 public final class ModCatalog {
@@ -40,10 +47,78 @@ public final class ModCatalog {
     }
 
     private static List<ModInfo> cached;
+    private static Map<String, ClientModAboutC2S.About> abouts = Map.of();
 
     public static synchronized List<ModInfo> all() {
         if (cached == null) cached = load();
         return cached;
+    }
+
+    /** Licence, contributors and links of a mod on this side, or null for one not installed here. */
+    public static synchronized ClientModAboutC2S.About about(String id) {
+        all();
+        return abouts.get(id);
+    }
+
+    /**
+     * Read off a mod's own manifest: its contact links, then any links it declared for Mod Menu, the
+     * one other place mods keep them. The icon is a texture id, and empty unless the jar keeps it
+     * under {@code assets/}, where the game's resources can reach it. Clipped to what
+     * {@link ClientModAboutC2S} carries.
+     */
+    public static ClientModAboutC2S.About aboutOf(ModContainer container) {
+        ModMetadata meta = container.getMetadata();
+        Map<String, String> links = new LinkedHashMap<>();
+        link(links, "Homepage", meta.getContact().get("homepage").orElse(null));
+        link(links, "Issues", meta.getContact().get("issues").orElse(null));
+        link(links, "Source", meta.getContact().get("sources").orElse(null));
+        for (var entry : meta.getContact().asMap().entrySet()) link(links, label(entry.getKey()), entry.getValue());
+        CustomValue modmenu = meta.getCustomValue("modmenu");
+        if (modmenu != null && modmenu.getType() == CustomValue.CvType.OBJECT) {
+            CustomValue declared = modmenu.getAsObject().get("links");
+            if (declared != null && declared.getType() == CustomValue.CvType.OBJECT) {
+                for (var entry : declared.getAsObject()) {
+                    if (entry.getValue().getType() == CustomValue.CvType.STRING) {
+                        link(links, label(entry.getKey()), entry.getValue().getAsString());
+                    }
+                }
+            }
+        }
+        List<ClientModAboutC2S.Link> list = new ArrayList<>();
+        for (var entry : links.entrySet()) {
+            if (list.size() >= 16) break;
+            list.add(new ClientModAboutC2S.Link(clip(entry.getValue(), 64), entry.getKey()));
+        }
+        List<String> contributors = new ArrayList<>();
+        for (Person person : meta.getContributors()) contributors.add(person.getName());
+        return new ClientModAboutC2S.About(clip(meta.getId(), 64), clip(String.join(", ", meta.getLicense()), 256),
+            clip(String.join(", ", contributors), 1024), iconTexture(meta.getIconPath(32).orElse("")), list);
+    }
+
+    /** By url, so a link given both as a contact and to Mod Menu is listed once, under its first name. */
+    private static void link(Map<String, String> links, String label, String url) {
+        if (url == null || url.length() > 512) return;
+        String lower = url.toLowerCase(Locale.ROOT);
+        if (!lower.startsWith("https://") && !lower.startsWith("http://")) return;
+        links.putIfAbsent(url, label);
+    }
+
+    /** {@code modmenu.donate} is Donate; Mod Menu's own keys carry its prefix. */
+    private static String label(String key) {
+        String bare = key.startsWith("modmenu.") ? key.substring("modmenu.".length()) : key;
+        return bare.isEmpty() ? key : Character.toUpperCase(bare.charAt(0)) + bare.substring(1);
+    }
+
+    static String iconTexture(String path) {
+        if (!path.startsWith("assets/")) return "";
+        int slash = path.indexOf('/', "assets/".length());
+        if (slash < 0) return "";
+        Identifier id = Identifier.tryParse(path.substring("assets/".length(), slash) + ":" + path.substring(slash + 1));
+        return id == null || id.toString().length() > 256 ? "" : id.toString();
+    }
+
+    private static String clip(String text, int most) {
+        return text.length() <= most ? text : text.substring(0, most);
     }
 
     /**
@@ -63,6 +138,7 @@ public final class ModCatalog {
 
     private static List<ModInfo> load() {
         List<ModInfo> mods = new ArrayList<>();
+        Map<String, ClientModAboutC2S.About> read = new HashMap<>();
         for (ModContainer container : FabricLoader.getInstance().getAllMods()) {
             ModMetadata meta = container.getMetadata();
             // A jar nested in another mod is that mod's library, not something anyone installed.
@@ -71,7 +147,9 @@ public final class ModCatalog {
             for (Person person : meta.getAuthors()) names.add(person.getName());
             mods.add(new ModInfo(meta.getId(), meta.getName(), meta.getVersion().getFriendlyString(),
                 String.join(", ", names), meta.getDescription(), readme(container)));
+            read.put(meta.getId(), aboutOf(container));
         }
+        abouts = Map.copyOf(read);
         mods.sort(Comparator.comparing(mod -> mod.name().toLowerCase()));
         return mods;
     }

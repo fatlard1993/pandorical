@@ -28,7 +28,7 @@ public final class ClientMods {
     private static final Map<UUID, Map<String, String>> values = new ConcurrentHashMap<>();
 
     /** A registered setting lasts the server's life, so what clients may add to it is capped. */
-    private static final int MOST_MODS = 64;
+    private static final int MOST_MODS = 256;
     private static final int MOST_SETTINGS_PER_MOD = 64;
     private static final int MOST_REGISTERED = 1024;
     private static final Pattern MOD_ID = Pattern.compile("[a-z][a-z0-9_-]{1,63}");
@@ -38,6 +38,23 @@ public final class ClientMods {
     /** The jars in this player's mods folder, switched on and off, or empty if they never said. */
     public static List<justfatlard.pandorical.protocol.ClientModFilesC2S.Entry> filesOf(ServerPlayer player) {
         return filesByPlayer.getOrDefault(player.getUUID(), List.of());
+    }
+
+    private static final Map<UUID, Map<String, justfatlard.pandorical.protocol.ClientModAboutC2S.About>> aboutByPlayer =
+        new ConcurrentHashMap<>();
+
+    /** Licence, contributors, icon and links of one of the player's own mods, or null. */
+    public static justfatlard.pandorical.protocol.ClientModAboutC2S.About aboutOf(ServerPlayer player, String id) {
+        return aboutByPlayer.getOrDefault(player.getUUID(), Map.of()).get(id);
+    }
+
+    public static void declareAbout(ServerPlayer player, justfatlard.pandorical.protocol.ClientModAboutC2S payload) {
+        Map<String, justfatlard.pandorical.protocol.ClientModAboutC2S.About> mine = new java.util.HashMap<>();
+        for (var about : payload.mods()) {
+            if (mine.size() >= MOST_MODS) break;
+            if (MOD_ID.matcher(about.id()).matches()) mine.put(about.id(), about);
+        }
+        aboutByPlayer.put(player.getUUID(), Map.copyOf(mine));
     }
 
     public static void declareFiles(ServerPlayer player,
@@ -75,6 +92,7 @@ public final class ClientMods {
         byPlayer.remove(player.getUUID());
         values.remove(player.getUUID());
         filesByPlayer.remove(player.getUUID());
+        aboutByPlayer.remove(player.getUUID());
         previews.remove(player.getUUID());
     }
 

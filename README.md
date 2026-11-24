@@ -54,9 +54,11 @@ Its client settings are the container habits above (on), immersive portals (on, 
 
 `/pandorical mods` lists everything you are running, in three groups: **on this server**, **on your client**, and **switched off**. A server mod is the server's business and is shown for reference; a mod of your own carries a **Disable** button, and one you have switched off carries **Enable**.
 
+A search box above the list narrows it by name, id, author or description as you type. Each of your own mods shows its icon. A mod's readme tab opens with its licence, its contributors and its links (homepage, issues, source, and any it declared for Mod Menu, such as a donate link), and pressing a link asks before your browser opens it. **Mods folder** under the list opens your own mods folder.
+
 Switching off renames the jar to `.disabled`, which is the only thing the loader understands - it takes what it finds at startup and there is no unloading afterwards - so nothing changes until you restart, and the message says so. A disabled jar is invisible to the loader, so its name and version are read out of the jar itself; a mod you switch off does not vanish from the screen that switched it off.
 
-For that screen to list anything, your client tells the server which mods you have: their names and versions, and the names of the jar files, including the ones you have switched off. Nothing is sent from inside the files. A server can ask you to switch one off or back on, but it cannot do it itself: the question is always yours to answer, it always names the file, and Pandorical's own jar is not on offer - switching that off would take away the screen that switches it back.
+For that screen to list anything, your client tells the server which mods you have: their names and versions, and the names of the jar files, including the ones you have switched off. For the mods it is running it also sends what each says about itself in its own `fabric.mod.json` and readme: description, readme, authors, contributors, licence, links, and where its icon sits in the jar. Nothing else is read from inside the files. A server can ask you to switch one off or back on, but it cannot do it itself: the question is always yours to answer, it always names the file, and Pandorical's own jar is not on offer - switching that off would take away the screen that switches it back.
 
 ### What is running here
 

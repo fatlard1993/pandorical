@@ -4,6 +4,11 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.38.0": [
+      "The mods screen has a search box, shows your own mods' icons, and opens each mod's readme with its licence, contributors and links: homepage, issues, source and any it gave Mod Menu. A link asks before it opens.",
+      "A Mods folder button opens your own mods folder.",
+      "The mods screen lists up to 256 of your own mods, not 64. Past a generous total, the rest are listed without their readmes rather than not at all."
+    ],
     "15.37.0": [
       "Sleeping can speed the night up instead of skipping it: the clock runs faster the more players are asleep, smoothly on any client, an op's choice, left out when SleepWarp is installed.",
       "Rain can grow crops, and mobs dying on their own can drop a share of their XP: two rules of the world, off until a mod asks or an op turns them on.",
