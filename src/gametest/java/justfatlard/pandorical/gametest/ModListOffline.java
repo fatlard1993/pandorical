@@ -46,6 +46,10 @@ public final class ModListOffline implements FabricClientGameTest {
 				}
 			});
 			check(verdict == null, verdict);
+			// Mod Menu bundles Placeholder API inside its jar: the mods screens name it
+			var about = justfatlard.pandorical.settings.ModCatalog.aboutOf(
+				net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("modmenu").orElseThrow());
+			check(about.bundled().contains("Placeholder API"), "Mod Menu's bundled mods read as '" + about.bundled() + "'");
 			context.waitTicks(5);
 			check(context.computeOnClient(client -> client.gui.screen() != null
 				&& client.gui.screen().getClass().getName().equals("com.terraformersmc.modmenu.gui.ModsScreen")),
@@ -53,6 +57,13 @@ public final class ModListOffline implements FabricClientGameTest {
 		}
 		if (!Smoke.full()) return;
 
+		// The icon the list draws for Pandorical is a texture the game actually has, not a checkerboard
+		check(context.computeOnClient(client -> {
+			var about = justfatlard.pandorical.settings.ModCatalog.aboutOf(
+				net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("pandorical").orElseThrow());
+			var id = net.minecraft.resources.Identifier.tryParse(about.icon());
+			return id != null && client.getResourceManager().getResource(id).isPresent();
+		}), "Pandorical's icon does not resolve to a texture the game has");
 		context.setScreen(() -> new ModListScreen(new TitleScreen()));
 		context.waitTicks(2);
 		click(context, TEST_MOD);
