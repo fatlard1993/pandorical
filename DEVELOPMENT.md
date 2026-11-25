@@ -1189,6 +1189,34 @@ Anything taken out of a pack on loan is made from nothing, and anything put in i
 loan ends. Lenders are asked often, so answer cheaply; one that throws is logged once and skipped.
 New in 15.35.
 
+## Side trips
+
+A player can step out of one mod's world into another's meaning to come back: from an arena demo
+into a Miniature Bench's workshop. Both may hold the player's own things aside, so neither may hand
+anything back while the other still holds them. The world stepped out of lets it, and calls the
+player back before it ends:
+
+```java
+PandoricalApi.sideTrips().permit(player -> inMyDemo(player));
+// Gone from my world: only left if no host holds them.
+if (!PandoricalApi.sideTrips().away(player)) endVisit(player);
+// Ending a visit: back from any side trip first, then hand things back.
+PandoricalApi.sideTrips().callBack(player);
+```
+
+The mod stepped into refuses anyone from such a world unless `mayStepAside(player)`, and says who
+it holds, sending them back on request with what they carried in, before `sendBack` returns:
+
+```java
+PandoricalApi.sideTrips().host(new SideTripApi.Host() {
+    public boolean holds(ServerPlayer player) { return inMyWorld(player); }
+    public void sendBack(ServerPlayer player) { returnThem(player); }
+});
+```
+
+Hooks are asked often, so answer cheaply; one that throws is logged once and counted as no.
+New in 15.39.
+
 ## Gating play
 
 A mod that holds a player short of play - a pen at the spawn until a password is said, a rules

@@ -324,6 +324,8 @@ public final class PandoricalApi {
 
     public static LoanApi loans() { return justfatlard.pandorical.loan.Loans.INSTANCE; }
 
+    public static SideTripApi sideTrips() { return justfatlard.pandorical.trip.SideTrips.INSTANCE; }
+
     // --- Internal methods (used by Pandorical core, not for consuming mods) ---
 
     /** @hidden */

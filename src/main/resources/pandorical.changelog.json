@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.39.0": [
+      "A player can step from one mod's world into another's and back, such as from a PvP Dimensions demo into a Miniature Bench's workshop, with each mod holding on to their own things until they are back."
+    ],
     "15.38.1": [
       "Joining under a name already playing no longer kicks the player who is on: the new connection is turned away, and one from another address is noted in the server log as someone else possibly using the name."
     ],
