@@ -111,6 +111,7 @@ public final class ClientMods {
         aboutByPlayer.remove(player.getUUID());
         configurableByPlayer.remove(player.getUUID());
         previews.remove(player.getUUID());
+        ModIcons.forget(player);
     }
 
     /**

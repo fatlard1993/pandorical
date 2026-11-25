@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import justfatlard.pandorical.api.NavigableScreen;
 import justfatlard.pandorical.api.PandoricalApi;
+import justfatlard.pandorical.client.mods.ClientModIcons;
+import justfatlard.pandorical.protocol.ModIconS2C;
 import justfatlard.pandorical.settings.ClientMods;
 import justfatlard.pandorical.settings.ModCatalog;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -30,6 +32,22 @@ public final class ModsScreenFinds implements FabricClientGameTest {
 					wrong.set("Pandorical's homepage is not among its links: " + ours.links());
 			});
 			check(wrong.get() == null, wrong.get());
+			// An icon at the jar's root, as Sodium keeps its own, which the game's resources cannot reach
+			String outside = ModCatalog.ICON_PREFIX + "pandorical-gametest";
+			session.onServer(server -> {
+				var test = ClientMods.aboutOf(session.player(), "pandorical-gametest");
+				if (test == null || !test.icon().equals(outside))
+					wrong.set("the client reported a jar-root icon as '" + (test == null ? null : test.icon()) + "'");
+			});
+			check(wrong.get() == null, wrong.get());
+			check(context.computeOnClient(client -> ClientModIcons.drawable(net.minecraft.resources.Identifier.parse(outside))),
+				"the client reported a jar-root icon it has nothing to draw for");
+			// A mod only the server runs: its icon arrives from the server
+			context.runOnClient(client -> ClientModIcons.receive(new ModIconS2C("server-only",
+				ModCatalog.iconBytes(net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("pandorical").orElseThrow()))));
+			check(context.computeOnClient(client -> ClientModIcons.drawable(
+				net.minecraft.resources.Identifier.parse(ModCatalog.ICON_PREFIX + "server-only"))),
+				"an icon the server sent for a mod the client lacks has nothing to draw");
 			if (!session.full()) return;
 
 			session.onServer(server -> PandoricalApi.settings().open(session.player()));

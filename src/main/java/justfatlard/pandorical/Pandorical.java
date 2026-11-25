@@ -413,6 +413,9 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(
             justfatlard.pandorical.protocol.OpenModsFolderS2C.TYPE,
             justfatlard.pandorical.protocol.OpenModsFolderS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.ModIconS2C.TYPE,
+            justfatlard.pandorical.protocol.ModIconS2C.STREAM_CODEC);
         PayloadTypeRegistry.serverboundPlay().register(
             justfatlard.pandorical.protocol.ClientConfigurableC2S.TYPE,
             justfatlard.pandorical.protocol.ClientConfigurableC2S.STREAM_CODEC);

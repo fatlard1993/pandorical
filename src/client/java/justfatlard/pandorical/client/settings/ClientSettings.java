@@ -103,7 +103,7 @@ public final class ClientSettings implements ClientSettingsApi {
             mods.add(new ClientSettingsC2S.Mod(meta.getId(), meta.getName(),
                 meta.getVersion().getFriendlyString(), String.join(", ", names),
                 meta.getDescription(), readme, settings));
-            abouts.add(ModCatalog.aboutOf(container));
+            abouts.add(justfatlard.pandorical.client.mods.ClientModIcons.aboutOf(container));
         }
         // A group whose mod the loader does not know about: keep it rather than lose its settings.
         for (GroupImpl group : byMod.values()) mods.add(group.describe());

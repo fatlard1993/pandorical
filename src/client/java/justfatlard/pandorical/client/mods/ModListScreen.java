@@ -85,7 +85,7 @@ public final class ModListScreen extends Screen {
 			// Switched off since launch: still running, but listed once, as off, where Enable is
 			if (file == null && switchedOff) continue;
 			out.add(new Entry(meta.getId(), meta.getName(), meta.getVersion().getFriendlyString(), String.join(", ", names),
-				meta.getDescription(), ModCatalog.readmeOf(container), ModCatalog.aboutOf(container), file, true));
+				meta.getDescription(), ModCatalog.readmeOf(container), ClientModIcons.aboutOf(container), file, true));
 		}
 		out.sort(Comparator.comparing(entry -> entry.name().toLowerCase(Locale.ROOT)));
 		List<Entry> off = new ArrayList<>();
@@ -263,7 +263,7 @@ public final class ModListScreen extends Screen {
 		if (entry == null) return;
 		int x = paneX();
 		Identifier icon = entry.about() == null || entry.about().icon().isEmpty() ? null : Identifier.tryParse(entry.about().icon());
-		if (icon != null && minecraft.getResourceManager().getResource(icon).isPresent()) {
+		if (icon != null && ClientModIcons.drawable(icon)) {
 			graphics.blit(RenderPipelines.GUI_TEXTURED, icon, x, 24, 0.0F, 0.0F, ICON, ICON, ICON, ICON);
 			x += ICON + 6;
 		}

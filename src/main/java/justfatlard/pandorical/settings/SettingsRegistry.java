@@ -341,14 +341,11 @@ public final class SettingsRegistry implements SettingsApi {
                 .prop(ComponentType.PROP_VISIBLE, String.valueOf(placed.headY()[g] >= 0))
                 .prop(ComponentType.PROP_COLOR, HINT_COLOR).build());
         }
-        // Icons only for the player's own mods, whose textures their game has: a texture it lacks
-        // is drawn as the missing-texture checkerboard. Room is kept for them on every row, so the
-        // names line up, whenever any row has one.
+        // Room is kept for icons on every row, so the names line up, whenever any row has one.
         List<String> icons = new ArrayList<>();
         boolean anyIcon = false;
         for (ModCatalog.ModInfo mod : mods) {
-            var mine = ClientMods.aboutOf(player, mod.id());
-            String icon = mine == null ? "" : mine.icon();
+            String icon = ModIcons.textureFor(player, mod.id());
             icons.add(icon);
             anyIcon |= !icon.isEmpty();
         }

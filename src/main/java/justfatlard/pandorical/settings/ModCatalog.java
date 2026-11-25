@@ -3,10 +3,12 @@ package justfatlard.pandorical.settings;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import justfatlard.pandorical.protocol.ClientModAboutC2S;
+import justfatlard.pandorical.protocol.ModIconS2C;
 import net.fabricmc.loader.api.metadata.CustomValue;
 import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.fabricmc.loader.api.metadata.Person;
 import net.minecraft.resources.Identifier;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -62,9 +64,9 @@ public final class ModCatalog {
 
     /**
      * Read off a mod's own manifest: its contact links, then any links it declared for Mod Menu, the
-     * one other place mods keep them. The icon is a texture id, and empty unless the jar keeps it
-     * under {@code assets/}, where the game's resources can reach it. Clipped to what
-     * {@link ClientModAboutC2S} carries.
+     * one other place mods keep them. The icon is a texture id: the game's own resources reach one
+     * kept under {@code assets/}, and any other is {@link #ICON_PREFIX} and the mod's id, which
+     * the client registers from {@link #iconBytes}. Clipped to what {@link ClientModAboutC2S} carries.
      */
     public static ClientModAboutC2S.About aboutOf(ModContainer container) {
         ModMetadata meta = container.getMetadata();
@@ -97,7 +99,7 @@ public final class ModCatalog {
         }
         bundled.sort(String.CASE_INSENSITIVE_ORDER);
         return new ClientModAboutC2S.About(clip(meta.getId(), 64), clip(String.join(", ", meta.getLicense()), 256),
-            clip(String.join(", ", contributors), 1024), iconTexture(meta.getIconPath(32).orElse("")), list,
+            clip(String.join(", ", contributors), 1024), iconTexture(meta.getId(), meta.getIconPath(32).orElse("")), list,
             clip(String.join(", ", bundled), 2048));
     }
 
@@ -119,12 +121,29 @@ public final class ModCatalog {
         return bare.isEmpty() ? key : Character.toUpperCase(bare.charAt(0)) + bare.substring(1);
     }
 
-    static String iconTexture(String path) {
-        if (!path.startsWith("assets/")) return "";
+    /** Where a mod's icon is drawn from when the game's resources cannot reach it. */
+    public static final String ICON_PREFIX = "pandorical:mod_icon/";
+
+    static String iconTexture(String modId, String path) {
+        if (path.isEmpty()) return "";
         int slash = path.indexOf('/', "assets/".length());
-        if (slash < 0) return "";
-        Identifier id = Identifier.tryParse(path.substring("assets/".length(), slash) + ":" + path.substring(slash + 1));
+        Identifier id = path.startsWith("assets/") && slash >= 0
+            ? Identifier.tryParse(path.substring("assets/".length(), slash) + ":" + path.substring(slash + 1))
+            : Identifier.tryParse(ICON_PREFIX + modId);
         return id == null || id.toString().length() > 256 ? "" : id.toString();
+    }
+
+    /** The PNG a mod names as its icon, or null for none, one missing from its jar, or one too big to send. */
+    public static byte @Nullable [] iconBytes(ModContainer container) {
+        String path = container.getMetadata().getIconPath(32).orElse(null);
+        if (path == null) return null;
+        try {
+            Path file = container.findPath(path).orElse(null);
+            if (file == null || Files.size(file) > ModIconS2C.MOST_BYTES) return null;
+            return Files.readAllBytes(file);
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     private static String clip(String text, int most) {

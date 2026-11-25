@@ -5,6 +5,7 @@
 	"name": "Pandorical launch gate",
 	"description": "Launches a client, applies every Pandorical mixin, joins a world and opens a screen.",
 	"license": "MIT",
+	"icon": "gametest-icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
