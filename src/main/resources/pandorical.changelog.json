@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.40.0": [
+      "A mod can turn an entity any way at all, such as a minecart riding upside down under a ceiling or standing on end up a wall: the cart is drawn turned, its riders sit and are drawn turned with it, and a rider's view turns too, unless they turn that off in Pandorical's settings."
+    ],
     "15.39.0": [
       "A player can step from one mod's world into another's and back, such as from a PvP Dimensions demo into a Miniature Bench's workshop, with each mod holding on to their own things until they are back."
     ],
