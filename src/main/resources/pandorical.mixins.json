@@ -37,7 +37,8 @@
 		"EntityKindTrackingMixin",
 		"EntityKindPairingMixin",
 		"EntityBodyDataMixin",
-		"CustomClickActionMixin"
+		"CustomClickActionMixin",
+		"DuplicateLoginMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

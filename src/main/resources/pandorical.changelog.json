@@ -4,6 +4,9 @@
     "Press N for questions waiting on you, J for action menus, /pandorical mods for the rest."
   ],
   "versions": {
+    "15.38.1": [
+      "Joining under a name already playing no longer kicks the player who is on: the new connection is turned away, and one from another address is noted in the server log as someone else possibly using the name."
+    ],
     "15.38.0": [
       "Server settings can be listed and changed from the server console and over RCON with /pandorical settings, so a server's choices can be scripted.",
       "Chat shows the sender's face beside each message a player sends: a client setting, on unless you turn it off, left to Chat Heads when it is installed.",
