@@ -10,7 +10,21 @@ import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(EntityRenderState.class)
 public class EntityRenderStateMixin implements OverlayTextureHolder,
-		AnimationHolder, justfatlard.pandorical.client.renderer.EntityModelHolder {
+		AnimationHolder, justfatlard.pandorical.client.renderer.EntityModelHolder,
+		justfatlard.pandorical.client.renderer.OrientationHolder {
+
+	@Unique
+	private org.joml.Quaternionfc pandorical$orientation;
+
+	@Override
+	public void pandorical$setOrientation(org.joml.Quaternionfc orientation) {
+		this.pandorical$orientation = orientation;
+	}
+
+	@Override
+	public org.joml.Quaternionfc pandorical$getOrientation() {
+		return this.pandorical$orientation;
+	}
 
 	@Unique
 	private justfatlard.pandorical.client.entitymodel.ClientEntityModels.Drawn pandorical$entityModel;

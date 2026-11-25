@@ -64,6 +64,26 @@ public abstract class LivingEntityRendererMixin<T extends LivingEntity, S extend
 			animation == null ? 0L : System.currentTimeMillis() - animation.startedAt());
 
 		ClientEntityModels.extract((LivingEntityRenderer<?, ?, ?>) (Object) this, entity, state);
+
+		var vehicle = entity.getVehicle();
+		org.joml.Quaternionfc turned = vehicle == null ? null : justfatlard.pandorical.client.animation.ClientOrientations.now(vehicle.getId());
+		((justfatlard.pandorical.client.renderer.OrientationHolder) state).pandorical$setOrientation(
+			turned == null ? null : justfatlard.pandorical.push.EntityOrientations.tilt(turned));
+	}
+
+	/**
+	 * A rider of a turned vehicle is drawn tilted with it, from where their feet are carried round
+	 * to: their box hangs from their eyes, so the feet are found back from the eyes along the
+	 * tilt rather than straight down.
+	 */
+	@Inject(method = "submit(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
+		at = @At("HEAD"))
+	private void pandorical$tiltRider(S state, PoseStack poseStack, SubmitNodeCollector collector, CameraRenderState camera, CallbackInfo ci) {
+		org.joml.Quaternionfc tilt = ((justfatlard.pandorical.client.renderer.OrientationHolder) state).pandorical$getOrientation();
+		if (tilt == null) return;
+		org.joml.Vector3f eyes = tilt.transform(new org.joml.Vector3f(0F, state.eyeHeight, 0F));
+		poseStack.translate(-eyes.x, state.eyeHeight - eyes.y, -eyes.z);
+		poseStack.rotate(tilt);
 	}
 
 	/**

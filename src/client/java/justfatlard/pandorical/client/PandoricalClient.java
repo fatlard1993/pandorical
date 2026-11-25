@@ -483,6 +483,12 @@ public class PandoricalClient implements ClientModInitializer {
                 justfatlard.pandorical.client.animation.ClientDisplaySpins.handle(payload));
 
         ClientPlayNetworking.registerGlobalReceiver(
+            justfatlard.pandorical.protocol.EntityOrientationS2C.TYPE, (payload, context) ->
+                justfatlard.pandorical.client.animation.ClientOrientations.handle(payload));
+        justfatlard.pandorical.push.EntityOrientations.client = justfatlard.pandorical.client.animation.ClientOrientations::now;
+        justfatlard.pandorical.client.animation.ClientOrientations.register();
+
+        ClientPlayNetworking.registerGlobalReceiver(
             RenderPolicyS2C.TYPE, (payload, context) -> {
                 context.client().execute(() ->
                     LeafCulling.setEnforced(payload.cullLeaves()));
@@ -535,6 +541,7 @@ public class PandoricalClient implements ClientModInitializer {
                 EntityOverlayStore.forget(entity.getId());
                 EntityAnimations.forget(entity.getId());
                 justfatlard.pandorical.client.animation.ClientDisplaySpins.forget(entity.getId());
+                justfatlard.pandorical.client.animation.ClientOrientations.forget(entity.getId());
             });
 
         ClientPlayNetworking.registerGlobalReceiver(
@@ -659,6 +666,7 @@ public class PandoricalClient implements ClientModInitializer {
         LeafCulling.onDisconnect();
         EntityAnimations.clearAll();
         justfatlard.pandorical.client.animation.ClientDisplaySpins.clearAll();
+        justfatlard.pandorical.client.animation.ClientOrientations.clearAll();
         MountPolicy.clear();
         SkinOverrides.clearAll();
     }

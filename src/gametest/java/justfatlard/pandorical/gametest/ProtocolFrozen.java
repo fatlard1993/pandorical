@@ -179,6 +179,8 @@ public final class ProtocolFrozen implements FabricClientGameTest {
 			new justfatlard.pandorical.protocol.PlayAnimationV2S2C(7, "mymod:wave", true, 1500L)));
 		out.put("display_spin", encode(justfatlard.pandorical.protocol.DisplaySpinS2C.STREAM_CODEC,
 			new justfatlard.pandorical.protocol.DisplaySpinS2C(7, 0.5F, 0.5F, 0.5F, 0F, 1F, 0F, 40F, 24, 1500L)));
+		out.put("entity_orientation", encode(justfatlard.pandorical.protocol.EntityOrientationS2C.STREAM_CODEC,
+			new justfatlard.pandorical.protocol.EntityOrientationS2C(7, true, 0F, 0F, 1F, 0F)));
 		out.put("block_materials", encode(justfatlard.pandorical.protocol.BlockMaterialsS2C.STREAM_CODEC,
 			new justfatlard.pandorical.protocol.BlockMaterialsS2C(net.minecraft.resources.Identifier.parse("mymod:d"), false,
 				List.of(new justfatlard.pandorical.protocol.BlockMaterialsS2C.Entry(5L,

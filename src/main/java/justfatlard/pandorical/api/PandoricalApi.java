@@ -256,6 +256,9 @@ public final class PandoricalApi {
 
     public static DisplaySpinApi displaySpins() { return justfatlard.pandorical.push.DisplaySpins.INSTANCE; }
 
+    /** Entities turned any way, riders and all. New in 15.40. */
+    public static EntityOrientationApi entityOrientations() { return justfatlard.pandorical.push.EntityOrientations.INSTANCE; }
+
     public static EntityOverlayApi entityOverlays() { return ENTITY_OVERLAYS; }
 
     /** Entities drawn with a model a mod ships, for a client that can. New in 15.16. */

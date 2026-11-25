@@ -331,6 +331,7 @@ public class Pandorical implements ModInitializer {
             (entity, level) -> {
                 PlayingAnimations.forget(entity);
                 justfatlard.pandorical.push.DisplaySpins.forget(entity);
+                justfatlard.pandorical.push.EntityOrientations.forget(entity);
             });
 
         PayloadTypeRegistry.clientboundPlay().register(
@@ -351,6 +352,9 @@ public class Pandorical implements ModInitializer {
         PayloadTypeRegistry.clientboundPlay().register(
             justfatlard.pandorical.protocol.DisplaySpinS2C.TYPE,
             justfatlard.pandorical.protocol.DisplaySpinS2C.STREAM_CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(
+            justfatlard.pandorical.protocol.EntityOrientationS2C.TYPE,
+            justfatlard.pandorical.protocol.EntityOrientationS2C.STREAM_CODEC);
         PayloadTypeRegistry.clientboundPlay().register(
             RenderPolicyS2C.TYPE,
             RenderPolicyS2C.STREAM_CODEC);
@@ -642,6 +646,7 @@ public class Pandorical implements ModInitializer {
                 DeclaredRenderPolicy.sendTo(player);
                 PlayingAnimations.sendAllTo(player);
                 justfatlard.pandorical.push.DisplaySpins.sendAllTo(player);
+                justfatlard.pandorical.push.EntityOrientations.sendAllTo(player);
                 DeclaredMountPolicy.sendTo(player);
                 ImmersivePortals.sendTo(player);
 
@@ -919,6 +924,7 @@ public class Pandorical implements ModInitializer {
                 PandoricalApi.entityOverlaysImpl().handleStartTracking(entity, player);
                 PlayingAnimations.handleStartTracking(entity, player);
                 justfatlard.pandorical.push.DisplaySpins.handleStartTracking(entity, player);
+                justfatlard.pandorical.push.EntityOrientations.handleStartTracking(entity, player);
             });
         EntityTrackingEvents.STOP_TRACKING.register(
             (entity, player) -> PandoricalApi.structuresImpl().handleStopTracking(entity, player));

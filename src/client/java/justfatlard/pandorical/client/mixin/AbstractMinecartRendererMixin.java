@@ -1,7 +1,12 @@
 package justfatlard.pandorical.client.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import justfatlard.pandorical.client.animation.ClientOrientations;
 import justfatlard.pandorical.client.renderer.EntityOverlayStore;
+import justfatlard.pandorical.client.renderer.OrientationHolder;
+import org.joml.Quaternionfc;
 import justfatlard.pandorical.client.renderer.OverlayTextureHolder;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.entity.AbstractMinecartRenderer;
@@ -32,6 +37,20 @@ public abstract class AbstractMinecartRendererMixin {
 		at = @At("TAIL"))
 	private void pandorical$stashOverlay(AbstractMinecart entity, MinecartRenderState state, float partialTick, CallbackInfo ci) {
 		((OverlayTextureHolder) state).pandorical$setOverlayTexture(EntityOverlayStore.get(entity.getId()));
+		((OrientationHolder) state).pandorical$setOrientation(ClientOrientations.now(entity.getId()));
+	}
+
+	/** A turned cart is drawn by its turn, about the point vanilla turns its yaw and pitch about. */
+	@WrapOperation(method = "submit(Lnet/minecraft/client/renderer/entity/state/MinecartRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
+		at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/AbstractMinecartRenderer;newRender(Lnet/minecraft/client/renderer/entity/state/MinecartRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;)V"))
+	private void pandorical$drawTurned(MinecartRenderState state, PoseStack pose, Operation<Void> original) {
+		Quaternionfc orientation = ((OrientationHolder) state).pandorical$getOrientation();
+		if (orientation == null) {
+			original.call(state, pose);
+			return;
+		}
+		pose.translate(0F, 0.375F, 0F);
+		pose.rotate(orientation);
 	}
 
 	/** A field-read redirect gets no arguments; submit draws carts one at a time. */
